@@ -1,0 +1,263 @@
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title layout:fragment="title">配置</title>
+</head>
+<body>
+<th:block layout:fragment="content">
+
+<div class="card">
+    <h2>⚙️ 定时任务（Spring @Scheduled）</h2>
+    <div class="text-muted mb-2">由 Spring 注解驱动，替代了 crontab 和 LaunchAgent。</div>
+    <ul class="scheduler-list">
+        <li th:each="job : ${scheduler_jobs}">
+            <span th:text="${job.desc}">任务描述</span>
+            <span class="text-muted" th:text="${job.time}">时间</span>
+        </li>
+    </ul>
+</div>
+
+<div class="card">
+    <h2>🔗 飞书 Webhook 配置</h2>
+    <div class="text-muted mb-2">修改后自动保存到 <code>config.json</code>，下次推送生效。</div>
+    <div class="flex" style="flex-wrap:wrap;gap:8px;">
+        <input type="text" id="webhookUrl" style="flex:1;min-width:300px;padding:10px 14px;border:1px solid #e1e3e6;border-radius:8px;font-size:14px;outline:none;background:#fff;color:#1a1b1e;" placeholder="https://open.feishu.cn/open-apis/bot/v2/hook/...">
+        <button class="btn btn-primary" onclick="saveWebhook()">保存</button>
+    </div>
+    <div id="webhookStatus" class="text-muted mt-2"></div>
+</div>
+
+<div class="card">
+    <h2>📩 飞书消息接收（API 轮询）</h2>
+    <div class="text-muted mb-2">配置飞书自建应用的凭据，AI助理将轮询指定群的未读消息并自动回复。</div>
+    <form id="feishuForm" onsubmit="return saveFeishu(event)">
+        <div class="form-group">
+            <label>App ID</label>
+            <input type="text" id="feishuAppId" placeholder="飞书自建应用的 App ID">
+        </div>
+        <div class="form-group">
+            <label>App Secret</label>
+            <input type="password" id="feishuAppSecret" placeholder="飞书自建应用的 App Secret">
+        </div>
+        <div class="form-group">
+            <label>群 Chat ID</label>
+            <div class="flex" style="gap:8px;">
+                <input type="text" id="feishuChatId" placeholder="群聊的 chat_id，点击右侧按钮自动获取" style="flex:1;">
+                <button type="button" class="btn btn-secondary" onclick="fetchChats()" id="fetchChatsBtn" style="white-space:nowrap;">获取群列表</button>
+            </div>
+            <div id="chatList" class="mt-2" style="display:none;"></div>
+            <div class="text-muted" style="font-size:12px;margin-top:4px;">先填入 App ID 和 Secret，点击"获取群列表"选择你要监听的群</div>
+        </div>
+        <div class="form-group">
+            <label>
+                <input type="checkbox" id="feishuPollingEnabled">
+                启用消息轮询（每15秒检查一次）
+            </label>
+        </div>
+        <div class="form-group">
+            <label>📁 代码项目路径（可选）</label>
+            <input type="text" id="erpProjectDir" placeholder="/Users/qihang/Projects/qihangerp" style="font-family:monospace;">
+            <div class="text-muted" style="font-size:12px;margin-top:4px;">
+                填写 ERP 源码目录后，发消息含 "bug/报错/异常/排查/修复" 等关键字时自动路由到代码助理
+            </div>
+        </div>
+        <div class="flex" style="gap:8px;">
+            <button type="submit" class="btn btn-primary">保存飞书配置</button>
+            <button type="button" class="btn btn-secondary" onclick="testFeishu()" id="testFeishuBtn">发送测试消息</button>
+            <span id="feishuStatus" class="text-muted" style="margin-left:4px;"></span>
+        </div>
+    </form>
+</div>
+
+<div class="card">
+    <h2>🔧 手动触发</h2>
+    <div class="text-muted mb-2">手动执行以下任务，立即推送飞书。</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;">
+        <button class="btn btn-secondary" onclick="triggerJob('morning')">🌅 生成综合日报</button>
+        <button class="btn btn-secondary" onclick="triggerJob('daily-report')">📝 下班提醒</button>
+        <button class="btn btn-secondary" onclick="triggerJob('article-tue')">📢 周二发文提醒</button>
+        <button class="btn btn-secondary" onclick="triggerJob('article-thu')">📢 周四发文提醒</button>
+    </div>
+</div>
+
+<div class="card">
+    <h2>📜 旧配置状态（已迁移）</h2>
+    <div class="text-muted mb-2">以下为迁移前的旧配置状态，仅供参考。</div>
+    <div class="report" style="font-size:13px;">
+        <strong>crontab：</strong>
+        <div class="text-muted" th:text="${crontab}">无</div>
+        <strong class="mt-2">LaunchAgent：</strong>
+        <div class="text-muted" th:text="${launchagent}">无</div>
+    </div>
+</div>
+
+<style>
+.form-group { margin-bottom: 12px; }
+.form-group label {
+    display: block; font-size: 13px; font-weight: 500; color: #5c5f66; margin-bottom: 4px;
+}
+.form-group input[type="text"],
+.form-group input[type="password"] {
+    width: 100%; padding: 10px 12px; border: 1px solid #e1e3e6; border-radius: 8px;
+    font-size: 14px; outline: none; font-family: inherit; box-sizing: border-box;
+}
+.form-group input[type="checkbox"] { margin-right: 6px; }
+.form-group input:focus { border-color: #7c5cfc; }
+</style>
+
+<script>
+function triggerJob(job) {
+    const form = new FormData();
+    form.append('job', job);
+    fetch('/config/trigger', { method: 'POST', body: form })
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) toast('任务已触发', 'ok');
+            else toast('失败：' + (data.error || ''), 'error');
+        })
+        .catch(() => toast('请求失败', 'error'));
+}
+
+// Load current config on page load
+fetch('/api/config')
+    .then(r => r.json())
+    .then(cfg => {
+        const input = document.getElementById('webhookUrl');
+        if (cfg.feishu_webhook_url) input.value = cfg.feishu_webhook_url;
+        if (cfg.feishu_app_id) document.getElementById('feishuAppId').value = cfg.feishu_app_id;
+        if (cfg.feishu_app_secret) document.getElementById('feishuAppSecret').value = cfg.feishu_app_secret;
+        if (cfg.feishu_chat_id) document.getElementById('feishuChatId').value = cfg.feishu_chat_id;
+        if (cfg.feishu_polling_enabled) document.getElementById('feishuPollingEnabled').checked = true;
+        if (cfg.erp_project_dir) document.getElementById('erpProjectDir').value = cfg.erp_project_dir;
+    })
+    .catch(() => {});
+
+function saveWebhook() {
+    const url = document.getElementById('webhookUrl').value.trim();
+    if (!url.startsWith('https://')) {
+        document.getElementById('webhookStatus').textContent = '❌ URL 必须以 https:// 开头';
+        return;
+    }
+    const form = new FormData();
+    form.append('url', url);
+    fetch('/api/config/webhook', { method: 'POST', body: form })
+        .then(r => r.json())
+        .then(data => {
+            const status = document.getElementById('webhookStatus');
+            if (data.ok) {
+                status.textContent = '✅ 已保存';
+                setTimeout(() => status.textContent = '', 3000);
+            } else {
+                status.textContent = '❌ ' + (data.error || '保存失败');
+            }
+        })
+        .catch(() => {
+            document.getElementById('webhookStatus').textContent = '❌ 请求失败';
+        });
+}
+
+async function saveFeishu(e) {
+    e.preventDefault();
+    const form = new FormData();
+    form.append('app_id', document.getElementById('feishuAppId').value.trim());
+    form.append('app_secret', document.getElementById('feishuAppSecret').value.trim());
+    form.append('chat_id', document.getElementById('feishuChatId').value.trim());
+    form.append('polling_enabled', document.getElementById('feishuPollingEnabled').checked ? 'on' : 'off');
+    form.append('erp_project_dir', document.getElementById('erpProjectDir').value.trim());
+    const res = await fetch('/api/config/feishu', { method: 'POST', body: form });
+    const data = await res.json();
+    const status = document.getElementById('feishuStatus');
+    if (data.ok) {
+        status.textContent = '✅ 已保存';
+        setTimeout(() => status.textContent = '', 3000);
+    } else {
+        status.textContent = '❌ ' + (data.error || '保存失败');
+    }
+    return false;
+}
+
+async function fetchChats() {
+    const btn = document.getElementById('fetchChatsBtn');
+    const list = document.getElementById('chatList');
+    const appId = document.getElementById('feishuAppId').value.trim();
+    const appSecret = document.getElementById('feishuAppSecret').value.trim();
+    if (!appId || !appSecret) { toast('请先填写 App ID 和 App Secret', 'error'); return; }
+
+    btn.disabled = true; btn.textContent = '⏳ 查询中...';
+    list.style.display = 'none';
+
+    const form = new FormData();
+    form.append('app_id', appId);
+    form.append('app_secret', appSecret);
+    const res = await fetch('/api/config/feishu/chats', { method: 'POST', body: form });
+    const data = await res.json();
+
+    btn.disabled = false; btn.textContent = '获取群列表';
+
+    if (!data.ok) {
+        list.innerHTML = '<div style="color:#ff6b6b;font-size:13px;">❌ ' + (data.error || '查询失败') + '</div>';
+        list.style.display = 'block';
+        return;
+    }
+
+    const chats = data.chats || [];
+    if (!chats.length) {
+        list.innerHTML = '<div class="text-muted" style="font-size:13px;">没有找到群聊，请确认应用已添加到目标群</div>';
+        list.style.display = 'block';
+        return;
+    }
+
+    let html = '<div style="font-size:13px;font-weight:500;margin-bottom:6px;">选择群聊：</div>';
+    chats.forEach(c => {
+        html += '<div class="chat-option" data-id="' + c.chat_id + '" onclick="selectChat(this)" style="padding:8px 12px;border:1px solid #e1e3e6;border-radius:6px;margin-bottom:4px;cursor:pointer;font-size:13px;">';
+        html += '<strong>' + c.name + '</strong> <span style="color:#909296;font-size:11px;">' + c.type + '</span>';
+        html += '<div style="font-size:11px;color:#7c5cfc;word-break:break-all;">' + c.chat_id + '</div>';
+        html += '</div>';
+    });
+    list.innerHTML = html;
+    list.style.display = 'block';
+}
+
+function selectChat(el) {
+    const id = el.dataset.id;
+    document.getElementById('feishuChatId').value = id;
+    document.getElementById('chatList').style.display = 'none';
+    toast('已选择群聊，点击保存即可', 'success');
+}
+
+async function testFeishu() {
+    const btn = document.getElementById('testFeishuBtn');
+    const status = document.getElementById('feishuStatus');
+    const appId = document.getElementById('feishuAppId').value.trim();
+    const appSecret = document.getElementById('feishuAppSecret').value.trim();
+    const chatId = document.getElementById('feishuChatId').value.trim();
+    if (!appId || !appSecret || !chatId) {
+        toast('请先填完 App ID、App Secret 和 Chat ID', 'error');
+        return;
+    }
+
+    btn.disabled = true; btn.textContent = '⏳ 发送中...'; status.textContent = '';
+
+    const form = new FormData();
+    form.append('app_id', appId);
+    form.append('app_secret', appSecret);
+    form.append('chat_id', chatId);
+    const res = await fetch('/api/config/feishu/test', { method: 'POST', body: form });
+    const data = await res.json();
+
+    btn.disabled = false; btn.textContent = '发送测试消息';
+
+    if (data.ok) {
+        status.textContent = '✅ 测试消息已发送到群，请查看飞书！';
+        toast('✅ 测试消息发送成功！', 'success');
+    } else {
+        status.textContent = '❌ ' + (data.error || '发送失败');
+        toast('❌ ' + (data.error || '发送失败'), 'error');
+    }
+}
+</script>
+
+</th:block>
+</body>
+</html>

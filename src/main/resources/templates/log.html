@@ -1,0 +1,45 @@
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title layout:fragment="title">日志</title>
+</head>
+<body>
+<th:block layout:fragment="content">
+
+<div class="card">
+    <h2>📋 操作日志</h2>
+    <div class="text-muted mb-2">最近 100 条操作记录。</div>
+
+    <th:block th:if="${logs != null and #lists.size(logs) > 0}">
+    <table class="log-table">
+        <thead>
+            <tr>
+                <th>时间</th>
+                <th>操作</th>
+                <th>状态</th>
+                <th>详情</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="log : ${logs}">
+                <td style="white-space:nowrap;" th:text="${log.time}">时间</td>
+                <td th:text="${log.action}">操作</td>
+                <td>
+                    <span th:if="${log.status == '成功'}" class="badge badge-ok">✓ 成功</span>
+                    <span th:if="${log.status == '失败'}" class="badge badge-fail">✗ 失败</span>
+                    <span th:if="${log.status != '成功' and log.status != '失败'}" class="badge badge-info" th:text="'ℹ ' + ${log.status}">状态</span>
+                </td>
+                <td class="text-muted" th:text="${log.detail}">详情</td>
+            </tr>
+        </tbody>
+    </table>
+    </th:block>
+    <th:block th:unless="${logs != null and #lists.size(logs) > 0}">
+    <div class="text-muted">暂无日志记录。</div>
+    </th:block>
+</div>
+
+</th:block>
+</body>
+</html>

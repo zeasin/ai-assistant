@@ -1,0 +1,184 @@
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title layout:fragment="title" th:text="${title}"></title>
+</head>
+<body>
+<th:block layout:fragment="content">
+
+<div class="card article-card">
+    <div class="flex" style="justify-content:space-between;margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid #e1e3e6;">
+        <h2 style="font-size:18px;margin:0;" th:text="${title}">标题</h2>
+        <div class="flex">
+            <button class="btn btn-primary" onclick="copyArticle()" id="copyBtn">📋 复制文章</button>
+            <a class="btn btn-secondary"
+   th:with="backUrl=${parent != null && !parent.isEmpty() ? '/browse?dir=' + parent : '/browse'}"
+   th:href="${backUrl}">← 返回</a>
+        </div>
+    </div>
+    <div class="article-content" id="articleContent" th:utext="${content}">
+    </div>
+</div>
+
+<style>
+.article-card { max-width: 780px; }
+.article-content {
+    line-height: 1.8;
+    color: #1a1b1e;
+    font-size: 15px;
+}
+.article-content h1 {
+    font-size: 26px;
+    font-weight: 700;
+    margin: 28px 0 16px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #7c5cfc;
+}
+.article-content h2 {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 24px 0 12px;
+    padding-left: 10px;
+    border-left: 3px solid #7c5cfc;
+}
+.article-content h3 {
+    font-size: 17px;
+    font-weight: 600;
+    margin: 20px 0 10px;
+}
+.article-content p {
+    margin: 0 0 14px;
+}
+.article-content img {
+    max-width: 100%;
+    border-radius: 8px;
+    margin: 12px 0;
+}
+.article-content blockquote {
+    margin: 14px 0;
+    padding: 12px 16px;
+    background: #f8f7ff;
+    border-left: 4px solid #7c5cfc;
+    border-radius: 0 8px 8px 0;
+    color: #444;
+}
+.article-content blockquote p { margin: 0; }
+.article-content code {
+    background: #f0edff;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 13px;
+    color: #5c3dcf;
+    font-family: "SF Mono", "Fira Code", monospace;
+}
+.article-content pre {
+    background: #1e1e2e;
+    color: #cdd6f4;
+    padding: 16px 20px;
+    border-radius: 10px;
+    overflow-x: auto;
+    margin: 14px 0;
+    font-size: 13px;
+    line-height: 1.6;
+}
+.article-content pre code {
+    background: none;
+    padding: 0;
+    color: inherit;
+    font-size: inherit;
+}
+.article-content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0;
+    font-size: 14px;
+}
+.article-content th, .article-content td {
+    padding: 10px 14px;
+    border: 1px solid #e1e3e6;
+    text-align: left;
+}
+.article-content th {
+    background: #f8f7ff;
+    font-weight: 600;
+    color: #5c3dcf;
+}
+.article-content tr:nth-child(even) { background: #fafafa; }
+.article-content ul, .article-content ol {
+    margin: 10px 0;
+    padding-left: 24px;
+}
+.article-content li { margin: 4px 0; }
+.article-content hr {
+    border: none;
+    border-top: 1px solid #e1e3e6;
+    margin: 24px 0;
+}
+.article-content strong { font-weight: 600; }
+</style>
+
+<script>
+async function copyArticle() {
+    const btn = document.getElementById('copyBtn');
+    btn.textContent = '⏳ 复制中...';
+    btn.disabled = true;
+
+    try {
+        const content = document.getElementById('articleContent');
+        const html = buildStyledHtml(content);
+        const blob = new Blob([html], { type: 'text/html' });
+        await navigator.clipboard.write([new ClipboardItem({ 'text/html': blob })]);
+
+        btn.textContent = '✅ 已复制！可直接粘贴到公众号';
+        setTimeout(() => {
+            btn.textContent = '📋 复制文章';
+            btn.disabled = false;
+        }, 2500);
+    } catch (e) {
+        btn.textContent = '❌ 复制失败，请手动复制';
+        btn.disabled = false;
+        console.error(e);
+    }
+}
+
+function buildStyledHtml(source) {
+    const clone = source.cloneNode(true);
+    clone.querySelectorAll('*').forEach(el => {
+        const tag = el.tagName.toLowerCase();
+        const style = {
+            'h1': 'font-size:26px;font-weight:700;margin:28px 0 16px;padding-bottom:8px;border-bottom:2px solid #7c5cfc;',
+            'h2': 'font-size:20px;font-weight:600;margin:24px 0 12px;padding-left:10px;border-left:3px solid #7c5cfc;',
+            'h3': 'font-size:17px;font-weight:600;margin:20px 0 10px;',
+            'p': 'margin:0 0 14px;',
+            'img': 'max-width:100%;border-radius:8px;margin:12px 0;',
+            'blockquote': 'margin:14px 0;padding:12px 16px;background:#f8f7ff;border-left:4px solid #7c5cfc;border-radius:0 8px 8px 0;color:#444;',
+            'pre': 'background:#1e1e2e;color:#cdd6f4;padding:16px 20px;border-radius:10px;overflow-x:auto;margin:14px 0;font-size:13px;line-height:1.6;',
+            'code': 'background:#f0edff;padding:2px 6px;border-radius:4px;font-size:13px;color:#5c3dcf;font-family:"SF Mono","Fira Code",monospace;',
+            'table': 'width:100%;border-collapse:collapse;margin:14px 0;font-size:14px;',
+            'th': 'padding:10px 14px;border:1px solid #e1e3e6;text-align:left;background:#f8f7ff;font-weight:600;color:#5c3dcf;',
+            'td': 'padding:10px 14px;border:1px solid #e1e3e6;text-align:left;',
+            'hr': 'border:none;border-top:1px solid #e1e3e6;margin:24px 0;',
+            'ul': 'margin:10px 0;padding-left:24px;',
+            'ol': 'margin:10px 0;padding-left:24px;',
+            'li': 'margin:4px 0;',
+            'strong': 'font-weight:600;',
+        }[tag];
+        if (style) el.style.cssText = style;
+
+        if (tag === 'pre' && el.querySelector('code')) {
+            el.style.cssText = 'background:#1e1e2e;color:#cdd6f4;padding:16px 20px;border-radius:10px;overflow-x:auto;margin:14px 0;font-size:13px;line-height:1.6;';
+            el.querySelector('code').style.cssText = 'background:none;padding:0;color:inherit;font-size:inherit;';
+        }
+    });
+
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = 'line-height:1.8;color:#1a1b1e;font-size:15px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;max-width:780px;';
+    wrapper.innerHTML = clone.innerHTML;
+    return wrapper.outerHTML;
+}
+</script>
+
+</th:block>
+</body>
+</html>

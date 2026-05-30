@@ -1,0 +1,281 @@
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title layout:fragment="title">对话</title>
+</head>
+<body>
+<th:block layout:fragment="content">
+
+<div class="chat-layout">
+    <div class="chat-sidebar">
+        <div class="sidebar-header">
+            <h3>💬 历史对话</h3>
+            <button class="btn btn-primary" onclick="newSession()" style="padding:6px 12px;font-size:12px;">＋ 新对话</button>
+        </div>
+        <div class="session-list" id="sessionList">
+            <th:block th:if="${#lists.size(sessions) > 0}">
+                <th:block th:each="s : ${sessions}">
+                <div class="session-item" th:classappend="${#strings.equals(s.id, current_id) ? 'active' : ''}" th:data-sid="${s.id}" th:id="|sess-${s.id}|">
+                    <div class="session-title" th:text="${s.title}">会话标题</div>
+                    <div class="session-meta" th:text="${s.updated}">时间</div>
+                    <button class="session-del" th:data-sid="${s.id}">✕</button>
+                </div>
+                </th:block>
+            </th:block>
+            <th:block th:unless="${#lists.size(sessions) > 0}">
+                <div class="session-empty">暂无历史对话</div>
+            </th:block>
+        </div>
+    </div>
+
+    <div class="chat-main">
+        <div class="card" style="flex:1;display:flex;flex-direction:column;margin:0;border-radius:0 12px 12px 0;">
+            <div class="chat-box" id="chatBox">
+                <th:block th:if="${current != null and current.messages != null and #lists.size(current.messages) > 0}">
+                    <th:block th:each="m : ${current.messages}">
+                    <div class="chat-msg" th:classappend="${m.role}">
+                        <div class="label" th:text="${m.role == 'user' ? '你' : 'AI 助理'}">AI 助理</div>
+                        <div class="text" th:text="${m.content}">内容</div>
+                    </div>
+                    </th:block>
+                </th:block>
+                <th:block th:unless="${current != null and current.messages != null and #lists.size(current.messages) > 0}">
+                <div class="chat-msg ai">
+                    <div class="label">AI 助理</div>
+                    <div class="text">你好！有什么我可以帮你的？我可以读取你的笔记库来回答关于项目、客户、计划等方面的问题。</div>
+                </div>
+                </th:block>
+            </div>
+
+            <div class="chat-input" style="border-top:1px solid #e1e3e6;padding-top:12px;margin-top:12px;">
+                <input type="text" id="chatInput" placeholder="输入你的问题..."
+                       onkeydown="if(event.key==='Enter') sendMessage()">
+                <button class="btn btn-primary" id="chatBtn" onclick="sendMessage()">发送</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.chat-layout {
+    display: flex; gap: 0; margin: -24px; height: calc(100vh - 52px); overflow: hidden;
+}
+.chat-sidebar {
+    width: 260px; flex-shrink: 0;
+    background: #fff; border-right: 1px solid #e1e3e6;
+    display: flex; flex-direction: column; overflow: hidden;
+}
+.sidebar-header {
+    padding: 16px; border-bottom: 1px solid #e1e3e6;
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.sidebar-header h3 { margin: 0; font-size: 14px; white-space: nowrap; }
+.session-list {
+    flex: 1; overflow-y: auto; padding: 8px;
+}
+.session-item {
+    padding: 10px 12px; border-radius: 8px; cursor: pointer;
+    margin-bottom: 4px; position: relative; transition: background .1s;
+    display: flex; flex-direction: column; gap: 2px;
+}
+.session-item:hover { background: #f5f5f7; }
+.session-item.active { background: #f0edff; }
+.session-title {
+    font-size: 13px; font-weight: 500; color: #1a1b1e;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 20px;
+}
+.session-meta { font-size: 11px; color: #909296; }
+.session-del {
+    position: absolute; right: 8px; top: 8px;
+    border: none; background: none; color: #909296; cursor: pointer;
+    font-size: 12px; padding: 2px 4px; border-radius: 4px; display: none;
+}
+.session-item:hover .session-del { display: block; }
+.session-del:hover { background: #ffe0e0; color: #c92a2a; }
+.session-empty {
+    font-size: 13px; color: #909296; text-align: center; padding: 24px 16px;
+}
+.chat-main {
+    flex: 1; display: flex; flex-direction: column; overflow: hidden;
+}
+.chat-box {
+    flex: 1; overflow-y: auto; padding: 16px; min-height: 0;
+}
+.chat-box .chat-msg { margin-bottom: 12px; padding: 10px 14px; border-radius: 8px; max-width: 85%; }
+.chat-box .chat-msg.user { background: #f0edff; margin-left: auto; border: 1px solid #d9d0ff; }
+.chat-box .chat-msg.ai { background: #f5f5f7; margin-right: auto; }
+.chat-box .chat-msg .label { font-size: 11px; color: #909296; margin-bottom: 4px; }
+.chat-box .chat-msg .text { font-size: 14px; line-height: 1.6; white-space: pre-wrap; }
+.chat-reasoning {
+    font-size: 12px; color: #888; line-height: 1.5; white-space: pre-wrap;
+    padding: 8px 10px; margin: 6px 0 4px; background: #fafafa;
+    border-left: 2px solid #ccc; border-radius: 4px;
+    display: none;
+}
+.chat-reasoning.visible { display: block; }
+.chat-status {
+    font-size: 12px; color: #888; line-height: 1.5;
+    padding: 6px 0; font-style: italic;
+}
+.chat-toggle {
+    font-size: 11px; color: #7c5cfc; cursor: pointer; user-select: none;
+    margin: 2px 0 4px; display: inline-block;
+}
+.chat-toggle:hover { text-decoration: underline; }
+.chat-input { display: flex; gap: 8px; padding: 0 16px 16px; }
+.chat-input input {
+    flex: 1; padding: 10px 14px; border: 1px solid #e1e3e6; border-radius: 8px;
+    background: #fff; color: #1a1b1e; font-size: 14px; outline: none;
+}
+.chat-input input:focus { border-color: #7c5cfc; }
+</style>
+
+<script>
+let currentSessionId = '[[${current_id}]]';
+let replyText = '';
+
+function escapeHtml(text) {
+    const d = document.createElement('div');
+    d.textContent = text;
+    return d.innerHTML;
+}
+
+async function saveMessage(role, content) {
+    const form = new FormData();
+    form.append('session_id', currentSessionId);
+    form.append('role', role);
+    form.append('content', content);
+    const res = await fetch('/chat/session/save', { method: 'POST', body: form });
+    const data = await res.json();
+    if (data.ok) {
+        currentSessionId = data.session_id;
+    }
+    return data.session_id;
+}
+
+async function sendMessage() {
+    const input = document.getElementById('chatInput');
+    const box = document.getElementById('chatBox');
+    const btn = document.getElementById('chatBtn');
+    const msg = input.value.trim();
+    if (!msg) return;
+
+    input.value = '';
+    btn.disabled = true; btn.textContent = '⏳ 思考中...';
+    replyText = '';
+
+    // save & show user msg
+    await saveMessage('user', msg);
+    box.innerHTML += `<div class="chat-msg user"><div class="label">你</div><div class="text">${escapeHtml(msg)}</div></div>`;
+    box.scrollTop = box.scrollHeight;
+
+    // AI message container (initially shows thinking indicator)
+    const aiMsgId = 'ai-' + Date.now();
+    box.innerHTML += `<div class="chat-msg ai" id="${aiMsgId}">
+        <div class="label">AI 助理</div>
+        <div class="chat-status" id="status-${aiMsgId}" style="display:none;">⏳ 处理中...</div>
+        <div class="text" id="reply-${aiMsgId}"></div>
+    </div>`;
+    box.scrollTop = box.scrollHeight;
+
+    const form = new FormData();
+    form.append('message', msg);
+    form.append('session_id', currentSessionId);
+
+    try {
+        const res = await fetch('/chat', { method: 'POST', body: form });
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+
+            const parts = buffer.split('\n\n');
+            buffer = parts.pop() || '';
+
+            for (const part of parts) {
+                if (!part.startsWith('data:')) continue;
+                try {
+                    const data = JSON.parse(part.replace(/^data:\s*/, ''));
+                    if (data.type === 'status') {
+                        if (data.tool === 'read' && data.file) {
+                            const name = data.file.split('/').pop();
+                            document.getElementById('status-' + aiMsgId).textContent = '📖 ' + name;
+                        } else if (data.tool === 'write' || data.tool === 'edit') {
+                            document.getElementById('status-' + aiMsgId).textContent = '✏️ 正在写入...';
+                        } else if (data.tool === 'bash') {
+                            document.getElementById('status-' + aiMsgId).textContent = '💻 正在执行...';
+                        } else {
+                            document.getElementById('status-' + aiMsgId).textContent = '⏳ 处理中...';
+                        }
+                        document.getElementById('status-' + aiMsgId).style.display = 'block';
+                    } else if (data.type === 'reasoning') {
+                        document.getElementById('status-' + aiMsgId).textContent = '🧠 思考中...';
+                    } else if (data.type === 'text') {
+                        replyText += data.content;
+                        document.getElementById('reply-' + aiMsgId).innerHTML = escapeHtml(replyText);
+                        document.getElementById('status-' + aiMsgId).style.display = 'none';
+                    } else if (data.type === 'error') {
+                        document.getElementById('status-' + aiMsgId).style.display = 'none';
+                        document.getElementById('reply-' + aiMsgId).innerHTML = '<span style="color:#ff6b6b;">❌ ' + escapeHtml(data.content) + '</span>';
+                    } else if (data.type === 'done') {
+                        document.getElementById('status-' + aiMsgId).style.display = 'none';
+                        await saveMessage('assistant', replyText);
+                    }
+                } catch (e) { /* skip malformed events */ }
+            }
+            box.scrollTop = box.scrollHeight;
+        }
+    } catch (e) {
+        document.getElementById('reply-' + aiMsgId).innerHTML = '<span style="color:#ff6b6b;">❌ 网络错误</span>';
+    }
+
+    btn.disabled = false; btn.textContent = '发送';
+}
+
+function switchSession(id) {
+    window.location.href = '/chat?id=' + id;
+}
+
+function newSession() {
+    currentSessionId = '';
+    window.location.href = '/chat?id=new';
+}
+
+async function deleteSession(id) {
+    if (!confirm('确定删除该对话？')) return;
+    const form = new FormData();
+    form.append('session_id', id);
+    const res = await fetch('/chat/session/delete', { method: 'POST', body: form });
+    const data = await res.json();
+    if (data.ok) {
+        window.location.href = '/chat';
+    }
+}
+
+// 页面加载后自动滚动到最底部
+addEventListener('DOMContentLoaded', () => {
+    const box = document.getElementById('chatBox');
+    if (box) box.scrollTop = box.scrollHeight;
+    // Event delegation for session click/delete
+    document.getElementById('sessionList')?.addEventListener('click', e => {
+        const item = e.target.closest('.session-item');
+        if (!item) return;
+        const sid = item.getAttribute('data-sid');
+        if (e.target.classList.contains('session-del')) {
+            e.stopPropagation();
+            deleteSession(sid);
+        } else {
+            switchSession(sid);
+        }
+    });
+});
+</script>
+
+</th:block>
+</body>
+</html>

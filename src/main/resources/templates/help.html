@@ -1,0 +1,206 @@
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title layout:fragment="title">帮助</title>
+</head>
+<body>
+<th:block layout:fragment="content">
+
+<div class="card">
+    <h2>📖 老齐AI个人助理</h2>
+    <p class="text-muted" style="line-height:1.7;">
+        一站式个人工作台，集成 AI 综合日报、对话问答、笔记管理、公众号运营分析、客户管理等功能。
+        所有 AI 能力基于本地笔记库，无需联网第三方知识库。
+    </p>
+</div>
+
+<div class="card">
+    <h2>🚀 快速启动</h2>
+    <h3 style="font-size:15px;margin:16px 0 8px;">本地运行（Java 版）</h3>
+    <pre style="background:#1e1e2e;color:#cdd6f4;padding:16px;border-radius:8px;font-size:13px;line-height:1.6;overflow-x:auto;"># 1. 编译
+mvn clean package -DskipTests
+
+# 2. 运行
+java -jar target/assistant-v2-2.0.0.jar
+
+# 服务默认运行在 http://localhost:6789</pre>
+    <h3 style="font-size:15px;margin:16px 0 8px;">环境要求</h3>
+    <table class="log-table">
+        <thead><tr><th>依赖</th><th>版本</th><th>用途</th></tr></thead>
+        <tbody>
+            <tr><td>Java</td><td>≥21</td><td>Web 服务运行环境</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <h2>🧠 AI 引擎</h2>
+    <p class="text-muted" style="line-height:1.7;">
+        系统通过两个服务端口提供 AI 能力，需确保对应服务已启动：
+    </p>
+    <table class="log-table">
+        <thead><tr><th>服务</th><th>端口</th><th>用途</th></tr></thead>
+        <tbody>
+            <tr><td><strong>笔记库服务</strong></td><td>14096</td><td>查资料、记笔记、更新数据、添加客户跟进等</td></tr>
+            <tr><td><strong>Java项目服务</strong></td><td>14099</td><td>Java编程、代码问答</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <h2>🤖 Agent 体系</h2>
+    <p class="text-muted" style="line-height:1.7;">
+        AI 引擎待配置。配置完成后，系统将通过 AI 引擎提供智能对话和日报生成能力。
+    </p>
+</div>
+
+<div class="card">
+    <h2>📋 页面功能总览</h2>
+    <table class="log-table">
+        <thead><tr><th>功能</th><th>路由</th><th>说明</th></tr></thead>
+        <tbody>
+            <tr><td><strong>综合日报</strong></td><td><code>/</code></td><td>AI 每日综合报告，含项目进展、客户动态、TODO、学习、生活、AI建议</td></tr>
+            <tr><td><strong>AI 对话</strong></td><td><code>/chat</code></td><td>与 AI 对话，AI 读取笔记库回答问题，支持流式响应和会话管理</td></tr>
+            <tr><td><strong>笔记浏览</strong></td><td><code>/browse</code></td><td>文件浏览器，支持查看/新建/删除 Markdown 文件</td></tr>
+            <tr><td><strong>运营看板</strong></td><td><code>/operations</code></td><td>公众号阅读数据分析、平台对比、AI 内容策略建议</td></tr>
+            <tr><td><strong>客户管理</strong></td><td><code>/customers</code></td><td>客户/线索看板、销售漏斗、合同金额统计、跟进记录</td></tr>
+            <tr><td><strong>日报浏览</strong></td><td><code>/daily-reports</code></td><td>浏览已保存的工作日报</td></tr>
+            <tr><td><strong>周报浏览</strong></td><td><code>/weekly-reports</code></td><td>浏览已保存的工作周报</td></tr>
+            <tr><td><strong>系统配置</strong></td><td><code>/config</code></td><td>飞书 Webhook/API 配置、定时任务</td></tr>
+            <tr><td><strong>操作日志</strong></td><td><code>/log</code></td><td>查看最近 100 条操作记录</td></tr>
+            <tr><td><strong>健康检查</strong></td><td><code>/health</code></td><td>服务健康状态 API</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <h2>⏰ 定时任务</h2>
+    <p class="text-muted" style="line-height:1.7;">
+        系统内置 Spring @Scheduled 驱动以下定时任务（时区：Asia/Shanghai）：
+    </p>
+    <table class="log-table">
+        <thead><tr><th>任务</th><th>时间</th><th>说明</th></tr></thead>
+        <tbody>
+            <tr><td><strong>综合日报生成</strong></td><td>每天 09:00</td><td>AI 读取笔记库生成日报，推送飞书并保存到 <code>工作/综合日报/</code></td></tr>
+            <tr><td><strong>下班提醒</strong></td><td>每天 18:00</td><td>提醒写工作记录</td></tr>
+            <tr><td><strong>周二发文提醒</strong></td><td>每周二 09:00</td><td>提醒发布「码农老齐」公众号</td></tr>
+            <tr><td><strong>周四发文提醒</strong></td><td>每周四 09:00</td><td>提醒发布「启航电商ERP」公众号</td></tr>
+        </tbody>
+    </table>
+    <p class="text-muted" style="line-height:1.7;margin-top:8px;">
+        所有定时任务可在 <a href="/config">配置页</a> 手动触发执行。
+    </p>
+</div>
+
+<div class="card">
+    <h2>📊 综合日报</h2>
+    <p class="text-muted" style="line-height:1.7;">
+        首页展示 AI 综合日报，数据源为笔记库中的记忆文件，涵盖：项目进展、客户动态、今日 TODO、昨日回顾、学习方向、生活提醒、个人目标、AI 建议。
+    </p>
+</div>
+
+<div class="card">
+    <h2>💬 AI 对话</h2>
+    <p class="text-muted" style="line-height:1.7;">
+        与 AI 助理对话，它会读取整个笔记库来回答问题。支持流式响应、实时状态显示、历史会话管理。
+    </p>
+    <ul class="text-muted" style="line-height:1.7;padding-left:20px;margin-top:8px;">
+        <li><strong>流式响应</strong> — 回答逐字显示，无需等待全部生成完毕</li>
+        <li><strong>实时状态</strong> — AI 读取笔记时显示 📖 文件名，知道它在做什么</li>
+        <li><strong>历史会话</strong> — 左侧边栏保存所有对话记录，可切换、可删除</li>
+        <li><strong>自动保存</strong> — 每次对话自动保存到 <code>chat_sessions.json</code></li>
+    </ul>
+</div>
+
+<div class="card">
+    <h2>📩 飞书集成</h2>
+    <p class="text-muted" style="line-height:1.7;">
+        配置 Webhook URL 后，AI 综合日报、发文提醒、下班提醒等自动推送到飞书群。
+        在 <a href="/config">配置页</a> 设置 Webhook 地址。
+    </p>
+</div>
+
+<div class="card">
+    <h2>👥 客户管理</h2>
+    <p class="text-muted" style="line-height:1.7;">
+        客户管理看板展示概览、销售漏斗、合同金额、线索漏斗、近期活动、待跟进等数据。
+        数据存储在 <code>企业/客户管理/</code> 目录。
+    </p>
+</div>
+
+<div class="card">
+    <h2>📈 运营看板</h2>
+    <p class="text-muted" style="line-height:1.7;">
+        公众号运营数据分析，数据来自 <code>自媒体/运营数据.json</code>。
+        提供各公众号粉丝数据、文章阅读量排名、平台对比、AI 自动分析内容策略效果、写作建议和选题推荐。
+    </p>
+</div>
+
+<div class="card">
+    <h2>📂 笔记管理</h2>
+    <p class="text-muted" style="line-height:1.7;">
+        内置文件浏览器，无需 Obsidian 即可管理笔记库中的 Markdown 文件：
+    </p>
+    <ul class="text-muted" style="line-height:1.7;padding-left:20px;">
+        <li><strong>浏览</strong> — 按目录树逐层浏览所有文件</li>
+        <li><strong>查看</strong> — Markdown 渲染为美观的 HTML</li>
+        <li><strong>复制</strong> — 查看页有「📋 复制文章」按钮，可直接粘贴到公众号编辑器</li>
+        <li><strong>新建</strong> — 在当前目录创建 Markdown 文件</li>
+        <li><strong>删除</strong> — 删除 .md 文件</li>
+    </ul>
+</div>
+
+<div class="card">
+    <h2>🔧 故障排查</h2>
+    <table class="log-table">
+        <thead><tr><th>问题</th><th>原因</th><th>解决</th></tr></thead>
+        <tbody>
+            <tr><td>日报生成失败</td><td>AI 引擎未配置</td><td>在 <code>application.yml</code> 中配置 AI 服务连接信息</td></tr>
+            <tr><td>AI 对话无响应</td><td>AI 引擎未配置</td><td>在 <code>application.yml</code> 中配置 AI 服务连接信息</td></tr>
+            <tr><td>飞书推送失败</td><td>Webhook URL 错误或网络问题</td><td>在 <a href="/config">配置页</a> 检查并更新 Webhook 地址</td></tr>
+            <tr><td>获取飞书 token 失败</td><td>App ID 或 App Secret 错误</td><td>去飞书开发者后台复制正确的凭据</td></tr>
+            <tr><td>客户端访问页面白屏</td><td>端口被占用或服务未启动</td><td>检查 6789 端口是否被占用；查看后台日志</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <h2>🗂️ 数据文件</h2>
+    <table class="log-table">
+        <thead><tr><th>文件</th><th>读写</th><th>说明</th></tr></thead>
+        <tbody>
+            <tr><td><code>config.json</code></td><td>读写</td><td>飞书 Webhook、App 凭据、轮询开关、ERP 项目路径等配置</td></tr>
+            <tr><td><code>chat_sessions.json</code></td><td>读写</td><td>对话历史记录</td></tr>
+            <tr><td><code>assistant_log.json</code></td><td>读写</td><td>操作日志（最多保留 100 条）</td></tr>
+            <tr><td><code>工作/综合日报/</code></td><td>读写</td><td>AI 生成的综合日报文件</td></tr>
+            <tr><td><code>自媒体/运营数据.json</code></td><td>只读</td><td>公众号运营原始数据</td></tr>
+            <tr><td><code>企业/客户管理/客户数据.json</code></td><td>只读</td><td>已合作客户信息</td></tr>
+            <tr><td><code>企业/客户管理/线索数据.json</code></td><td>只读</td><td>线索客户信息</td></tr>
+            <tr><td><code>企业/客户管理/跟进记录.json</code></td><td>只读</td><td>跟进记录</td></tr>
+            <tr><td><code>记忆/当前重点.md</code></td><td>只读</td><td>TODO、近期动态、关键数据</td></tr>
+            <tr><td><code>记忆/项目状态.md</code></td><td>只读</td><td>各项目进展</td></tr>
+            <tr><td><code>AI记忆.md</code></td><td>只读</td><td>全局背景、产品矩阵、客户规模、战略决策</td></tr>
+            <tr><td><code>提醒.md</code></td><td>读写</td><td>每日循环和临时提醒（日报生成后自动清空临时提醒）</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <h2>🏗️ 技术架构</h2>
+    <table class="log-table">
+        <thead><tr><th>组件</th><th>技术</th></tr></thead>
+        <tbody>
+            <tr><td>Web 框架</td><td>Spring Boot 3.4.4</td></tr>
+            <tr><td>模板引擎</td><td>Thymeleaf + Layout Dialect</td></tr>
+            <tr><td>定时任务</td><td>Spring @Scheduled</td></tr>
+            <tr><td>前端渲染</td><td>commonmark 库</td></tr>
+            <tr><td>消息推送</td><td>飞书 Webhook / API</td></tr>
+            <tr><td>运行环境</td><td>Java ≥21</td></tr>
+        </tbody>
+    </table>
+</div>
+
+</th:block>
+</body>
+</html>

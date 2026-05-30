@@ -1,0 +1,66 @@
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# ========== 编译输出目录 ==========
+dist/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+# ========== Node.js ==========
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.local
+
+# ========== IDE ==========
+.idea/
+.vscode/
+*.iws
+*.iml
+*.ipr
+*.iws
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+# ========== 日志 ==========
+logs/
+*.log
+**/*.log
+
+# ========== 操作系统 ==========
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+.config
+
+# ========== 其他 ==========
+.fastRequest
+docs/qihangerp3-*.sql
+.sisyphus/
+
+package-lock.json
+yarn.lock
+
+# ========== 各子项目特定 ==========
+ux/vue-erp/.vscode/
+ux/vue-erp/node_modules/
+ux/vue-erp/dist/
+ux/vue-wechat-h5/node_modules/
+ux/vue-wechat-h5/dist/
+ux/mini-wechat/node_modules/
+ux/mini-wechat/dist/
+ux/cli/node_modules/
+cert/

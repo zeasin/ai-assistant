@@ -1,0 +1,45 @@
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title layout:fragment="title">工作周报</title>
+</head>
+<body>
+<th:block layout:fragment="content">
+
+<div class="card">
+    <h2>📋 工作周报</h2>
+    <div class="text-muted mb-2">数据来源：<code>工作/周报/</code> 目录下的每周工作计划/总结。点击标题展开/收起。</div>
+</div>
+
+<th:block th:if="${reports != null and #lists.size(reports) > 0}">
+    <div class="card" th:each="report : ${reports}">
+        <details>
+            <summary class="report-summary" style="cursor:pointer;font-size:14px;font-weight:600;list-style:none;padding:8px 0;display:flex;align-items:center;">
+                <span th:text="${report.name}">周报名</span>
+                <span class="text-muted" style="font-size:12px;margin-left:8px;" th:text="${report.modified}">时间</span>
+            </summary>
+            <div class="report" style="font-family:inherit;font-size:14px;line-height:1.7;margin-top:12px;" th:utext="${report.content}">内容</div>
+        </details>
+    </div>
+</th:block>
+<th:block th:unless="${reports != null and #lists.size(reports) > 0}">
+<div class="card">
+    <div class="text-muted">暂无工作周报记录。</div>
+</div>
+</th:block>
+
+<script>
+document.querySelectorAll('details').forEach(d => {
+    const name = d.querySelector('.report-summary span:first-child').textContent;
+    const time = d.querySelector('.report-summary .text-muted').textContent;
+    d.addEventListener('toggle', () => {
+        const icon = d.querySelector('.report-summary .text-muted');
+        icon.textContent = d.open ? '▲ 收起' : name + ' · ' + time;
+    });
+});
+</script>
+
+</th:block>
+</body>
+</html>

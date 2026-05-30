@@ -1,0 +1,115 @@
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title layout:fragment="title">综合日报</title>
+</head>
+<body>
+<th:block layout:fragment="content">
+
+<th:block th:with="total_todos=${#lists.size(todos.high) + #lists.size(todos.mid) + #lists.size(todos.daily) + #lists.size(todos.temp)}">
+
+<div class="todo-float" id="todoPanel">
+    <h3>
+        ⚡ 今日待办
+        <span class="todo-count" th:text="${total_todos + ' 项'}">0 项</span>
+    </h3>
+    <th:block th:if="${#lists.size(todos.high) > 0}">
+    <div class="todo-group">
+        <div class="group-label" style="color:#e03131;">🔴 高优先级</div>
+        <div th:each="item : ${todos.high}" class="todo-item" style="border-left-color:#e03131;" th:utext="${@utils.mdInline(item)}"></div>
+    </div>
+    </th:block>
+    <th:block th:if="${#lists.size(todos.mid) > 0}">
+    <div class="todo-group">
+        <div class="group-label" style="color:#e8590c;">🟡 中优先级</div>
+        <div th:each="item : ${todos.mid}" class="todo-item" style="border-left-color:#e8590c;" th:utext="${@utils.mdInline(item)}"></div>
+    </div>
+    </th:block>
+    <th:block th:if="${#lists.size(todos.daily) > 0}">
+    <div class="todo-group">
+        <div class="group-label" style="color:#2b8a3e;">🔄 每日循环</div>
+        <div th:each="item : ${todos.daily}" class="todo-item" style="border-left-color:#2b8a3e;" th:utext="${@utils.mdInline(item)}"></div>
+    </div>
+    </th:block>
+    <th:block th:if="${#lists.size(todos.temp) > 0}">
+    <div class="todo-group">
+        <div class="group-label" style="color:#1971c2;">📌 临时提醒</div>
+        <div th:each="item : ${todos.temp}" class="todo-item" style="border-left-color:#1971c2;" th:utext="${@utils.mdInline(item)}"></div>
+    </div>
+    </th:block>
+    <th:block th:if="${total_todos == 0}">
+    <div class="todo-empty">✅ 暂无未完成待办</div>
+    </th:block>
+</div>
+
+<div class="status-bar">
+    <div class="status-item">
+        <div class="label">笔记库服务</div>
+        <div class="value" th:classappend="${notesRunning} ? 'status-up' : 'status-down'" th:text="${notesRunning} ? '● 运行中' : '● 已停止'">● 运行中</div>
+        <div class="text-muted" style="font-size:11px;margin-top:2px;">端口 <span th:text="${notesPort}">14096</span></div>
+    </div>
+    <div class="status-item">
+        <div class="label">Java项目服务</div>
+        <div class="value" th:classappend="${codeRunning} ? 'status-up' : 'status-down'" th:text="${codeRunning} ? '● 运行中' : '● 已停止'">● 已停止</div>
+        <div class="text-muted" style="font-size:11px;margin-top:2px;">端口 <span th:text="${codePort}">14099</span></div>
+    </div>
+    <div class="status-item">
+        <div class="label">最新日报</div>
+        <div class="value" id="reportTime" th:text="${report_time}">尚未生成</div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="flex" style="justify-content:space-between;">
+        <h2>📊 AI 综合日报</h2>
+        <button class="btn btn-primary" id="genBtn" onclick="generateReport()">
+            🔄 重新生成
+        </button>
+    </div>
+
+    <th:block th:if="${report_error != null and !report_error.isEmpty()}">
+    <div class="text-muted mb-2" style="color:#ff6b6b;">
+        ⚠️ <span th:text="${report_error}"></span>
+    </div>
+    </th:block>
+
+    <div id="reportContent" class="report">
+        <th:block th:if="${report != null and !report.isEmpty()}">
+            <div th:utext="${report}"></div>
+        </th:block>
+        <th:block th:unless="${report != null and !report.isEmpty()}">
+            <div class="text-muted">
+                暂无日报数据。点击"重新生成"或等待定时任务（每天 9:00）自动推送。
+            </div>
+        </th:block>
+    </div>
+</div>
+
+</th:block> <!-- total_todos -->
+
+<script>
+function generateReport() {
+    const btn = document.getElementById('genBtn');
+    btn.disabled = true; btn.textContent = '⏳ 生成中...';
+
+    fetch('/generate', { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) {
+                setTimeout(() => location.reload(), 500);
+            } else {
+                toast('生成失败：' + (data.error || '未知错误'), 'error');
+                btn.disabled = false; btn.textContent = '🔄 重新生成';
+            }
+        })
+        .catch(() => {
+            toast('请求失败，请检查服务状态', 'error');
+            btn.disabled = false; btn.textContent = '🔄 重新生成';
+        });
+}
+</script>
+
+</th:block>
+</body>
+</html>

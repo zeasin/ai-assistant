@@ -1,0 +1,145 @@
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title layout:fragment="title">所有线索</title>
+</head>
+<body>
+<th:block layout:fragment="content">
+
+<div class="card">
+    <h2 style="display:flex;justify-content:space-between;align-items:center;">
+        所有线索
+        <span>
+            <button class="btn btn-primary" onclick="showAddLead()">+ 添加线索</button>
+            <a href="/customers" style="font-size:13px;font-weight:400;color:#7c5cfc;text-decoration:none;margin-left:8px;">← 返回看板</a>
+        </span>
+    </h2>
+</div>
+
+<div class="card">
+    <table class="log-table">
+        <thead><tr><th style="width:30px;">#</th><th style="width:60px;">ID</th><th style="width:105px;">日期</th><th>客户</th><th style="width:120px;">公司</th><th style="width:70px;">地区</th><th>来源</th><th style="width:80px;">状态</th><th>联系人</th><th>备注</th></tr></thead>
+        <tbody>
+            <tr th:each="l, iterStat : ${leads}">
+                <td th:text="${iterStat.count}">1</td>
+                <td><small th:text="${l.id}">ID</small></td>
+                <th:block th:with="activities=${@utils.toList(l.get('activities'))}, lastActDate=${#lists.size(activities) > 0 and activities[#lists.size(activities)-1].get('date') != null ? activities[#lists.size(activities)-1].get('date') : l.get('createdAt')}">
+                <td th:text="${@utils.limit(lastActDate != null ? lastActDate : '', 10)}">日期</td>
+                </th:block>
+                <td><strong th:text="${l.name}">客户</strong></td>
+                <td th:text="${l.get('company') != null ? l.get('company') : '—'}">—</td>
+                <td th:text="${l.get('region') != null ? l.get('region') : '—'}">—</td>
+                <td th:text="${l.source}">来源</td>
+                <td th:text="${l.status}">状态</td>
+                <td>
+                    <th:block th:if="${l.contacts != null and #lists.size(l.contacts) > 0}" th:with="contact=${l.contacts[0]}">
+                        <span th:text="${contact.get('name') != null ? contact.get('name') : ''}"></span>
+                        <span th:if="${contact.get('phone') != null}" th:text="' ' + ${contact.get('phone')}"></span>
+                        <span th:if="${contact.get('wechat') != null}" th:text="' ' + ${contact.get('wechat')}"></span>
+                    </th:block>
+                </td>
+                <td th:text="${l.notes != null ? @utils.limit(l.notes, 40) : '—'}">备注</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="modal-overlay" id="addLeadModal">
+    <div class="modal">
+        <h3>添加线索</h3>
+        <form id="addLeadForm" onsubmit="return submitLead(event)">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>线索名称 *</label>
+                    <input type="text" name="name" required placeholder="客户/项目名称">
+                </div>
+                <div class="form-group">
+                    <label>来源</label>
+                    <select name="source">
+                        <option value="微信咨询">微信咨询</option>
+                        <option value="新咨询">新咨询</option>
+                        <option value="电话咨询">电话咨询</option>
+                        <option value="微信">微信</option>
+                        <option value="微信好友">微信好友</option>
+                        <option value="开源社区">开源社区</option>
+                        <option value="客户自用">客户自用</option>
+                        <option value="意向报价">意向报价</option>
+                        <option value="其他">其他</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>公司</label>
+                    <input type="text" name="company" placeholder="公司名称">
+                </div>
+                <div class="form-group">
+                    <label>地区</label>
+                    <input type="text" name="region" placeholder="如：深圳、上海">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>状态</label>
+                    <select name="status">
+                        <option value="待跟进">待跟进</option>
+                        <option value="跟进中">跟进中</option>
+                        <option value="已放弃">已放弃</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>联系人姓名</label>
+                    <input type="text" name="contact_name" placeholder="联系人">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>联系电话</label>
+                    <input type="text" name="contact_phone" placeholder="手机号">
+                </div>
+                <div class="form-group">
+                    <label>微信</label>
+                    <input type="text" name="contact_wechat" placeholder="微信号">
+                </div>
+                <div class="form-group">
+                    <label>邮箱</label>
+                    <input type="email" name="contact_email" placeholder="邮箱">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>备注</label>
+                <textarea name="notes" rows="2" placeholder="备注信息"></textarea>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('addLeadModal')">取消</button>
+                <button type="submit" class="btn btn-primary">保存</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function showAddLead() { document.getElementById('addLeadModal').classList.add('active'); }
+function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+function submitLead(e) {
+    e.preventDefault();
+    const form = document.getElementById('addLeadForm');
+    const data = new FormData(form);
+    fetch('/api/leads/add', { method: 'POST', body: data })
+    .then(r => r.json())
+    .then(res => {
+        if (res.ok) { toast('线索 ' + res.name + ' 添加成功'); closeModal('addLeadModal'); form.reset(); location.reload(); }
+        else { toast(res.error || '添加失败', 'error'); }
+    })
+    .catch(() => toast('网络错误', 'error'));
+    return false;
+}
+document.getElementById('addLeadModal').addEventListener('click', function(e) {
+    if (e.target === this) closeModal('addLeadModal');
+});
+</script>
+
+</th:block>
+</body>
+</html>

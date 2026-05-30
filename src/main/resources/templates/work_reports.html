@@ -1,0 +1,311 @@
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title layout:fragment="title">工作</title>
+</head>
+<body>
+<th:block layout:fragment="content">
+
+<div class="card">
+    <h2>📋 工作看板</h2>
+</div>
+
+<div class="work-reminders">
+    <div class="reminder-item" style="border-left: 4px solid #e03131;">
+        <span class="reminder-icon">📱</span>
+        <span class="reminder-text">自媒体运营</span>
+    </div>
+    <div class="reminder-item" style="border-left: 4px solid #2b8a3e;">
+        <span class="reminder-icon">💻</span>
+        <span class="reminder-text">开源项目</span>
+    </div>
+    <div class="reminder-item" style="border-left: 4px solid #1971c2;">
+        <span class="reminder-icon">🤝</span>
+        <span class="reminder-text">跟进客户</span>
+    </div>
+    <div class="reminder-item" style="border-left: 4px solid #e8590c;">
+        <span class="reminder-icon">⌨️</span>
+        <span class="reminder-text">编码</span>
+    </div>
+    <div class="reminder-item" style="border-left: 4px solid #9c36b5;">
+        <span class="reminder-icon">🔍</span>
+        <span class="reminder-text">拓展客户</span>
+    </div>
+    <div class="reminder-item" style="border-left: 4px solid #0ca678;">
+        <span class="reminder-icon">🛠️</span>
+        <span class="reminder-text">服务客户</span>
+    </div>
+</div>
+
+<div class="work-tabs">
+    <button class="tab-btn active" id="tabDaily" onclick="switchTab('daily')">📅 日报</button>
+    <button class="tab-btn" id="tabWeekly" onclick="switchTab('weekly')">📊 周报</button>
+</div>
+
+<div id="daily-tab" class="tab-content active">
+    <div style="margin-bottom:16px;">
+        <button class="btn btn-primary" onclick="showAddDailyModal()">+ 添加日报</button>
+    </div>
+    <th:block th:if="${daily_reports != null and #lists.size(daily_reports) > 0}">
+        <div class="card" style="padding:0;overflow:hidden;" th:each="report : ${daily_reports}">
+            <details>
+                <summary class="report-summary" style="cursor:pointer;font-size:14px;font-weight:600;list-style:none;display:flex;align-items:center;padding:14px 20px;background:#fafafe;border-bottom:1px solid #e1e3e6;">
+                    <span style="color:#5c3dcf;" th:text="'📄 ' + ${report.name}">日报名</span>
+                    <span class="text-muted" style="font-size:12px;margin-left:auto;" th:text="${report.modified}">时间</span>
+                </summary>
+                <div class="report" style="padding:16px 20px;" th:utext="${report.content}">内容</div>
+            </details>
+        </div>
+    </th:block>
+    <th:block th:unless="${daily_reports != null and #lists.size(daily_reports) > 0}">
+    <div class="card">
+        <div class="text-muted">暂无工作日报记录。</div>
+    </div>
+    </th:block>
+</div>
+
+<div id="weekly-tab" class="tab-content">
+    <div style="margin-bottom:16px;">
+        <button class="btn btn-primary" onclick="showAddWeeklyModal()">+ 添加周报</button>
+    </div>
+    <th:block th:if="${weekly_reports != null and #lists.size(weekly_reports) > 0}">
+        <div class="card" th:each="report : ${weekly_reports}">
+            <details>
+                <summary class="report-summary" style="cursor:pointer;font-size:14px;font-weight:600;list-style:none;padding:8px 0;display:flex;align-items:center;">
+                    <span th:text="${report.name}">周报名</span>
+                    <span class="text-muted" style="font-size:12px;margin-left:8px;" th:text="${report.modified}">时间</span>
+                </summary>
+                <div class="report" style="font-family:inherit;font-size:14px;line-height:1.7;margin-top:12px;" th:utext="${report.content}">内容</div>
+            </details>
+        </div>
+    </th:block>
+    <th:block th:unless="${weekly_reports != null and #lists.size(weekly_reports) > 0}">
+    <div class="card">
+        <div class="text-muted">暂无工作周报记录。</div>
+    </div>
+    </th:block>
+</div>
+
+<div class="modal-overlay" id="add-daily-modal">
+    <div class="modal">
+        <h3>📝 添加日报</h3>
+        <div class="form-group" style="margin-bottom:12px;">
+            <label>日期</label>
+            <input type="date" id="daily-date" style="width:100%;">
+        </div>
+        <div class="form-group" style="margin-bottom:16px;">
+            <label>内容（Markdown 格式）</label>
+            <textarea id="daily-content" rows="12" placeholder="## 工作&#10;1. **任务名称** — 任务描述&#10;&#10;## 明日计划&#10;- [ ] 待办事项"></textarea>
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-secondary" onclick="closeModal('add-daily-modal')">取消</button>
+            <button class="btn btn-primary" onclick="submitDailyReport()">保存</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="add-weekly-modal">
+    <div class="modal">
+        <h3>📝 添加周报</h3>
+        <div class="form-row">
+            <div class="form-group" style="margin-bottom:12px;">
+                <label>年-周（如 2026-21）</label>
+                <input type="text" id="weekly-year-week" placeholder="2026-21" style="width:100%;">
+            </div>
+            <div class="form-group" style="margin-bottom:12px;">
+                <label>日期范围（如 05-19 ~ 05-25）</label>
+                <input type="text" id="weekly-date-range" placeholder="05-19 ~ 05-25" style="width:100%;">
+            </div>
+        </div>
+        <div class="form-group" style="margin-bottom:16px;">
+            <label>内容（Markdown 格式）</label>
+            <textarea id="weekly-content" rows="12" placeholder="## 一、本周重点工作&#10;### 1️⃣ 任务名称&#10;**目标：** 目标描述&#10;&#10;## 二、下周计划"></textarea>
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-secondary" onclick="closeModal('add-weekly-modal')">取消</button>
+            <button class="btn btn-primary" onclick="submitWeeklyReport()">保存</button>
+        </div>
+    </div>
+</div>
+
+<style>
+.work-reminders {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+}
+.reminder-item {
+    background: #fff;
+    border: 1px solid #e1e3e6;
+    border-radius: 8px;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: all .15s;
+    cursor: default;
+}
+.reminder-item:hover {
+    background: #f8f7ff;
+    border-color: #d9d0ff;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+.reminder-icon {
+    font-size: 20px;
+}
+.reminder-text {
+    font-size: 14px;
+    font-weight: 500;
+    color: #1a1b1e;
+}
+.work-tabs {
+    display: flex; gap: 8px; margin-bottom: 16px;
+}
+.tab-btn {
+    padding: 10px 24px; border: none; border-radius: 8px;
+    font-size: 14px; font-weight: 500; cursor: pointer;
+    background: #e8e8ed; color: #1a1b1e; transition: all .15s;
+}
+.tab-btn:hover { background: #d5d5dc; }
+.tab-btn.active { background: #7c5cfc; color: #fff; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+</style>
+
+<script>
+// Tab management - check URL param for initial state
+(function() {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get('tab');
+    if (tab === 'weekly') {
+        document.getElementById('tabDaily').classList.remove('active');
+        document.getElementById('daily-tab').classList.remove('active');
+        document.getElementById('tabWeekly').classList.add('active');
+        document.getElementById('weekly-tab').classList.add('active');
+    }
+})();
+
+function switchTab(tab) {
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+    if (tab === 'daily') {
+        document.getElementById('tabDaily').classList.add('active');
+        document.getElementById('daily-tab').classList.add('active');
+    } else {
+        document.getElementById('tabWeekly').classList.add('active');
+        document.getElementById('weekly-tab').classList.add('active');
+    }
+}
+
+document.querySelectorAll('details').forEach(d => {
+    const name = d.querySelector('.report-summary span:first-child').textContent;
+    const time = d.querySelector('.report-summary .text-muted').textContent;
+    d.addEventListener('toggle', () => {
+        const icon = d.querySelector('.report-summary .text-muted');
+        icon.textContent = d.open ? '▲ 收起' : time;
+    });
+});
+
+function setDefaultDate() {
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('daily-date').value = today;
+}
+
+function showAddDailyModal() {
+    setDefaultDate();
+    document.getElementById('add-daily-modal').classList.add('active');
+}
+
+function showAddWeeklyModal() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const oneJan = new Date(year, 0, 1);
+    const weekNum = Math.ceil(((now - oneJan) / 86400000 + oneJan.getDay() + 1) / 7);
+    document.getElementById('weekly-year-week').value = `${year}-${weekNum}`;
+    document.getElementById('add-weekly-modal').classList.add('active');
+}
+
+function closeModal(id) {
+    document.getElementById(id).classList.remove('active');
+}
+
+async function submitDailyReport() {
+    const date = document.getElementById('daily-date').value;
+    const content = document.getElementById('daily-content').value;
+
+    if (!date) {
+        toast('请选择日期', 'error');
+        return;
+    }
+    if (!content.trim()) {
+        toast('请输入日报内容', 'error');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('date', date);
+    formData.append('content', content);
+
+    try {
+        const resp = await fetch('/api/daily-reports/add', {
+            method: 'POST',
+            body: formData,
+        });
+        const data = await resp.json();
+        if (data.ok) {
+            toast('日报添加成功');
+            closeModal('add-daily-modal');
+            setTimeout(() => { window.location.href = '/work-reports?tab=daily'; }, 500);
+        } else {
+            toast(data.error || '添加失败', 'error');
+        }
+    } catch (e) {
+        toast('请求失败: ' + e.message, 'error');
+    }
+}
+
+async function submitWeeklyReport() {
+    const yearWeek = document.getElementById('weekly-year-week').value;
+    const dateRange = document.getElementById('weekly-date-range').value;
+    const content = document.getElementById('weekly-content').value;
+
+    if (!yearWeek) {
+        toast('请输入年-周', 'error');
+        return;
+    }
+    if (!content.trim()) {
+        toast('请输入周报内容', 'error');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('year_week', yearWeek);
+    formData.append('date_range', dateRange);
+    formData.append('content', content);
+
+    try {
+        const resp = await fetch('/api/weekly-reports/add', {
+            method: 'POST',
+            body: formData,
+        });
+        const data = await resp.json();
+        if (data.ok) {
+            toast('周报添加成功');
+            closeModal('add-weekly-modal');
+            setTimeout(() => { window.location.href = '/work-reports?tab=weekly'; }, 500);
+        } else {
+            toast(data.error || '添加失败', 'error');
+        }
+    } catch (e) {
+        toast('请求失败: ' + e.message, 'error');
+    }
+}
+</script>
+
+</th:block>
+</body>
+</html>
