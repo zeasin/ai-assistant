@@ -1,6 +1,8 @@
 package com.laoqi.assistant.controller;
 
 import com.laoqi.assistant.config.AppConfig;
+import com.laoqi.assistant.model.Config;
+import com.laoqi.assistant.service.ConfigService;
 import com.laoqi.assistant.service.LogService;
 import com.laoqi.assistant.util.FileUtil;
 import com.laoqi.assistant.util.MarkdownUtil;
@@ -24,14 +26,23 @@ public class BrowseController {
 
     private final AppConfig appConfig;
     private final LogService logService;
+    private final ConfigService configService;
 
-    public BrowseController(AppConfig appConfig, LogService logService) {
+    public BrowseController(AppConfig appConfig, LogService logService, ConfigService configService) {
         this.appConfig = appConfig;
         this.logService = logService;
+        this.configService = configService;
+    }
+
+    private Path getBaseDir() {
+        Config config = configService.load();
+        String baseDir = config.getBaseDir();
+        if (baseDir == null || baseDir.isEmpty()) baseDir = "D:\\projects\\richie_learning_notes";
+        return Paths.get(baseDir);
     }
 
     private Path safeResolve(String rel) {
-        Path base = appConfig.getBaseDirPath().normalize();
+        Path base = getBaseDir().normalize();
         Path resolved = base.resolve(rel != null ? rel : "").normalize();
         if (!resolved.startsWith(base)) return base;
         return resolved;

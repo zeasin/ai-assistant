@@ -1,6 +1,8 @@
 package com.laoqi.assistant.controller;
 
 import com.laoqi.assistant.config.AppConfig;
+import com.laoqi.assistant.model.Config;
+import com.laoqi.assistant.service.ConfigService;
 import com.laoqi.assistant.service.LogService;
 import com.laoqi.assistant.util.FileUtil;
 import com.laoqi.assistant.util.MarkdownUtil;
@@ -21,10 +23,30 @@ public class WorkReportController {
 
     private final AppConfig appConfig;
     private final LogService logService;
+    private final ConfigService configService;
 
-    public WorkReportController(AppConfig appConfig, LogService logService) {
+    public WorkReportController(AppConfig appConfig, LogService logService, ConfigService configService) {
         this.appConfig = appConfig;
         this.logService = logService;
+        this.configService = configService;
+    }
+
+    private Path getDailyDir() {
+        Config config = configService.load();
+        String baseDir = config.getBaseDir();
+        if (baseDir == null || baseDir.isEmpty()) baseDir = "D:\\projects\\richie_learning_notes";
+        String dailyDir = config.getDailyDir();
+        if (dailyDir == null || dailyDir.isEmpty()) dailyDir = "工作\\日报";
+        return Paths.get(baseDir).resolve(dailyDir);
+    }
+
+    private Path getWeeklyDir() {
+        Config config = configService.load();
+        String baseDir = config.getBaseDir();
+        if (baseDir == null || baseDir.isEmpty()) baseDir = "D:\\projects\\richie_learning_notes";
+        String weeklyDir = config.getWeeklyDir();
+        if (weeklyDir == null || weeklyDir.isEmpty()) weeklyDir = "工作\\周报";
+        return Paths.get(baseDir).resolve(weeklyDir);
     }
 
     record ReportItem(String name, String modified, String content) {}
@@ -57,8 +79,8 @@ public class WorkReportController {
     @GetMapping("/work-reports")
     public String workReportsPage(@RequestParam(required = false, defaultValue = "daily") String tab,
                                    Model model) {
-        List<ReportItem> dailyReports = loadReports(appConfig.getDailyDir());
-        List<ReportItem> weeklyReports = loadReports(appConfig.getWeeklyDir());
+        List<ReportItem> dailyReports = loadReports(getDailyDir());
+        List<ReportItem> weeklyReports = loadReports(getWeeklyDir());
         model.addAttribute("daily_reports", dailyReports);
         model.addAttribute("weekly_reports", weeklyReports);
         return "work_reports";
@@ -66,13 +88,13 @@ public class WorkReportController {
 
     @GetMapping("/daily-reports")
     public String dailyReportsPage(Model model) {
-        model.addAttribute("reports", loadReports(appConfig.getDailyDir()));
+        model.addAttribute("reports", loadReports(getDailyDir()));
         return "daily_reports";
     }
 
     @GetMapping("/weekly-reports")
     public String weeklyReportsPage(Model model) {
-        model.addAttribute("reports", loadReports(appConfig.getWeeklyDir()));
+        model.addAttribute("reports", loadReports(getWeeklyDir()));
         return "weekly_reports";
     }
 
@@ -85,7 +107,7 @@ public class WorkReportController {
         if (!dateStr.matches("\\d{4}-\\d{2}-\\d{2}"))
             return Map.of("ok", false, "error", "日期格式错误，应为 YYYY-MM-DD");
 
-        Path file = appConfig.getDailyDir().resolve(dateStr + ".md");
+        Path file = getDailyDir().resolve(dateStr + ".md");
         if (Files.exists(file)) return Map.of("ok", false, "error", "日报文件已存在: " + dateStr + ".md");
 
         String md = """
@@ -118,7 +140,7 @@ modified: %s
         if (!yw.matches("\\d{4}-\\d{1,2}"))
             return Map.of("ok", false, "error", "年周格式错误，应为 YYYY-WW");
 
-        Path file = appConfig.getWeeklyDir().resolve(yw + ".md");
+        Path file = getWeeklyDir().resolve(yw + ".md");
         if (Files.exists(file)) return Map.of("ok", false, "error", "周报文件已存在: " + yw + ".md");
 
         String display = dateRange.isEmpty() ? yw + "周" : yw + "周（" + dateRange + "）";

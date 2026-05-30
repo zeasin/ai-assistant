@@ -16,7 +16,7 @@ public class ConfigService {
 
     public Config load() {
         return FileUtil.readJson(appConfig.getConfigFile(), Config.class,
-                Config.defaultConfig(appConfig.getFeishuWebhookUrl()));
+                Config.defaultConfig("", "D:\\projects\\richie_learning_notes"));
     }
 
     public void save(Config config) {

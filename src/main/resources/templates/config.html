@@ -19,6 +19,52 @@
 </div>
 
 <div class="card">
+    <h2>📁 笔记库根目录配置</h2>
+    <div class="text-muted mb-2">配置笔记库的根目录路径，修改后所有数据文件的相对路径都将基于此目录。</div>
+    <form id="baseDirForm" onsubmit="return saveBaseDir(event)">
+        <div class="form-group">
+            <label>笔记库根目录</label>
+            <input type="text" id="baseDirPath" placeholder="D:\projects\richie_learning_notes" style="font-family:monospace;">
+            <div class="text-muted" style="font-size:12px;margin-top:4px;">
+                支持绝对路径，如 <code>D:\notes</code> 或 <code>C:\Users\xxx\Notes</code>
+            </div>
+        </div>
+        <div class="flex" style="gap:8px;">
+            <button type="submit" class="btn btn-primary">保存根目录</button>
+            <span id="baseDirStatus" class="text-muted" style="margin-left:4px;"></span>
+        </div>
+    </form>
+</div>
+
+<div class="card">
+    <h2>📁 数据文件相对路径配置</h2>
+    <div class="text-muted mb-2">相对于笔记库根目录的路径。修改后立即生效。</div>
+    <form id="pathsForm" onsubmit="return savePaths(event)">
+        <div class="form-group">
+            <label>客户数据</label>
+            <input type="text" id="customerDataPath" placeholder="企业/客户管理/客户数据.json">
+        </div>
+        <div class="form-group">
+            <label>线索数据</label>
+            <input type="text" id="leadDataPath" placeholder="企业/客户管理/线索数据.json">
+        </div>
+        <div class="form-group">
+            <label>跟进记录</label>
+            <input type="text" id="recordDataPath" placeholder="企业/客户管理/跟进记录.json">
+        </div>
+        <div class="form-group">
+            <label>运营数据</label>
+            <input type="text" id="operationsDataPath" placeholder="自媒体/运营数据.json">
+        </div>
+        <div class="flex" style="gap:8px;">
+            <button type="submit" class="btn btn-primary">保存相对路径</button>
+            <button type="button" class="btn btn-secondary" onclick="resetPaths()">恢复默认</button>
+            <span id="pathsStatus" class="text-muted" style="margin-left:4px;"></span>
+        </div>
+    </form>
+</div>
+
+<div class="card">
     <h2>🔗 飞书 Webhook 配置</h2>
     <div class="text-muted mb-2">修改后自动保存到 <code>config.json</code>，下次推送生效。</div>
     <div class="flex" style="flex-wrap:wrap;gap:8px;">
@@ -130,8 +176,55 @@ fetch('/api/config')
         if (cfg.feishuChatId) document.getElementById('feishuChatId').value = cfg.feishuChatId;
         if (cfg.feishuPollingEnabled) document.getElementById('feishuPollingEnabled').checked = true;
         if (cfg.erpProjectDir) document.getElementById('erpProjectDir').value = cfg.erpProjectDir;
+        if (cfg.baseDir) document.getElementById('baseDirPath').value = cfg.baseDir;
+        if (cfg.customerDataPath) document.getElementById('customerDataPath').value = cfg.customerDataPath;
+        if (cfg.leadDataPath) document.getElementById('leadDataPath').value = cfg.leadDataPath;
+        if (cfg.recordDataPath) document.getElementById('recordDataPath').value = cfg.recordDataPath;
+        if (cfg.operationsDataPath) document.getElementById('operationsDataPath').value = cfg.operationsDataPath;
     })
     .catch(() => {});
+
+async function saveBaseDir(e) {
+    e.preventDefault();
+    const form = new FormData();
+    form.append('baseDir', document.getElementById('baseDirPath').value.trim());
+    const res = await fetch('/api/config/baseDir', { method: 'POST', body: form });
+    const data = await res.json();
+    const status = document.getElementById('baseDirStatus');
+    if (data.ok) {
+        status.textContent = '✅ 已保存';
+        setTimeout(() => status.textContent = '', 3000);
+    } else {
+        status.textContent = '❌ ' + (data.error || '保存失败');
+    }
+    return false;
+}
+
+async function savePaths(e) {
+    e.preventDefault();
+    const form = new FormData();
+    form.append('customerDataPath', document.getElementById('customerDataPath').value.trim());
+    form.append('leadDataPath', document.getElementById('leadDataPath').value.trim());
+    form.append('recordDataPath', document.getElementById('recordDataPath').value.trim());
+    form.append('operationsDataPath', document.getElementById('operationsDataPath').value.trim());
+    const res = await fetch('/api/config/paths', { method: 'POST', body: form });
+    const data = await res.json();
+    const status = document.getElementById('pathsStatus');
+    if (data.ok) {
+        status.textContent = '✅ 已保存';
+        setTimeout(() => status.textContent = '', 3000);
+    } else {
+        status.textContent = '❌ ' + (data.error || '保存失败');
+    }
+    return false;
+}
+
+function resetPaths() {
+    document.getElementById('customerDataPath').value = '企业/客户管理/客户数据.json';
+    document.getElementById('leadDataPath').value = '企业/客户管理/线索数据.json';
+    document.getElementById('recordDataPath').value = '企业/客户管理/跟进记录.json';
+    document.getElementById('operationsDataPath').value = '自媒体/运营数据.json';
+}
 
 function saveWebhook() {
     const url = document.getElementById('webhookUrl').value.trim();

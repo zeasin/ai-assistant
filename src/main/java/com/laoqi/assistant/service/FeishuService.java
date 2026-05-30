@@ -86,7 +86,10 @@ public class FeishuService {
     public void sendPost(String title, List<List<Map<String, String>>> paragraphs) {
         var config = configService.load();
         String webhookUrl = config.getFeishuWebhookUrl();
-        if (webhookUrl == null || webhookUrl.isEmpty()) webhookUrl = appConfig.getFeishuWebhookUrl();
+        if (webhookUrl == null || webhookUrl.isEmpty()) {
+            logService.add("飞书推送", "跳过", "未配置 Webhook URL");
+            return;
+        }
         try {
             String body = "{\"msg_type\":\"post\",\"content\":{\"post\":{\"zh_cn\":{\"title\":\"" +
                     escapeJson(title) + "\",\"content\":" + toJson(paragraphs) + "}}}}";

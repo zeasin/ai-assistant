@@ -1,8 +1,19 @@
 {
+  "baseDir" : "D:\\projects\\richie_learning_notes",
   "feishuWebhookUrl" : "https://open.feishu.cn/open-apis/bot/v2/hook/5684e7f9-3cdc-4ac8-a5ce-97051c4f8393",
   "feishuAppId" : "cli_a8f9b3e8deb9100c",
   "feishuAppSecret" : "IVsBQADPxkx62MnksTdxObxIWiCG6LZs",
   "feishuChatId" : "oc_83c41f86a177d021d2838372b2a11fea",
   "feishuPollingEnabled" : true,
-  "erpProjectDir" : ""
+  "erpProjectDir" : "",
+  "customerDataPath" : null,
+  "leadDataPath" : null,
+  "recordDataPath" : null,
+  "operationsDataPath" : null,
+  "chatSessionsFile" : null,
+  "logFile" : null,
+  "dailyDir" : null,
+  "weeklyDir" : null,
+  "comprehensiveReportDir" : null,
+  "remindFile" : null
 }

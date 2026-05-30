@@ -1,6 +1,7 @@
 package com.laoqi.assistant.service;
 
 import com.laoqi.assistant.config.AppConfig;
+import com.laoqi.assistant.model.Config;
 import com.laoqi.assistant.util.FileUtil;
 import com.laoqi.assistant.util.TimeUtil;
 import org.slf4j.Logger;
@@ -8,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.nio.file.Path;
+import java.nio.file.Paths;
 
 @Service
 public class ReportService {
@@ -35,6 +37,15 @@ public class ReportService {
         this.logService = logService;
         this.openCodeService = openCodeService;
         this.configService = configService;
+    }
+
+    private Path getComprehensiveReportDir() {
+        Config config = configService.load();
+        String baseDir = config.getBaseDir();
+        if (baseDir == null || baseDir.isEmpty()) baseDir = "D:\\projects\\richie_learning_notes";
+        String comprehensiveReportDir = config.getComprehensiveReportDir();
+        if (comprehensiveReportDir == null || comprehensiveReportDir.isEmpty()) comprehensiveReportDir = "工作\\综合日报";
+        return Paths.get(baseDir).resolve(comprehensiveReportDir);
     }
 
     public static class ReportResult {
@@ -112,7 +123,7 @@ public class ReportService {
     }
 
     public void saveComprehensiveReport(String report) {
-        Path dir = appConfig.getComprehensiveReportDir();
+        Path dir = getComprehensiveReportDir();
         String date = TimeUtil.todayStr();
         Path file = dir.resolve(date + ".md");
         FileUtil.writeText(file, report);

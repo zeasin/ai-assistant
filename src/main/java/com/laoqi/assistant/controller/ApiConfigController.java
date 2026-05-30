@@ -39,6 +39,40 @@ public class ApiConfigController {
         return Map.of("ok", true);
     }
 
+    @PostMapping("/api/config/baseDir")
+    public Map<String, Object> updateBaseDir(@RequestParam String baseDir) {
+        try {
+            Config cfg = configService.load();
+            cfg.setBaseDir(baseDir);
+            configService.save(cfg);
+            logService.add("配置更新", "成功", "笔记库根目录已更新为: " + baseDir);
+            return Map.of("ok", true);
+        } catch (Exception e) {
+            return Map.of("ok", false, "error", e.getMessage());
+        }
+    }
+
+    @PostMapping("/api/config/paths")
+    public Map<String, Object> updatePaths(
+            @RequestParam String customerDataPath,
+            @RequestParam String leadDataPath,
+            @RequestParam String recordDataPath,
+            @RequestParam String operationsDataPath) {
+        try {
+            Config config = configService.load();
+            config.setCustomerDataPath(customerDataPath);
+            config.setLeadDataPath(leadDataPath);
+            config.setRecordDataPath(recordDataPath);
+            config.setOperationsDataPath(operationsDataPath);
+            configService.save(config);
+            logService.add("路径配置", "保存成功", "");
+            return Map.of("ok", true);
+        } catch (Exception e) {
+            logService.add("路径配置", "保存失败", e.getMessage());
+            return Map.of("ok", false, "error", e.getMessage());
+        }
+    }
+
     @PostMapping("/api/config/feishu")
     public Map<String, Object> updateFeishu(
             @RequestParam(required = false, defaultValue = "") String appId,

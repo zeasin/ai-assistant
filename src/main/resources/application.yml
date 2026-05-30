@@ -14,10 +14,8 @@ spring:
     time-zone: Asia/Shanghai
 
 app:
-  base-dir: ${ASSISTANT_BASE_DIR:D:\projects\richie_learning_notes}
   config-dir: ${ASSISTANT_CONFIG_DIR:.}
   notes-port: 14096
   code-port: 14099
-  feishu-webhook-url: https://open.feishu.cn/open-apis/bot/v2/hook/5684e7f9-3cdc-4ac8-a5ce-97051c4f8393
   timezone: Asia/Shanghai
   max-history-chars: 6000

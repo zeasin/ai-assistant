@@ -1,20 +1,37 @@
 package com.laoqi.assistant.service;
 
 import com.laoqi.assistant.config.AppConfig;
+import com.laoqi.assistant.model.Config;
 import com.laoqi.assistant.util.FileUtil;
-import com.laoqi.assistant.util.TimeUtil;
 import org.springframework.stereotype.Service;
 
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 
 @Service
 public class TodoService {
 
     private final AppConfig appConfig;
+    private final ConfigService configService;
 
-    public TodoService(AppConfig appConfig) {
+    public TodoService(AppConfig appConfig, ConfigService configService) {
         this.appConfig = appConfig;
+        this.configService = configService;
+    }
+
+    private Path getBaseDir() {
+        Config config = configService.load();
+        String baseDir = config.getBaseDir();
+        if (baseDir == null || baseDir.isEmpty()) baseDir = "D:\\projects\\richie_learning_notes";
+        return Paths.get(baseDir);
+    }
+
+    private Path getRemindFile() {
+        Config config = configService.load();
+        String remindFile = config.getRemindFile();
+        if (remindFile == null || remindFile.isEmpty()) remindFile = "提醒.md";
+        return getBaseDir().resolve(remindFile);
     }
 
     public static class Todos {
@@ -29,7 +46,7 @@ public class TodoService {
         Todos todos = new Todos();
 
         // Read 记忆/当前重点.md
-        Path focusPath = appConfig.getBaseDirPath().resolve("记忆").resolve("当前重点.md");
+        Path focusPath = getBaseDir().resolve("记忆").resolve("当前重点.md");
         if (FileUtil.exists(focusPath)) {
             String content = FileUtil.readText(focusPath);
             String section = null;
@@ -49,7 +66,7 @@ public class TodoService {
         }
 
         // Read 提醒.md
-        Path remindPath = appConfig.getRemindFile();
+        Path remindPath = getRemindFile();
         if (FileUtil.exists(remindPath)) {
             String content = FileUtil.readText(remindPath);
             String section = null;
@@ -70,7 +87,7 @@ public class TodoService {
     }
 
     public void clearTempReminders() {
-        Path remindPath = appConfig.getRemindFile();
+        Path remindPath = getRemindFile();
         if (!FileUtil.exists(remindPath)) return;
         String content = FileUtil.readText(remindPath);
         StringBuilder out = new StringBuilder();

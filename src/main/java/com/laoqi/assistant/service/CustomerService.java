@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -19,14 +20,36 @@ public class CustomerService {
     private static final TypeReference<Map<String, Object>> mapType = new TypeReference<Map<String, Object>>() {};
 
     private final AppConfig appConfig;
+    private final ConfigService configService;
 
-    public CustomerService(AppConfig appConfig) {
+    public CustomerService(AppConfig appConfig, ConfigService configService) {
         this.appConfig = appConfig;
+        this.configService = configService;
     }
 
-    private Path customerFile() { return appConfig.getBaseDirPath().resolve("企业").resolve("客户管理").resolve("客户数据.json"); }
-    private Path leadFile() { return appConfig.getBaseDirPath().resolve("企业").resolve("客户管理").resolve("线索数据.json"); }
-    private Path recordFile() { return appConfig.getBaseDirPath().resolve("企业").resolve("客户管理").resolve("跟进记录.json"); }
+    private Path getBaseDir() {
+        String baseDir = configService.load().getBaseDir();
+        if (baseDir != null && !baseDir.isEmpty()) {
+            return Paths.get(baseDir);
+        }
+        return Paths.get("D:\\projects\\richie_learning_notes");
+    }
+
+    private Path customerFile() { 
+        String path = configService.load().getCustomerDataPath();
+        if (path == null || path.isEmpty()) path = "企业/客户管理/客户数据.json";
+        return getBaseDir().resolve(path);
+    }
+    private Path leadFile() { 
+        String path = configService.load().getLeadDataPath();
+        if (path == null || path.isEmpty()) path = "企业/客户管理/线索数据.json";
+        return getBaseDir().resolve(path);
+    }
+    private Path recordFile() { 
+        String path = configService.load().getRecordDataPath();
+        if (path == null || path.isEmpty()) path = "企业/客户管理/跟进记录.json";
+        return getBaseDir().resolve(path);
+    }
 
     public Map<String, Object> loadCustomerData() {
         return FileUtil.readJson(customerFile(), mapType, new HashMap<>());
@@ -59,7 +82,6 @@ public class CustomerService {
         Map<String, Object> leadData = FileUtil.readJson(leadFile(), mapType, new HashMap<>());
         List<Map<String, Object>> leads = (List<Map<String, Object>>) leadData.computeIfAbsent("leads", k -> new ArrayList<>());
 
-        // Generate new ID
         int maxNum = leads.stream()
                 .filter(l -> l.get("id") instanceof String s && s.startsWith("M"))
                 .mapToInt(l -> {
@@ -68,7 +90,7 @@ public class CustomerService {
                 })
                 .max().orElse(0);
         String newId = String.format("M%02d", maxNum + 1);
-        String now = TimeUtil.todayStr(); // Use the correct import
+        String now = TimeUtil.todayStr();
 
         Map<String, Object> newLead = new LinkedHashMap<>();
         newLead.put("id", newId);
@@ -99,7 +121,6 @@ public class CustomerService {
         meta.put("lastUpdated", now);
         FileUtil.writeJson(leadFile(), leadData);
 
-        // Add auto-follow-up record
         Map<String, Object> recordData = FileUtil.readJson(recordFile(), mapType, new HashMap<>());
         List<Map<String, Object>> records = (List<Map<String, Object>>) recordData.computeIfAbsent("records", k -> new ArrayList<>());
         int maxRNum = records.stream()
@@ -155,7 +176,6 @@ public class CustomerService {
         meta.put("lastUpdated", date);
         FileUtil.writeJson(recordFile(), recordData);
 
-        // Update customer/lead lastContactedAt
         String leadDir = "lead";
         if (customerId.matches("M\\d+|P\\d+")) {
             Map<String, Object> leadData = FileUtil.readJson(leadFile(), mapType, new HashMap<>());

@@ -6,20 +6,32 @@ import com.laoqi.assistant.util.FileUtil;
 import org.springframework.stereotype.Service;
 
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 public class OperationsService {
 
     private final AppConfig appConfig;
+    private final ConfigService configService;
 
-    public OperationsService(AppConfig appConfig) {
+    public OperationsService(AppConfig appConfig, ConfigService configService) {
         this.appConfig = appConfig;
+        this.configService = configService;
+    }
+
+    private Path getBaseDir() {
+        String baseDir = configService.load().getBaseDir();
+        if (baseDir != null && !baseDir.isEmpty()) {
+            return Paths.get(baseDir);
+        }
+        return Paths.get("D:\\projects\\richie_learning_notes");
     }
 
     private Path dataFile() {
-        return appConfig.getBaseDirPath().resolve("自媒体").resolve("运营数据.json");
+        String path = configService.load().getOperationsDataPath();
+        if (path == null || path.isEmpty()) path = "自媒体/运营数据.json";
+        return getBaseDir().resolve(path);
     }
 
     public Root loadData() {
@@ -63,12 +75,10 @@ public class OperationsService {
         allRanked.sort((a, b) -> b.reads - a.reads);
         result.topArticles = allRanked.size() > 6 ? allRanked.subList(0, 6) : allRanked;
 
-        // Findings
         result.findings = new ArrayList<>();
         result.platformTips = new ArrayList<>();
         result.suggestionPriority = new ArrayList<>();
 
-        // 1. WeChat search keyword effect
         List<ArticleReads> wxArticles = new ArrayList<>();
         for (Map.Entry<String, List<ArticleData>> entry : articles.entrySet()) {
             for (ArticleData a : entry.getValue()) {
@@ -91,7 +101,6 @@ public class OperationsService {
             result.findings.add(f);
         }
 
-        // 2. CSDN vs WeChat
         List<CsdnWxGap> gaps = new ArrayList<>();
         for (Map.Entry<String, List<ArticleData>> entry : articles.entrySet()) {
             for (ArticleData a : entry.getValue()) {
@@ -113,7 +122,6 @@ public class OperationsService {
             result.findings.add(f);
         }
 
-        // 3. Hot concept effect
         List<String> hotKeywords = Arrays.asList("OpenMemory", "AI", "OpenCode", "记忆体");
         for (Map.Entry<String, List<ArticleData>> entry : articles.entrySet()) {
             for (ArticleData a : entry.getValue()) {
@@ -132,12 +140,10 @@ public class OperationsService {
             }
         }
 
-        // Platform tips
         result.platformTips.add(createTip("微信·码农老齐", "标题搜索词覆盖不稳定", "每篇检查搜一搜关键词热度，标题含≥1个热词"));
         result.platformTips.add(createTip("CSDN", "已验证冲突标题有效但未持续优化", "标题用「冲突/悬念」句式，内容保持技术深度"));
         result.platformTips.add(createTip("知乎", "只发文章不答题，曝光不足", "每周回答2-3个相关知乎问题，文末引导关注"));
 
-        // Suggestions
         boolean hasHot = false;
         for (Map.Entry<String, List<ArticleData>> entry : articles.entrySet()) {
             for (ArticleData a : entry.getValue()) {
@@ -159,7 +165,6 @@ public class OperationsService {
         s2.reason = "CSDN已验证冲突标题效果6倍于平淡标题";
         result.suggestionPriority.add(s2);
 
-        // Writing template
         WritingTemplate wt = new WritingTemplate();
         wt.formula = "[热门AI概念/工具] + [实操/避坑] + [结果暗示]";
         wt.goodExamples = Arrays.asList("OpenCode安装与使用", "OpenMemory记忆体");
