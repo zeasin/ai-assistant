@@ -36,6 +36,14 @@ public class PortHealthChecker implements ApplicationRunner {
         checkPort(appConfig.getNotesPort(), "笔记库", true);
         checkPort(appConfig.getCodePort(), "Java项目", true);
         started = true;
+        logStartupStatus();
+    }
+
+    private void logStartupStatus() {
+        logService.add("端口检测(笔记库)", notesRunning ? "成功" : "警告",
+                "服务(笔记库) " + (notesRunning ? "已启动" : "未启动，端口: " + appConfig.getNotesPort()));
+        logService.add("端口检测(Java项目)", codeRunning ? "成功" : "警告",
+                "服务(Java项目) " + (codeRunning ? "已启动" : "未启动，端口: " + appConfig.getCodePort()));
     }
 
     @Scheduled(fixedRate = 30_000)
@@ -62,6 +70,8 @@ public class PortHealthChecker implements ApplicationRunner {
             if (previousStatus) {
                 setRunningStatus(port, false);
                 log.warn("服务({}) 连接断开 ({}:{})", label, host, port);
+                logService.add("端口检测(" + label + ")", "警告",
+                        "服务(" + label + ") 连接断开，端口: " + port);
             }
             if (startup) {
                 log.warn("");
@@ -70,9 +80,6 @@ public class PortHealthChecker implements ApplicationRunner {
                 log.warn("  端口: {}", port);
                 log.warn(BORDER);
                 log.warn("");
-
-                logService.add("端口检测(" + label + ")", "警告",
-                        "服务(" + label + ") 未启动，端口: " + port);
             }
         }
     }

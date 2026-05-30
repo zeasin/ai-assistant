@@ -32,11 +32,13 @@ public class LogService {
 
     private Path getLogFile() {
         Config config = configService.load();
-        String baseDir = config.getBaseDir();
-        if (baseDir == null || baseDir.isEmpty()) baseDir = "D:\\projects\\richie_learning_notes";
         String logFile = config.getLogFile();
-        if (logFile == null || logFile.isEmpty()) logFile = "assistant_log.json";
-        return Paths.get(baseDir).resolve(logFile);
+        if (logFile == null || logFile.isEmpty()) {
+            return appConfig.getConfigDirPath().resolve("assistant_log.json");
+        }
+        return Paths.get(logFile).isAbsolute()
+                ? Paths.get(logFile)
+                : appConfig.getConfigDirPath().resolve(logFile);
     }
 
     public List<LogEntry> load() {
