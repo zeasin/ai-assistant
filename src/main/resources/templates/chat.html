@@ -35,15 +35,15 @@
                 <th:block th:if="${current != null and current.messages != null and #lists.size(current.messages) > 0}">
                     <th:block th:each="m : ${current.messages}">
                     <div class="chat-msg" th:classappend="${m.role}">
-                        <div class="label" th:text="${m.role == 'user' ? '你' : 'AI 助理'}">AI 助理</div>
+                        <div class="label" th:text="${m.role == 'user' ? '你' : (m.mode == 'coding' ? '💻 编程AI' : '🤖 AI 助理')}">AI 助理</div>
                         <div class="text" th:text="${m.content}">内容</div>
                     </div>
                     </th:block>
                 </th:block>
                 <th:block th:unless="${current != null and current.messages != null and #lists.size(current.messages) > 0}">
                 <div class="chat-msg ai">
-                    <div class="label">AI 助理</div>
-                    <div class="text">你好！有什么我可以帮你的？我可以读取你的笔记库来回答关于项目、客户、计划等方面的问题。</div>
+                    <div class="label" th:text="${current_mode == 'coding' ? '💻 编程AI' : '🤖 AI 助理'}">AI 助理</div>
+                    <div class="text" id="welcomeMsg">你好！有什么我可以帮你的？我可以读取你的笔记库来回答关于项目、客户、计划等方面的问题。</div>
                 </div>
                 </th:block>
             </div>
@@ -99,6 +99,24 @@
 .chat-main {
     flex: 1; display: flex; flex-direction: column; overflow: hidden;
 }
+.chat-mode-bar {
+    background: #fff; border-bottom: 1px solid #e1e3e6;
+    padding: 10px 16px; display: flex; align-items: center;
+}
+.mode-tabs {
+    display: flex; gap: 8px;
+}
+.mode-tab {
+    padding: 8px 16px; border: 1px solid #e1e3e6; border-radius: 8px;
+    background: #fff; color: #666; cursor: pointer; font-size: 13px;
+    transition: all .15s;
+}
+.mode-tab:hover {
+    border-color: #7c5cfc; color: #7c5cfc;
+}
+.mode-tab.active {
+    background: #7c5cfc; border-color: #7c5cfc; color: #fff;
+}
 .chat-box {
     flex: 1; overflow-y: auto; padding: 16px; min-height: 0;
 }
@@ -133,6 +151,7 @@
 
 <script>
 let currentSessionId = '[[${current_id}]]';
+let currentMode = '[[${current_mode}]]';
 let replyText = '';
 
 function escapeHtml(text) {
@@ -141,17 +160,47 @@ function escapeHtml(text) {
     return d.innerHTML;
 }
 
-async function saveMessage(role, content) {
+function isCodeRelatedMessage(text) {
+    const lowerText = text.toLowerCase();
+    return lowerText.includes("项目") ||
+           lowerText.includes("代码") ||
+           lowerText.includes("bug") ||
+           lowerText.includes("启动") ||
+           lowerText.includes("java") ||
+           lowerText.includes("程序") ||
+           lowerText.includes("开发") ||
+           lowerText.includes("功能") ||
+           lowerText.includes("流程") ||
+           lowerText.includes("优化") ||
+           lowerText.includes("重构") ||
+           lowerText.includes("部署") ||
+           lowerText.includes("微服务") ||
+           lowerText.includes("service") ||
+           lowerText.includes("controller") ||
+           lowerText.includes("repository") ||
+           lowerText.includes("dao") ||
+           lowerText.includes("entity") ||
+           lowerText.includes("model") ||
+           lowerText.includes("class") ||
+           lowerText.includes("接口") ||
+           lowerText.includes("api") ||
+           lowerText.includes("文件") ||
+           lowerText.includes("目录") ||
+           lowerText.includes("包");
+}
+
+function getAIModeName(mode) {
+    return mode === 'coding' ? '💻 编程AI' : '🤖 AI 助理';
+}
+
+async function saveMessage(role, content, mode) {
+    if (!currentSessionId) return;
     const form = new FormData();
     form.append('session_id', currentSessionId);
     form.append('role', role);
     form.append('content', content);
-    const res = await fetch('/chat/session/save', { method: 'POST', body: form });
-    const data = await res.json();
-    if (data.ok) {
-        currentSessionId = data.session_id;
-    }
-    return data.session_id;
+    form.append('mode', mode);
+    await fetch('/chat/session/save', { method: 'POST', body: form });
 }
 
 async function sendMessage() {
@@ -165,15 +214,15 @@ async function sendMessage() {
     btn.disabled = true; btn.textContent = '⏳ 思考中...';
     replyText = '';
 
-    // save & show user msg
-    await saveMessage('user', msg);
+    // 保存用户消息到当前会话
+    await saveMessage('user', msg, 'knowledge');
     box.innerHTML += `<div class="chat-msg user"><div class="label">你</div><div class="text">${escapeHtml(msg)}</div></div>`;
     box.scrollTop = box.scrollHeight;
 
-    // AI message container (initially shows thinking indicator)
+    let aiMode = 'knowledge';  // 默认值，会从后端更新
     const aiMsgId = 'ai-' + Date.now();
     box.innerHTML += `<div class="chat-msg ai" id="${aiMsgId}">
-        <div class="label">AI 助理</div>
+        <div class="label" id="ai-label-${aiMsgId}">🤖 AI 助理</div>
         <div class="chat-status" id="status-${aiMsgId}" style="display:none;">⏳ 处理中...</div>
         <div class="text" id="reply-${aiMsgId}"></div>
     </div>`;
@@ -201,6 +250,12 @@ async function sendMessage() {
                 if (!part.startsWith('data:')) continue;
                 try {
                     const data = JSON.parse(part.replace(/^data:\s*/, ''));
+                    // 如果有 mode 信息，更新我们的变量
+                    if (data.mode) {
+                        aiMode = data.mode;
+                        // 更新 label
+                        document.getElementById('ai-label-' + aiMsgId).textContent = getAIModeName(aiMode);
+                    }
                     if (data.type === 'status') {
                         if (data.tool === 'read' && data.file) {
                             const name = data.file.split('/').pop();
@@ -224,7 +279,8 @@ async function sendMessage() {
                         document.getElementById('reply-' + aiMsgId).innerHTML = '<span style="color:#ff6b6b;">❌ ' + escapeHtml(data.content) + '</span>';
                     } else if (data.type === 'done') {
                         document.getElementById('status-' + aiMsgId).style.display = 'none';
-                        await saveMessage('assistant', replyText);
+                        // 使用从后端获取的 aiMode 来保存回复
+                        await saveMessage('assistant', replyText, aiMode);
                     }
                 } catch (e) { /* skip malformed events */ }
             }
@@ -257,11 +313,9 @@ async function deleteSession(id) {
     }
 }
 
-// 页面加载后自动滚动到最底部
 addEventListener('DOMContentLoaded', () => {
     const box = document.getElementById('chatBox');
     if (box) box.scrollTop = box.scrollHeight;
-    // Event delegation for session click/delete
     document.getElementById('sessionList')?.addEventListener('click', e => {
         const item = e.target.closest('.session-item');
         if (!item) return;

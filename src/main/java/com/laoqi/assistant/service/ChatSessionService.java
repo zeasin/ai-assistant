@@ -31,9 +31,11 @@ public class ChatSessionService {
         Config config = configService.load();
         String baseDir = config.getBaseDir();
         if (baseDir == null || baseDir.isEmpty()) baseDir = "D:\\projects\\richie_learning_notes";
+        String chatDir = config.getChatSessionsDir();
+        if (chatDir == null || chatDir.isEmpty()) chatDir = "chat";
         String chatSessionsFile = config.getChatSessionsFile();
         if (chatSessionsFile == null || chatSessionsFile.isEmpty()) chatSessionsFile = "chat_sessions.json";
-        return Paths.get(baseDir).resolve(chatSessionsFile);
+        return Paths.get(baseDir).resolve(chatDir).resolve(chatSessionsFile);
     }
 
     public static class SessionsData {
@@ -42,45 +44,51 @@ public class ChatSessionService {
     }
 
     public SessionsData load() {
-        return FileUtil.readJson(getChatSessionsFile(), SessionsData.class, new SessionsData());
+        SessionsData data = FileUtil.readJson(getChatSessionsFile(), SessionsData.class, new SessionsData());
+        // 给旧的会话和消息补充默认 mode 字段（向下兼容）
+        for (ChatSession session : data.sessions) {
+            if (session.getMode() == null) {
+                session.setMode("knowledge");
+            }
+            if (session.getMessages() != null) {
+                for (ChatSession.ChatMessage msg : session.getMessages()) {
+                    if (msg.getMode() == null) {
+                        // 如果是AI回复，使用会话的mode；用户消息可以为空
+                        if (!"user".equals(msg.getRole())) {
+                            msg.setMode(session.getMode());
+                        }
+                    }
+                }
+            }
+        }
+        return data;
     }
 
     public void save(SessionsData data) {
         FileUtil.writeJson(getChatSessionsFile(), data);
     }
 
-    public String saveMessage(String sessionId, String role, String content) {
+    public boolean saveMessage(String sessionId, String role, String content, String mode) {
         SessionsData data = load();
         String now = TimeUtil.nowStr();
 
-        // Find existing session
         if (sessionId != null && !sessionId.isEmpty()) {
             for (ChatSession s : data.sessions) {
                 if (s.getId().equals(sessionId)) {
-                    s.getMessages().add(new ChatSession.ChatMessage(role, content, now));
+                    s.getMessages().add(new ChatSession.ChatMessage(role, content, now, mode));
                     s.setTitle(ChatSession.deriveTitle(s.getMessages()));
                     s.setUpdated(now);
+                    if (mode != null && !mode.isEmpty()) {
+                        s.setMode(mode);
+                    }
                     data.current = sessionId;
                     save(data);
-                    return sessionId;
+                    return true;
                 }
             }
         }
 
-        // Create new session
-        String sid = TimeUtil.sessionId();
-        ChatSession session = new ChatSession();
-        session.setId(sid);
-        session.setCreated(now);
-        session.setUpdated(now);
-        List<ChatSession.ChatMessage> msgs = new ArrayList<>();
-        msgs.add(new ChatSession.ChatMessage(role, content, now));
-        session.setMessages(msgs);
-        session.setTitle(ChatSession.deriveTitle(msgs));
-        data.sessions.add(0, session);
-        data.current = sid;
-        save(data);
-        return sid;
+        return false;
     }
 
     public void deleteSession(String sessionId) {

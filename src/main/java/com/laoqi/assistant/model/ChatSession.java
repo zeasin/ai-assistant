@@ -6,6 +6,7 @@ import java.util.List;
 public class ChatSession {
     private String id;
     private String title;
+    private String mode;
     private String created;
     private String updated;
     private List<ChatMessage> messages = new ArrayList<>();
@@ -14,6 +15,7 @@ public class ChatSession {
         private String role;
         private String content;
         private String time;
+        private String mode;
 
         public ChatMessage() {}
 
@@ -23,12 +25,21 @@ public class ChatSession {
             this.time = time;
         }
 
+        public ChatMessage(String role, String content, String time, String mode) {
+            this.role = role;
+            this.content = content;
+            this.time = time;
+            this.mode = mode;
+        }
+
         public String getRole() { return role; }
         public void setRole(String role) { this.role = role; }
         public String getContent() { return content; }
         public void setContent(String content) { this.content = content; }
         public String getTime() { return time; }
         public void setTime(String time) { this.time = time; }
+        public String getMode() { return mode; }
+        public void setMode(String mode) { this.mode = mode; }
     }
 
     public static String deriveTitle(List<ChatMessage> messages) {
@@ -46,6 +57,8 @@ public class ChatSession {
     public void setId(String id) { this.id = id; }
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
+    public String getMode() { return mode; }
+    public void setMode(String mode) { this.mode = mode; }
     public String getCreated() { return created; }
     public void setCreated(String created) { this.created = created; }
     public String getUpdated() { return updated; }

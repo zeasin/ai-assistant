@@ -16,6 +16,7 @@ public class Config {
     private String recordDataPath;
     private String operationsDataPath;
     
+    private String chatSessionsDir;
     private String chatSessionsFile;
     private String logFile;
     private String dailyDir;
@@ -33,6 +34,7 @@ public class Config {
         c.leadDataPath = "企业/客户管理/线索数据.json";
         c.recordDataPath = "企业/客户管理/跟进记录.json";
         c.operationsDataPath = "自媒体/运营数据.json";
+        c.chatSessionsDir = "chat";
         c.chatSessionsFile = "chat_sessions.json";
         c.logFile = "assistant_log.json";
         c.dailyDir = "工作/日报";
@@ -62,6 +64,8 @@ public class Config {
     public void setRecordDataPath(String recordDataPath) { this.recordDataPath = recordDataPath; }
     public String getOperationsDataPath() { return operationsDataPath; }
     public void setOperationsDataPath(String operationsDataPath) { this.operationsDataPath = operationsDataPath; }
+    public String getChatSessionsDir() { return chatSessionsDir; }
+    public void setChatSessionsDir(String chatSessionsDir) { this.chatSessionsDir = chatSessionsDir; }
     public String getChatSessionsFile() { return chatSessionsFile; }
     public void setChatSessionsFile(String chatSessionsFile) { this.chatSessionsFile = chatSessionsFile; }
     public String getLogFile() { return logFile; }

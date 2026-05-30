@@ -73,6 +73,19 @@ public class ApiConfigController {
         }
     }
 
+    @PostMapping("/api/config/chatDir")
+    public Map<String, Object> updateChatDir(@RequestParam String chatSessionsDir) {
+        try {
+            Config cfg = configService.load();
+            cfg.setChatSessionsDir(chatSessionsDir);
+            configService.save(cfg);
+            logService.add("配置更新", "成功", "聊天记录保存目录已更新为: " + chatSessionsDir);
+            return Map.of("ok", true);
+        } catch (Exception e) {
+            return Map.of("ok", false, "error", e.getMessage());
+        }
+    }
+
     @PostMapping("/api/config/feishu")
     public Map<String, Object> updateFeishu(
             @RequestParam(required = false, defaultValue = "") String appId,
