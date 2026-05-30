@@ -124,12 +124,12 @@ fetch('/api/config')
     .then(r => r.json())
     .then(cfg => {
         const input = document.getElementById('webhookUrl');
-        if (cfg.feishu_webhook_url) input.value = cfg.feishu_webhook_url;
-        if (cfg.feishu_app_id) document.getElementById('feishuAppId').value = cfg.feishu_app_id;
-        if (cfg.feishu_app_secret) document.getElementById('feishuAppSecret').value = cfg.feishu_app_secret;
-        if (cfg.feishu_chat_id) document.getElementById('feishuChatId').value = cfg.feishu_chat_id;
-        if (cfg.feishu_polling_enabled) document.getElementById('feishuPollingEnabled').checked = true;
-        if (cfg.erp_project_dir) document.getElementById('erpProjectDir').value = cfg.erp_project_dir;
+        if (cfg.feishuWebhookUrl) input.value = cfg.feishuWebhookUrl;
+        if (cfg.feishuAppId) document.getElementById('feishuAppId').value = cfg.feishuAppId;
+        if (cfg.feishuAppSecret) document.getElementById('feishuAppSecret').value = cfg.feishuAppSecret;
+        if (cfg.feishuChatId) document.getElementById('feishuChatId').value = cfg.feishuChatId;
+        if (cfg.feishuPollingEnabled) document.getElementById('feishuPollingEnabled').checked = true;
+        if (cfg.erpProjectDir) document.getElementById('erpProjectDir').value = cfg.erpProjectDir;
     })
     .catch(() => {});
 
@@ -160,11 +160,11 @@ function saveWebhook() {
 async function saveFeishu(e) {
     e.preventDefault();
     const form = new FormData();
-    form.append('app_id', document.getElementById('feishuAppId').value.trim());
-    form.append('app_secret', document.getElementById('feishuAppSecret').value.trim());
-    form.append('chat_id', document.getElementById('feishuChatId').value.trim());
-    form.append('polling_enabled', document.getElementById('feishuPollingEnabled').checked ? 'on' : 'off');
-    form.append('erp_project_dir', document.getElementById('erpProjectDir').value.trim());
+    form.append('appId', document.getElementById('feishuAppId').value.trim());
+    form.append('appSecret', document.getElementById('feishuAppSecret').value.trim());
+    form.append('chatId', document.getElementById('feishuChatId').value.trim());
+    form.append('pollingEnabled', document.getElementById('feishuPollingEnabled').checked ? 'on' : 'off');
+    form.append('erpProjectDir', document.getElementById('erpProjectDir').value.trim());
     const res = await fetch('/api/config/feishu', { method: 'POST', body: form });
     const data = await res.json();
     const status = document.getElementById('feishuStatus');
@@ -188,8 +188,8 @@ async function fetchChats() {
     list.style.display = 'none';
 
     const form = new FormData();
-    form.append('app_id', appId);
-    form.append('app_secret', appSecret);
+    form.append('appId', appId);
+    form.append('appSecret', appSecret);
     const res = await fetch('/api/config/feishu/chats', { method: 'POST', body: form });
     const data = await res.json();
 
@@ -240,9 +240,9 @@ async function testFeishu() {
     btn.disabled = true; btn.textContent = '⏳ 发送中...'; status.textContent = '';
 
     const form = new FormData();
-    form.append('app_id', appId);
-    form.append('app_secret', appSecret);
-    form.append('chat_id', chatId);
+    form.append('appId', appId);
+    form.append('appSecret', appSecret);
+    form.append('chatId', chatId);
     const res = await fetch('/api/config/feishu/test', { method: 'POST', body: form });
     const data = await res.json();
 

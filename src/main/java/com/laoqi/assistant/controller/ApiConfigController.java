@@ -85,7 +85,7 @@ public class ApiConfigController {
         try {
             String token = feishuService.getTenantToken(appId, appSecret);
             feishuService.sendTextMessage(token, chatId,
-                    "🧪 老齐AI助理连接测试成功！\\nAI助理已就绪，现在可以开始在群里与我对话啦 🎉");
+                    "🧪 老齐AI助理连接测试成功！AI助理已就绪，现在可以开始在群里与我对话啦 🎉");
             logService.add("飞书测试", "成功", "向 " + chatId.substring(0, Math.min(20, chatId.length())) + " 发送测试消息成功");
             return Map.of("ok", true);
         } catch (Exception e) {

@@ -52,10 +52,15 @@ public class FeishuService {
     }
 
     public String sendTextMessage(String token, String chatId, String text) throws IOException {
-        String content = "{\"text\":\"" + escapeJson(text) + "\"}";
-        String body = "{\"receive_id\":\"" + chatId + "\",\"msg_type\":\"text\",\"content\":" + content + "}";
-        return httpPost("https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=chat_id",
+        String innerContent = "{\"text\":\"" + escapeJson(text) + "\"}";
+        String body = "{\"receive_id\":\"" + chatId + "\",\"msg_type\":\"text\",\"content\":\"" + escapeJson(innerContent) + "\"}";
+        String response = httpPost("https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=chat_id",
                 body, "application/json; charset=utf-8", token);
+        Map<String, Object> json = parseJson(response);
+        if (!"0".equals(String.valueOf(json.get("code")))) {
+            throw new RuntimeException("发送消息失败: " + json.get("msg"));
+        }
+        return response;
     }
 
     public Map<String, Object> listMessages(String token, String chatId, int pageSize) throws IOException {

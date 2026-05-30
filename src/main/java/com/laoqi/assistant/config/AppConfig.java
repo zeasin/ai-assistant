@@ -11,6 +11,7 @@ import java.nio.file.Paths;
 public class AppConfig {
 
     private String baseDir;
+    private String configDir;
     private int notesPort = 14096;
     private int codePort = 14099;
     private String feishuWebhookUrl;
@@ -21,8 +22,12 @@ public class AppConfig {
         return Paths.get(baseDir);
     }
 
+    public Path getConfigDirPath() {
+        return Paths.get(configDir);
+    }
+
     public Path getConfigFile() {
-        return getBaseDirPath().resolve("config.json");
+        return getConfigDirPath().resolve("config.json");
     }
 
     public Path getLogFile() {
@@ -51,6 +56,8 @@ public class AppConfig {
 
     public String getBaseDir() { return baseDir; }
     public void setBaseDir(String baseDir) { this.baseDir = baseDir; }
+    public String getConfigDir() { return configDir; }
+    public void setConfigDir(String configDir) { this.configDir = configDir; }
     public int getNotesPort() { return notesPort; }
     public void setNotesPort(int notesPort) { this.notesPort = notesPort; }
     public int getCodePort() { return codePort; }
