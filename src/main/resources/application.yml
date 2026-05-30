@@ -19,3 +19,12 @@ app:
   code-port: 14099
   timezone: Asia/Shanghai
   max-history-chars: 6000
+
+logging:
+  level:
+    root: INFO
+    com.laoqi.assistant.service.SchedulerService: DEBUG
+    com.laoqi.assistant.service.FeishuService: DEBUG
+    com.laoqi.assistant.service.OpenCodeService: DEBUG
+  pattern:
+    console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"

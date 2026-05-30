@@ -57,6 +57,11 @@
             <artifactId>Java-WebSocket</artifactId>
             <version>1.6.0</version>
         </dependency>
+        <dependency>
+            <groupId>com.larksuite.oapi</groupId>
+            <artifactId>oapi-sdk</artifactId>
+            <version>2.3.2</version>
+        </dependency>
     </dependencies>
 
     <build>

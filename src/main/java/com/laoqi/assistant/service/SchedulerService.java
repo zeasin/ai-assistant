@@ -16,7 +16,7 @@ public class SchedulerService {
     private final LogService logService;
 
     public SchedulerService(ReportService reportService, FeishuService feishuService,
-                             LogService logService) {
+                            LogService logService) {
         this.reportService = reportService;
         this.feishuService = feishuService;
         this.logService = logService;
