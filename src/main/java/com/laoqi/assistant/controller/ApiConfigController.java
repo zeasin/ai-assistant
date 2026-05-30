@@ -78,14 +78,12 @@ public class ApiConfigController {
             @RequestParam(required = false, defaultValue = "") String appId,
             @RequestParam(required = false, defaultValue = "") String appSecret,
             @RequestParam(required = false, defaultValue = "") String chatId,
-            @RequestParam(required = false, defaultValue = "off") String pollingEnabled,
-            @RequestParam(required = false, defaultValue = "") String erpProjectDir) {
+            @RequestParam(required = false, defaultValue = "off") String pollingEnabled) {
         Config cfg = configService.load();
         cfg.setFeishuAppId(appId);
         cfg.setFeishuAppSecret(appSecret);
         cfg.setFeishuChatId(chatId);
         cfg.setFeishuPollingEnabled("on".equals(pollingEnabled));
-        cfg.setErpProjectDir(erpProjectDir);
         configService.save(cfg);
         logService.add("配置更新", "成功", "飞书消息接收配置已更新");
         return Map.of("ok", true);

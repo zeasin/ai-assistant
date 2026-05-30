@@ -101,13 +101,6 @@
                 启用消息轮询（每15秒检查一次）
             </label>
         </div>
-        <div class="form-group">
-            <label>📁 代码项目路径（可选）</label>
-            <input type="text" id="erpProjectDir" placeholder="/Users/qihang/Projects/qihangerp" style="font-family:monospace;">
-            <div class="text-muted" style="font-size:12px;margin-top:4px;">
-                填写 ERP 源码目录后，发消息含 "bug/报错/异常/排查/修复" 等关键字时自动路由到代码助理
-            </div>
-        </div>
         <div class="flex" style="gap:8px;">
             <button type="submit" class="btn btn-primary">保存飞书配置</button>
             <button type="button" class="btn btn-secondary" onclick="testFeishu()" id="testFeishuBtn">发送测试消息</button>
@@ -124,17 +117,6 @@
         <button class="btn btn-secondary" onclick="triggerJob('daily-report')">📝 下班提醒</button>
         <button class="btn btn-secondary" onclick="triggerJob('article-tue')">📢 周二发文提醒</button>
         <button class="btn btn-secondary" onclick="triggerJob('article-thu')">📢 周四发文提醒</button>
-    </div>
-</div>
-
-<div class="card">
-    <h2>📜 旧配置状态（已迁移）</h2>
-    <div class="text-muted mb-2">以下为迁移前的旧配置状态，仅供参考。</div>
-    <div class="report" style="font-size:13px;">
-        <strong>crontab：</strong>
-        <div class="text-muted" th:text="${crontab}">无</div>
-        <strong class="mt-2">LaunchAgent：</strong>
-        <div class="text-muted" th:text="${launchagent}">无</div>
     </div>
 </div>
 
@@ -175,7 +157,6 @@ fetch('/api/config')
         if (cfg.feishuAppSecret) document.getElementById('feishuAppSecret').value = cfg.feishuAppSecret;
         if (cfg.feishuChatId) document.getElementById('feishuChatId').value = cfg.feishuChatId;
         if (cfg.feishuPollingEnabled) document.getElementById('feishuPollingEnabled').checked = true;
-        if (cfg.erpProjectDir) document.getElementById('erpProjectDir').value = cfg.erpProjectDir;
         if (cfg.baseDir) document.getElementById('baseDirPath').value = cfg.baseDir;
         if (cfg.customerDataPath) document.getElementById('customerDataPath').value = cfg.customerDataPath;
         if (cfg.leadDataPath) document.getElementById('leadDataPath').value = cfg.leadDataPath;
@@ -257,7 +238,6 @@ async function saveFeishu(e) {
     form.append('appSecret', document.getElementById('feishuAppSecret').value.trim());
     form.append('chatId', document.getElementById('feishuChatId').value.trim());
     form.append('pollingEnabled', document.getElementById('feishuPollingEnabled').checked ? 'on' : 'off');
-    form.append('erpProjectDir', document.getElementById('erpProjectDir').value.trim());
     const res = await fetch('/api/config/feishu', { method: 'POST', body: form });
     const data = await res.json();
     const status = document.getElementById('feishuStatus');

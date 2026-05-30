@@ -1,13 +1,6 @@
 package com.laoqi.assistant.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
-
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class Config {
@@ -17,7 +10,6 @@ public class Config {
     private String feishuAppSecret;
     private String feishuChatId;
     private boolean feishuPollingEnabled;
-    private String erpProjectDir;
     
     private String customerDataPath;
     private String leadDataPath;
@@ -62,8 +54,6 @@ public class Config {
     public void setFeishuChatId(String feishuChatId) { this.feishuChatId = feishuChatId; }
     public boolean isFeishuPollingEnabled() { return feishuPollingEnabled; }
     public void setFeishuPollingEnabled(boolean feishuPollingEnabled) { this.feishuPollingEnabled = feishuPollingEnabled; }
-    public String getErpProjectDir() { return erpProjectDir; }
-    public void setErpProjectDir(String erpProjectDir) { this.erpProjectDir = erpProjectDir; }
     public String getCustomerDataPath() { return customerDataPath; }
     public void setCustomerDataPath(String customerDataPath) { this.customerDataPath = customerDataPath; }
     public String getLeadDataPath() { return leadDataPath; }
