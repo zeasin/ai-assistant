@@ -35,6 +35,10 @@ public class OpenCodeService {
         return "http://127.0.0.1:" + appConfig.getNotesPort();
     }
 
+    private String getCodeBaseUrl() {
+        return "http://127.0.0.1:" + appConfig.getCodePort();
+    }
+
     /**
      * Create a new opencode session
      */
@@ -181,6 +185,128 @@ public class OpenCodeService {
             return json.get("healthy").asBoolean();
         } catch (Exception e) {
             log.warn("[opencode] 健康检查失败: {}", e.getMessage());
+            return false;
+        }
+    }
+
+    public String createCodeSession(String title) throws Exception {
+        Map<String, Object> body = new HashMap<>();
+        if (title != null) {
+            body.put("title", title);
+        }
+
+        String url = getCodeBaseUrl() + "/session";
+        String requestBody = mapper.writeValueAsString(body);
+
+        log.info("[opencode-code] 创建会话 POST {} body={}", url, requestBody);
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                .timeout(Duration.ofSeconds(30))
+                .build();
+
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+        log.info("[opencode-code] 创建会话响应 status={} body={}", response.statusCode(), response.body());
+
+        if (response.statusCode() != 200) {
+            throw new RuntimeException("opencode createCodeSession error: " + response.statusCode());
+        }
+
+        JsonNode json = mapper.readTree(response.body());
+        return json.get("id").asText();
+    }
+
+    public String sendCodeMessage(String sessionId, String message) throws Exception {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("parts", List.of(Map.of("type", "text", "text", message)));
+
+        String url = getCodeBaseUrl() + "/session/" + sessionId + "/message";
+        String requestBody = mapper.writeValueAsString(body);
+
+        log.info("[opencode-code] 发送消息 POST {} sessionId={} message={}", url, sessionId, message);
+
+        long start = System.currentTimeMillis();
+
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                    .timeout(Duration.ofSeconds(300))
+                    .build();
+
+            log.debug("[opencode-code] 请求已构建，准备发送...");
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            log.debug("[opencode-code] 请求已发送，等待响应...");
+
+            long elapsed = System.currentTimeMillis() - start;
+
+            log.info("[opencode-code] 消息响应 status={} 耗时={}ms", response.statusCode(), elapsed);
+            log.info("[opencode-code] 响应体: {}", truncate(response.body(), 2000));
+
+            if (response.statusCode() != 200) {
+                throw new RuntimeException("opencode sendCodeMessage error: " + response.statusCode() + " body=" + response.body());
+            }
+
+            String reply = extractReplyText(response.body());
+            log.info("[opencode-code] 提取回复文本 长度={}", reply.length());
+            return reply;
+        } catch (Exception e) {
+            long elapsed = System.currentTimeMillis() - start;
+            log.error("[opencode-code] 发送消息失败，耗时={}ms: {}", elapsed, e.getMessage(), e);
+            throw e;
+        }
+    }
+
+    public String findIdleCodeSession() {
+        try {
+            String sessionsUrl = getCodeBaseUrl() + "/session";
+            log.debug("[opencode-code] 查询所有 session GET {}", sessionsUrl);
+
+            HttpRequest sessionsRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(sessionsUrl))
+                    .GET()
+                    .timeout(Duration.ofSeconds(10))
+                    .build();
+
+            HttpResponse<String> sessionsResponse = httpClient.send(sessionsRequest, HttpResponse.BodyHandlers.ofString());
+            JsonNode sessionsJson = mapper.readTree(sessionsResponse.body());
+
+            if (sessionsJson.isArray() && sessionsJson.size() > 0) {
+                String sessionId = sessionsJson.get(0).get("id").asText();
+                log.info("[opencode-code] 使用已有 session: {}", sessionId);
+                return sessionId;
+            }
+
+            log.info("[opencode-code] 没有找到已有 session");
+            return null;
+        } catch (Exception e) {
+            log.warn("[opencode-code] 查询 session 失败: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    public boolean isCodeHealthy() {
+        try {
+            String url = getCodeBaseUrl() + "/global/health";
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .GET()
+                    .timeout(Duration.ofSeconds(5))
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            log.debug("[opencode-code] 健康检查响应 status={} body={}", response.statusCode(), response.body());
+
+            JsonNode json = mapper.readTree(response.body());
+            return json.get("healthy").asBoolean();
+        } catch (Exception e) {
+            log.warn("[opencode-code] 健康检查失败: {}", e.getMessage());
             return false;
         }
     }
