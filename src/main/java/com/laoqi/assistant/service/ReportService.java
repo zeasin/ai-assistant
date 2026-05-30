@@ -18,14 +18,23 @@ public class ReportService {
     private final FeishuService feishuService;
     private final TodoService todoService;
     private final LogService logService;
+    private final OpenCodeService openCodeService;
+    private final ConfigService configService;
+
+    private String latestReport = "";
+    private String latestReportTime = "";
+    private String latestError = "";
 
     public ReportService(AppConfig appConfig,
                           FeishuService feishuService, TodoService todoService,
-                          LogService logService) {
+                          LogService logService, OpenCodeService openCodeService,
+                          ConfigService configService) {
         this.appConfig = appConfig;
         this.feishuService = feishuService;
         this.todoService = todoService;
         this.logService = logService;
+        this.openCodeService = openCodeService;
+        this.configService = configService;
     }
 
     public static class ReportResult {
@@ -35,22 +44,69 @@ public class ReportService {
 
     public ReportResult generate() {
         ReportResult result = new ReportResult();
-        result.error = "AI 引擎未配置，请在 application.yml 中配置 AI 服务";
+        try {
+            if (!openCodeService.isHealthy()) {
+                result.error = "opencode serve 未启动";
+                latestReport = "";
+                latestError = result.error;
+                return result;
+            }
+
+            String sessionId = openCodeService.findIdleSession();
+            if (sessionId == null) {
+                sessionId = openCodeService.createSession("日报生成");
+            }
+
+            String today = TimeUtil.todayStr();
+            String wd = TimeUtil.weekdayCn(TimeUtil.now());
+
+            String prompt = "现在是" + today + " " + wd + "。请根据我的工作笔记生成今天的综合日报。" +
+                    "内容需要涵盖：今日重点工作、客户沟通情况、开发进展、文章发布情况、明日计划。" +
+                    "请按以下格式输出：\n\n" +
+                    "【今日重点】\n...\n\n" +
+                    "【客户沟通】\n...\n\n" +
+                    "【开发进展】\n...\n\n" +
+                    "【文章发布】\n...\n\n" +
+                    "【明日计划】\n...\n\n" +
+                    "注意：如果某个板块没有相关信息，请写\"暂无\"。请使用中文回复。";
+
+            String report = openCodeService.sendMessage(sessionId, prompt);
+            if (report != null && !report.isEmpty()) {
+                result.report = report;
+                latestReport = report;
+                latestReportTime = TimeUtil.nowStr();
+                latestError = "";
+            } else {
+                result.error = "AI 返回内容为空";
+                latestReport = "";
+                latestError = result.error;
+            }
+        } catch (Exception e) {
+            log.error("生成日报失败", e);
+            result.error = e.getMessage();
+            latestReport = "";
+            latestError = e.getMessage();
+        }
         return result;
     }
+
+    public String getLatestReport() { return latestReport; }
+    public String getLatestReportTime() { return latestReportTime; }
+    public String getLatestError() { return latestError; }
 
     public void generateAndPush() {
         ReportResult r = generate();
         if (r.report != null) {
             String today = TimeUtil.todayStr();
             String wd = TimeUtil.weekdayCn(TimeUtil.now());
-            String title = "🌅 老齐早安 · " + today + " · " + wd;
+            String title = TimeUtil.greetingEmoji() + " 老齐" + TimeUtil.greetingText() + " · " + today + " · " + wd;
             var paras = feishuService.reportToParagraphs(r.report);
             feishuService.sendPost(title, paras);
             saveComprehensiveReport(r.report);
             todoService.clearTempReminders();
             logService.add("日报生成", "成功", "AI 日报已生成并推送");
         } else {
+            log.error("日报生成失败: {}", r.error);
             logService.add("日报生成", "失败", r.error);
         }
     }

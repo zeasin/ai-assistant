@@ -36,6 +36,32 @@ public class TimeUtil {
         };
     }
 
+    public static String greetingEmoji() {
+        return greetingEmoji(now().getHour());
+    }
+
+    public static String greetingEmoji(int hour) {
+        if (hour >= 5 && hour < 9) return "🌅";
+        if (hour >= 9 && hour < 12) return "☀️";
+        if (hour >= 12 && hour < 13) return "🌞";
+        if (hour >= 13 && hour < 17) return "🌤";
+        if (hour >= 17 && hour < 21) return "🌆";
+        return "🌙";
+    }
+
+    public static String greetingText() {
+        return greetingText(now().getHour());
+    }
+
+    public static String greetingText(int hour) {
+        if (hour >= 5 && hour < 9) return "早安";
+        if (hour >= 9 && hour < 12) return "上午好";
+        if (hour >= 12 && hour < 13) return "中午好";
+        if (hour >= 13 && hour < 17) return "下午好";
+        if (hour >= 17 && hour < 21) return "晚上好";
+        return "夜深了";
+    }
+
     public static String weekdayRoutine(ZonedDateTime dt) {
         return switch (dt.getDayOfWeek().getValue()) {
             case 1 -> "常规工作日，推进开发任务";
