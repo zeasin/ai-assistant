@@ -1,6 +1,7 @@
 package com.laoqi.assistant.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 
@@ -27,6 +28,7 @@ public class Config {
     private String weeklyDir;
     private String comprehensiveReportDir;
     private String remindFile;
+    private Map<String, Map<String, List<String>>> columnSettings = new HashMap<>();
 
     public Config() {}
 
@@ -84,4 +86,6 @@ public class Config {
     public void setComprehensiveReportDir(String comprehensiveReportDir) { this.comprehensiveReportDir = comprehensiveReportDir; }
     public String getRemindFile() { return remindFile; }
     public void setRemindFile(String remindFile) { this.remindFile = remindFile; }
+    public Map<String, Map<String, List<String>>> getColumnSettings() { return columnSettings; }
+    public void setColumnSettings(Map<String, Map<String, List<String>>> columnSettings) { this.columnSettings = columnSettings; }
 }

@@ -6,6 +6,9 @@
   "feishuAppSecret" : "IVsBQADPxkx62MnksTdxObxIWiCG6LZs",
   "feishuChatId" : "oc_83c41f86a177d021d2838372b2a11fea",
   "feishuPollingEnabled" : true,
+  "customerDataPath" : null,
+  "leadDataPath" : null,
+  "recordDataPath" : null,
   "customerDataDir" : "客户管理",
   "operationsDataPath" : "",
   "chatSessionsDir" : null,
@@ -14,5 +17,12 @@
   "dailyDir" : null,
   "weeklyDir" : null,
   "comprehensiveReportDir" : null,
-  "remindFile" : null
+  "remindFile" : null,
+  "columnSettings" : {
+    "customer" : {
+      "客户数据_customers" : [ "id", "name", "stage", "source", "product", "company", "createdAt", "notes" ],
+      "线索数据_leads" : [ "id", "name", "status", "source", "contacts", "createdAt", "lastContactedAt", "notes" ]
+    },
+    "operations" : { }
+  }
 }

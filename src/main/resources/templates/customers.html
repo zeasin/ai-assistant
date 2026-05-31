@@ -16,6 +16,63 @@
         .hidden-rows {
             display: none;
         }
+        .col-settings-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.3);
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .col-settings-popup {
+            background: #fff;
+            border-radius: 12px;
+            padding: 20px 24px;
+            min-width: 260px;
+            max-width: 400px;
+            max-height: 80vh;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+        }
+        .col-settings-popup h3 {
+            margin: 0 0 12px 0;
+            font-size: 15px;
+        }
+        .col-settings-item {
+            display: flex;
+            align-items: center;
+            padding: 6px 0;
+            font-size: 13px;
+        }
+        .col-settings-item input[type="checkbox"] {
+            margin-right: 8px;
+        }
+        .col-settings-actions {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+            margin-top: 14px;
+            padding-top: 12px;
+            border-top: 1px solid #e1e3e6;
+        }
+        .col-settings-actions .btn {
+            padding: 6px 16px;
+            font-size: 13px;
+        }
+        .col-settings-btn {
+            cursor: pointer;
+            font-size: 14px;
+            color: #909296;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: none;
+            border: none;
+            margin-left: 8px;
+        }
+        .col-settings-btn:hover {
+            color: #7c5cfc;
+            background: #f0edff;
+        }
     </style>
 </head>
 <body>
@@ -53,7 +110,36 @@
 let appData = null;
 let currentEventSource = null;
 let customerDataDir = null;
-const DATA_TYPE = 'customer';
+let columnSettings = {};
+	const DATA_TYPE = 'customer';
+
+	// 检测并按照时间字段倒序排列
+	function compareByTime(a, b) {
+	    var timeField = null;
+	    var timeKeywords = ['时间', '日期', '创建时间', '更新时间', '发布时间', 'date', 'created', 'updated', 'timestamp', 'publish', 'lastContact'];
+	    for (var k = 0; k < timeKeywords.length; k++) {
+	        for (var key in a) {
+	            if (key.indexOf(timeKeywords[k]) !== -1) {
+	                timeField = key;
+	                break;
+	            }
+	        }
+	        if (timeField) break;
+	    }
+	    // Fallback: 检查值是否为日期格式的字段
+	    if (!timeField) {
+	        for (var key in a) {
+	            if (typeof a[key] === 'string' && /^\d{4}[-\/]\d{1,2}[-\/]\d/.test(a[key])) {
+	                timeField = key;
+	                break;
+	            }
+	        }
+	    }
+	    if (!timeField) return 0;
+	    var ta = a[timeField] || '';
+	    var tb = b[timeField] || '';
+	    return String(tb).localeCompare(String(ta));
+	}
 
 document.addEventListener('DOMContentLoaded', function() {
     loadCustomerData();
@@ -100,11 +186,7 @@ async function loadCustomerData() {
                                 entries.push(item);
                             }
                         }
-                        entries.sort(function(a, b) {
-                            let timeA = a['时间'] || a['创建时间'] || a['date'] || a['timestamp'] || '';
-                            let timeB = b['时间'] || b['创建时间'] || b['date'] || b['timestamp'] || '';
-                            return String(timeB).localeCompare(String(timeA));
-                        });
+                        entries.sort(compareByTime);
                         appData.rawDataGroups[fileName][groupKey] = entries;
                         
                         let tableId = fileName + '_' + groupKey;
@@ -131,6 +213,19 @@ async function loadCustomerData() {
             }
         }
         
+        // 加载保存的列设置
+        try {
+            let settingsResp = await fetch('/api/data/column-settings?type=customer');
+            if (settingsResp.ok) {
+                let settingsData = await settingsResp.json();
+                if (settingsData.ok && settingsData.settings) {
+                    columnSettings = settingsData.settings;
+                }
+            }
+        } catch (e) {
+            console.warn('加载列设置失败:', e);
+        }
+
         renderData();
         setTimeout(function() { startCustomerAnalysis(false); }, 300);
     } catch (e) {
@@ -178,10 +273,14 @@ function renderData() {
         for (let groupKey in fileGroups) {
             let rows = fileGroups[groupKey];
             let tableId = fileKey + '_' + groupKey;
-            let columns = appData.tableColumns[tableId] || [];
-            
+            let allColumns = appData.tableColumns[tableId] || [];
+            let savedCols = columnSettings[tableId];
+            let columns = savedCols && savedCols.length > 0
+                ? allColumns.filter(function(c) { return savedCols.indexOf(c) !== -1; })
+                : allColumns;
+
             html += '<div class="card" style="margin-bottom:12px;">';
-            html += '<div class="data-header"><h4>' + groupKey + '</h4></div>';
+            html += '<div class="data-header"><h4>' + groupKey + '<button class="col-settings-btn" onclick="showColumnSettings(\'' + tableId + '\')" title="列设置">⚙️</button></h4></div>';
             
             html += '<div style="overflow-x:auto;">';
             html += '<table class="log-table" id="table_' + tableId + '">';
@@ -197,7 +296,7 @@ function renderData() {
             html += '<tbody>';
             for (let i = 0; i < rows.length; i++) {
                 let row = rows[i];
-                let rowClass = i >= 10 ? 'hidden-rows' : '';
+                let rowClass = i >= 6 ? 'hidden-rows' : '';
                 html += '<tr class="' + rowClass + '">';
                 for (let col of columns) {
                     let val = row[col] != null ? row[col] : '—';
@@ -207,7 +306,7 @@ function renderData() {
             }
             
             if (rows.length === 0) {
-                html += '<tr><td colspan="100" style="text-align:center;color:#909296;">暂无数据</td></tr>';
+                html += '<tr><td colspan="' + columns.length + '" style="text-align:center;color:#909296;">暂无数据</td></tr>';
             }
             
             html += '</tbody>';
@@ -219,6 +318,71 @@ function renderData() {
     
     html += '</div></details>';
     container.innerHTML = html;
+}
+
+function showColumnSettings(tableId) {
+    var allColumns = appData.tableColumns[tableId] || [];
+    if (allColumns.length === 0) return;
+
+    var savedCols = columnSettings[tableId];
+    var selected = savedCols && savedCols.length > 0
+        ? savedCols.slice()
+        : allColumns.slice();
+
+    var popup = document.createElement('div');
+    popup.className = 'col-settings-overlay';
+    popup.onclick = function(e) { if (e.target === popup) popup.remove(); };
+
+    var html = '<div class="col-settings-popup" onclick="event.stopPropagation();">';
+    html += '<h3>选择要显示的列</h3>';
+    html += '<div style="max-height:50vh;overflow-y:auto;">';
+    for (var i = 0; i < allColumns.length; i++) {
+        var col = allColumns[i];
+        var checked = selected.indexOf(col) !== -1;
+        html += '<label class="col-settings-item">';
+        html += '<input type="checkbox" value="' + col.replace(/"/g, '&quot;') + '" ' + (checked ? 'checked' : '') + '>';
+        html += col;
+        html += '</label>';
+    }
+    html += '</div>';
+    html += '<div class="col-settings-actions">';
+    html += '<button class="btn btn-secondary" onclick="this.closest(\'.col-settings-overlay\').remove()">取消</button>';
+    html += '<button class="btn btn-primary" onclick="saveColumnSettings(\'' + tableId + '\', this)">确认</button>';
+    html += '</div></div>';
+
+    popup.innerHTML = html;
+    document.body.appendChild(popup);
+}
+
+async function saveColumnSettings(tableId, btn) {
+    var popup = btn.closest('.col-settings-overlay');
+    var checkboxes = popup.querySelectorAll('input[type="checkbox"]');
+    var selected = [];
+    for (var i = 0; i < checkboxes.length; i++) {
+        if (checkboxes[i].checked) {
+            selected.push(checkboxes[i].value);
+        }
+    }
+
+    columnSettings[tableId] = selected;
+
+    try {
+        var resp = await fetch('/api/data/column-settings?type=customer', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(columnSettings)
+        });
+        var data = await resp.json();
+        if (data.ok) {
+            renderData();
+        } else {
+            alert('保存失败: ' + (data.error || '未知错误'));
+        }
+    } catch (e) {
+        alert('保存失败: ' + e.message);
+    }
+
+    popup.remove();
 }
 
 var customerStartTime;

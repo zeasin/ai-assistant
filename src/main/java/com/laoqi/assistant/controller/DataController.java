@@ -481,4 +481,34 @@ public class DataController {
         
         return groups;
     }
+
+    @GetMapping(value = "/column-settings", produces = MediaType.APPLICATION_JSON_VALUE)
+    public Map<String, Object> getColumnSettings(@RequestParam(required = false, defaultValue = "customer") String type) {
+        Config config = configService.load();
+        Map<String, Map<String, List<String>>> allSettings = config.getColumnSettings();
+        if (allSettings == null) {
+            allSettings = new HashMap<>();
+        }
+        Map<String, List<String>> typeSettings = allSettings.getOrDefault(type, new HashMap<>());
+        return Map.of("ok", true, "settings", typeSettings);
+    }
+
+    @PostMapping(value = "/column-settings", produces = MediaType.APPLICATION_JSON_VALUE)
+    public Map<String, Object> saveColumnSettings(
+            @RequestParam(required = false, defaultValue = "customer") String type,
+            @RequestBody Map<String, List<String>> settings) {
+        try {
+            Config config = configService.load();
+            Map<String, Map<String, List<String>>> allSettings = config.getColumnSettings();
+            if (allSettings == null) {
+                allSettings = new HashMap<>();
+            }
+            allSettings.put(type, settings);
+            config.setColumnSettings(allSettings);
+            configService.save(config);
+            return Map.of("ok", true);
+        } catch (Exception e) {
+            return Map.of("ok", false, "error", e.getMessage());
+        }
+    }
 }
