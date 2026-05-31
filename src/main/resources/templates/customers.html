@@ -16,16 +16,6 @@
         .hidden-rows {
             display: none;
         }
-        .show-more-btn {
-            text-align: center;
-            margin-top: 8px;
-            cursor: pointer;
-            color: #7c5cfc;
-            font-size: 14px;
-        }
-        .show-more-btn:hover {
-            text-decoration: underline;
-        }
     </style>
 </head>
 <body>
@@ -58,27 +48,6 @@
 </div>
 
 <div id="raw-data-container"></div>
-
-<div class="modal-overlay" id="modal-add-data">
-    <div class="modal">
-        <h3 id="modal-add-title">📝 添加数据</h3>
-        <form onsubmit="return submitAddData(event)">
-            <input type="hidden" name="fileKey" id="modal-add-fileKey">
-            <input type="hidden" name="groupKey" id="modal-add-groupKey">
-            <div class="form-group" style="margin-bottom:12px;">
-                <label>请输入要添加的数据内容</label>
-                <textarea name="dataInput" id="modal-add-input" required rows="4" placeholder="用自然语言描述要添加的数据，例如：新增客户：姓名=张三，公司=ABC科技，阶段=意向，联系人=张三，电话=13800138000" style="width:100%;padding:10px 12px;border:1px solid #e1e3e6;border-radius:8px;font-size:13px;font-family:inherit;box-sizing:border-box;resize:vertical;"></textarea>
-            </div>
-            <div class="text-muted" style="font-size:12px;margin-bottom:12px;">
-                💡 描述要添加的数据，AI 会自动理解并写入对应的 JSON 文件
-            </div>
-            <div class="modal-actions">
-                <button type="button" class="btn btn-secondary" onclick="closeModal('modal-add-data')">取消</button>
-                <button type="submit" class="btn btn-primary" id="modal-add-submit">提交给 AI</button>
-            </div>
-        </form>
-    </div>
-</div>
 
 <script>
 let appData = null;
@@ -131,6 +100,11 @@ async function loadCustomerData() {
                                 entries.push(item);
                             }
                         }
+                        entries.sort(function(a, b) {
+                            let timeA = a['时间'] || a['创建时间'] || a['date'] || a['timestamp'] || '';
+                            let timeB = b['时间'] || b['创建时间'] || b['date'] || b['timestamp'] || '';
+                            return String(timeB).localeCompare(String(timeA));
+                        });
                         appData.rawDataGroups[fileName][groupKey] = entries;
                         
                         let tableId = fileName + '_' + groupKey;
@@ -196,9 +170,9 @@ function renderData() {
     for (let fileKey in appData.rawDataGroups) {
         let fileGroups = appData.rawDataGroups[fileKey];
         html += '<div style="margin-bottom:20px;">';
-        html += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">';
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">';
         html += '<h3 style="margin:0;">' + fileKey + '</h3>';
-        html += '<a href="/data-editor?type=customer&data=' + encodeURIComponent(fileKey) + '" class="btn btn-secondary" style="font-size:12px;">✏️ 编辑</a>';
+        html += '<a href="/data-editor?type=customer&data=' + encodeURIComponent(fileKey) + '" class="btn btn-secondary" style="font-size:12px;">更多数据</a>';
         html += '</div>';
         
         for (let groupKey in fileGroups) {
@@ -207,9 +181,7 @@ function renderData() {
             let columns = appData.tableColumns[tableId] || [];
             
             html += '<div class="card" style="margin-bottom:12px;">';
-            html += '<div class="data-header"><h4>' + groupKey + '</h4>';
-            html += '<button class="btn btn-secondary btn-add-data" data-file-key="' + fileKey + '" data-group-key="' + groupKey + '" style="font-size:12px;">+ 添加</button>';
-            html += '</div>';
+            html += '<div class="data-header"><h4>' + groupKey + '</h4></div>';
             
             html += '<div style="overflow-x:auto;">';
             html += '<table class="log-table" id="table_' + tableId + '">';
@@ -225,7 +197,7 @@ function renderData() {
             html += '<tbody>';
             for (let i = 0; i < rows.length; i++) {
                 let row = rows[i];
-                let rowClass = i >= 5 ? 'hidden-rows' : '';
+                let rowClass = i >= 10 ? 'hidden-rows' : '';
                 html += '<tr class="' + rowClass + '">';
                 for (let col of columns) {
                     let val = row[col] != null ? row[col] : '—';
@@ -240,12 +212,6 @@ function renderData() {
             
             html += '</tbody>';
             html += '</table>';
-            
-            if (rows.length > 5) {
-                html += '<div class="show-more-btn" data-table-id="' + tableId + '">' +
-                    '<span>查看全部 ' + rows.length + ' 条</span></div>';
-            }
-            
             html += '</div></div>';
         }
         html += '</div>';
@@ -253,82 +219,6 @@ function renderData() {
     
     html += '</div></details>';
     container.innerHTML = html;
-    
-    // 重新绑定事件
-    document.querySelectorAll('.btn-add-data').forEach(function(btn) {
-        btn.addEventListener('click', function(e) {
-            e.stopPropagation();
-            showAddModal(this.getAttribute('data-file-key'), this.getAttribute('data-group-key'));
-        });
-    });
-    
-    document.querySelectorAll('.show-more-btn').forEach(function(btn) {
-        btn.addEventListener('click', function(e) {
-            e.stopPropagation();
-            var tableId = this.getAttribute('data-table-id');
-            toggleShowMore(tableId);
-        });
-    });
-}
-
-function toggleShowMore(tableId) {
-    var table = document.getElementById('table_' + tableId);
-    var hiddenRows = table.querySelectorAll('.hidden-rows');
-    var btn = table.nextElementSibling;
-    
-    if (hiddenRows.length > 0 && hiddenRows[0].style.display === 'none') {
-        hiddenRows.forEach(function(row) {
-            row.style.display = 'table-row';
-        });
-        btn.querySelector('span').textContent = '收起';
-    } else {
-        hiddenRows.forEach(function(row) {
-            row.style.display = 'none';
-        });
-        btn.querySelector('span').textContent = '查看全部 ' + hiddenRows.length + ' 条';
-    }
-}
-
-function showAddModal(fileKey, groupKey) {
-    document.getElementById('modal-add-title').textContent = '📝 添加 ' + fileKey + '-' + groupKey;
-    document.getElementById('modal-add-fileKey').value = fileKey;
-    document.getElementById('modal-add-groupKey').value = groupKey;
-    document.getElementById('modal-add-input').value = '';
-    document.getElementById('modal-add-data').classList.add('active');
-}
-
-function closeModal(id) { 
-    document.getElementById(id).classList.remove('active'); 
-}
-
-async function aiSend(msg) {
-    const resp = await fetch('/api/ai/send?message=' + encodeURIComponent(msg), { method: 'POST' });
-    return resp.json();
-}
-
-async function submitAddData(event) {
-    event.preventDefault();
-    var btn = document.getElementById('modal-add-submit');
-    btn.disabled = true; btn.textContent = '⏳ 提交中...';
-    var fileKey = document.getElementById('modal-add-fileKey').value;
-    var groupKey = document.getElementById('modal-add-groupKey').value;
-    var input = document.getElementById('modal-add-input').value.trim();
-    var msg = '在[' + fileKey + ']的[' + groupKey + ']中' + input;
-    try {
-        const res = await aiSend(msg);
-        if (res.ok) { 
-            toast('✅ ' + res.reply); 
-            closeModal('modal-add-data'); 
-            // 重新加载数据
-            loadCustomerData();
-        } else { 
-            toast(res.error || '添加失败', 'error'); 
-        }
-    } catch(e) { 
-        toast('网络错误', 'error'); 
-    }
-    btn.disabled = false; btn.textContent = '提交给 AI';
-    return false;
 }
 
 var customerStartTime;
