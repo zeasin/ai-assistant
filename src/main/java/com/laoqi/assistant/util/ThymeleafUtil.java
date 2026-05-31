@@ -71,4 +71,20 @@ public class ThymeleafUtil {
         if (val instanceof List) return (List) val;
         return List.of();
     }
+
+    public String label(String key) {
+        return key != null ? key : "";
+    }
+
+    public String label(String key, Map<String, String> userLabels) {
+        if (key == null) return "";
+        if (userLabels != null && userLabels.containsKey(key)) {
+            return userLabels.get(key);
+        }
+        return key;
+    }
+
+    public boolean isSimpleValue(Object val) {
+        return !(val instanceof java.util.Map) && !(val instanceof java.util.List);
+    }
 }

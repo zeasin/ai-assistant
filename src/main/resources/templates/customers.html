@@ -3,13 +3,43 @@
       layout:decorate="~{layout}">
 <head>
     <title layout:fragment="title">客户看板</title>
+    <style>
+        .data-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .data-header h4 {
+            margin: 0;
+        }
+        .hidden-rows {
+            display: none;
+        }
+        .show-more-btn {
+            text-align: center;
+            margin-top: 8px;
+            cursor: pointer;
+            color: #7c5cfc;
+            font-size: 14px;
+        }
+        .show-more-btn:hover {
+            text-decoration: underline;
+        }
+    </style>
 </head>
 <body>
 <th:block layout:fragment="content">
 
 <div class="card">
     <h2>📊 客户管理看板</h2>
-    <div class="text-muted mb-2">数据来源：<code>企业/客户管理/客户数据.json</code> | 最后更新：<span th:text="${last_updated}">未知</span></div>
+    <div class="text-muted mb-2" id="data-source-info">数据来源：<code>加载中...</code> /data/(自动发现目录下所有 JSON 文件) | 最后更新：<span>加载中...</span></div>
+</div>
+
+<div class="card" id="config-card" style="display:none;text-align:center;padding:30px 20px;border:2px dashed #d9d0ff;background:#fafafe;">
+    <div style="font-size:16px;font-weight:600;color:#7c5cfc;margin-bottom:8px;">📁 尚未配置客户数据目录</div>
+    <div class="text-muted" style="margin-bottom:16px;">请在 <a href="/config" style="color:#7c5cfc;">配置页面</a> 中设置「客户数据目录」，程序将自动读取该目录下所有 JSON 文件。</div>
+    <a href="/config" class="btn btn-primary">去配置</a>
 </div>
 
 <div class="card" style="background:linear-gradient(135deg,#f0edff,#fafafe);border:1px solid #d9d0ff;">
@@ -19,7 +49,7 @@
         <span id="customer-ai-elapsed" style="display:none;margin-left:8px;"></span>
     </div>
     <div id="customer-ai-status" class="text-muted" style="padding:20px 0;text-align:center;">
-        ⏳ 正在生成 AI 客户分析报告...
+        ⏳ 加载中...
     </div>
     <div id="customer-ai-result" class="report"></div>
     <div style="margin-top:12px;text-align:right;">
@@ -27,409 +57,186 @@
     </div>
 </div>
 
-<details style="background:#fff;border:1px solid #e1e3e6;border-radius:12px;padding:16px 20px;margin-bottom:16px;">
-    <summary style="cursor:pointer;font-size:14px;font-weight:600;color:#5c5f66;outline:none;">
-        📁 原始客户数据详情
-    </summary>
-    <div style="margin-top:12px;">
+<div id="raw-data-container"></div>
 
-<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
-    <button class="btn btn-primary" onclick="showAddCustomerModal()" style="font-size:12px;">+ 添加客户</button>
-    <button class="btn btn-primary" onclick="showAddLeadModal()" style="font-size:12px;">+ 添加线索</button>
-</div>
-
-<div class="card">
-    <h2>总览统计</h2>
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;">
-        <div class="status-item"><div class="label">客户总数</div><div class="value" th:text="${total}">0</div></div>
-        <div class="status-item"><div class="label">活跃客户</div><div class="value" style="color:#2b8a3e;" th:text="${active_count}">0</div></div>
-        <div class="status-item"><div class="label">线索客户</div><div class="value" style="color:#1971c2;" th:text="${lead_count}">0</div></div>
-        <div class="status-item"><div class="label">年度签约</div><div class="value" style="color:#e8590c;" th:text="${@utils.wan(total_contract)}">0</div></div>
-    </div>
-    <table class="log-table">
-        <thead><tr><th>指标</th><th>数值</th></tr></thead>
-        <tbody>
-            <tr><td>客户总数</td><td th:text="${total}">0</td></tr>
-            <tr><td>活跃客户</td><td th:text="${active_count}">0</td></tr>
-            <tr><td>线索客户</td><td th:text="${lead_count}">0</td></tr>
-            <tr><td>已流失客户</td><td th:text="${churned_count}">0</td></tr>
-            <tr><td>年度目标</td><td th:text="${@utils.wan(target)}">0</td></tr>
-            <tr><td>签约金额（2026）</td><td th:text="${@utils.wan(total_contract)}">0</td></tr>
-            <tr><td>实际收款（2026）</td><td th:text="${@utils.wan(total_paid)}">0</td></tr>
-            <tr><td>完成率</td>
-                <td th:if="${target > 0}">
-                    <span th:text="${@utils.fmtOne(total_contract / target * 100)} + '%（金额） / ' + ${@utils.fmtOne(total_paid / target * 100)} + '%（流水）'">完成率</span>
-                </td>
-                <td th:unless="${target > 0}">—</td>
-            </tr>
-        </tbody>
-    </table>
-</div>
-
-<div class="card">
-    <h2>客户漏斗</h2>
-    <div style="display:flex;flex-direction:column;gap:2px;">
-        <th:block th:each="stageEntry : ${pipeline_stages}">
-            <th:block th:with="stageName=${stageEntry.key}, stageData=${stageEntry.value}">
-                <th:block th:if="${@utils.toInt(stageData.count) > 0}">
-                    <th:block th:with="barColor=${stageData.color != null ? stageData.color : '#868e96'}, barWidth=${max_funnel_count > 0 ? @utils.toInt(stageData.count) * 100 / @utils.toInt(max_funnel_count) : 0}">
-                <div style="display:flex;align-items:center;gap:10px;padding:6px 0;">
-                    <div style="width:100px;font-size:13px;color:#5c5f66;font-weight:500;text-align:right;" th:text="${stageName}">阶段</div>
-                    <div style="flex:1;display:flex;align-items:center;gap:8px;">
-                        <div th:style="'height:24px;width:' + ${barWidth} + '%;min-width:4px;background:' + ${barColor} + ';border-radius:4px;opacity:0.85;transition:width .2s;'"></div>
-                        <span style="font-size:15px;font-weight:700;color:#1a1b1e;min-width:20px;" th:text="${@utils.toInt(stageData.count)}">0</span>
-                    </div>
-                    <div style="font-size:12px;color:#909296;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-                        <th:block th:if="${stageData.customers != null and #lists.size(stageData.customers) > 0 and stageData.customers[0].notes != null}">
-                            <span th:text="${@utils.limit(stageData.customers[0].notes, 30)}">备注</span>
-                        </th:block>
-                    </div>
-                </div>
-                    </th:block>
-                </th:block>
-            </th:block>
-        </th:block>
-    </div>
-</div>
-
-<div class="card">
-    <h2>线索漏斗</h2>
-    <div style="display:flex;flex-direction:column;gap:2px;">
-        <th:block th:each="funnelEntry : ${lead_funnel}">
-            <th:block th:with="statusName=${funnelEntry.key}, statusData=${funnelEntry.value}">
-                <th:block th:if="${@utils.toInt(statusData.count) > 0}">
-                    <th:block th:with="barColor=${statusData.color != null ? statusData.color : '#868e96'}, barWidth=${max_lead_funnel > 0 ? @utils.toInt(statusData.count) * 100 / @utils.toInt(max_lead_funnel) : 0}">
-                <div style="display:flex;align-items:center;gap:10px;padding:6px 0;">
-                    <div style="width:100px;font-size:13px;color:#5c5f66;font-weight:500;text-align:right;" th:text="${statusName}">状态</div>
-                    <div style="flex:1;display:flex;align-items:center;gap:8px;">
-                        <div th:style="'height:24px;width:' + ${barWidth} + '%;min-width:4px;background:' + ${barColor} + ';border-radius:4px;opacity:0.85;transition:width .2s;'"></div>
-                        <span style="font-size:15px;font-weight:700;color:#1a1b1e;min-width:20px;" th:text="${@utils.toInt(statusData.count)}">0</span>
-                    </div>
-                    <div style="font-size:12px;color:#909296;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-                        <th:block th:if="${statusData.leads != null and #lists.size(statusData.leads) > 0 and statusData.leads[0].notes != null}">
-                            <span th:text="${@utils.limit(statusData.leads[0].notes, 30)}">备注</span>
-                        </th:block>
-                    </div>
-                </div>
-                    </th:block>
-                </th:block>
-            </th:block>
-        </th:block>
-    </div>
-</div>
-
-<div class="card">
-    <h2>2026 年度营收</h2>
-    <table class="log-table">
-        <thead><tr><th>#</th><th>客户</th><th>合同</th><th>金额</th><th>已收款</th><th>未收款</th></tr></thead>
-        <tbody>
-            <tr th:each="c, iterStat : ${revenue_customers}">
-                <td th:text="${iterStat.count}">1</td>
-                <td th:text="${c.name}">客户</td>
-                <td th:text="${c.get('product') != null ? c.get('product') : '—'}">—</td>
-                <td th:text="${@utils.wan(@utils.toDouble(c.get('contractAmount')))}">0</td>
-                <td th:text="${@utils.wan(@utils.toDouble(c.get('paidAmount')))}">0</td>
-                <td th:text="${@utils.wan(@utils.toDouble(c.get('contractAmount')) - @utils.toDouble(c.get('paidAmount')))}">0</td>
-            </tr>
-            <tr>
-                <td colspan="2"><strong>合计</strong></td>
-                <td></td>
-                <td><strong th:text="${@utils.wan(total_contract)}">0</strong></td>
-                <td><strong th:text="${@utils.wan(total_paid)}">0</strong></td>
-                <td><strong th:text="${@utils.wan(total_contract - total_paid)}">0</strong></td>
-            </tr>
-        </tbody>
-    </table>
-    <div class="text-muted" style="margin-top:8px;">
-        年度目标 <span th:text="${@utils.wan(target)}">0</span>，完成
-        <span th:text="${@utils.fmtOne(total_contract/target*100)} + '%（金额）/ ' + ${@utils.fmtOne(total_paid/target*100)} + '%（流水）'">完成率</span>
-    </div>
-</div>
-
-<div class="card">
-    <h2 style="display:flex;justify-content:space-between;align-items:center;">服务中 <a href="/customers/all" style="font-size:13px;font-weight:400;color:#7c5cfc;text-decoration:none;">查看所有 →</a></h2>
-    <table class="log-table">
-        <thead><tr><th style="width:50px;">ID</th><th>客户</th><th>公司</th><th>地区</th><th>阶段</th><th>产品</th><th>联系人</th><th>合同/收款</th><th>备注</th></tr></thead>
-        <tbody>
-            <th:block th:each="c : ${customers}">
-                <th:block th:if="${c.stage == '已签约-待首款' or c.stage == '进行中' or c.stage == '售后中'}">
-                <tr>
-                    <td><small th:text="${c.id}">ID</small></td>
-                    <td><strong th:text="${c.name}">客户</strong></td>
-                    <td th:text="${c.get('company') != null ? c.get('company') : '—'}">—</td>
-                    <td th:text="${c.get('region') != null ? c.get('region') : '—'}">—</td>
-                    <td th:text="${c.stage}">阶段</td>
-                    <td th:text="${c.get('product') != null ? c.get('product') : '—'}">—</td>
-                    <td>
-                        <th:block th:if="${c.contacts != null and #lists.size(c.contacts) > 0}" th:with="contact=${c.contacts[0]}">
-                            <span th:text="${contact.get('name') != null ? contact.get('name') : ''}"></span>
-                            <br><small th:if="${contact.get('phone') != null}" th:text="${contact.get('phone')}"></small>
-                            <br><small th:if="${contact.get('email') != null}" th:text="${contact.get('email')}"></small>
-                        </th:block>
-                    </td>
-                    <td>
-                        <th:block th:if="${@utils.toDouble(c.get('contractAmount')) > 0}">
-                            <span th:text="${@utils.wan(@utils.toDouble(c.get('contractAmount')))} + '/' + ${@utils.wan(@utils.toDouble(c.get('paidAmount')))}">合同/收款</span>
-                        </th:block>
-                        <th:block th:unless="${@utils.toDouble(c.get('contractAmount')) > 0}">—</th:block>
-                    </td>
-                    <td th:text="${c.notes != null ? @utils.limit(c.notes, 30) : ''}">备注</td>
-                </tr>
-                </th:block>
-            </th:block>
-            <tr th:if="${#lists.size(customers) == 0}">
-                <td colspan="6" style="text-align:center;color:#909296;">暂无服务中的客户</td>
-            </tr>
-        </tbody>
-    </table>
-</div>
-
-<div class="card">
-    <h2 style="display:flex;justify-content:space-between;align-items:center;">线索池 <a href="/leads/all" style="font-size:13px;font-weight:400;color:#7c5cfc;text-decoration:none;">查看所有 →</a></h2>
-    <table class="log-table">
-        <thead><tr><th style="width:50px;">ID</th><th style="width:105px;">最后跟进</th><th>客户</th><th>公司</th><th>地区</th><th>来源</th><th style="width:80px;">状态</th><th>联系人</th><th>跟进内容</th><th>备注</th></tr></thead>
-        <tbody>
-            <th:block th:each="l : ${leads}">
-                <th:block th:if="${l.status == '跟进中' or l.status == '待跟进'}">
-                    <th:block th:with="activities=${@utils.toList(l.get('activities'))}, lastAct=${#lists.size(activities) > 0 ? activities[#lists.size(activities)-1] : null}">
-                <tr>
-                    <td><small th:text="${l.id}">ID</small></td>
-                    <td th:text="${lastAct != null ? @utils.limit(lastAct.get('date') != null ? lastAct.get('date') : '', 10) : @utils.limit(l.get('createdAt') != null ? l.get('createdAt') : '', 10)}">日期</td>
-                    <td><strong th:text="${l.name}">客户</strong></td>
-                    <td th:text="${l.get('company') != null ? l.get('company') : '—'}">—</td>
-                    <td th:text="${l.get('region') != null ? l.get('region') : '—'}">—</td>
-                    <td th:text="${l.source}">来源</td>
-                    <td th:text="${l.status}">状态</td>
-                    <td>
-                        <th:block th:if="${l.contacts != null and #lists.size(l.contacts) > 0}" th:with="contact=${l.contacts[0]}">
-                            <span th:text="${contact.get('name') != null ? contact.get('name') : ''}"></span>
-                            <span th:if="${contact.get('phone') != null}" th:text="' ' + ${contact.get('phone')}"></span>
-                            <span th:if="${contact.get('wechat') != null}" th:text="' ' + ${contact.get('wechat')}"></span>
-                        </th:block>
-                    </td>
-                    <td th:text="${lastAct != null ? @utils.limit(lastAct.get('content') != null ? lastAct.get('content') : '', 40) : @utils.limit(l.get('notes') != null ? l.get('notes') : '', 30)}">内容</td>
-                    <td th:text="${l.notes != null ? @utils.limit(l.notes, 30) : '—'}">备注</td>
-                </tr>
-                    </th:block>
-                </th:block>
-            </th:block>
-        </tbody>
-    </table>
-</div>
-
-<div class="card">
-    <h2>待办</h2>
-    <table class="log-table">
-        <thead><tr><th>优先级</th><th>客户</th><th>事项</th></tr></thead>
-        <tbody>
-            <tr th:each="c, iterStat : ${todos}" th:if="${iterStat.index < 8}">
-                <th:block th:with="urgency=${c.nextFollowUp != null and #strings.contains(c.nextFollowUp, '06') ? '🔴' : (c.nextFollowUp != null ? '🟡' : '🟢')}">
-                <td>
-                    <span th:style="'color:' + (${urgency} == '🔴' ? '#e03131' : (${urgency} == '🟡' ? '#e8590c' : '#2b8a3e')) + ';'" th:text="${urgency}">🔴</span>
-                </td>
-                </th:block>
-                <td th:text="${c.name}">客户</td>
-                <td th:text="${c.notes != null ? @utils.limit(c.notes, 50) : ''}">事项</td>
-            </tr>
-        </tbody>
-    </table>
-</div>
-
-<div class="card">
-    <h2>最近活动</h2>
-    <table class="log-table">
-        <thead><tr><th style="width:105px;">日期</th><th style="width:120px;">客户</th><th style="width:80px;">类型</th><th>内容</th></tr></thead>
-        <tbody>
-            <tr th:each="act : ${recent_activities}">
-                <td th:text="${act.date}">日期</td>
-                <td th:text="${act.customer}">客户</td>
-                <td th:text="${act.type}">类型</td>
-                <td th:text="${@utils.limit(act.content, 60)}">内容</td>
-            </tr>
-        </tbody>
-    </table>
-</div>
-</details>
-
-<div class="card" style="text-align:center;">
-    <button class="btn btn-primary" onclick="showAddRecord()">+ 添加跟进记录</button>
-</div>
-
-<!-- 添加客户弹窗 -->
-<div class="modal-overlay" id="modal-customer">
+<div class="modal-overlay" id="modal-add-data">
     <div class="modal">
-        <h3>📋 添加客户</h3>
-        <form onsubmit="return submitCustomer(event)">
-            <div class="form-row">
-                <div class="form-group">
-                    <label>客户名 *</label>
-                    <input type="text" name="name" required placeholder="客户名称">
-                </div>
-                <div class="form-group">
-                    <label>阶段 *</label>
-                    <select name="stage" required>
-                        <option value="潜在">潜在</option>
-                        <option value="意向">意向</option>
-                        <option value="已签约-待首款">已签约-待首款</option>
-                        <option value="进行中">进行中</option>
-                        <option value="售后中">售后中</option>
-                        <option value="已流失">已流失</option>
-                    </select>
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group"><label>公司</label><input type="text" name="company" placeholder="公司名"></div>
-                <div class="form-group"><label>地区</label><input type="text" name="region" placeholder="如 北京"></div>
-            </div>
-            <div class="form-row">
-                <div class="form-group"><label>合同金额</label><input type="number" name="contractAmount" value="0" step="0.01"></div>
-                <div class="form-group"><label>已收款</label><input type="number" name="paidAmount" value="0" step="0.01"></div>
-            </div>
+        <h3 id="modal-add-title">📝 添加数据</h3>
+        <form onsubmit="return submitAddData(event)">
+            <input type="hidden" name="fileKey" id="modal-add-fileKey">
+            <input type="hidden" name="groupKey" id="modal-add-groupKey">
             <div class="form-group" style="margin-bottom:12px;">
-                <label>产品</label>
-                <input type="text" name="product" placeholder="如 ERP系统">
+                <label>请输入要添加的数据内容</label>
+                <textarea name="dataInput" id="modal-add-input" required rows="4" placeholder="用自然语言描述要添加的数据，例如：新增客户：姓名=张三，公司=ABC科技，阶段=意向，联系人=张三，电话=13800138000" style="width:100%;padding:10px 12px;border:1px solid #e1e3e6;border-radius:8px;font-size:13px;font-family:inherit;box-sizing:border-box;resize:vertical;"></textarea>
             </div>
-            <div style="background:#f8f7ff;border-radius:8px;padding:12px;margin-bottom:12px;">
-                <div style="font-size:12px;font-weight:600;margin-bottom:8px;">联系人信息</div>
-                <div class="form-row">
-                    <div class="form-group"><label>姓名</label><input type="text" name="contactName" placeholder="联系人"></div>
-                    <div class="form-group"><label>电话</label><input type="text" name="contactPhone" placeholder="手机号"></div>
-                    <div class="form-group"><label>微信</label><input type="text" name="contactWechat" placeholder="微信号"></div>
-                </div>
-            </div>
-            <div class="form-group" style="margin-bottom:12px;">
-                <label>备注</label>
-                <input type="text" name="notes" placeholder="备注信息">
+            <div class="text-muted" style="font-size:12px;margin-bottom:12px;">
+                💡 描述要添加的数据，AI 会自动理解并写入对应的 JSON 文件
             </div>
             <div class="modal-actions">
-                <button type="button" class="btn btn-secondary" onclick="closeModal('modal-customer')">取消</button>
-                <button type="submit" class="btn btn-primary">保存</button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- 添加线索弹窗 -->
-<div class="modal-overlay" id="modal-lead">
-    <div class="modal">
-        <h3>📋 添加线索</h3>
-        <form onsubmit="return submitLead(event)">
-            <div class="form-row">
-                <div class="form-group">
-                    <label>线索名 *</label>
-                    <input type="text" name="name" required placeholder="线索名称/联系人">
-                </div>
-                <div class="form-group">
-                    <label>状态 *</label>
-                    <select name="status" required>
-                        <option value="待跟进">待跟进</option>
-                        <option value="跟进中">跟进中</option>
-                        <option value="已转化">已转化</option>
-                        <option value="已放弃">已放弃</option>
-                    </select>
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group"><label>公司</label><input type="text" name="company" placeholder="公司名"></div>
-                <div class="form-group"><label>地区</label><input type="text" name="region" placeholder="如 北京"></div>
-            </div>
-            <div class="form-row">
-                <div class="form-group"><label>来源 *</label>
-                    <select name="source" required>
-                        <option value="微信">微信</option>
-                        <option value="知乎">知乎</option>
-                        <option value="CSDN">CSDN</option>
-                        <option value="转介绍">转介绍</option>
-                        <option value="线下">线下</option>
-                        <option value="其他">其他</option>
-                    </select>
-                </div>
-                <div class="form-group"></div>
-            </div>
-            <div style="background:#f8f7ff;border-radius:8px;padding:12px;margin-bottom:12px;">
-                <div style="font-size:12px;font-weight:600;margin-bottom:8px;">联系人信息</div>
-                <div class="form-row">
-                    <div class="form-group"><label>姓名</label><input type="text" name="contactName" placeholder="联系人"></div>
-                    <div class="form-group"><label>电话</label><input type="text" name="contactPhone" placeholder="手机号"></div>
-                    <div class="form-group"><label>微信</label><input type="text" name="contactWechat" placeholder="微信号"></div>
-                </div>
-                <div class="form-group">
-                    <label>邮箱</label>
-                    <input type="email" name="contactEmail" placeholder="邮箱地址">
-                </div>
-            </div>
-            <div class="form-group" style="margin-bottom:12px;">
-                <label>备注</label>
-                <input type="text" name="notes" placeholder="备注信息">
-            </div>
-            <div class="modal-actions">
-                <button type="button" class="btn btn-secondary" onclick="closeModal('modal-lead')">取消</button>
-                <button type="submit" class="btn btn-primary">保存</button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<div class="modal-overlay" id="addRecordModal">
-    <div class="modal">
-        <h3>添加跟进记录</h3>
-        <form id="addRecordForm" onsubmit="return submitRecord(event)">
-            <div class="form-row">
-                <div class="form-group">
-                    <label>客户/线索 *</label>
-                    <select name="customerId" required id="recordCustomerId" onchange="updateCustomerName()">
-                        <option value="">— 选择客户或线索 —</option>
-                        <optgroup label="已合作客户">
-                            <option th:each="c : ${customers}" th:value="${c.id}" th:attr="data-name=${c.name}" th:text="${c.id + ' ' + c.name}">客户</option>
-                        </optgroup>
-                        <optgroup label="线索">
-                            <option th:each="l : ${leads}" th:value="${l.id}" th:attr="data-name=${l.name}" th:text="${l.id + ' ' + l.name}">线索</option>
-                        </optgroup>
-                    </select>
-                    <input type="hidden" name="customerName" id="recordCustomerName">
-                </div>
-                <div class="form-group">
-                    <label>类型</label>
-                    <select name="actType">
-                        <option value="跟进">跟进</option>
-                        <option value="咨询">咨询</option>
-                        <option value="演示">演示</option>
-                        <option value="测试">测试</option>
-                        <option value="签约">签约</option>
-                        <option value="收款">收款</option>
-                        <option value="已放弃">已放弃</option>
-                        <option value="其他">其他</option>
-                    </select>
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>日期</label>
-                    <input type="date" name="date" id="recordDate">
-                </div>
-                <div class="form-group">
-                    <label>下次跟进</label>
-                    <input type="date" name="nextFollowUp" id="recordNextFollowUp">
-                </div>
-            </div>
-            <div class="form-group">
-                <label>跟进内容 *</label>
-                <textarea name="content" required rows="3" placeholder="详细描述跟进内容"></textarea>
-            </div>
-            <div class="modal-actions">
-                <button type="button" class="btn btn-secondary" onclick="closeModal('addRecordModal')">取消</button>
-                <button type="submit" class="btn btn-primary">保存</button>
+                <button type="button" class="btn btn-secondary" onclick="closeModal('modal-add-data')">取消</button>
+                <button type="submit" class="btn btn-primary" id="modal-add-submit">提交给 AI</button>
             </div>
         </form>
     </div>
 </div>
 
 <script>
-function showAddCustomerModal() {
-    document.getElementById('modal-customer').classList.add('active');
+let appData = null;
+let currentEventSource = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadCustomerData();
+});
+
+async function loadCustomerData() {
+    try {
+        const response = await fetch('/api/customers/data');
+        if (!response.ok) {
+            throw new Error('HTTP ' + response.status + ': ' + response.statusText);
+        }
+        appData = await response.json();
+        
+        renderData();
+        if (appData.isDataDirConfigured) {
+            setTimeout(function() { startCustomerAnalysis(false); }, 300);
+        }
+    } catch (e) {
+        console.error('加载数据失败:', e);
+        document.getElementById('data-source-info').innerHTML = '数据加载失败: ' + e.message;
+    }
 }
-function showAddLeadModal() {
-    document.getElementById('modal-lead').classList.add('active');
+
+function renderData() {
+    if (!appData.isDataDirConfigured) {
+        document.getElementById('config-card').style.display = 'block';
+        document.getElementById('customer-ai-status').textContent = '⚠️ 请先在配置页面设置「客户数据目录」，然后再进行 AI 分析。';
+        return;
+    }
+    
+    // 更新数据来源信息
+    const dataSourceInfo = document.getElementById('data-source-info');
+    dataSourceInfo.innerHTML = '数据来源：<code>' + (appData.customerDataDir || '未配置') + '</code> /data/(自动发现目录下所有 JSON 文件) | 最后更新：<span>' + (appData.lastUpdated || '未知') + '</span>';
+    
+    // 渲染原始数据
+    const container = document.getElementById('raw-data-container');
+    container.innerHTML = '';
+    
+    if (appData.dataDirEmpty) {
+        container.innerHTML = '<details style="background:#fff;border:1px solid #e1e3e6;border-radius:12px;padding:16px 20px;margin-bottom:16px;" open>' +
+            '<summary style="cursor:pointer;font-size:14px;font-weight:600;color:#5c5f66;outline:none;">📁 原始数据详情</summary>' +
+            '<div style="margin-top:12px;"><div class="card"><div style="text-align:center;padding:30px 20px;border:2px dashed #d9d0ff;background:#fafafe;">' +
+            '<div style="font-size:16px;font-weight:600;color:#7c5cfc;margin-bottom:8px;">📁 目录为空</div>' +
+            '<div class="text-muted">请在配置的目录下添加 JSON 文件</div></div></div></div></details>';
+        return;
+    }
+    
+    let html = '<details style="background:#fff;border:1px solid #e1e3e6;border-radius:12px;padding:16px 20px;margin-bottom:16px;" open>' +
+        '<summary style="cursor:pointer;font-size:14px;font-weight:600;color:#5c5f66;outline:none;">📁 原始数据详情</summary>' +
+        '<div style="margin-top:12px;">';
+    
+    for (let fileKey in appData.rawDataGroups) {
+        let fileGroups = appData.rawDataGroups[fileKey];
+        html += '<div style="margin-bottom:20px;">';
+        html += '<h3>' + fileKey + '</h3>';
+        
+        for (let groupKey in fileGroups) {
+            let rows = fileGroups[groupKey];
+            let tableId = fileKey + '_' + groupKey;
+            let columns = appData.tableColumns[tableId] || [];
+            
+            html += '<div class="card" style="margin-bottom:12px;">';
+            html += '<div class="data-header"><h4>' + groupKey + '</h4>';
+            html += '<button class="btn btn-secondary btn-add-data" data-file-key="' + fileKey + '" data-group-key="' + groupKey + '" style="font-size:12px;">+ 添加</button>';
+            html += '</div>';
+            
+            html += '<div style="overflow-x:auto;">';
+            html += '<table class="log-table" id="table_' + tableId + '">';
+            
+            // 表头
+            html += '<thead><tr>';
+            for (let col of columns) {
+                html += '<th>' + col + '</th>';
+            }
+            html += '</tr></thead>';
+            
+            // 表体
+            html += '<tbody>';
+            for (let i = 0; i < rows.length; i++) {
+                let row = rows[i];
+                let rowClass = i >= 5 ? 'hidden-rows' : '';
+                html += '<tr class="' + rowClass + '">';
+                for (let col of columns) {
+                    let val = row[col] != null ? row[col] : '—';
+                    html += '<td>' + val + '</td>';
+                }
+                html += '</tr>';
+            }
+            
+            if (rows.length === 0) {
+                html += '<tr><td colspan="100" style="text-align:center;color:#909296;">暂无数据</td></tr>';
+            }
+            
+            html += '</tbody>';
+            html += '</table>';
+            
+            if (rows.length > 5) {
+                html += '<div class="show-more-btn" data-table-id="' + tableId + '">' +
+                    '<span>查看全部 ' + rows.length + ' 条</span></div>';
+            }
+            
+            html += '</div></div>';
+        }
+        html += '</div>';
+    }
+    
+    html += '</div></details>';
+    container.innerHTML = html;
+    
+    // 重新绑定事件
+    document.querySelectorAll('.btn-add-data').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            showAddModal(this.getAttribute('data-file-key'), this.getAttribute('data-group-key'));
+        });
+    });
+    
+    document.querySelectorAll('.show-more-btn').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            var tableId = this.getAttribute('data-table-id');
+            toggleShowMore(tableId);
+        });
+    });
+}
+
+function toggleShowMore(tableId) {
+    var table = document.getElementById('table_' + tableId);
+    var hiddenRows = table.querySelectorAll('.hidden-rows');
+    var btn = table.nextElementSibling;
+    
+    if (hiddenRows.length > 0 && hiddenRows[0].style.display === 'none') {
+        hiddenRows.forEach(function(row) {
+            row.style.display = 'table-row';
+        });
+        btn.querySelector('span').textContent = '收起';
+    } else {
+        hiddenRows.forEach(function(row) {
+            row.style.display = 'none';
+        });
+        btn.querySelector('span').textContent = '查看全部 ' + hiddenRows.length + ' 条';
+    }
+}
+
+function showAddModal(fileKey, groupKey) {
+    document.getElementById('modal-add-title').textContent = '📝 添加 ' + fileKey + '-' + groupKey;
+    document.getElementById('modal-add-fileKey').value = fileKey;
+    document.getElementById('modal-add-groupKey').value = groupKey;
+    document.getElementById('modal-add-input').value = '';
+    document.getElementById('modal-add-data').classList.add('active');
+}
+
+function closeModal(id) { 
+    document.getElementById(id).classList.remove('active'); 
 }
 
 async function aiSend(msg) {
@@ -437,78 +244,30 @@ async function aiSend(msg) {
     return resp.json();
 }
 
-async function submitCustomer(e) {
-    e.preventDefault();
-    const fd = new FormData(e.target);
-    const msg = '新增客户：姓名=' + fd.get('name')
-        + '，阶段=' + fd.get('stage')
-        + (fd.get('company') ? '，公司=' + fd.get('company') : '')
-        + (fd.get('region') ? '，地区=' + fd.get('region') : '')
-        + (fd.get('product') ? '，产品=' + fd.get('product') : '')
-        + (fd.get('contractAmount') > 0 ? '，合同金额=' + fd.get('contractAmount') : '')
-        + (fd.get('paidAmount') > 0 ? '，已收款=' + fd.get('paidAmount') : '')
-        + (fd.get('contactName') ? '，联系人=' + fd.get('contactName') : '')
-        + (fd.get('contactPhone') ? '，电话=' + fd.get('contactPhone') : '')
-        + (fd.get('contactWechat') ? '，微信=' + fd.get('contactWechat') : '')
-        + (fd.get('notes') ? '，备注=' + fd.get('notes') : '');
+async function submitAddData(event) {
+    event.preventDefault();
+    var btn = document.getElementById('modal-add-submit');
+    btn.disabled = true; btn.textContent = '⏳ 提交中...';
+    var fileKey = document.getElementById('modal-add-fileKey').value;
+    var groupKey = document.getElementById('modal-add-groupKey').value;
+    var input = document.getElementById('modal-add-input').value.trim();
+    var msg = '在[' + fileKey + ']的[' + groupKey + ']中' + input;
     try {
         const res = await aiSend(msg);
-        if (res.ok) { toast('✅ ' + res.reply); closeModal('modal-customer'); location.reload(); }
-        else { toast(res.error || '添加失败', 'error'); }
-    } catch(e) { toast('网络错误', 'error'); }
+        if (res.ok) { 
+            toast('✅ ' + res.reply); 
+            closeModal('modal-add-data'); 
+            // 重新加载数据
+            loadCustomerData();
+        } else { 
+            toast(res.error || '添加失败', 'error'); 
+        }
+    } catch(e) { 
+        toast('网络错误', 'error'); 
+    }
+    btn.disabled = false; btn.textContent = '提交给 AI';
     return false;
 }
-
-async function submitLead(e) {
-    e.preventDefault();
-    const fd = new FormData(e.target);
-    const msg = '新增线索：姓名=' + fd.get('name')
-        + '，来源=' + fd.get('source')
-        + '，状态=' + fd.get('status')
-        + (fd.get('company') ? '，公司=' + fd.get('company') : '')
-        + (fd.get('region') ? '，地区=' + fd.get('region') : '')
-        + (fd.get('contactName') ? '，联系人=' + fd.get('contactName') : '')
-        + (fd.get('contactPhone') ? '，电话=' + fd.get('contactPhone') : '')
-        + (fd.get('contactWechat') ? '，微信=' + fd.get('contactWechat') : '')
-        + (fd.get('contactEmail') ? '，邮箱=' + fd.get('contactEmail') : '')
-        + (fd.get('notes') ? '，备注=' + fd.get('notes') : '');
-    try {
-        const res = await aiSend(msg);
-        if (res.ok) { toast('✅ ' + res.reply); closeModal('modal-lead'); location.reload(); }
-        else { toast(res.error || '添加失败', 'error'); }
-    } catch(e) { toast('网络错误', 'error'); }
-    return false;
-}
-
-function showAddRecord() {
-    document.getElementById('addRecordModal').classList.add('active');
-    document.getElementById('recordDate').value = new Date().toISOString().slice(0,10);
-}
-function closeModal(id) { document.getElementById(id).classList.remove('active'); }
-function updateCustomerName() {
-    const sel = document.getElementById('recordCustomerId');
-    const opt = sel.options[sel.selectedIndex];
-    document.getElementById('recordCustomerName').value = opt ? opt.getAttribute('data-name') || '' : '';
-}
-async function submitRecord(e) {
-    e.preventDefault();
-    const fd = new FormData(document.getElementById('addRecordForm'));
-    const name = document.getElementById('recordCustomerName').value || fd.get('customerName') || fd.get('customerId');
-    const msg = '记录跟进：客户名=' + name
-        + '，类型=' + (fd.get('actType') || '跟进')
-        + '，内容=' + fd.get('content')
-        + (fd.get('date') ? '，日期=' + fd.get('date') : '')
-        + (fd.get('nextFollowUp') ? '，下次跟进=' + fd.get('nextFollowUp') : '');
-    try {
-        const res = await aiSend(msg);
-        if (res.ok) { toast('✅ ' + res.reply); closeModal('addRecordModal'); location.reload(); }
-        else { toast(res.error || '添加失败', 'error'); }
-    } catch(e) { toast('网络错误', 'error'); }
-    return false;
-}
-document.querySelectorAll('.modal-overlay').forEach(function(m) {
-    m.addEventListener('click', function(e) { if (e.target === this) closeModal(this.id); });
-});
 
 var customerStartTime;
 function startCustomerAnalysis(force) {
@@ -516,6 +275,18 @@ function startCustomerAnalysis(force) {
     var status = document.getElementById('customer-ai-status');
     var result = document.getElementById('customer-ai-result');
     var elapsed = document.getElementById('customer-ai-elapsed');
+    
+    if (!appData || !appData.isDataDirConfigured) {
+        status.style.display = 'block';
+        status.textContent = '⚠️ 请先在配置页面设置「客户数据目录」，然后再进行 AI 分析。';
+        result.innerHTML = '';
+        return;
+    }
+    
+    if (currentEventSource) {
+        currentEventSource.close();
+        currentEventSource = null;
+    }
 
     btn.disabled = true;
     btn.textContent = '⏳ 分析中...';
@@ -527,6 +298,7 @@ function startCustomerAnalysis(force) {
 
     var url = '/api/customers/ai-analysis' + (force ? '?force=true' : '');
     var es = new EventSource(url);
+    currentEventSource = es;
     es.onmessage = function(event) {
         try {
             var data = JSON.parse(event.data);
@@ -543,6 +315,7 @@ function startCustomerAnalysis(force) {
                 result.innerHTML = '<div style="color:#e03131;padding:20px;text-align:center;">❌ ' + data.content + '</div>';
             } else if (data.type === 'done') {
                 es.close();
+                currentEventSource = null;
                 btn.disabled = false;
                 btn.textContent = '🔄 重新分析';
             }
@@ -550,6 +323,7 @@ function startCustomerAnalysis(force) {
     };
     es.onerror = function() {
         es.close();
+        currentEventSource = null;
         btn.disabled = false;
         btn.textContent = '🔄 重新分析';
         if (result.innerHTML === '') {
@@ -558,9 +332,6 @@ function startCustomerAnalysis(force) {
         }
     };
 }
-window.addEventListener('DOMContentLoaded', function() {
-    setTimeout(function() { startCustomerAnalysis(false); }, 300);
-});
 </script>
 
 </th:block>

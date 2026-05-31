@@ -46,17 +46,14 @@
                     <th:block th:if="${#lists.size(stats) > 0}">
                     <h3 style="font-size:14px;margin:12px 0 6px;" th:text="${account_name}">账号名</h3>
                     <table class="log-table">
-                        <thead><tr><th>日期</th><th>粉丝</th><th>阅读量</th><th>文章数</th><th>推荐</th><th>搜一搜</th><th>消息</th><th>朋友圈</th></tr></thead>
+                        <thead>
+                            <tr>
+                                <th th:each="col : ${stats[0]}" th:if="${@utils.isSimpleValue(col.value)}" th:text="${@utils.label(col.key, keyLabels)}">列</th>
+                            </tr>
+                        </thead>
                         <tbody>
                             <tr th:each="day : ${stats}">
-                                <td th:text="${day.date}">日期</td>
-                                <td th:text="${day.fans != null ? day.fans : '—'}">—</td>
-                                <td th:text="${day.reads}">0</td>
-                                <td th:text="${day.readArticles}">0</td>
-                                <td th:text="${@utils.pct(day.sourceRecommend != null ? day.sourceRecommend : 0, day.reads != null ? day.reads : 0)}">0%</td>
-                                <td th:text="${@utils.pct(day.sourceSearch != null ? day.sourceSearch : 0, day.reads != null ? day.reads : 0)}">0%</td>
-                                <td th:text="${@utils.pct(day.sourceMessage != null ? day.sourceMessage : 0, day.reads != null ? day.reads : 0)}">0%</td>
-                                <td th:text="${@utils.pct(day.sourceMoments != null ? day.sourceMoments : 0, day.reads != null ? day.reads : 0)}">0%</td>
+                                <td th:each="col : ${stats[0]}" th:if="${@utils.isSimpleValue(col.value)}" th:text="${day[col.key] != null ? day[col.key] : '—'}">—</td>
                             </tr>
                         </tbody>
                     </table>
@@ -67,58 +64,51 @@
 
         <div class="card" style="margin-bottom:12px;">
             <h2>账号总览</h2>
-            <table class="log-table">
-                <thead><tr><th>账号</th><th>平台</th><th>账号名</th><th>粉丝</th><th>备注</th></tr></thead>
-                <tbody>
-                    <th:block th:each="accEntry : ${accounts}">
-                        <th:block th:with="accName=${accEntry.key}, platforms=${accEntry.value}, rowspan=${#maps.size(platforms)}">
-                        <th:block th:each="platEntry, platStat : ${platforms}" th:with="platKey=${platEntry.key}, info=${platEntry.value}">
-                        <tr>
-                            <th:block th:if="${platStat.first}">
-                            <td th:rowspan="${rowspan}"><strong th:text="${accName}">账号名</strong></td>
-                            </th:block>
-                            <td th:text="${@utils.platformName(platKey)}">平台</td>
-                            <td th:text="${info.name}">—</td>
-                            <td th:text="${info.fans != null ? info.fans : '—'}">—</td>
-                            <td>
-                                <th:block th:if="${info.totalViews != null}">
-                                    <span th:text="'总访问' + info.totalViews + '，原创' + info.totalArticles + '篇'">统计</span>
-                                </th:block>
-                                <th:block th:if="${info.totalViews == null and info.fansUpdated != null}">
-                                    <span th:text="'更新于 ' + info.fansUpdated">更新</span>
-                                </th:block>
-                                <th:block th:if="${info.totalViews == null and info.fansUpdated == null}">—</th:block>
-                            </td>
-                        </tr>
-                        </th:block>
-                        </th:block>
-                    </th:block>
-                </tbody>
-            </table>
+            <th:block th:each="accEntry : ${accounts}">
+                <th:block th:with="accName=${accEntry.key}, platforms=${accEntry.value}">
+                <h3 style="font-size:14px;margin:12px 0 6px;" th:text="${accName}">账号名</h3>
+                <th:block th:each="platEntry : ${platforms}" th:with="platKey=${platEntry.key}, info=${platEntry.value}">
+                    <div style="margin:4px 0 8px 12px;font-size:13px;">
+                        <strong th:text="${@utils.platformName(platKey)}">平台</strong>
+                        <div style="display:flex;flex-wrap:wrap;gap:4px 16px;margin:4px 0 0 12px;">
+                            <span th:each="fieldEntry : ${info}" th:if="${@utils.isSimpleValue(fieldEntry.value)}">
+                                <span style="color:#5c5f66;" th:text="${@utils.label(fieldEntry.key, keyLabels) + ':'}">字段:</span>
+                                <span th:text="${fieldEntry.value}">值</span>
+                            </span>
+                        </div>
+                    </div>
+                </th:block>
+                </th:block>
+            </th:block>
         </div>
 
         <th:block th:each="artEntry : ${articles}">
             <th:block th:with="accName=${artEntry.key}, articleList=${artEntry.value}">
             <div class="card" style="margin-bottom:12px;">
                 <h2 th:text="${accName}">账号名</h2>
+                <div style="overflow-x:auto;">
                 <table class="log-table" style="margin-top:8px;">
-                    <thead><tr><th style="width:32px">ID</th><th style="width:125px">日期</th><th style="text-align:left">文章</th><th style="width:48px">阅读</th><th style="width:36px">👍</th><th style="width:36px">🔁</th></tr></thead>
+                    <thead>
+                        <tr>
+                            <th th:each="col : ${#lists.size(articleList) > 0 ? articleList[0] : {}}" th:if="${@utils.isSimpleValue(col.value)}" th:text="${@utils.label(col.key, keyLabels)}">列</th>
+                            <th th:if="${#lists.size(articleList) > 0 and articleList[0].containsKey('data')}">平台数据</th>
+                        </tr>
+                    </thead>
                     <tbody>
                         <tr th:each="article : ${articleList}">
-                            <td th:text="${article.id}">ID</td>
-                            <td th:text="${article.publishDate}">日期</td>
-                            <td style="text-align:left">
-                                <span th:text="${article.topic}">文章</span>
-                                <th:block th:if="${article.fansGained != null}">
-                                    <br><small class="text-muted" th:text="'增粉 ' + ${article.fansGained}"></small>
-                                </th:block>
+                            <td th:each="col : ${#lists.size(articleList) > 0 ? articleList[0] : {}}" th:if="${@utils.isSimpleValue(col.value)}" th:text="${article[col.key] != null ? article[col.key] : '—'}">—</td>
+                            <td th:if="${article.containsKey('data') and article.get('data') != null}">
+                                <span th:each="platEntry, platStat : ${article.get('data')}">
+                                    <span th:text="${@utils.platformName(platEntry.key)}"></span>
+                                    <span th:text="' 阅读' + (platEntry.value.reads != null ? platEntry.value.reads : 0) + ' 赞' + (platEntry.value.likes != null ? platEntry.value.likes : 0) + (platEntry.value.shares != null ? ' 分享' + platEntry.value.shares : '')"></span>
+                                    <br th:if="${!platStat.last}">
+                                </span>
                             </td>
-                            <td th:text="${article.data != null and article.data.get('wechat') != null ? article.data.get('wechat').reads : '—'}">—</td>
-                            <td th:text="${article.data != null and article.data.get('wechat') != null ? article.data.get('wechat').likes : '—'}">—</td>
-                            <td th:text="${article.data != null and article.data.get('wechat') != null ? article.data.get('wechat').shares : '—'}">—</td>
+                            <td th:if="${!article.containsKey('data') or article.get('data') == null}">—</td>
                         </tr>
                     </tbody>
                 </table>
+                </div>
             </div>
             </th:block>
         </th:block>

@@ -12,8 +12,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.Executors;
 
 @Controller
@@ -35,28 +34,50 @@ public class OperationsController {
             String lastUpdated = data.meta != null ?
                     (String) data.meta.getOrDefault("lastUpdated", "未知") : "未知";
 
-            // Convert raw Object maps to typed PlatformInfo for the template
-            Map<String, Map<String, OperationsData.PlatformInfo>> convertedAccounts = new LinkedHashMap<>();
+            // Convert POJOs to Maps for dynamic template rendering
+            Map<String, List<Map<String, Object>>> dailyStatsMaps = new LinkedHashMap<>();
+            if (data.dailyStats != null) {
+                for (var entry : data.dailyStats.entrySet()) {
+                    List<Map<String, Object>> list = new ArrayList<>();
+                    for (var ds : entry.getValue()) {
+                        list.add(mapper.convertValue(ds, Map.class));
+                    }
+                    dailyStatsMaps.put(entry.getKey(), list);
+                }
+            }
+
+            Map<String, Map<String, Map<String, Object>>> accountsMaps = new LinkedHashMap<>();
             if (data.accounts != null) {
                 for (var accEntry : data.accounts.entrySet()) {
-                    Map<String, OperationsData.PlatformInfo> platforms = new LinkedHashMap<>();
+                    Map<String, Map<String, Object>> platforms = new LinkedHashMap<>();
                     for (var platEntry : accEntry.getValue().entrySet()) {
                         if (platEntry.getValue() instanceof Map) {
                             try {
-                                OperationsData.PlatformInfo info = mapper.convertValue(
-                                        platEntry.getValue(), OperationsData.PlatformInfo.class);
+                                Map<String, Object> info = mapper.convertValue(
+                                        platEntry.getValue(), Map.class);
                                 platforms.put(platEntry.getKey(), info);
                             } catch (Exception ignored) {}
                         }
                     }
-                    convertedAccounts.put(accEntry.getKey(), platforms);
+                    accountsMaps.put(accEntry.getKey(), platforms);
+                }
+            }
+
+            Map<String, List<Map<String, Object>>> articlesMaps = new LinkedHashMap<>();
+            if (data.articles != null) {
+                for (var entry : data.articles.entrySet()) {
+                    List<Map<String, Object>> list = new ArrayList<>();
+                    for (var a : entry.getValue()) {
+                        list.add(mapper.convertValue(a, Map.class));
+                    }
+                    articlesMaps.put(entry.getKey(), list);
                 }
             }
 
             model.addAttribute("last_updated", lastUpdated);
-            model.addAttribute("accounts", convertedAccounts);
-            model.addAttribute("articles", data.articles);
-            model.addAttribute("daily_stats", data.dailyStats);
+            model.addAttribute("accounts", accountsMaps);
+            model.addAttribute("articles", articlesMaps);
+            model.addAttribute("daily_stats", dailyStatsMaps);
 
             OperationsData.AnalysisResult analysis = operationsService.analyze(data.articles);
             model.addAttribute("analysis", analysis);

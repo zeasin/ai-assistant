@@ -3,14 +3,19 @@
 ## Quick start
 
 ```powershell
-# build
+# 1. 先启动两个 opencode serve 服务（必须）
+opencode serve --port 14096  # AI聊天服务
+opencode serve --port 14099  # 代码分析服务
+
+# 2. 编译项目
 mvn package -q
 
-# run (opencode serve must be running on port 14096)
+# 3. 启动应用
 java -jar target/assistant-v2-2.0.0.jar
 
-# web UI at http://localhost:6790
-# health check at http://localhost:6790/health
+# 访问地址
+# - Web UI: http://localhost:6790
+# - Health check: http://localhost:6790/health
 ```
 
 No tests, no linter, no CI.
@@ -20,9 +25,11 @@ No tests, no linter, no CI.
 Spring Boot 3.4.4 + Thymeleaf + Java 17, single-module Maven.
 
 - **Web port**: 6790 (config: `server.port`)
-- **opencode serve**: required on port 14096 (`app.notes-port`) for AI chat
-- **Notes library**: port 14099 (`app.code-port`) — file-based notes repo
-- **External deps**: `opencode serve` must be running (`opencode serve --port 14096`)
+- **opencode serve (AI聊天)**: port 14096 (`app.notes-port`) — 用于客户看板AI分析、智能问答等AI功能
+- **opencode serve (代码分析)**: port 14099 (`app.code-port`) — 用于Java项目的代码分析和知识库
+- **External deps**: 两个 `opencode serve` **都必须**运行
+  - `opencode serve --port 14096` — AI聊天服务
+  - `opencode serve --port 14099` — 代码分析服务
 - **Data persistence**: JSON files under `app.base-dir` (default: `D:\projects\richie_learning_notes`)
   - `chat_sessions.json` — chat history
   - `config.json` — feishu webhook etc.
@@ -94,6 +101,7 @@ src/main/resources/
 
 ## Gotchas
 
+- **端口配置**: 应用启动前必须先启动两个 opencode serve 实例（14096 和 14099），否则相关功能将不可用
 - `ReportService.generate()` is **stubbed** — always returns "AI 引擎未配置". Needs opencode serve integration to work.
 - Chinese path names in config: `工作/日报`, `工作/综合日报`, `自媒体/运营数据.json`
 - FeishuService uses raw `HttpURLConnection` (not RestTemplate or HttpClient), manually escapes JSON

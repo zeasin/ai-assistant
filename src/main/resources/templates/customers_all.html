@@ -35,7 +35,7 @@
                     </th:block>
                     <th:block th:unless="${@utils.toDouble(c.get('contractAmount')) > 0}">—</th:block>
                 </td>
-                <td th:text="${c.notes != null ? @utils.limit(c.notes, 40) : ''}">备注</td>
+                <td th:text="${c.get('notes') != null ? @utils.limit(c.get('notes'), 40) : ''}">备注</td>
             </tr>
         </tbody>
     </table>

@@ -57,31 +57,45 @@
 </div>
 
 <div class="card">
-    <h2>📁 数据文件相对路径配置</h2>
-    <div class="text-muted mb-2">相对于笔记库根目录的路径。修改后立即生效。</div>
-    <form id="pathsForm" onsubmit="return savePaths(event)">
+    <h2>📁 数据目录配置</h2>
+    <div class="text-muted mb-2">相对于笔记库根目录的路径。程序自动发现目录下所有 JSON 文件。</div>
+    <form id="dataDirsForm" onsubmit="return saveDataDirs(event)">
         <div class="form-group">
-            <label>客户数据</label>
-            <input type="text" id="customerDataPath" placeholder="企业/客户管理/客户数据.json">
-        </div>
-        <div class="form-group">
-            <label>线索数据</label>
-            <input type="text" id="leadDataPath" placeholder="企业/客户管理/线索数据.json">
-        </div>
-        <div class="form-group">
-            <label>跟进记录</label>
-            <input type="text" id="recordDataPath" placeholder="企业/客户管理/跟进记录.json">
+            <label>客户数据目录</label>
+            <input type="text" id="customerDataDir" placeholder="客户管理">
+            <div class="text-muted" style="font-size:12px;margin-top:4px;">程序将自动读取此目录下所有 .json 文件并显示为数据表</div>
         </div>
         <div class="form-group">
             <label>运营数据</label>
             <input type="text" id="operationsDataPath" placeholder="自媒体/运营数据.json">
         </div>
         <div class="flex" style="gap:8px;">
-            <button type="submit" class="btn btn-primary">保存相对路径</button>
-            <button type="button" class="btn btn-secondary" onclick="resetPaths()">恢复默认</button>
-            <span id="pathsStatus" class="text-muted" style="margin-left:4px;"></span>
+            <button type="submit" class="btn btn-primary">保存</button>
+            <button type="button" class="btn btn-secondary" onclick="resetDataDirs()">恢复默认</button>
+            <span id="dataDirsStatus" class="text-muted" style="margin-left:4px;"></span>
         </div>
     </form>
+</div>
+
+<div class="card">
+    <h2>🏷️ 字段标签配置</h2>
+    <div class="text-muted mb-2">自定义数据表格中英文 key 显示为中文标签。未配置的 key 保持原始英文显示。</div>
+    <div id="labels-container" style="margin-bottom:12px;"></div>
+    <div class="form-row" style="gap:8px;margin-bottom:12px;align-items:end;">
+        <div class="form-group" style="flex:1;">
+            <label style="font-size:12px;">Key</label>
+            <input type="text" id="new-label-key" placeholder="如 fans" style="width:100%;padding:8px 10px;border:1px solid #e1e3e6;border-radius:6px;font-size:13px;font-family:monospace;">
+        </div>
+        <div class="form-group" style="flex:1;">
+            <label style="font-size:12px;">标签</label>
+            <input type="text" id="new-label-value" placeholder="如 粉丝数" style="width:100%;padding:8px 10px;border:1px solid #e1e3e6;border-radius:6px;font-size:13px;">
+        </div>
+        <button class="btn btn-secondary" onclick="addLabelRow()" style="padding:8px 16px;font-size:13px;">+ 添加</button>
+    </div>
+    <div class="flex" style="gap:8px;">
+        <button class="btn btn-primary" onclick="saveLabels()">保存标签</button>
+        <span id="labelsStatus" class="text-muted" style="margin-left:4px;"></span>
+    </div>
 </div>
 
 <div class="card">
@@ -178,9 +192,7 @@ fetch('/api/config')
         if (cfg.feishuChatId) document.getElementById('feishuChatId').value = cfg.feishuChatId;
         if (cfg.feishuPollingEnabled) document.getElementById('feishuPollingEnabled').checked = true;
         if (cfg.baseDir) document.getElementById('baseDirPath').value = cfg.baseDir;
-        if (cfg.customerDataPath) document.getElementById('customerDataPath').value = cfg.customerDataPath;
-        if (cfg.leadDataPath) document.getElementById('leadDataPath').value = cfg.leadDataPath;
-        if (cfg.recordDataPath) document.getElementById('recordDataPath').value = cfg.recordDataPath;
+        if (cfg.customerDataDir) document.getElementById('customerDataDir').value = cfg.customerDataDir;
         if (cfg.operationsDataPath) document.getElementById('operationsDataPath').value = cfg.operationsDataPath;
         if (cfg.chatSessionsDir) document.getElementById('chatSessionsDir').value = cfg.chatSessionsDir;
     })
@@ -218,16 +230,14 @@ async function saveChatDir(e) {
     return false;
 }
 
-async function savePaths(e) {
+async function saveDataDirs(e) {
     e.preventDefault();
     const form = new FormData();
-    form.append('customerDataPath', document.getElementById('customerDataPath').value.trim());
-    form.append('leadDataPath', document.getElementById('leadDataPath').value.trim());
-    form.append('recordDataPath', document.getElementById('recordDataPath').value.trim());
+    form.append('customerDataDir', document.getElementById('customerDataDir').value.trim());
     form.append('operationsDataPath', document.getElementById('operationsDataPath').value.trim());
-    const res = await fetch('/api/config/paths', { method: 'POST', body: form });
+    const res = await fetch('/api/config/dataDirs', { method: 'POST', body: form });
     const data = await res.json();
-    const status = document.getElementById('pathsStatus');
+    const status = document.getElementById('dataDirsStatus');
     if (data.ok) {
         status.textContent = '✅ 已保存';
         setTimeout(() => status.textContent = '', 3000);
@@ -237,10 +247,8 @@ async function savePaths(e) {
     return false;
 }
 
-function resetPaths() {
-    document.getElementById('customerDataPath').value = '企业/客户管理/客户数据.json';
-    document.getElementById('leadDataPath').value = '企业/客户管理/线索数据.json';
-    document.getElementById('recordDataPath').value = '企业/客户管理/跟进记录.json';
+function resetDataDirs() {
+    document.getElementById('customerDataDir').value = '';
     document.getElementById('operationsDataPath').value = '自媒体/运营数据.json';
 }
 
@@ -328,6 +336,92 @@ async function fetchChats() {
     list.innerHTML = html;
     list.style.display = 'block';
 }
+
+// ===== 字段标签管理 =====
+var labelData = {};
+
+function loadLabels() {
+    fetch('/api/config/labels')
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) {
+                labelData = data.labels || {};
+                renderLabels();
+            }
+        })
+        .catch(() => {});
+}
+
+function renderLabels() {
+    var container = document.getElementById('labels-container');
+    var keys = Object.keys(labelData);
+    if (keys.length === 0) {
+        container.innerHTML = '<div class="text-muted" style="font-size:13px;padding:12px 0;">暂无自定义标签，请在下方添加。</div>';
+        return;
+    }
+    var html = '<table class="log-table"><thead><tr><th style="width:40%;">Key</th><th style="width:40%;">标签</th><th style="width:20%;">操作</th></tr></thead><tbody>';
+    keys.forEach(function(k) {
+        html += '<tr>';
+        html += '<td><code>' + escapeHtml(k) + '</code></td>';
+        html += '<td><input type="text" class="label-value-input" data-key="' + escapeHtml(k) + '" value="' + escapeHtml(labelData[k] || '') + '" style="width:100%;padding:6px 8px;border:1px solid #e1e3e6;border-radius:4px;font-size:13px;"></td>';
+        html += '<td><button class="btn btn-secondary" onclick="deleteLabelRow(\'' + escapeHtml(k) + '\')" style="padding:4px 10px;font-size:12px;">删除</button></td>';
+        html += '</tr>';
+    });
+    html += '</tbody></table>';
+    container.innerHTML = html;
+}
+
+function addLabelRow() {
+    var key = document.getElementById('new-label-key').value.trim();
+    var value = document.getElementById('new-label-value').value.trim();
+    if (!key) { toast('请输入 Key', 'error'); return; }
+    labelData[key] = value || key;
+    renderLabels();
+    document.getElementById('new-label-key').value = '';
+    document.getElementById('new-label-value').value = '';
+    toast('已添加：' + key + ' → ' + (value || key), 'success');
+}
+
+function deleteLabelRow(key) {
+    delete labelData[key];
+    renderLabels();
+}
+
+function saveLabels() {
+    // 收集当前所有 input 中的值
+    document.querySelectorAll('.label-value-input').forEach(function(input) {
+        labelData[input.dataset.key] = input.value.trim();
+    });
+    fetch('/api/config/labels', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(labelData)
+    })
+    .then(r => r.json())
+    .then(data => {
+        var status = document.getElementById('labelsStatus');
+        if (data.ok) {
+            status.textContent = '✅ 已保存';
+            toast('✅ 标签已保存', 'success');
+            setTimeout(function() { status.textContent = ''; }, 3000);
+        } else {
+            status.textContent = '❌ ' + (data.error || '保存失败');
+            toast('❌ 保存失败', 'error');
+        }
+    })
+    .catch(function() {
+        document.getElementById('labelsStatus').textContent = '❌ 请求失败';
+    });
+}
+
+function escapeHtml(str) {
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Load labels on page init
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(loadLabels, 100);
+});
 
 function selectChat(el) {
     const id = el.dataset.id;

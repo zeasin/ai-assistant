@@ -39,7 +39,7 @@
                         <span th:if="${contact.get('wechat') != null}" th:text="' ' + ${contact.get('wechat')}"></span>
                     </th:block>
                 </td>
-                <td th:text="${l.notes != null ? @utils.limit(l.notes, 40) : '—'}">备注</td>
+                <td th:text="${l.get('notes') != null ? @utils.limit(l.get('notes'), 40) : '—'}">备注</td>
             </tr>
         </tbody>
     </table>

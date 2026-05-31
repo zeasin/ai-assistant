@@ -1,9 +1,12 @@
 package com.laoqi.assistant.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import java.util.Map;
+import java.util.HashMap;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class Config {
+    private Map<String, String> keyLabels = new HashMap<>();
     private String baseDir;
     private String feishuWebhookUrl;
     private String feishuAppId;
@@ -14,6 +17,7 @@ public class Config {
     private String customerDataPath;
     private String leadDataPath;
     private String recordDataPath;
+    private String customerDataDir;
     private String operationsDataPath;
     
     private String chatSessionsDir;
@@ -30,9 +34,7 @@ public class Config {
         Config c = new Config();
         c.baseDir = baseDir;
         c.feishuWebhookUrl = webhookUrl;
-        c.customerDataPath = "企业/客户管理/客户数据.json";
-        c.leadDataPath = "企业/客户管理/线索数据.json";
-        c.recordDataPath = "企业/客户管理/跟进记录.json";
+        c.customerDataDir = "";
         c.operationsDataPath = "自媒体/运营数据.json";
         c.chatSessionsDir = "chat";
         c.chatSessionsFile = "chat_sessions.json";
@@ -44,6 +46,8 @@ public class Config {
         return c;
     }
 
+    public Map<String, String> getKeyLabels() { return keyLabels; }
+    public void setKeyLabels(Map<String, String> keyLabels) { this.keyLabels = keyLabels; }
     public String getBaseDir() { return baseDir; }
     public void setBaseDir(String baseDir) { this.baseDir = baseDir; }
     public String getFeishuWebhookUrl() { return feishuWebhookUrl; }
@@ -62,6 +66,8 @@ public class Config {
     public void setLeadDataPath(String leadDataPath) { this.leadDataPath = leadDataPath; }
     public String getRecordDataPath() { return recordDataPath; }
     public void setRecordDataPath(String recordDataPath) { this.recordDataPath = recordDataPath; }
+    public String getCustomerDataDir() { return customerDataDir; }
+    public void setCustomerDataDir(String customerDataDir) { this.customerDataDir = customerDataDir; }
     public String getOperationsDataPath() { return operationsDataPath; }
     public void setOperationsDataPath(String operationsDataPath) { this.operationsDataPath = operationsDataPath; }
     public String getChatSessionsDir() { return chatSessionsDir; }

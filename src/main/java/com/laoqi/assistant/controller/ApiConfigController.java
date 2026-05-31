@@ -52,23 +52,19 @@ public class ApiConfigController {
         }
     }
 
-    @PostMapping("/api/config/paths")
-    public Map<String, Object> updatePaths(
-            @RequestParam String customerDataPath,
-            @RequestParam String leadDataPath,
-            @RequestParam String recordDataPath,
+    @PostMapping("/api/config/dataDirs")
+    public Map<String, Object> updateDataDirs(
+            @RequestParam String customerDataDir,
             @RequestParam String operationsDataPath) {
         try {
             Config config = configService.load();
-            config.setCustomerDataPath(customerDataPath);
-            config.setLeadDataPath(leadDataPath);
-            config.setRecordDataPath(recordDataPath);
+            config.setCustomerDataDir(customerDataDir);
             config.setOperationsDataPath(operationsDataPath);
             configService.save(config);
-            logService.add("路径配置", "保存成功", "");
+            logService.add("数据目录配置", "保存成功", "");
             return Map.of("ok", true);
         } catch (Exception e) {
-            logService.add("路径配置", "保存失败", e.getMessage());
+            logService.add("数据目录配置", "保存失败", e.getMessage());
             return Map.of("ok", false, "error", e.getMessage());
         }
     }
@@ -137,5 +133,19 @@ public class ApiConfigController {
             logService.add("飞书测试", "失败", e.getMessage());
             return Map.of("ok", false, "error", e.getMessage());
         }
+    }
+
+    @GetMapping("/api/config/labels")
+    public Map<String, Object> getLabels() {
+        return Map.of("ok", true, "labels", configService.load().getKeyLabels());
+    }
+
+    @PostMapping("/api/config/labels")
+    public Map<String, Object> updateLabels(@RequestBody Map<String, String> labels) {
+        Config cfg = configService.load();
+        cfg.setKeyLabels(labels);
+        configService.save(cfg);
+        logService.add("配置更新", "成功", "字段标签映射已更新");
+        return Map.of("ok", true);
     }
 }

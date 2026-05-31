@@ -41,20 +41,94 @@ public class CustomerService {
         return Paths.get("D:\\projects\\richie_learning_notes");
     }
 
-    private Path customerFile() { 
+    private Path customerFile() {
+        Path dir = customerDataDir();
+        if (dir != null && java.nio.file.Files.exists(dir)) {
+            return dir.resolve("客户数据.json");
+        }
         String path = configService.load().getCustomerDataPath();
         if (path == null || path.isEmpty()) path = "企业/客户管理/客户数据.json";
         return getBaseDir().resolve(path);
     }
-    private Path leadFile() { 
+    private Path leadFile() {
+        Path dir = customerDataDir();
+        if (dir != null && java.nio.file.Files.exists(dir)) {
+            return dir.resolve("线索数据.json");
+        }
         String path = configService.load().getLeadDataPath();
         if (path == null || path.isEmpty()) path = "企业/客户管理/线索数据.json";
         return getBaseDir().resolve(path);
     }
-    private Path recordFile() { 
+    private Path recordFile() {
+        Path dir = customerDataDir();
+        if (dir != null && java.nio.file.Files.exists(dir)) {
+            return dir.resolve("跟进记录.json");
+        }
         String path = configService.load().getRecordDataPath();
         if (path == null || path.isEmpty()) path = "企业/客户管理/跟进记录.json";
         return getBaseDir().resolve(path);
+    }
+    
+    private Path customerDataDir() {
+        String dir = configService.load().getCustomerDataDir();
+        if (dir == null || dir.isEmpty()) return null;
+        return getBaseDir().resolve(dir).resolve("data");
+    }
+
+    public boolean isCustomerDataDirConfigured() {
+        String dir = configService.load().getCustomerDataDir();
+        return dir != null && !dir.isEmpty();
+    }
+
+    public Map<String, Map<String, List<Map<String, Object>>>> loadAllDataGroups() {
+        Map<String, Map<String, List<Map<String, Object>>>> groups = new LinkedHashMap<>();
+        
+        Path dir = customerDataDir();
+        log.info("loadAllDataGroups() - dir: {}", dir);
+        if (dir == null || !java.nio.file.Files.exists(dir)) {
+            log.warn("dir not found: {}", dir);
+            return groups;
+        }
+
+        try (java.util.stream.Stream<java.nio.file.Path> stream = java.nio.file.Files.list(dir)) {
+            // 先收集所有文件到列表
+            List<java.nio.file.Path> jsonFiles = stream
+                .filter(f -> f.getFileName().toString().endsWith(".json"))
+                .sorted()
+                .collect(java.util.stream.Collectors.toList());
+                
+            log.info("Found {} JSON files", jsonFiles.size());
+            
+            for (java.nio.file.Path f : jsonFiles) {
+                String name = f.getFileName().toString().replace(".json", "");
+                log.info("Processing file: {}", name);
+                Map<String, Object> data = FileUtil.readJson(f, mapType, new HashMap<>());
+                log.info("  File {} has keys: {}", name, data.keySet());
+                Map<String, List<Map<String, Object>>> fileGroups = new LinkedHashMap<>();
+                for (Map.Entry<String, Object> e : data.entrySet()) {
+                    if (e.getValue() instanceof List) {
+                        List<Map<String, Object>> entries = new ArrayList<>();
+                        for (Object item : (List) e.getValue()) {
+                            if (item instanceof Map) {
+                                @SuppressWarnings("unchecked")
+                                Map<String, Object> entry = (Map<String, Object>) item;
+                                entries.add(entry);
+                            }
+                        }
+                        if (!entries.isEmpty()) {
+                            fileGroups.put(e.getKey(), entries);
+                        }
+                    }
+                }
+                log.info("  File {} groups: {}", name, fileGroups.keySet());
+                groups.put(name, fileGroups);
+            }
+            log.info("Final groups: {}", groups.keySet());
+        } catch (java.io.IOException e) {
+            log.error("Failed to load JSON files", e);
+        }
+
+        return groups;
     }
 
     public Map<String, Object> loadCustomerData() {
