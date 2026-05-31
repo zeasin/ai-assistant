@@ -57,6 +57,24 @@
 </div>
 
 <div class="card">
+    <h2>📊 综合日报目录配置</h2>
+    <div class="text-muted mb-2">综合日报将保存在笔记库根目录下的指定文件夹中，按日期命名（如 2026-05-31.md）。首页将优先从该目录读取今日日报。</div>
+    <form id="comprehensiveReportDirForm" onsubmit="return saveComprehensiveReportDir(event)">
+        <div class="form-group">
+            <label>综合日报文件夹</label>
+            <input type="text" id="comprehensiveReportDir" placeholder="工作/综合日报" style="font-family:monospace;">
+            <div class="text-muted" style="font-size:12px;margin-top:4px;">
+                相对于笔记库根目录的路径，首页按 <code>{根目录}/{综合日报文件夹}/{今日日期}.md</code> 读取文件
+            </div>
+        </div>
+        <div class="flex" style="gap:8px;">
+            <button type="submit" class="btn btn-primary">保存目录</button>
+            <span id="comprehensiveReportDirStatus" class="text-muted" style="margin-left:4px;"></span>
+        </div>
+    </form>
+</div>
+
+<div class="card">
     <h2>📁 数据目录配置</h2>
     <div class="text-muted mb-2">相对于笔记库根目录的路径。程序自动发现目录下所有 JSON 文件。</div>
     <form id="dataDirsForm" onsubmit="return saveDataDirs(event)">
@@ -202,6 +220,7 @@ fetch('/api/config')
         if (cfg.operationsDataDir) document.getElementById('operationsDataDir').value = cfg.operationsDataDir;
         if (cfg.todoDataDir) document.getElementById('todoDataDir').value = cfg.todoDataDir;
         if (cfg.chatSessionsDir) document.getElementById('chatSessionsDir').value = cfg.chatSessionsDir;
+        if (cfg.comprehensiveReportDir) document.getElementById('comprehensiveReportDir').value = cfg.comprehensiveReportDir;
     })
     .catch(() => {});
 
@@ -228,6 +247,22 @@ async function saveChatDir(e) {
     const res = await fetch('/api/config/chatDir', { method: 'POST', body: form });
     const data = await res.json();
     const status = document.getElementById('chatDirStatus');
+    if (data.ok) {
+        status.textContent = '✅ 已保存';
+        setTimeout(() => status.textContent = '', 3000);
+    } else {
+        status.textContent = '❌ ' + (data.error || '保存失败');
+    }
+    return false;
+}
+
+async function saveComprehensiveReportDir(e) {
+    e.preventDefault();
+    const form = new FormData();
+    form.append('comprehensiveReportDir', document.getElementById('comprehensiveReportDir').value.trim());
+    const res = await fetch('/api/config/comprehensiveReportDir', { method: 'POST', body: form });
+    const data = await res.json();
+    const status = document.getElementById('comprehensiveReportDirStatus');
     if (data.ok) {
         status.textContent = '✅ 已保存';
         setTimeout(() => status.textContent = '', 3000);

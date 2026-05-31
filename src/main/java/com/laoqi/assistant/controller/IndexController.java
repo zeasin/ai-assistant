@@ -29,12 +29,30 @@ public class IndexController {
 
     @GetMapping("/")
     public String index(Model model) {
-        String report = reportService.getLatestReport();
-        String reportTime = reportService.getLatestReportTime();
-        String error = reportService.getLatestError();
-        model.addAttribute("report", MarkdownUtil.toHtml(report));
-        model.addAttribute("report_time", reportTime.isEmpty() ? "尚未生成" : reportTime);
-        model.addAttribute("report_error", error);
+        // 优先从笔记库读取今日综合日报文件
+        String todayReport = reportService.readTodayReport();
+        String reportTime;
+        String error;
+
+        if (todayReport != null) {
+            // 文件存在，使用文件内容
+            model.addAttribute("report", MarkdownUtil.toHtml(todayReport));
+            model.addAttribute("report_time", reportService.getLatestReportTime().isEmpty() ? "今日已生成" : reportService.getLatestReportTime());
+            model.addAttribute("report_error", "");
+        } else {
+            // 文件不存在，回退到内存中的生成结果
+            String report = reportService.getLatestReport();
+            String rt = reportService.getLatestReportTime();
+            String err = reportService.getLatestError();
+            if (report != null && !report.isEmpty()) {
+                model.addAttribute("report", MarkdownUtil.toHtml(report));
+            } else {
+                model.addAttribute("report", "");
+            }
+            model.addAttribute("report_time", rt.isEmpty() ? "尚未生成" : rt);
+            model.addAttribute("report_error", err);
+        }
+
         model.addAttribute("todos", todoService.parse());
         return "index";
     }

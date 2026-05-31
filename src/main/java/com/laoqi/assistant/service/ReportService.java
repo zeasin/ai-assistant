@@ -3,6 +3,7 @@ package com.laoqi.assistant.service;
 import com.laoqi.assistant.config.AppConfig;
 import com.laoqi.assistant.model.Config;
 import com.laoqi.assistant.util.FileUtil;
+import com.laoqi.assistant.util.MarkdownUtil;
 import com.laoqi.assistant.util.TimeUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -104,6 +105,23 @@ public class ReportService {
     public String getLatestReport() { return latestReport; }
     public String getLatestReportTime() { return latestReportTime; }
     public String getLatestError() { return latestError; }
+
+    public String readTodayReport() {
+        Path dir = getComprehensiveReportDir();
+        String date = TimeUtil.todayStr();
+        Path file = dir.resolve(date + ".md");
+        if (FileUtil.exists(file)) {
+            String raw = FileUtil.readText(file);
+            return MarkdownUtil.stripFrontmatter(raw);
+        }
+        return null;
+    }
+
+    public Path getTodayReportPath() {
+        Path dir = getComprehensiveReportDir();
+        String date = TimeUtil.todayStr();
+        return dir.resolve(date + ".md");
+    }
 
     public void generateAndPush() {
         ReportResult r = generate();

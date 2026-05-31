@@ -84,6 +84,19 @@ public class ApiConfigController {
         }
     }
 
+    @PostMapping("/api/config/comprehensiveReportDir")
+    public Map<String, Object> updateComprehensiveReportDir(@RequestParam String comprehensiveReportDir) {
+        try {
+            Config cfg = configService.load();
+            cfg.setComprehensiveReportDir(comprehensiveReportDir);
+            configService.save(cfg);
+            logService.add("配置更新", "成功", "综合日报目录已更新为: " + comprehensiveReportDir);
+            return Map.of("ok", true);
+        } catch (Exception e) {
+            return Map.of("ok", false, "error", e.getMessage());
+        }
+    }
+
     @PostMapping("/api/config/feishu")
     public Map<String, Object> updateFeishu(
             @RequestParam(required = false, defaultValue = "") String appId,
