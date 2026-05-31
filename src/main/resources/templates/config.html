@@ -70,6 +70,11 @@
             <input type="text" id="operationsDataDir" placeholder="自媒体">
             <div class="text-muted" style="font-size:12px;margin-top:4px;">程序将自动读取此目录下所有 .json 文件（目录/data/*.json）</div>
         </div>
+        <div class="form-group">
+            <label>任务数据目录</label>
+            <input type="text" id="todoDataDir" placeholder="工作/任务">
+            <div class="text-muted" style="font-size:12px;margin-top:4px;">程序将读取此目录下的 data.json 文件作为任务数据</div>
+        </div>
         <div class="flex" style="gap:8px;">
             <button type="submit" class="btn btn-primary">保存</button>
             <button type="button" class="btn btn-secondary" onclick="resetDataDirs()">恢复默认</button>
@@ -195,6 +200,7 @@ fetch('/api/config')
         if (cfg.baseDir) document.getElementById('baseDirPath').value = cfg.baseDir;
         if (cfg.customerDataDir) document.getElementById('customerDataDir').value = cfg.customerDataDir;
         if (cfg.operationsDataDir) document.getElementById('operationsDataDir').value = cfg.operationsDataDir;
+        if (cfg.todoDataDir) document.getElementById('todoDataDir').value = cfg.todoDataDir;
         if (cfg.chatSessionsDir) document.getElementById('chatSessionsDir').value = cfg.chatSessionsDir;
     })
     .catch(() => {});
@@ -236,6 +242,7 @@ async function saveDataDirs(e) {
     const form = new FormData();
     form.append('customerDataDir', document.getElementById('customerDataDir').value.trim());
     form.append('operationsDataDir', document.getElementById('operationsDataDir').value.trim());
+    form.append('todoDataDir', document.getElementById('todoDataDir').value.trim());
     const res = await fetch('/api/config/dataDirs', { method: 'POST', body: form });
     const data = await res.json();
     const status = document.getElementById('dataDirsStatus');
@@ -251,6 +258,7 @@ async function saveDataDirs(e) {
 function resetDataDirs() {
     document.getElementById('customerDataDir').value = '';
     document.getElementById('operationsDataDir').value = '';
+    document.getElementById('todoDataDir').value = '';
 }
 
 function saveWebhook() {

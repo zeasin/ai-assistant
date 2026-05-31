@@ -21,6 +21,7 @@ public class Config {
     private String customerDataDir;
     private String operationsDataPath;
     private String operationsDataDir;
+    private String todoDataDir;
     
     private String chatSessionsDir;
     private String chatSessionsFile;
@@ -75,6 +76,8 @@ public class Config {
     public void setOperationsDataPath(String operationsDataPath) { this.operationsDataPath = operationsDataPath; }
     public String getOperationsDataDir() { return operationsDataDir; }
     public void setOperationsDataDir(String operationsDataDir) { this.operationsDataDir = operationsDataDir; }
+    public String getTodoDataDir() { return todoDataDir; }
+    public void setTodoDataDir(String todoDataDir) { this.todoDataDir = todoDataDir; }
     public String getChatSessionsDir() { return chatSessionsDir; }
     public void setChatSessionsDir(String chatSessionsDir) { this.chatSessionsDir = chatSessionsDir; }
     public String getChatSessionsFile() { return chatSessionsFile; }

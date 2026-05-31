@@ -12,6 +12,7 @@
   "customerDataDir" : "客户管理",
   "operationsDataPath" : "",
   "operationsDataDir" : "自媒体",
+  "todoDataDir" : "工作/任务",
   "chatSessionsDir" : null,
   "chatSessionsFile" : null,
   "logFile" : null,

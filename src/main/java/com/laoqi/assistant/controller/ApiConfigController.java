@@ -55,11 +55,13 @@ public class ApiConfigController {
     @PostMapping("/api/config/dataDirs")
     public Map<String, Object> updateDataDirs(
             @RequestParam String customerDataDir,
-            @RequestParam(required = false, defaultValue = "") String operationsDataDir) {
+            @RequestParam(required = false, defaultValue = "") String operationsDataDir,
+            @RequestParam(required = false, defaultValue = "") String todoDataDir) {
         try {
             Config config = configService.load();
             config.setCustomerDataDir(customerDataDir);
             config.setOperationsDataDir(operationsDataDir);
+            config.setTodoDataDir(todoDataDir);
             configService.save(config);
             logService.add("数据目录配置", "保存成功", "");
             return Map.of("ok", true);

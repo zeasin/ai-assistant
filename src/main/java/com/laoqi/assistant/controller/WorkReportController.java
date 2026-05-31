@@ -173,16 +173,6 @@ public class WorkReportController {
         }
     }
 
-    @GetMapping("/work-reports")
-    public String workReportsPage(@RequestParam(required = false, defaultValue = "daily") String tab,
-                                   Model model) {
-        List<ReportItem> dailyReports = loadReports(getDailyDir());
-        List<ReportItem> weeklyReports = loadReports(getWeeklyDir());
-        model.addAttribute("daily_reports", dailyReports);
-        model.addAttribute("weekly_reports", weeklyReports);
-        return "work_reports";
-    }
-
     @GetMapping("/daily-reports")
     public String dailyReportsPage(Model model) {
         model.addAttribute("reports", loadReports(getDailyDir()));
