@@ -11,6 +11,7 @@
   "recordDataPath" : null,
   "customerDataDir" : "客户管理",
   "operationsDataPath" : "",
+  "operationsDataDir" : "自媒体",
   "chatSessionsDir" : null,
   "chatSessionsFile" : null,
   "logFile" : null,
@@ -23,6 +24,8 @@
       "客户数据_customers" : [ "id", "name", "stage", "source", "product", "company", "createdAt", "notes" ],
       "线索数据_leads" : [ "id", "name", "status", "source", "contacts", "createdAt", "lastContactedAt", "notes" ]
     },
-    "operations" : { }
+    "operations" : {
+      "自媒体文章_码农老齐" : [ "id", "topic", "series", "publishDate", "fansAtPublish", "fansGained" ]
+    }
   }
 }

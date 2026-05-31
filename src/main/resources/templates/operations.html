@@ -3,19 +3,96 @@
       layout:decorate="~{layout}">
 <head>
     <title layout:fragment="title">运营看板</title>
+    <style>
+        .data-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .data-header h4 {
+            margin: 0;
+        }
+        .hidden-rows {
+            display: none;
+        }
+        .col-settings-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.3);
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .col-settings-popup {
+            background: #fff;
+            border-radius: 12px;
+            padding: 20px 24px;
+            min-width: 260px;
+            max-width: 400px;
+            max-height: 80vh;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+        }
+        .col-settings-popup h3 {
+            margin: 0 0 12px 0;
+            font-size: 15px;
+        }
+        .col-settings-item {
+            display: flex;
+            align-items: center;
+            padding: 6px 0;
+            font-size: 13px;
+        }
+        .col-settings-item input[type="checkbox"] {
+            margin-right: 8px;
+        }
+        .col-settings-actions {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+            margin-top: 14px;
+            padding-top: 12px;
+            border-top: 1px solid #e1e3e6;
+        }
+        .col-settings-actions .btn {
+            padding: 6px 16px;
+            font-size: 13px;
+        }
+        .col-settings-btn {
+            cursor: pointer;
+            font-size: 14px;
+            color: #909296;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: none;
+            border: none;
+            margin-left: 8px;
+        }
+        .col-settings-btn:hover {
+            color: #7c5cfc;
+            background: #f0edff;
+        }
+    </style>
 </head>
 <body>
 <th:block layout:fragment="content">
 
 <div class="card">
     <h2>📊 自媒体运营看板</h2>
-    <div class="text-muted mb-2">数据来源：<code>自媒体/运营数据.json</code> | 最后更新：<span th:text="${last_updated}">未知</span></div>
+    <div class="text-muted mb-2">数据来源：<code>自媒体/data/(自动发现目录下所有 JSON 文件)</code> | 最后更新：<span th:text="${last_updated}">未知</span></div>
+</div>
+
+<div class="card" id="config-card" style="display:none;text-align:center;padding:30px 20px;border:2px dashed #d9d0ff;background:#fafafe;">
+    <div style="font-size:16px;font-weight:600;color:#7c5cfc;margin-bottom:8px;">📁 尚未配置运营数据目录</div>
+    <div class="text-muted" style="margin-bottom:16px;">请在 <a href="/config" style="color:#7c5cfc;">配置页面</a> 中设置「运营数据目录」，程序将自动读取该目录下所有 JSON 文件。</div>
+    <a href="/config" class="btn btn-primary">去配置</a>
 </div>
 
 <div class="card" style="background:linear-gradient(135deg,#f0edff,#fafafe);border:1px solid #d9d0ff;">
     <h2 style="margin-bottom:4px;">🤖 AI 运营分析报告</h2>
     <div class="text-muted mb-2" style="font-size:12px;">
-        基于 <code>自媒体/运营数据.json</code> 实时生成 |
+        基于 <code>自媒体/data/(自动发现目录下所有 JSON 文件)</code> 实时生成 |
         最后更新：<span th:text="${last_updated}">未知</span>
         <span id="ai-analysis-elapsed" style="display:none;margin-left:8px;"></span>
     </div>
@@ -28,106 +105,272 @@
     </div>
 </div>
 
-<details style="background:#fff;border:1px solid #e1e3e6;border-radius:12px;padding:16px 20px;margin-bottom:16px;">
-    <summary style="cursor:pointer;font-size:14px;font-weight:600;color:#5c5f66;outline:none;">
-        📁 原始数据详情
-    </summary>
-    <div style="margin-top:12px;">
-        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
-            <a href="/data-editor?type=operations&data=运营数据" class="btn btn-secondary" style="font-size:12px;">✏️ 编辑数据</a>
-            <button class="btn btn-primary" onclick="showAddArticleModal()" style="font-size:12px;">+ 添加文章</button>
-            <button class="btn btn-primary" onclick="showAddDailyStatsModal()" style="font-size:12px;">+ 添加日统计</button>
-            <button class="btn btn-primary" onclick="showSaveAccountModal()" style="font-size:12px;">+ 添加账号</button>
-        </div>
-        <div class="card" style="margin-bottom:12px;">
-            <h2>📈 每日数据统计</h2>
-            <div class="text-muted mb-2">账号级每日汇总数据</div>
-            <th:block th:each="statsEntry : ${daily_stats}">
-                <th:block th:with="account_name=${statsEntry.key}, stats=${statsEntry.value}">
-                    <th:block th:if="${#lists.size(stats) > 0}">
-                    <h3 style="font-size:14px;margin:12px 0 6px;" th:text="${account_name}">账号名</h3>
-                    <table class="log-table">
-                        <thead>
-                            <tr>
-                                <th th:each="col : ${stats[0]}" th:if="${@utils.isSimpleValue(col.value)}" th:text="${@utils.label(col.key, keyLabels)}">列</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr th:each="day : ${stats}">
-                                <td th:each="col : ${stats[0]}" th:if="${@utils.isSimpleValue(col.value)}" th:text="${day[col.key] != null ? day[col.key] : '—'}">—</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                    </th:block>
-                </th:block>
-            </th:block>
-        </div>
+<div id="raw-data-container" style="margin-bottom:16px;"></div>
 
-        <div class="card" style="margin-bottom:12px;">
-            <h2>账号总览</h2>
-            <th:block th:each="accEntry : ${accounts}">
-                <th:block th:with="accName=${accEntry.key}, platforms=${accEntry.value}">
-                <h3 style="font-size:14px;margin:12px 0 6px;" th:text="${accName}">账号名</h3>
-                <th:block th:each="platEntry : ${platforms}" th:with="platKey=${platEntry.key}, info=${platEntry.value}">
-                    <div style="margin:4px 0 8px 12px;font-size:13px;">
-                        <strong th:text="${@utils.platformName(platKey)}">平台</strong>
-                        <div style="display:flex;flex-wrap:wrap;gap:4px 16px;margin:4px 0 0 12px;">
-                            <span th:each="fieldEntry : ${info}" th:if="${@utils.isSimpleValue(fieldEntry.value)}">
-                                <span style="color:#5c5f66;" th:text="${@utils.label(fieldEntry.key, keyLabels) + ':'}">字段:</span>
-                                <span th:text="${fieldEntry.value}">值</span>
-                            </span>
-                        </div>
-                    </div>
-                </th:block>
-                </th:block>
-            </th:block>
-        </div>
-
-        <th:block th:each="artEntry : ${articles}">
-            <th:block th:with="accName=${artEntry.key}, articleList=${artEntry.value}">
-            <div class="card" style="margin-bottom:12px;">
-                <h2 th:text="${accName}">账号名</h2>
-                <div style="overflow-x:auto;">
-                <table class="log-table" style="margin-top:8px;">
-                    <thead>
-                        <tr>
-                            <th th:each="col : ${#lists.size(articleList) > 0 ? articleList[0] : {}}" th:if="${@utils.isSimpleValue(col.value)}" th:text="${@utils.label(col.key, keyLabels)}">列</th>
-                            <th th:if="${#lists.size(articleList) > 0 and articleList[0].containsKey('data')}">平台数据</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr th:each="article : ${articleList}">
-                            <td th:each="col : ${#lists.size(articleList) > 0 ? articleList[0] : {}}" th:if="${@utils.isSimpleValue(col.value)}" th:text="${article[col.key] != null ? article[col.key] : '—'}">—</td>
-                            <td th:if="${article.containsKey('data') and article.get('data') != null}">
-                                <span th:each="platEntry, platStat : ${article.get('data')}">
-                                    <span th:text="${@utils.platformName(platEntry.key)}"></span>
-                                    <span th:text="' 阅读' + (platEntry.value.reads != null ? platEntry.value.reads : 0) + ' 赞' + (platEntry.value.likes != null ? platEntry.value.likes : 0) + (platEntry.value.shares != null ? ' 分享' + platEntry.value.shares : '')"></span>
-                                    <br th:if="${!platStat.last}">
-                                </span>
-                            </td>
-                            <td th:if="${!article.containsKey('data') or article.get('data') == null}">—</td>
-                        </tr>
-                    </tbody>
-                </table>
-                </div>
-            </div>
-            </th:block>
-        </th:block>
-
-        <div class="card">
-            <h2>发布节奏</h2>
-            <table class="log-table">
-                <thead><tr><th>账号</th><th>首发</th><th>次发</th><th>最后</th></tr></thead>
-                <tbody>
-                    <tr><td>码农老齐</td><td>周二18:00-19:00 微信</td><td>周三09:00-10:00 CSDN</td><td>周四20:00-22:00 知乎</td></tr>
-                    <tr><td>启航电商ERP</td><td>周四20:00 微信（电商干货、产品动态）</td><td>—</td><td>—</td></tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
 </details>
 
 <script>
+const DATA_TYPE = 'operations';
+let appData = null;
+let columnSettings = {};
+
+// 检测并按照时间字段倒序排列
+function compareByTime(a, b) {
+    var timeField = null;
+    var timeKeywords = ['时间', '日期', '创建时间', '更新时间', '发布时间', 'date', 'created', 'updated', 'timestamp', 'publish', 'lastContact'];
+    for (var k = 0; k < timeKeywords.length; k++) {
+        for (var key in a) {
+            if (key.indexOf(timeKeywords[k]) !== -1) {
+                timeField = key;
+                break;
+            }
+        }
+        if (timeField) break;
+    }
+    if (!timeField) {
+        for (var key in a) {
+            if (typeof a[key] === 'string' && /^\d{4}[-\/]\d{1,2}[-\/]\d/.test(a[key])) {
+                timeField = key;
+                break;
+            }
+        }
+    }
+    if (!timeField) return 0;
+    var ta = a[timeField] || '';
+    var tb = b[timeField] || '';
+    return String(tb).localeCompare(String(ta));
+}
+
+async function loadOperationsData() {
+    try {
+        const response = await fetch('/api/data/list?type=' + DATA_TYPE + '&includeData=true');
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        const apiResult = await response.json();
+
+        if (!apiResult.ok) {
+            // 未配置数据目录时显示 config-card
+            if (apiResult.error && apiResult.error.indexOf('未配置') !== -1) {
+                document.getElementById('config-card').style.display = 'block';
+            } else {
+                document.getElementById('raw-data-container').innerHTML = '<div class="text-muted" style="padding:20px;text-align:center;">' + (apiResult.error || '暂无数据') + '</div>';
+            }
+            return;
+        }
+
+        if (apiResult.fileCount === 0) {
+            document.getElementById('raw-data-container').innerHTML = '<div class="text-muted" style="padding:20px;text-align:center;">暂无数据</div>';
+            return;
+        }
+
+        appData = { rawDataGroups: {}, tableColumns: {} };
+
+        for (let fileData of apiResult.dataGroups) {
+            let fileName = fileData.fileName;
+            appData.rawDataGroups[fileName] = {};
+
+            for (let groupKey in fileData.groups) {
+                let groupInfo = fileData.groups[groupKey];
+                if (groupInfo.type === 'array') {
+                    let groupResp = await fetch('/api/data/group?type=' + DATA_TYPE + '&fileName=' + encodeURIComponent(fileName) + '&group=' + encodeURIComponent(groupKey));
+                    let groupData = await groupResp.json();
+                    if (groupData.ok && Array.isArray(groupData.data)) {
+                        let entries = [];
+                        for (let item of groupData.data) {
+                            if (typeof item === 'object' && item !== null) entries.push(item);
+                        }
+                        entries.sort(compareByTime);
+                        appData.rawDataGroups[fileName][groupKey] = entries;
+
+                        let tableId = fileName + '_' + groupKey;
+                        let colSet = new Set();
+                        for (let row of entries) {
+                            Object.keys(row).forEach(function(key) { colSet.add(key); });
+                        }
+                        appData.tableColumns[tableId] = Array.from(colSet);
+                    }
+                }
+            }
+
+            if (Object.keys(appData.rawDataGroups[fileName]).length === 0) {
+                delete appData.rawDataGroups[fileName];
+            }
+        }
+
+        // 加载列设置
+        try {
+            let settingsResp = await fetch('/api/data/column-settings?type=' + DATA_TYPE);
+            if (settingsResp.ok) {
+                let settingsData = await settingsResp.json();
+                if (settingsData.ok && settingsData.settings) {
+                    columnSettings = settingsData.settings;
+                }
+            }
+        } catch (e) {
+            console.warn('加载列设置失败:', e);
+        }
+
+        renderData();
+    } catch (e) {
+        console.error('加载运营数据失败:', e);
+        document.getElementById('raw-data-container').innerHTML = '<div class="text-muted" style="padding:20px;text-align:center;">加载失败: ' + e.message + '</div>';
+    }
+}
+
+function renderData() {
+    const container = document.getElementById('raw-data-container');
+    container.innerHTML = '';
+
+    var hasData = false;
+    for (let fileKey in appData.rawDataGroups) { hasData = true; break; }
+    if (!hasData) {
+        container.innerHTML = '<div class="text-muted" style="padding:20px;text-align:center;">暂无数据</div>';
+        return;
+    }
+
+    let html = '<details style="background:#fff;border:1px solid #e1e3e6;border-radius:12px;padding:16px 20px;margin-bottom:16px;" open>' +
+        '<summary style="cursor:pointer;font-size:14px;font-weight:600;color:#5c5f66;outline:none;">📁 原始数据详情</summary>' +
+        '<div style="margin-top:12px;">'
+
+    for (let fileKey in appData.rawDataGroups) {
+        let fileGroups = appData.rawDataGroups[fileKey];
+        html += '<div style="margin-bottom:20px;">';
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">';
+        html += '<h3 style="margin:0;">' + fileKey + '</h3>';
+        html += '<a href="/data-editor?type=operations&data=' + encodeURIComponent(fileKey) + '" class="btn btn-secondary" style="font-size:12px;">更多数据</a>';
+        html += '</div>';
+
+        for (let groupKey in fileGroups) {
+            let rows = fileGroups[groupKey];
+            let tableId = fileKey + '_' + groupKey;
+            let allColumns = appData.tableColumns[tableId] || [];
+            let savedCols = columnSettings[tableId];
+            let columns = savedCols && savedCols.length > 0
+                ? allColumns.filter(function(c) { return savedCols.indexOf(c) !== -1; })
+                : allColumns;
+
+            html += '<div class="card" style="margin-bottom:12px;">';
+            html += '<div class="data-header"><h4>' + groupKey + '<button class="col-settings-btn" onclick="showColumnSettings(\'' + tableId + '\')" title="列设置">⚙️</button></h4></div>';
+            html += '<div style="overflow-x:auto;">';
+            html += '<table class="log-table" id="table_' + tableId + '">';
+            html += '<thead><tr>';
+            for (let col of columns) {
+                html += '<th>' + col + '</th>';
+            }
+            html += '</tr></thead>';
+            html += '<tbody>';
+            for (let i = 0; i < rows.length; i++) {
+                let row = rows[i];
+                let rowClass = i >= 6 ? 'hidden-rows' : '';
+                html += '<tr class="' + rowClass + '">';
+                for (let col of columns) {
+                    let val = row[col] != null ? row[col] : '—';
+                    if (typeof val === 'object') {
+                        val = JSON.stringify(val);
+                    }
+                    html += '<td>' + val + '</td>';
+                }
+                html += '</tr>';
+            }
+            if (rows.length === 0) {
+                html += '<tr><td colspan="' + columns.length + '" style="text-align:center;color:#909296;">暂无数据</td></tr>';
+            }
+            html += '</tbody>';
+            html += '</table>';
+
+            if (rows.length > 6) {
+                html += '<div style="text-align:center;padding:8px 0 4px;"><a href="#" onclick="toggleRows(\'table_' + tableId + '\', this);return false;" style="color:#7c5cfc;font-size:13px;text-decoration:none;">展开全部 ' + rows.length + ' 条 ▼</a></div>';
+            }
+
+            html += '</div></div>';
+        }
+        html += '</div>';
+    }
+
+    html += '</div></details>';
+    container.innerHTML = html;
+}
+
+function toggleRows(tableId, link) {
+    var table = document.getElementById(tableId);
+    if (!table) return;
+    var hidden = table.querySelectorAll('.hidden-rows');
+    if (hidden.length > 0) {
+        hidden.forEach(function(r) { r.classList.remove('hidden-rows'); });
+        link.textContent = '收起 ▲';
+    } else {
+        var rows = table.querySelectorAll('tbody tr');
+        for (var i = 6; i < rows.length; i++) {
+            rows[i].classList.add('hidden-rows');
+        }
+        link.textContent = '展开全部 ' + rows.length + ' 条 ▼';
+    }
+}
+
+function showColumnSettings(tableId) {
+    var allColumns = appData.tableColumns[tableId] || [];
+    if (allColumns.length === 0) return;
+
+    var savedCols = columnSettings[tableId];
+    var selected = savedCols && savedCols.length > 0
+        ? savedCols.slice()
+        : allColumns.slice();
+
+    var popup = document.createElement('div');
+    popup.className = 'col-settings-overlay';
+    popup.onclick = function(e) { if (e.target === popup) popup.remove(); };
+
+    var html = '<div class="col-settings-popup" onclick="event.stopPropagation();">';
+    html += '<h3>选择要显示的列</h3>';
+    html += '<div style="max-height:50vh;overflow-y:auto;">';
+    for (var i = 0; i < allColumns.length; i++) {
+        var col = allColumns[i];
+        var checked = selected.indexOf(col) !== -1;
+        html += '<label class="col-settings-item">';
+        html += '<input type="checkbox" value="' + col.replace(/"/g, '&quot;') + '" ' + (checked ? 'checked' : '') + '>';
+        html += col;
+        html += '</label>';
+    }
+    html += '</div>';
+    html += '<div class="col-settings-actions">';
+    html += '<button class="btn btn-secondary" onclick="this.closest(\'.col-settings-overlay\').remove()">取消</button>';
+    html += '<button class="btn btn-primary" onclick="saveColumnSettings(\'' + tableId + '\', this)">确认</button>';
+    html += '</div></div>';
+
+    popup.innerHTML = html;
+    document.body.appendChild(popup);
+}
+
+async function saveColumnSettings(tableId, btn) {
+    var popup = btn.closest('.col-settings-overlay');
+    var checkboxes = popup.querySelectorAll('input[type="checkbox"]');
+    var selected = [];
+    for (var i = 0; i < checkboxes.length; i++) {
+        if (checkboxes[i].checked) {
+            selected.push(checkboxes[i].value);
+        }
+    }
+
+    columnSettings[tableId] = selected;
+
+    try {
+        var resp = await fetch('/api/data/column-settings?type=' + DATA_TYPE, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(columnSettings)
+        });
+        var data = await resp.json();
+        if (data.ok) {
+            renderData();
+        } else {
+            alert('保存失败: ' + (data.error || '未知错误'));
+        }
+    } catch (e) {
+        alert('保存失败: ' + e.message);
+    }
+
+    popup.remove();
+}
+
 var startTime;
 function startAiAnalysis(force) {
     var btn = document.getElementById('ai-analyze-btn');
@@ -183,6 +426,7 @@ function startAiAnalysis(force) {
 
 // Auto-load on page load — backend returns cached result if already done today
 window.addEventListener('DOMContentLoaded', function() {
+    loadOperationsData();
     setTimeout(function() { startAiAnalysis(false); }, 300);
 });
 

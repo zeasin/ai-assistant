@@ -20,6 +20,7 @@ public class Config {
     private String recordDataPath;
     private String customerDataDir;
     private String operationsDataPath;
+    private String operationsDataDir;
     
     private String chatSessionsDir;
     private String chatSessionsFile;
@@ -72,6 +73,8 @@ public class Config {
     public void setCustomerDataDir(String customerDataDir) { this.customerDataDir = customerDataDir; }
     public String getOperationsDataPath() { return operationsDataPath; }
     public void setOperationsDataPath(String operationsDataPath) { this.operationsDataPath = operationsDataPath; }
+    public String getOperationsDataDir() { return operationsDataDir; }
+    public void setOperationsDataDir(String operationsDataDir) { this.operationsDataDir = operationsDataDir; }
     public String getChatSessionsDir() { return chatSessionsDir; }
     public void setChatSessionsDir(String chatSessionsDir) { this.chatSessionsDir = chatSessionsDir; }
     public String getChatSessionsFile() { return chatSessionsFile; }

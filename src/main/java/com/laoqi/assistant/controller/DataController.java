@@ -52,7 +52,7 @@ public class DataController {
             case "customer":
                 return config.getCustomerDataDir();
             case "operations":
-                return config.getOperationsDataPath();
+                return config.getOperationsDataDir();
             default:
                 return null;
         }
@@ -85,7 +85,7 @@ public class DataController {
             return ResponseEntity.ok(result);
         }
         
-        Path targetDir = baseDir.resolve(dataDir).resolve("data");
+        Path targetDir = resolveDataDir(baseDir, dataDir);
         
         result.put("type", type);
         result.put("directory", dataDir);
@@ -169,7 +169,7 @@ public class DataController {
             return ResponseEntity.ok(result);
         }
         
-        Path targetDir = baseDir.resolve(dataDir).resolve("data");
+        Path targetDir = resolveDataDir(baseDir, dataDir);
         Path filePath = targetDir.resolve(fileName + ".json");
         
         if (!Files.exists(filePath)) {
@@ -217,7 +217,7 @@ public class DataController {
             return ResponseEntity.ok(result);
         }
         
-        Path targetDir = baseDir.resolve(dataDir).resolve("data");
+        Path targetDir = resolveDataDir(baseDir, dataDir);
         Path filePath = targetDir.resolve(fileName + ".json");
         
         if (!Files.exists(filePath)) {
@@ -239,10 +239,28 @@ public class DataController {
             result.put("ok", true);
             result.put("fileName", fileName);
             result.put("group", group);
-            result.put("data", groupData);
-            
+
             if (groupData instanceof List) {
                 result.put("count", ((List<?>) groupData).size());
+                result.put("data", groupData);
+            } else if (groupData instanceof Map) {
+                // 处理 Map<String, List<...>> 结构，展平为列表
+                Map<?, ?> mapData = (Map<?, ?>) groupData;
+                boolean hasArrayValues = mapData.values().stream().anyMatch(v -> v instanceof List);
+                if (hasArrayValues) {
+                    List<Object> flatList = new ArrayList<>();
+                    for (Object val : mapData.values()) {
+                        if (val instanceof List) {
+                            flatList.addAll((List<?>) val);
+                        }
+                    }
+                    result.put("count", flatList.size());
+                    result.put("data", flatList);
+                } else {
+                    result.put("data", groupData);
+                }
+            } else {
+                result.put("data", groupData);
             }
             
         } catch (Exception e) {
@@ -281,7 +299,7 @@ public class DataController {
             return ResponseEntity.ok(result);
         }
         
-        Path targetDir = baseDir.resolve(dataDir).resolve("data");
+        Path targetDir = resolveDataDir(baseDir, dataDir);
         Path filePath = targetDir.resolve(fileName + ".json");
         
         if (!Files.exists(filePath)) {
@@ -358,7 +376,7 @@ public class DataController {
             return ResponseEntity.ok(result);
         }
         
-        Path targetDir = baseDir.resolve(dataDir).resolve("data");
+        Path targetDir = resolveDataDir(baseDir, dataDir);
         Path filePath = targetDir.resolve(fileName + ".json");
         
         if (!Files.exists(filePath)) {
@@ -419,7 +437,7 @@ public class DataController {
             return ResponseEntity.ok(result);
         }
         
-        Path targetDir = baseDir.resolve(dataDir).resolve("data");
+        Path targetDir = resolveDataDir(baseDir, dataDir);
         Path filePath = targetDir.resolve(fileName + ".json");
         
         if (!Files.exists(filePath)) {
@@ -460,9 +478,13 @@ public class DataController {
         return ResponseEntity.ok(result);
     }
 
+    private Path resolveDataDir(Path baseDir, String dataDir) {
+        return baseDir.resolve(dataDir).resolve("data");
+    }
+
     private Map<String, Object> extractGroups(Map<String, Object> data) {
         Map<String, Object> groups = new LinkedHashMap<>();
-        
+
         for (Map.Entry<String, Object> e : data.entrySet()) {
             if (e.getValue() instanceof List) {
                 List<?> list = (List<?>) e.getValue();
@@ -472,13 +494,26 @@ public class DataController {
                 groups.put(e.getKey(), groupInfo);
             } else if (e.getValue() instanceof Map) {
                 Map<?, ?> map = (Map<?, ?>) e.getValue();
-                Map<String, Object> groupInfo = new LinkedHashMap<>();
-                groupInfo.put("keys", new ArrayList<>(map.keySet()));
-                groupInfo.put("type", "object");
-                groups.put(e.getKey(), groupInfo);
+                // 检查是否 Map 的值包含数组（例如 articles: { "账号名": [...] }）
+                boolean hasArrayValues = map.values().stream().anyMatch(v -> v instanceof List);
+                if (hasArrayValues) {
+                    int totalCount = map.values().stream()
+                        .filter(v -> v instanceof List)
+                        .mapToInt(v -> ((List<?>) v).size())
+                        .sum();
+                    Map<String, Object> groupInfo = new LinkedHashMap<>();
+                    groupInfo.put("count", totalCount);
+                    groupInfo.put("type", "array");
+                    groups.put(e.getKey(), groupInfo);
+                } else {
+                    Map<String, Object> groupInfo = new LinkedHashMap<>();
+                    groupInfo.put("keys", new ArrayList<>(map.keySet()));
+                    groupInfo.put("type", "object");
+                    groups.put(e.getKey(), groupInfo);
+                }
             }
         }
-        
+
         return groups;
     }
 

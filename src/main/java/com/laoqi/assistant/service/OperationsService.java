@@ -40,9 +40,24 @@ public class OperationsService {
     }
 
     private Path dataFile() {
-        String path = configService.load().getOperationsDataPath();
-        if (path == null || path.isEmpty()) path = "自媒体/运营数据.json";
-        return getBaseDir().resolve(path);
+        var config = configService.load();
+        String dir = config.getOperationsDataDir();
+        if (dir == null || dir.isEmpty()) {
+            throw new IllegalStateException("运营数据目录未配置");
+        }
+        Path dataDir = getBaseDir().resolve(dir).resolve("data");
+        if (!java.nio.file.Files.exists(dataDir)) {
+            throw new IllegalStateException("运营数据目录不存在: " + dataDir);
+        }
+        try (var stream = java.nio.file.Files.list(dataDir)) {
+            var files = stream.filter(f -> f.getFileName().toString().endsWith(".json")).collect(java.util.stream.Collectors.toList());
+            if (!files.isEmpty()) {
+                return files.get(0);
+            }
+        } catch (java.io.IOException e) {
+            log.warn("无法读取运营数据目录: {}", dataDir, e);
+        }
+        throw new IllegalStateException("运营数据目录下没有 JSON 文件: " + dataDir);
     }
 
     public Root loadData() {
