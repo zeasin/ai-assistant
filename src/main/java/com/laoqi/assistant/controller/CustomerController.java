@@ -91,7 +91,6 @@ public class CustomerController {
     public SseEmitter aiAnalysis(@RequestParam(required = false, defaultValue = "false") boolean force) {
         SseEmitter emitter = new SseEmitter(300_000L);
 
-        // Check if customer data directory is configured first
         if (!customerService.isCustomerDataDirConfigured()) {
             try {
                 emitter.send(SseEmitter.event().data(mapper.writeValueAsString(
@@ -102,6 +101,9 @@ public class CustomerController {
             return emitter;
         }
 
+        emitter.onCompletion(() -> {});
+        emitter.onTimeout(() -> emitter.complete());
+
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
                 Map<String, Object> statusEvent = Map.of("type", "status", "content", "⏳ AI 正在分析客户数据...");
@@ -111,6 +113,8 @@ public class CustomerController {
                 emitter.send(SseEmitter.event().data(mapper.writeValueAsString(Map.of("type", "text", "content", result))));
                 emitter.send(SseEmitter.event().data(mapper.writeValueAsString(Map.of("type", "done"))));
                 emitter.complete();
+            } catch (java.io.IOException e) {
+                try { emitter.complete(); } catch (Exception ignored) {}
             } catch (Exception e) {
                 try {
                     emitter.send(SseEmitter.event().data(mapper.writeValueAsString(

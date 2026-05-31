@@ -83,6 +83,7 @@
 <script>
 let appData = null;
 let currentEventSource = null;
+let customerDataDir = null;
 
 document.addEventListener('DOMContentLoaded', function() {
     loadCustomerData();
@@ -90,16 +91,76 @@ document.addEventListener('DOMContentLoaded', function() {
 
 async function loadCustomerData() {
     try {
-        const response = await fetch('/api/customers/data');
+        const response = await fetch('/api/data/list?includeData=true');
         if (!response.ok) {
             throw new Error('HTTP ' + response.status + ': ' + response.statusText);
         }
-        appData = await response.json();
+        const apiResult = await response.json();
+        
+        if (!apiResult.ok) {
+            if (apiResult.error === '目录未配置') {
+                document.getElementById('config-card').style.display = 'block';
+                document.getElementById('customer-ai-status').textContent = '⚠️ 请先在配置页面设置「客户数据目录」，然后再进行 AI 分析。';
+                document.getElementById('data-source-info').innerHTML = '数据来源：<code>未配置</code>';
+            } else {
+                document.getElementById('data-source-info').innerHTML = '数据加载失败: ' + apiResult.error;
+            }
+            return;
+        }
+        
+        customerDataDir = apiResult.directory;
+        appData = {
+            isDataDirConfigured: true,
+            customerDataDir: apiResult.directory,
+            dataDirEmpty: apiResult.fileCount === 0,
+            rawDataGroups: {},
+            tableColumns: {},
+            lastUpdated: '未知'
+        };
+        
+        for (let fileData of apiResult.dataGroups) {
+            let fileName = fileData.fileName;
+            appData.rawDataGroups[fileName] = {};
+            
+            for (let groupKey in fileData.groups) {
+                let groupInfo = fileData.groups[groupKey];
+                if (groupInfo.type === 'array') {
+                    let groupResp = await fetch('/api/data/group?fileName=' + encodeURIComponent(fileName) + '&group=' + encodeURIComponent(groupKey));
+                    let groupData = await groupResp.json();
+                    if (groupData.ok && Array.isArray(groupData.data)) {
+                        let entries = [];
+                        for (let item of groupData.data) {
+                            if (typeof item === 'object' && item !== null) {
+                                entries.push(item);
+                            }
+                        }
+                        appData.rawDataGroups[fileName][groupKey] = entries;
+                        
+                        let tableId = fileName + '_' + groupKey;
+                        let colSet = new Set();
+                        for (let row of entries) {
+                            Object.keys(row).forEach(function(key) { colSet.add(key); });
+                        }
+                        appData.tableColumns[tableId] = Array.from(colSet);
+                    }
+                }
+            }
+            
+            if (Object.keys(appData.rawDataGroups[fileName]).length === 0) {
+                delete appData.rawDataGroups[fileName];
+            }
+        }
+        
+        let metaResp = await fetch('/api/data/group?fileName=' + encodeURIComponent(Object.keys(appData.rawDataGroups)[0] || '客户数据') + '&group=meta');
+        if (metaResp.ok) {
+            let metaData = await metaResp.json();
+            if (metaData.ok && metaData.data && metaData.data.lastUpdated) {
+                appData.lastUpdated = metaData.data.lastUpdated;
+            }
+        }
         
         renderData();
-        if (appData.isDataDirConfigured) {
-            setTimeout(function() { startCustomerAnalysis(false); }, 300);
-        }
+        setTimeout(function() { startCustomerAnalysis(false); }, 300);
     } catch (e) {
         console.error('加载数据失败:', e);
         document.getElementById('data-source-info').innerHTML = '数据加载失败: ' + e.message;
