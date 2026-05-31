@@ -176,7 +176,12 @@
         <form id="add-form" onsubmit="return submitAdd(event)">
             <input type="hidden" id="add-fileName">
             <input type="hidden" id="add-group">
-            <div id="add-fields"></div>
+            <div class="edit-form">
+                <div class="form-group full-width">
+                    <label>JSON 数据</label>
+                    <textarea id="add-json" name="json" rows="15" placeholder='{ "key": "value" }'></textarea>
+                </div>
+            </div>
             <div class="modal-actions">
                 <button type="button" class="btn btn-secondary" onclick="closeModal('modal-add')">取消</button>
                 <button type="submit" class="btn btn-primary" id="btn-save-add">添加</button>
@@ -229,16 +234,16 @@ document.addEventListener('DOMContentLoaded', function() {
     loadData();
     
     document.getElementById('btn-edit-from-detail').addEventListener('click', function() {
-        if (currentRowData) {
+        if (currentRowData && currentRowData.row) {
             closeModal('modal-detail');
-            showEditModal(currentRowData);
+            showEditModal(currentRowData.row, currentRowData.groupName);
         }
     });
     
     document.getElementById('btn-confirm-delete').addEventListener('click', confirmDelete);
     
     document.getElementById('search-input').addEventListener('input', function(e) {
-        renderTable();
+        renderAllTables();
     });
 });
 
@@ -275,122 +280,148 @@ async function loadData() {
         }
         document.getElementById('data-source-info').textContent = '数据来源：' + fileLabel + ' | 直接编辑 JSON 数据，无需 AI 参与';
         
-        var fileData = allData.dataGroups.find(function(f) { return f.fileName === currentFile; });
-        if (fileData && fileData.groups) {
-            var firstArrayGroup = Object.keys(fileData.groups).find(function(g) { return fileData.groups[g].type === 'array'; });
-            if (firstArrayGroup) {
-                currentGroup = firstArrayGroup;
-                await loadGroupData();
-            } else {
-                container.innerHTML = '<div class="empty-state"><div class="icon">📋</div><div>暂无数组类型的数据分组</div></div>';
-            }
-        } else {
-            container.innerHTML = '<div class="empty-state"><div class="icon">📋</div><div>无法读取数据结构</div></div>';
-        }
+        await loadAllGroups();
     } catch (e) {
         container.innerHTML = '<div class="empty-state"><div class="icon">❌</div><div>加载失败: ' + e.message + '</div></div>';
     }
 }
 
-async function loadGroupData() {
+async function loadAllGroups() {
     var container = document.getElementById('data-container');
     container.innerHTML = '<div class="loading-state">⏳ 加载数据...</div>';
     
     try {
-        var response = await fetch('/api/data/group?type=' + currentType + '&fileName=' + encodeURIComponent(currentFile) + '&group=' + encodeURIComponent(currentGroup));
-        var result = await response.json();
-        
-        if (!result.ok) {
-            container.innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><div>' + (result.error || '加载失败') + '</div></div>';
+        var fileData = allData.dataGroups.find(function(f) { return f.fileName === currentFile; });
+        if (!fileData || !fileData.groups) {
+            container.innerHTML = '<div class="empty-state"><div class="icon">📋</div><div>无法读取数据结构</div></div>';
             return;
         }
         
-        var data = result.data;
-        if (!Array.isArray(data)) {
-            container.innerHTML = '<div class="empty-state"><div class="icon">📋</div><div>数据格式不支持</div></div>';
-            return;
-        }
-        
-        allData.currentRecords = data;
-        
-        var colSet = new Set();
-        data.forEach(function(row) {
-            if (typeof row === 'object' && row !== null) {
-                Object.keys(row).forEach(function(key) { colSet.add(key); });
+        var arrayGroups = [];
+        Object.keys(fileData.groups).forEach(function(groupName) {
+            if (fileData.groups[groupName].type === 'array') {
+                arrayGroups.push(groupName);
             }
         });
-        tableColumns = Array.from(colSet);
         
-        renderTable();
+        if (arrayGroups.length === 0) {
+            container.innerHTML = '<div class="empty-state"><div class="icon">📋</div><div>暂无数组类型的数据分组</div></div>';
+            return;
+        }
+        
+        allData.groupData = {};
+        for (var i = 0; i < arrayGroups.length; i++) {
+            var groupName = arrayGroups[i];
+            var response = await fetch('/api/data/group?type=' + currentType + '&fileName=' + encodeURIComponent(currentFile) + '&group=' + encodeURIComponent(groupName));
+            var groupResult = await response.json();
+            if (groupResult.ok && Array.isArray(groupResult.data)) {
+                allData.groupData[groupName] = groupResult.data;
+            }
+        }
+        
+        renderAllTables();
     } catch (e) {
         container.innerHTML = '<div class="empty-state"><div class="icon">❌</div><div>加载失败: ' + e.message + '</div></div>';
     }
 }
 
-function renderTable() {
+function renderAllTables() {
     var container = document.getElementById('data-container');
-    var records = allData.currentRecords || [];
     var searchTerm = document.getElementById('search-input').value.toLowerCase();
     
-    var filteredRecords = records.filter(function(row) {
-        if (!searchTerm) return true;
-        return Object.values(row).some(function(val) {
-            return val != null && String(val).toLowerCase().includes(searchTerm);
+    var totalRecords = 0;
+    var totalFiltered = 0;
+    
+    var html = '';
+    var groupNames = Object.keys(allData.groupData || {});
+    
+    groupNames.forEach(function(groupName) {
+        var records = allData.groupData[groupName] || [];
+        totalRecords += records.length;
+        
+        var filteredRecords = records.filter(function(row) {
+            if (!searchTerm) return true;
+            return Object.values(row).some(function(val) {
+                return val != null && String(val).toLowerCase().includes(searchTerm);
+            });
         });
+        totalFiltered += filteredRecords.length;
+        
+        var colSet = new Set();
+        records.forEach(function(row) {
+            if (typeof row === 'object' && row !== null) {
+                Object.keys(row).forEach(function(key) { colSet.add(key); });
+            }
+        });
+        var columns = Array.from(colSet);
+        
+        if (filteredRecords.length === 0 && searchTerm) {
+            return;
+        }
+        
+        html += '<div class="card" style="margin-bottom:16px;">';
+        html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">';
+        html += '<h3 style="margin:0;font-size:16px;">' + groupName + ' <span style="font-weight:400;color:#5c5f66;">(' + records.length + '条)</span></h3>';
+        html += '<button class="btn btn-primary" onclick="showAddModal(\'' + groupName + '\')" style="font-size:12px;">➕ 添加</button>';
+        html += '</div>';
+        
+        html += '<div class="data-table-container">';
+        html += '<table class="data-table">';
+        html += '<thead><tr>';
+        html += '<th style="width: 50px;">#</th>';
+        columns.forEach(function(col) {
+            html += '<th>' + col + '</th>';
+        });
+        html += '<th style="width: 140px;">操作</th>';
+        html += '</tr></thead>';
+        html += '<tbody>';
+        
+        var displayRecords = searchTerm ? filteredRecords : records;
+        displayRecords.forEach(function(row, index) {
+            var actualIndex = searchTerm ? records.indexOf(row) : index;
+            html += '<tr>';
+            html += '<td>' + (actualIndex + 1) + '</td>';
+            columns.forEach(function(col) {
+                var val = row[col];
+                if (val == null) {
+                    html += '<td style="color: #909296;">—</td>';
+                } else if (typeof val === 'object') {
+                    html += '<td style="color: #7c5cfc;">{...}</td>';
+                } else {
+                    var displayVal = String(val);
+                    if (displayVal.length > 50) {
+                        displayVal = displayVal.substring(0, 50) + '...';
+                    }
+                    html += '<td title="' + escapeHtml(String(val)) + '">' + escapeHtml(displayVal) + '</td>';
+                }
+            });
+            html += '<td class="row-actions">';
+            html += '<button class="btn btn-secondary" onclick="showDetailModal(\'' + groupName + '\', ' + actualIndex + ')">详情</button>';
+            html += '<button class="btn btn-secondary" onclick="showEditModalByIndex(\'' + groupName + '\', ' + actualIndex + ')">编辑</button>';
+            html += '<button class="btn btn-danger" onclick="showDeleteModal(\'' + groupName + '\', ' + actualIndex + ')">删除</button>';
+            html += '</td>';
+            html += '</tr>';
+        });
+        
+        if (records.length === 0) {
+            html += '<tr><td colspan="100" style="text-align:center;color:#909296;">暂无数据</td></tr>';
+        }
+        
+        html += '</tbody></table></div>';
+        html += '</div>';
     });
     
-    var statsHtml = '<div class="stat-item"><div class="label">总记录数</div><div class="value">' + records.length + '</div></div>';
+    var statsHtml = '<div class="stat-item"><div class="label">总记录数</div><div class="value">' + totalRecords + '</div></div>';
     if (searchTerm) {
-        statsHtml += '<div class="stat-item"><div class="label">匹配结果</div><div class="value">' + filteredRecords.length + '</div></div>';
+        statsHtml += '<div class="stat-item"><div class="label">匹配结果</div><div class="value">' + totalFiltered + '</div></div>';
     }
     document.getElementById('stats-bar').innerHTML = statsHtml;
     
-    if (filteredRecords.length === 0) {
-        container.innerHTML = '<div class="empty-state"><div class="icon">🔍</div><div>' + (searchTerm ? '未找到匹配记录' : '暂无数据') + '</div></div>';
-        return;
+    if (html === '') {
+        container.innerHTML = '<div class="empty-state"><div class="icon">🔍</div><div>未找到匹配记录</div></div>';
+    } else {
+        container.innerHTML = html;
     }
-    
-    var idField = findIdField(filteredRecords);
-    
-    var html = '<div class="data-table-container">';
-    html += '<div style="margin-bottom: 12px;"><button class="btn btn-primary" onclick="showAddModal()">➕ 添加记录</button></div>';
-    html += '<table class="data-table">';
-    html += '<thead><tr>';
-    html += '<th style="width: 60px;">#</th>';
-    tableColumns.forEach(function(col) {
-        html += '<th>' + col + '</th>';
-    });
-    html += '<th style="width: 140px;">操作</th>';
-    html += '</tr></thead>';
-    html += '<tbody>';
-    
-    filteredRecords.forEach(function(row, index) {
-        html += '<tr>';
-        html += '<td>' + (index + 1) + '</td>';
-        tableColumns.forEach(function(col) {
-            var val = row[col];
-            if (val == null) {
-                html += '<td style="color: #909296;">—</td>';
-            } else if (typeof val === 'object') {
-                html += '<td style="color: #7c5cfc;">{...}</td>';
-            } else {
-                var displayVal = String(val);
-                if (displayVal.length > 50) {
-                    displayVal = displayVal.substring(0, 50) + '...';
-                }
-                html += '<td title="' + escapeHtml(String(val)) + '">' + escapeHtml(displayVal) + '</td>';
-            }
-        });
-        html += '<td class="row-actions">';
-        html += '<button class="btn btn-secondary" onclick="showDetailModal(' + index + ')">详情</button>';
-        html += '<button class="btn btn-secondary" onclick="showEditModalByIndex(' + index + ')">编辑</button>';
-        html += '<button class="btn btn-danger" onclick="showDeleteModal(' + index + ')">删除</button>';
-        html += '</td>';
-        html += '</tr>';
-    });
-    
-    html += '</tbody></table></div>';
-    container.innerHTML = html;
 }
 
 function findIdField(records) {
@@ -410,12 +441,12 @@ function escapeHtml(str) {
     return div.innerHTML;
 }
 
-function showDetailModal(index) {
-    var records = allData.currentRecords || [];
+function showDetailModal(groupName, index) {
+    var records = allData.groupData[groupName] || [];
     var row = records[index];
     if (!row) return;
     
-    currentRowData = row;
+    currentRowData = { row: row, groupName: groupName, index: index };
     
     var title = row.name || row.id || row.title || '详情';
     document.getElementById('modal-detail-title').textContent = '📋 ' + title;
@@ -439,20 +470,21 @@ function showDetailModal(index) {
     document.getElementById('modal-detail').classList.add('active');
 }
 
-function showEditModalByIndex(index) {
-    var records = allData.currentRecords || [];
+function showEditModalByIndex(groupName, index) {
+    var records = allData.groupData[groupName] || [];
     var row = records[index];
     if (!row) return;
-    showEditModal(row);
+    showEditModal(row, groupName);
 }
 
-function showEditModal(row) {
-    var idField = findIdField(allData.currentRecords || []);
+function showEditModal(row, groupName) {
+    var records = allData.groupData[groupName] || [];
+    var idField = findIdField(records);
     var idValue = String(row[idField]);
     
     document.getElementById('modal-edit-title').textContent = '✏️ 编辑: ' + (row.name || row.id || idValue);
     document.getElementById('edit-fileName').value = currentFile;
-    document.getElementById('edit-group').value = currentGroup;
+    document.getElementById('edit-group').value = groupName;
     document.getElementById('edit-idField').value = idField;
     document.getElementById('edit-idValue').value = idValue;
     
@@ -499,7 +531,9 @@ async function submitEdit(event) {
     var formData = new FormData(form);
     var updates = {};
     
-    var originalRow = allData.currentRecords.find(function(r) {
+    var groupName = document.getElementById('edit-group').value;
+    var records = allData.groupData[groupName] || [];
+    var originalRow = records.find(function(r) {
         return String(r[document.getElementById('edit-idField').value]) === document.getElementById('edit-idValue').value;
     });
     
@@ -537,7 +571,7 @@ async function submitEdit(event) {
         if (result.ok) {
             toast('✅ 保存成功');
             closeModal('modal-edit');
-            loadGroupData();
+            loadData();
         } else {
             toast(result.error || '保存失败', 'error');
         }
@@ -550,25 +584,19 @@ async function submitEdit(event) {
     return false;
 }
 
-function showAddModal() {
+function showAddModal(groupName) {
     document.getElementById('modal-add-title').textContent = '➕ 添加记录';
     document.getElementById('add-fileName').value = currentFile;
-    document.getElementById('add-group').value = currentGroup;
+    document.getElementById('add-group').value = groupName;
     
-    var fieldsHtml = '<div class="edit-form">';
-    tableColumns.forEach(function(key) {
-        fieldsHtml += '<div class="form-group">';
-        fieldsHtml += '<label>' + key + '</label>';
-        if (key === 'notes' || key === 'content' || key === 'description') {
-            fieldsHtml += '<textarea name="' + key + '" rows="3"></textarea>';
-        } else {
-            fieldsHtml += '<input type="text" name="' + key + '" value="">';
-        }
-        fieldsHtml += '</div>';
-    });
-    fieldsHtml += '</div>';
+    var records = allData.groupData[groupName] || [];
+    var defaultJson = '{}';
+    if (records.length > 0) {
+        var lastRecord = records[records.length - 1];
+        defaultJson = JSON.stringify(lastRecord, null, 2);
+    }
     
-    document.getElementById('add-fields').innerHTML = fieldsHtml;
+    document.getElementById('add-json').value = defaultJson;
     document.getElementById('modal-add').classList.add('active');
 }
 
@@ -579,17 +607,19 @@ async function submitAdd(event) {
     btn.disabled = true;
     btn.textContent = '⏳ 添加中...';
     
-    var form = document.getElementById('add-form');
-    var formData = new FormData(form);
-    var record = {};
-    
-    formData.forEach(function(value, key) {
-        if (value !== '') {
-            record[key] = value;
-        }
-    });
-    
     try {
+        var jsonText = document.getElementById('add-json').value.trim();
+        var record;
+        
+        try {
+            record = JSON.parse(jsonText);
+        } catch (e) {
+            toast('JSON 格式错误: ' + e.message, 'error');
+            btn.disabled = false;
+            btn.textContent = '添加';
+            return false;
+        }
+        
         var params = new URLSearchParams({
             fileName: document.getElementById('add-fileName').value,
             group: document.getElementById('add-group').value,
@@ -607,7 +637,7 @@ async function submitAdd(event) {
         if (result.ok) {
             toast('✅ 添加成功');
             closeModal('modal-add');
-            loadGroupData();
+            loadData();
         } else {
             toast(result.error || '添加失败', 'error');
         }
@@ -620,8 +650,8 @@ async function submitAdd(event) {
     return false;
 }
 
-function showDeleteModal(index) {
-    var records = allData.currentRecords || [];
+function showDeleteModal(groupName, index) {
+    var records = allData.groupData[groupName] || [];
     var row = records[index];
     if (!row) return;
     
@@ -629,7 +659,7 @@ function showDeleteModal(index) {
     var idValue = String(row[idField]);
     
     document.getElementById('delete-fileName').value = currentFile;
-    document.getElementById('delete-group').value = currentGroup;
+    document.getElementById('delete-group').value = groupName;
     document.getElementById('delete-idField').value = idField;
     document.getElementById('delete-idValue').value = idValue;
     document.getElementById('modal-delete').classList.add('active');
