@@ -31,7 +31,7 @@ public class FeishuLongConnectionService {
     private final ConfigService configService;
     private final OpenCodeService openCodeService;
     private final LogService logService;
-
+    
     private com.lark.oapi.ws.Client wsClient;
     private Client client;
     private String feishuSessionId;

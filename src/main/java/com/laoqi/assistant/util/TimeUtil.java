@@ -25,6 +25,9 @@ public class TimeUtil {
         return now().format(DF_DATE);
     }
 
+    public static String yesterdayStr() {
+        return now().minusDays(1).format(DF_DATE);
+    }
     public static String sessionId() {
         return now().format(DF_COMPACT) + Math.abs(RNG.nextLong() % 1000);
     }
