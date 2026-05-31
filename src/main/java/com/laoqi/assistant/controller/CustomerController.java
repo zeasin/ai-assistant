@@ -1,12 +1,15 @@
 package com.laoqi.assistant.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.laoqi.assistant.service.CustomerService;
 import com.laoqi.assistant.service.LogService;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.*;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 @Controller
@@ -14,6 +17,7 @@ public class CustomerController {
 
     private final CustomerService customerService;
     private final LogService logService;
+    private static final ObjectMapper mapper = new ObjectMapper();
 
     public CustomerController(CustomerService customerService, LogService logService) {
         this.customerService = customerService;
@@ -170,6 +174,43 @@ public class CustomerController {
         return "leads_all";
     }
 
+    @GetMapping("/api/customers/ai-analysis")
+    public SseEmitter aiAnalysis(@RequestParam(required = false, defaultValue = "false") boolean force) {
+        SseEmitter emitter = new SseEmitter(300_000L);
+
+        if (!force) {
+            String cached = customerService.getCachedAnalysis();
+            if (cached != null) {
+                try {
+                    emitter.send(SseEmitter.event().data(mapper.writeValueAsString(
+                            Map.of("type", "text", "content", cached))));
+                    emitter.send(SseEmitter.event().data(mapper.writeValueAsString(Map.of("type", "done"))));
+                    emitter.complete();
+                } catch (Exception ignored) {}
+                return emitter;
+            }
+        }
+
+        Executors.newSingleThreadExecutor().execute(() -> {
+            try {
+                Map<String, Object> statusEvent = Map.of("type", "status", "content", "⏳ AI 正在分析客户数据...");
+                emitter.send(SseEmitter.event().data(mapper.writeValueAsString(statusEvent)));
+
+                String result = customerService.aiAnalyze(force);
+                emitter.send(SseEmitter.event().data(mapper.writeValueAsString(Map.of("type", "text", "content", result))));
+                emitter.send(SseEmitter.event().data(mapper.writeValueAsString(Map.of("type", "done"))));
+                emitter.complete();
+            } catch (Exception e) {
+                try {
+                    emitter.send(SseEmitter.event().data(mapper.writeValueAsString(
+                            Map.of("type", "error", "content", "AI 分析失败: " + e.getMessage()))));
+                    emitter.complete();
+                } catch (Exception ignored) {}
+            }
+        });
+        return emitter;
+    }
+
     @PostMapping("/api/leads/add")
     @ResponseBody
     public Map<String, Object> addLead(
@@ -205,6 +246,32 @@ public class CustomerController {
         try {
             customerService.addRecord(customerId, customerName, actType, content, date, nextFollowUp);
             return Map.of("ok", true);
+        } catch (Exception e) {
+            return Map.of("ok", false, "error", e.getMessage());
+        }
+    }
+
+    @PostMapping("/api/customers/add")
+    @ResponseBody
+    public Map<String, Object> addCustomer(
+            @RequestParam String name,
+            @RequestParam(required = false, defaultValue = "") String company,
+            @RequestParam(required = false, defaultValue = "") String region,
+            @RequestParam(required = false, defaultValue = "潜在") String stage,
+            @RequestParam(required = false, defaultValue = "") String product,
+            @RequestParam(required = false, defaultValue = "0") Double contractAmount,
+            @RequestParam(required = false, defaultValue = "0") Double paidAmount,
+            @RequestParam(required = false, defaultValue = "") String notes,
+            @RequestParam(required = false, defaultValue = "") String contactName,
+            @RequestParam(required = false, defaultValue = "") String contactPhone,
+            @RequestParam(required = false, defaultValue = "") String contactWechat) {
+        try {
+            Map<String, Object> result = customerService.addCustomer(name, company, region, stage, product,
+                    contractAmount > 0 ? contractAmount : null,
+                    paidAmount > 0 ? paidAmount : null,
+                    notes, contactName, contactPhone, contactWechat);
+            result.put("ok", true);
+            return result;
         } catch (Exception e) {
             return Map.of("ok", false, "error", e.getMessage());
         }

@@ -3,21 +3,32 @@ package com.laoqi.assistant.service;
 import com.laoqi.assistant.config.AppConfig;
 import com.laoqi.assistant.model.OperationsData.*;
 import com.laoqi.assistant.util.FileUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class OperationsService {
 
+    private static final Logger log = LoggerFactory.getLogger(OperationsService.class);
+
     private final AppConfig appConfig;
     private final ConfigService configService;
+    private final OpenCodeService openCodeService;
 
-    public OperationsService(AppConfig appConfig, ConfigService configService) {
+    // AI analysis cache
+    private String cachedAnalysis = "";
+    private String cachedDate = "";
+
+    public OperationsService(AppConfig appConfig, ConfigService configService, OpenCodeService openCodeService) {
         this.appConfig = appConfig;
         this.configService = configService;
+        this.openCodeService = openCodeService;
     }
 
     private Path getBaseDir() {
@@ -36,6 +47,149 @@ public class OperationsService {
 
     public Root loadData() {
         return FileUtil.readJson(dataFile(), Root.class, new Root());
+    }
+
+    /**
+     * Build a text summary of the operations data for use as AI prompt context
+     */
+    public String buildDataSummary(Root data) {
+        StringBuilder sb = new StringBuilder();
+
+        // Account summary
+        if (data.accounts != null && !data.accounts.isEmpty()) {
+            sb.append("## 账号概况\n\n");
+            for (var accEntry : data.accounts.entrySet()) {
+                sb.append("账号：").append(accEntry.getKey()).append("\n");
+                for (var platEntry : accEntry.getValue().entrySet()) {
+                    sb.append("  - 平台：").append(platEntry.getKey());
+                    if (platEntry.getValue() instanceof Map) {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> info = (Map<String, Object>) platEntry.getValue();
+                        if (info.get("name") != null) sb.append("，名称：").append(info.get("name"));
+                        if (info.get("fans") != null) sb.append("，粉丝：").append(info.get("fans"));
+                        if (info.get("totalViews") != null) sb.append("，总访问：").append(info.get("totalViews"));
+                        if (info.get("totalArticles") != null) sb.append("，总文章：").append(info.get("totalArticles"));
+                    }
+                    sb.append("\n");
+                }
+                sb.append("\n");
+            }
+        }
+
+        // Recent articles
+        if (data.articles != null && !data.articles.isEmpty()) {
+            sb.append("## 近期文章\n\n");
+            for (var artEntry : data.articles.entrySet()) {
+                sb.append("账号：").append(artEntry.getKey()).append("\n");
+                List<ArticleData> articles = artEntry.getValue();
+                if (articles != null) {
+                    for (ArticleData a : articles) {
+                        sb.append("  - [").append(a.id).append("] ").append(a.topic);
+                        if (a.series != null) sb.append(" (系列：").append(a.series).append(")");
+                        if (a.publishDate != null) sb.append(" 发布于：").append(a.publishDate);
+                        sb.append("\n");
+                        if (a.fansGained != null) sb.append("    增粉：").append(a.fansGained);
+                        if (a.notes != null) sb.append(" 备注：").append(a.notes);
+                        sb.append("\n");
+                        if (a.data != null) {
+                            for (var pEntry : a.data.entrySet()) {
+                                PlatformArticleData pd = pEntry.getValue();
+                                if (pd != null) {
+                                    sb.append("    ").append(pEntry.getKey()).append("：");
+                                    if (pd.reads != null) sb.append("阅读").append(pd.reads).append(" ");
+                                    if (pd.likes != null) sb.append("点赞").append(pd.likes).append(" ");
+                                    if (pd.shares != null) sb.append("分享").append(pd.shares).append(" ");
+                                    if (pd.favorites != null) sb.append("收藏").append(pd.favorites);
+                                    sb.append("\n");
+                                }
+                            }
+                        }
+                    }
+                }
+                sb.append("\n");
+            }
+        }
+
+        // Daily stats summary
+        if (data.dailyStats != null && !data.dailyStats.isEmpty()) {
+            sb.append("## 每日统计\n\n");
+            for (var statsEntry : data.dailyStats.entrySet()) {
+                sb.append("账号：").append(statsEntry.getKey()).append("\n");
+                List<DailyStats> stats = statsEntry.getValue();
+                if (stats != null) {
+                    // Only include recent 7 days
+                    int count = Math.min(stats.size(), 7);
+                    for (int i = stats.size() - count; i < stats.size(); i++) {
+                        DailyStats d = stats.get(i);
+                        if (d != null) {
+                            sb.append("  - ").append(d.date);
+                            if (d.fans != null) sb.append(" 粉丝：").append(d.fans);
+                            if (d.reads != null) sb.append(" 阅读：").append(d.reads);
+                            if (d.readArticles != null) sb.append(" 文章：").append(d.readArticles);
+                            sb.append("\n");
+                        }
+                    }
+                }
+                sb.append("\n");
+            }
+        }
+
+        return sb.toString();
+    }
+
+    /**
+     * Get cached AI analysis if already generated today, or null if not cached
+     */
+    public String getCachedAnalysis() {
+        String today = com.laoqi.assistant.util.TimeUtil.todayStr();
+        if (today.equals(cachedDate) && !cachedAnalysis.isEmpty()) {
+            return cachedAnalysis;
+        }
+        return null;
+    }
+
+    /**
+     * Use AI to analyze operations data and return insights.
+     * Returns cached result if available today, unless force=true.
+     */
+    public String aiAnalyze(boolean force) {
+        if (!force) {
+            String cached = getCachedAnalysis();
+            if (cached != null) {
+                log.debug("[AI分析] 使用缓存的运营分析结果");
+                return cached;
+            }
+        }
+
+        Root data = loadData();
+        String dataSummary = buildDataSummary(data);
+
+        String prompt = "你是一个自媒体运营分析专家。以下是我的自媒体运营数据：\n\n"
+                + dataSummary
+                + "\n请根据以上数据，生成一份运营分析报告，包含：\n"
+                + "1. 【数据概览】整体运营状况一句话总结\n"
+                + "2. 【各平台表现】每个平台的关键指标和变化趋势\n"
+                + "3. 【文章表现】表现最好和最差的文章分析\n"
+                + "4. 【发现问题】数据中反映出的问题\n"
+                + "5. 【改进建议】具体的改进措施建议\n\n"
+                + "请使用简洁的中文，适当使用小标题和列表，便于阅读。";
+
+        try {
+            if (!openCodeService.isHealthy()) {
+                return "⚠️ opencode serve 未启动，无法进行 AI 分析。请确保 opencode serve --port " + appConfig.getNotesPort() + " 已运行。";
+            }
+
+            String sessionId = openCodeService.createSession("运营分析");
+
+            String result = openCodeService.sendMessage(sessionId, prompt);
+            // Cache successful result with today's date
+            cachedAnalysis = result;
+            cachedDate = com.laoqi.assistant.util.TimeUtil.todayStr();
+            return result;
+        } catch (Exception e) {
+            log.error("AI 运营分析失败", e);
+            return "❌ AI 分析失败：" + e.getMessage();
+        }
     }
 
     public AnalysisResult analyze(Map<String, List<ArticleData>> articles) {
@@ -184,4 +338,51 @@ public class OperationsService {
     static class ArticleReads { String topic; int reads; ArticleReads(String t, int r) { topic = t; reads = r; } }
     static class CsdnWxGap { String topic; int csdnReads, wxReads, gap; CsdnWxGap(String t, int c, int w, int g) { topic = t; csdnReads = c; wxReads = w; gap = g; } }
     static class PlatformStats { int reads, count; }
+
+    public void saveData(Root data) {
+        FileUtil.writeJson(dataFile(), data);
+    }
+
+    public void addArticle(String accountName, String id, String topic, String series, String publishDate,
+                            String fansAtPublish, String fansGained, String notes,
+                            Map<String, PlatformArticleData> platformData) {
+        Root data = loadData();
+        if (data.articles == null) data.articles = new LinkedHashMap<>();
+        data.articles.computeIfAbsent(accountName, k -> new ArrayList<>());
+
+        ArticleData article = new ArticleData();
+        article.id = id;
+        article.topic = topic;
+        article.series = series;
+        article.publishDate = publishDate;
+        article.fansAtPublish = fansAtPublish;
+        article.fansGained = fansGained;
+        article.notes = notes;
+        article.data = platformData;
+        data.articles.get(accountName).add(article);
+        saveData(data);
+    }
+
+    public void addDailyStats(String accountName, DailyStats stats) {
+        Root data = loadData();
+        if (data.dailyStats == null) data.dailyStats = new LinkedHashMap<>();
+        data.dailyStats.computeIfAbsent(accountName, k -> new ArrayList<>());
+        data.dailyStats.get(accountName).add(stats);
+        saveData(data);
+    }
+
+    public void saveAccount(String accountName, String platformKey, String name, Integer fans,
+                             Integer totalViews, Integer totalArticles) {
+        Root data = loadData();
+        if (data.accounts == null) data.accounts = new LinkedHashMap<>();
+        data.accounts.computeIfAbsent(accountName, k -> new LinkedHashMap<>());
+
+        Map<String, Object> info = new LinkedHashMap<>();
+        info.put("name", name);
+        if (fans != null) info.put("fans", fans);
+        if (totalViews != null) info.put("totalViews", totalViews);
+        if (totalArticles != null) info.put("totalArticles", totalArticles);
+        data.accounts.get(accountName).put(platformKey, info);
+        saveData(data);
+    }
 }

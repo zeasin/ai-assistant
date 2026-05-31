@@ -4,11 +4,14 @@ import com.laoqi.assistant.config.AppConfig;
 import com.laoqi.assistant.model.Config;
 import com.laoqi.assistant.service.ConfigService;
 import com.laoqi.assistant.service.LogService;
+import com.laoqi.assistant.service.OpenCodeService;
 import com.laoqi.assistant.util.FileUtil;
 import com.laoqi.assistant.util.MarkdownUtil;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
 import java.nio.file.*;
@@ -16,6 +19,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.Executors;
 import java.util.stream.Stream;
 
 @Controller
@@ -24,11 +28,18 @@ public class WorkReportController {
     private final AppConfig appConfig;
     private final LogService logService;
     private final ConfigService configService;
+    private final OpenCodeService openCodeService;
+    private static final ObjectMapper mapper = new ObjectMapper();
 
-    public WorkReportController(AppConfig appConfig, LogService logService, ConfigService configService) {
+    // AI analysis cache
+    private String cachedAnalysis = "";
+    private String cachedDate = "";
+
+    public WorkReportController(AppConfig appConfig, LogService logService, ConfigService configService, OpenCodeService openCodeService) {
         this.appConfig = appConfig;
         this.logService = logService;
         this.configService = configService;
+        this.openCodeService = openCodeService;
     }
 
     private Path getDailyDir() {
@@ -74,6 +85,92 @@ public class WorkReportController {
                     });
         } catch (IOException ignored) {}
         return items;
+    }
+
+    @GetMapping("/api/work-reports/ai-analysis")
+    public SseEmitter aiAnalysis(@RequestParam(required = false, defaultValue = "false") boolean force) {
+        SseEmitter emitter = new SseEmitter(300_000L);
+
+        if (!force) {
+            String today = com.laoqi.assistant.util.TimeUtil.todayStr();
+            if (today.equals(cachedDate) && !cachedAnalysis.isEmpty()) {
+                try {
+                    emitter.send(SseEmitter.event().data(mapper.writeValueAsString(
+                            Map.of("type", "text", "content", cachedAnalysis))));
+                    emitter.send(SseEmitter.event().data(mapper.writeValueAsString(Map.of("type", "done"))));
+                    emitter.complete();
+                } catch (Exception ignored) {}
+                return emitter;
+            }
+        }
+
+        Executors.newSingleThreadExecutor().execute(() -> {
+            try {
+                emitter.send(SseEmitter.event().data(mapper.writeValueAsString(
+                        Map.of("type", "status", "content", "⏳ AI 正在分析工作日报..."))));
+
+                String result = buildAiReportSummary();
+                cachedAnalysis = result;
+                cachedDate = com.laoqi.assistant.util.TimeUtil.todayStr();
+                emitter.send(SseEmitter.event().data(mapper.writeValueAsString(
+                        Map.of("type", "text", "content", result))));
+                emitter.send(SseEmitter.event().data(mapper.writeValueAsString(
+                        Map.of("type", "done"))));
+                emitter.complete();
+            } catch (Exception e) {
+                try {
+                    emitter.send(SseEmitter.event().data(mapper.writeValueAsString(
+                            Map.of("type", "error", "content", "AI 分析失败: " + e.getMessage()))));
+                    emitter.complete();
+                } catch (Exception ignored) {}
+            }
+        });
+        return emitter;
+    }
+
+    private String buildAiReportSummary() {
+        List<ReportItem> dailyReports = loadReports(getDailyDir());
+        List<ReportItem> weeklyReports = loadReports(getWeeklyDir());
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("## 近期日报\n\n");
+        if (!dailyReports.isEmpty()) {
+            for (int i = 0; i < Math.min(dailyReports.size(), 5); i++) {
+                ReportItem r = dailyReports.get(i);
+                sb.append("### ").append(r.name).append("\n\n");
+                String plain = r.content.replaceAll("<[^>]+>", "");
+                sb.append(plain, 0, Math.min(plain.length(), 500)).append("\n\n");
+            }
+        }
+
+        sb.append("## 近期周报\n\n");
+        if (!weeklyReports.isEmpty()) {
+            for (int i = 0; i < Math.min(weeklyReports.size(), 3); i++) {
+                ReportItem r = weeklyReports.get(i);
+                sb.append("### ").append(r.name).append("\n\n");
+                String plain = r.content.replaceAll("<[^>]+>", "");
+                sb.append(plain, 0, Math.min(plain.length(), 800)).append("\n\n");
+            }
+        }
+
+        String prompt = "你是一个工作总结分析师。以下是我的近期日报和周报内容：\n\n"
+                + sb
+                + "\n请根据以上内容生成一份工作分析报告，包含：\n"
+                + "1. 【工作重点】近期主要工作内容和重点任务\n"
+                + "2. 【进展总结】各项工作的进展和成果\n"
+                + "3. 【待办事项】需要继续跟进的未完成任务\n"
+                + "4. 【趋势建议】工作效率、时间分配等方面的改进建议\n\n"
+                + "请使用简洁的中文，适当使用小标题和列表。";
+
+        try {
+            if (!openCodeService.isHealthy()) {
+                return "⚠️ opencode serve 未启动（端口 " + appConfig.getNotesPort() + "），无法进行 AI 分析。";
+            }
+            String sessionId = openCodeService.createSession("工作分析");
+            return openCodeService.sendMessage(sessionId, prompt);
+        } catch (Exception e) {
+            return "❌ AI 分析失败：" + e.getMessage();
+        }
     }
 
     @GetMapping("/work-reports")

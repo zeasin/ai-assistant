@@ -114,6 +114,28 @@ java -jar target/assistant-v2-2.0.0.jar
 </div>
 
 <div class="card">
+    <h2>📝 快速数据录入</h2>
+    <p class="text-muted" style="line-height:1.7;">
+        三个入口均可录入数据，数据互通，AI 分析时读取完整数据：
+    </p>
+    <table class="log-table">
+        <thead><tr><th style="width:100px;">入口</th><th>方式</th><th>支持的录入类型</th></tr></thead>
+        <tbody>
+            <tr><td><strong>页面表单</strong></td><td>运营/客户/工作页面点按钮弹窗填写</td><td>文章、日统计、账号、客户、线索、跟进记录、日报、周报</td></tr>
+            <tr><td><strong>飞书消息</strong></td><td>以"记录/新增/添加/创建/录入"开头发消息</td><td>同上，AI 自动解析自然语言</td></tr>
+            <tr><td><strong>AI对话</strong></td><td>聊天框以"记录/新增/添加/创建/录入"开头输入</td><td>同上，AI 自动解析自然语言</td></tr>
+        </tbody>
+    </table>
+    <h3 style="font-size:14px;margin:16px 0 8px;">飞书/对话录入示例</h3>
+    <pre style="background:#1e1e2e;color:#cdd6f4;padding:16px;border-radius:8px;font-size:13px;line-height:1.6;overflow-x:auto;">记录日报：今天修复了导出bug，下午跟进了张三的合同
+记录文章：《实战指南》微信阅读3200点赞85，增粉12
+新增客户：王五，公司启航科技，阶段意向，产品ERP
+新增线索：赵六，来源转介绍，备注朋友推荐
+记录跟进：张三 谈了合同细节，下周二再约
+记录日统计：码农老齐 粉丝28500 阅读4200</pre>
+</div>
+
+<div class="card">
     <h2>📩 飞书集成</h2>
     <p class="text-muted" style="line-height:1.7;">
         配置 Webhook URL 后，AI 综合日报、发文提醒、下班提醒等自动推送到飞书群。

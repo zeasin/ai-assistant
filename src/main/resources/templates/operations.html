@@ -12,187 +12,394 @@
     <div class="text-muted mb-2">数据来源：<code>自媒体/运营数据.json</code> | 最后更新：<span th:text="${last_updated}">未知</span></div>
 </div>
 
-<div class="card">
-    <h2>📈 每日数据统计</h2>
-    <div class="text-muted mb-2">账号级每日汇总数据，来源：<code>运营数据.json → dailyStats</code></div>
-    <th:block th:each="statsEntry : ${daily_stats}">
-        <th:block th:with="account_name=${statsEntry.key}, stats=${statsEntry.value}">
-            <th:block th:if="${#lists.size(stats) > 0}">
-            <h3 style="font-size:14px;margin:12px 0 6px;" th:text="${account_name}">账号名</h3>
+<div class="card" style="background:linear-gradient(135deg,#f0edff,#fafafe);border:1px solid #d9d0ff;">
+    <h2 style="margin-bottom:4px;">🤖 AI 运营分析报告</h2>
+    <div class="text-muted mb-2" style="font-size:12px;">
+        基于 <code>自媒体/运营数据.json</code> 实时生成 |
+        最后更新：<span th:text="${last_updated}">未知</span>
+        <span id="ai-analysis-elapsed" style="display:none;margin-left:8px;"></span>
+    </div>
+    <div id="ai-analysis-status" class="text-muted" style="padding:20px 0;text-align:center;">
+        ⏳ 正在生成 AI 分析报告...
+    </div>
+    <div id="ai-analysis-result" class="report"></div>
+    <div style="margin-top:12px;text-align:right;">
+        <button id="ai-analyze-btn" class="btn btn-secondary" onclick="startAiAnalysis(true)" style="font-size:12px;">🔄 重新分析</button>
+    </div>
+</div>
+
+<details style="background:#fff;border:1px solid #e1e3e6;border-radius:12px;padding:16px 20px;margin-bottom:16px;">
+    <summary style="cursor:pointer;font-size:14px;font-weight:600;color:#5c5f66;outline:none;">
+        📁 原始数据详情
+    </summary>
+    <div style="margin-top:12px;">
+        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+            <button class="btn btn-primary" onclick="showAddArticleModal()" style="font-size:12px;">+ 添加文章</button>
+            <button class="btn btn-primary" onclick="showAddDailyStatsModal()" style="font-size:12px;">+ 添加日统计</button>
+            <button class="btn btn-primary" onclick="showSaveAccountModal()" style="font-size:12px;">+ 添加账号</button>
+        </div>
+        <div class="card" style="margin-bottom:12px;">
+            <h2>📈 每日数据统计</h2>
+            <div class="text-muted mb-2">账号级每日汇总数据</div>
+            <th:block th:each="statsEntry : ${daily_stats}">
+                <th:block th:with="account_name=${statsEntry.key}, stats=${statsEntry.value}">
+                    <th:block th:if="${#lists.size(stats) > 0}">
+                    <h3 style="font-size:14px;margin:12px 0 6px;" th:text="${account_name}">账号名</h3>
+                    <table class="log-table">
+                        <thead><tr><th>日期</th><th>粉丝</th><th>阅读量</th><th>文章数</th><th>推荐</th><th>搜一搜</th><th>消息</th><th>朋友圈</th></tr></thead>
+                        <tbody>
+                            <tr th:each="day : ${stats}">
+                                <td th:text="${day.date}">日期</td>
+                                <td th:text="${day.fans != null ? day.fans : '—'}">—</td>
+                                <td th:text="${day.reads}">0</td>
+                                <td th:text="${day.readArticles}">0</td>
+                                <td th:text="${@utils.pct(day.sourceRecommend != null ? day.sourceRecommend : 0, day.reads != null ? day.reads : 0)}">0%</td>
+                                <td th:text="${@utils.pct(day.sourceSearch != null ? day.sourceSearch : 0, day.reads != null ? day.reads : 0)}">0%</td>
+                                <td th:text="${@utils.pct(day.sourceMessage != null ? day.sourceMessage : 0, day.reads != null ? day.reads : 0)}">0%</td>
+                                <td th:text="${@utils.pct(day.sourceMoments != null ? day.sourceMoments : 0, day.reads != null ? day.reads : 0)}">0%</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    </th:block>
+                </th:block>
+            </th:block>
+        </div>
+
+        <div class="card" style="margin-bottom:12px;">
+            <h2>账号总览</h2>
             <table class="log-table">
-                <thead><tr><th>日期</th><th>粉丝</th><th>阅读量</th><th>文章数</th><th>推荐</th><th>搜一搜</th><th>消息</th><th>朋友圈</th></tr></thead>
+                <thead><tr><th>账号</th><th>平台</th><th>账号名</th><th>粉丝</th><th>备注</th></tr></thead>
                 <tbody>
-                    <tr th:each="day : ${stats}">
-                        <td th:text="${day.date}">日期</td>
-                        <td th:text="${day.fans != null ? day.fans : '—'}">—</td>
-                        <td th:text="${day.reads}">0</td>
-                        <td th:text="${day.readArticles}">0</td>
-                        <td th:text="${@utils.pct(day.sourceRecommend != null ? day.sourceRecommend : 0, day.reads != null ? day.reads : 0)}">0%</td>
-                        <td th:text="${@utils.pct(day.sourceSearch != null ? day.sourceSearch : 0, day.reads != null ? day.reads : 0)}">0%</td>
-                        <td th:text="${@utils.pct(day.sourceMessage != null ? day.sourceMessage : 0, day.reads != null ? day.reads : 0)}">0%</td>
-                        <td th:text="${@utils.pct(day.sourceMoments != null ? day.sourceMoments : 0, day.reads != null ? day.reads : 0)}">0%</td>
-                    </tr>
+                    <th:block th:each="accEntry : ${accounts}">
+                        <th:block th:with="accName=${accEntry.key}, platforms=${accEntry.value}, rowspan=${#maps.size(platforms)}">
+                        <th:block th:each="platEntry, platStat : ${platforms}" th:with="platKey=${platEntry.key}, info=${platEntry.value}">
+                        <tr>
+                            <th:block th:if="${platStat.first}">
+                            <td th:rowspan="${rowspan}"><strong th:text="${accName}">账号名</strong></td>
+                            </th:block>
+                            <td th:text="${@utils.platformName(platKey)}">平台</td>
+                            <td th:text="${info.name}">—</td>
+                            <td th:text="${info.fans != null ? info.fans : '—'}">—</td>
+                            <td>
+                                <th:block th:if="${info.totalViews != null}">
+                                    <span th:text="'总访问' + info.totalViews + '，原创' + info.totalArticles + '篇'">统计</span>
+                                </th:block>
+                                <th:block th:if="${info.totalViews == null and info.fansUpdated != null}">
+                                    <span th:text="'更新于 ' + info.fansUpdated">更新</span>
+                                </th:block>
+                                <th:block th:if="${info.totalViews == null and info.fansUpdated == null}">—</th:block>
+                            </td>
+                        </tr>
+                        </th:block>
+                        </th:block>
+                    </th:block>
                 </tbody>
             </table>
+        </div>
+
+        <th:block th:each="artEntry : ${articles}">
+            <th:block th:with="accName=${artEntry.key}, articleList=${artEntry.value}">
+            <div class="card" style="margin-bottom:12px;">
+                <h2 th:text="${accName}">账号名</h2>
+                <table class="log-table" style="margin-top:8px;">
+                    <thead><tr><th style="width:32px">ID</th><th style="width:125px">日期</th><th style="text-align:left">文章</th><th style="width:48px">阅读</th><th style="width:36px">👍</th><th style="width:36px">🔁</th></tr></thead>
+                    <tbody>
+                        <tr th:each="article : ${articleList}">
+                            <td th:text="${article.id}">ID</td>
+                            <td th:text="${article.publishDate}">日期</td>
+                            <td style="text-align:left">
+                                <span th:text="${article.topic}">文章</span>
+                                <th:block th:if="${article.fansGained != null}">
+                                    <br><small class="text-muted" th:text="'增粉 ' + ${article.fansGained}"></small>
+                                </th:block>
+                            </td>
+                            <td th:text="${article.data != null and article.data.get('wechat') != null ? article.data.get('wechat').reads : '—'}">—</td>
+                            <td th:text="${article.data != null and article.data.get('wechat') != null ? article.data.get('wechat').likes : '—'}">—</td>
+                            <td th:text="${article.data != null and article.data.get('wechat') != null ? article.data.get('wechat').shares : '—'}">—</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
             </th:block>
         </th:block>
-    </th:block>
+
+        <div class="card">
+            <h2>发布节奏</h2>
+            <table class="log-table">
+                <thead><tr><th>账号</th><th>首发</th><th>次发</th><th>最后</th></tr></thead>
+                <tbody>
+                    <tr><td>码农老齐</td><td>周二18:00-19:00 微信</td><td>周三09:00-10:00 CSDN</td><td>周四20:00-22:00 知乎</td></tr>
+                    <tr><td>启航电商ERP</td><td>周四20:00 微信（电商干货、产品动态）</td><td>—</td><td>—</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</details>
+
+<script>
+var startTime;
+function startAiAnalysis(force) {
+    var btn = document.getElementById('ai-analyze-btn');
+    var status = document.getElementById('ai-analysis-status');
+    var result = document.getElementById('ai-analysis-result');
+    var elapsed = document.getElementById('ai-analysis-elapsed');
+    var url = '/api/operations/ai-analysis' + (force ? '?force=true' : '');
+
+    btn.disabled = true;
+    btn.textContent = '⏳ 分析中...';
+    status.style.display = 'block';
+    status.textContent = '⏳ AI 正在分析运营数据...';
+    result.innerHTML = '';
+    elapsed.style.display = 'none';
+    startTime = Date.now();
+
+    var eventSource = new EventSource(url);
+
+    eventSource.onmessage = function(event) {
+        try {
+            var data = JSON.parse(event.data);
+            if (data.type === 'status') {
+                status.textContent = data.content;
+            } else if (data.type === 'text') {
+                status.style.display = 'none';
+                result.innerHTML = marked.parse(data.content);
+                var sec = Math.round((Date.now() - startTime) / 1000);
+                elapsed.style.display = 'inline';
+                elapsed.textContent = '⏱️ ' + sec + 's';
+            } else if (data.type === 'error') {
+                status.style.display = 'none';
+                result.innerHTML = '<div style="color:#e03131;padding:20px;text-align:center;">❌ ' + data.content + '</div>';
+            } else if (data.type === 'done') {
+                eventSource.close();
+                btn.disabled = false;
+                btn.textContent = '🔄 重新分析';
+            }
+        } catch (e) {
+            result.innerHTML += event.data + '<br>';
+        }
+    };
+
+    eventSource.onerror = function() {
+        eventSource.close();
+        btn.disabled = false;
+        btn.textContent = '🔄 重新分析';
+        if (result.innerHTML === '') {
+            status.style.display = 'none';
+            result.innerHTML = '<div style="color:#e03131;padding:20px;text-align:center;">❌ AI 分析连接中断，请重试</div>';
+        }
+    };
+}
+
+// Auto-load on page load — backend returns cached result if already done today
+window.addEventListener('DOMContentLoaded', function() {
+    setTimeout(function() { startAiAnalysis(false); }, 300);
+});
+
+/* ===== 数据录入弹窗 ===== */
+function showAddArticleModal() {
+    document.getElementById('modal-article').classList.add('active');
+}
+function showAddDailyStatsModal() {
+    document.getElementById('modal-daily-stats').classList.add('active');
+}
+function showSaveAccountModal() {
+    document.getElementById('modal-account').classList.add('active');
+}
+function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+document.querySelectorAll('.modal-overlay').forEach(m => {
+    m.addEventListener('click', function(e) { if (e.target === this) this.classList.remove('active'); });
+});
+
+async function aiSend(msg) {
+    const resp = await fetch('/api/ai/send?message=' + encodeURIComponent(msg), { method: 'POST' });
+    return resp.json();
+}
+
+async function submitArticle(e) {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const msg = '记录文章：账号=' + fd.get('accountName')
+        + '，标题=' + fd.get('topic')
+        + '，日期=' + fd.get('publishDate')
+        + (fd.get('series') ? '，系列=' + fd.get('series') : '')
+        + (fd.get('fansGained') ? '，增粉=' + fd.get('fansGained') : '')
+        + (fd.get('notes') ? '，备注=' + fd.get('notes') : '')
+        + '，微信阅读=' + fd.get('wechatReads') + ' 微信点赞=' + fd.get('wechatLikes') + ' 微信分享=' + fd.get('wechatShares')
+        + '，CSDN阅读=' + fd.get('csdnReads') + ' CSDN点赞=' + fd.get('csdnLikes')
+        + '，知乎阅读=' + fd.get('zhihuReads') + ' 知乎点赞=' + fd.get('zhihuLikes');
+    try {
+        const res = await aiSend(msg);
+        if (res.ok) { toast('✅ ' + res.reply); closeModal('modal-article'); location.reload(); }
+        else { toast(res.error || '添加失败', 'error'); }
+    } catch(e) { toast('网络错误', 'error'); }
+    return false;
+}
+
+async function submitDailyStats(e) {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const msg = '记录日统计：账号=' + fd.get('accountName')
+        + '，日期=' + fd.get('date')
+        + '，粉丝=' + fd.get('fans')
+        + '，阅读=' + fd.get('reads')
+        + '，文章数=' + fd.get('readArticles')
+        + '，推荐来源=' + fd.get('sourceRecommend')
+        + '，搜一搜=' + fd.get('sourceSearch');
+    try {
+        const res = await aiSend(msg);
+        if (res.ok) { toast('✅ ' + res.reply); closeModal('modal-daily-stats'); location.reload(); }
+        else { toast(res.error || '添加失败', 'error'); }
+    } catch(e) { toast('网络错误', 'error'); }
+    return false;
+}
+
+async function submitAccount(e) {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const msg = '记录账号：账号名=' + fd.get('accountName')
+        + '，平台=' + fd.get('platformKey')
+        + (fd.get('name') ? '，名称=' + fd.get('name') : '')
+        + '，粉丝=' + fd.get('fans')
+        + '，总访问=' + fd.get('totalViews')
+        + '，总文章=' + fd.get('totalArticles');
+    try {
+        const res = await aiSend(msg);
+        if (res.ok) { toast('✅ ' + res.reply); closeModal('modal-account'); location.reload(); }
+        else { toast(res.error || '添加失败', 'error'); }
+    } catch(e) { toast('网络错误', 'error'); }
+    return false;
+}
+</script>
+
+<!-- 添加文章弹窗 -->
+<div class="modal-overlay" id="modal-article">
+    <div class="modal">
+        <h3>📝 添加文章</h3>
+        <form onsubmit="return submitArticle(event)">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>账号 *</label>
+                    <select name="accountName" required>
+                        <option value="码农老齐">码农老齐</option>
+                        <option value="启航电商ERP">启航电商ERP</option>
+                        <option value="老齐二三事">老齐二三事</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>发布日期 *</label>
+                    <input type="date" name="publishDate" required>
+                </div>
+            </div>
+            <div class="form-group" style="margin-bottom:12px;">
+                <label>文章标题 *</label>
+                <input type="text" name="topic" required placeholder="文章标题">
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>系列</label><input type="text" name="series" placeholder="如 OpenCode系列"></div>
+                <div class="form-group"><label>增粉</label><input type="text" name="fansGained" placeholder="可选"></div>
+            </div>
+            <div class="form-group" style="margin-bottom:12px;">
+                <label>备注</label>
+                <input type="text" name="notes" placeholder="可选">
+            </div>
+            <div style="background:#f8f7ff;border-radius:8px;padding:12px;margin-bottom:12px;">
+                <div style="font-size:12px;font-weight:600;margin-bottom:8px;">各平台数据</div>
+                <div class="form-row">
+                    <div class="form-group"><label>微信阅读</label><input type="number" name="wechatReads" value="0"></div>
+                    <div class="form-group"><label>微信点赞</label><input type="number" name="wechatLikes" value="0"></div>
+                    <div class="form-group"><label>微信分享</label><input type="number" name="wechatShares" value="0"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>CSDN阅读</label><input type="number" name="csdnReads" value="0"></div>
+                    <div class="form-group"><label>CSDN点赞</label><input type="number" name="csdnLikes" value="0"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>知乎阅读</label><input type="number" name="zhihuReads" value="0"></div>
+                    <div class="form-group"><label>知乎点赞</label><input type="number" name="zhihuLikes" value="0"></div>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('modal-article')">取消</button>
+                <button type="submit" class="btn btn-primary">保存</button>
+            </div>
+        </form>
+    </div>
 </div>
 
-<div class="card">
-    <h2>账号总览</h2>
-    <table class="log-table">
-        <thead>
-            <tr><th>账号</th><th>平台</th><th>账号名</th><th>粉丝</th><th>备注</th></tr>
-        </thead>
-        <tbody>
-            <th:block th:each="accEntry : ${accounts}">
-                <th:block th:with="accName=${accEntry.key}, platforms=${accEntry.value}, rowspan=${#maps.size(platforms)}">
-                <th:block th:each="platEntry, platStat : ${platforms}" th:with="platKey=${platEntry.key}, info=${platEntry.value}">
-                <tr>
-                    <th:block th:if="${platStat.first}">
-                    <td th:rowspan="${rowspan}"><strong th:text="${accName}">账号名</strong></td>
-                    </th:block>
-                    <td th:text="${@utils.platformName(platKey)}">平台</td>
-                    <td th:text="${info.name}">—</td>
-                    <td th:text="${info.fans != null ? info.fans : '—'}">—</td>
-                    <td>
-                        <th:block th:if="${info.totalViews != null}">
-                            <span th:text="'总访问' + info.totalViews + '，原创' + info.totalArticles + '篇'">统计</span>
-                        </th:block>
-                        <th:block th:if="${info.totalViews == null and info.fansUpdated != null}">
-                            <span th:text="'更新于 ' + info.fansUpdated">更新</span>
-                        </th:block>
-                        <th:block th:if="${info.totalViews == null and info.fansUpdated == null}">—</th:block>
-                    </td>
-                </tr>
-                </th:block>
-                </th:block>
-            </th:block>
-        </tbody>
-    </table>
+<!-- 添加日统计弹窗 -->
+<div class="modal-overlay" id="modal-daily-stats">
+    <div class="modal">
+        <h3>📊 添加每日统计</h3>
+        <form onsubmit="return submitDailyStats(event)">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>账号 *</label>
+                    <select name="accountName" required>
+                        <option value="码农老齐">码农老齐</option>
+                        <option value="启航电商ERP">启航电商ERP</option>
+                        <option value="老齐二三事">老齐二三事</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>日期 *</label>
+                    <input type="date" name="date" required>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>粉丝数</label><input type="number" name="fans" value="0"></div>
+                <div class="form-group"><label>阅读量</label><input type="number" name="reads" value="0"></div>
+                <div class="form-group"><label>文章数</label><input type="number" name="readArticles" value="0"></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>推荐来源</label><input type="number" name="sourceRecommend" value="0"></div>
+                <div class="form-group"><label>搜一搜来源</label><input type="number" name="sourceSearch" value="0"></div>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('modal-daily-stats')">取消</button>
+                <button type="submit" class="btn btn-primary">保存</button>
+            </div>
+        </form>
+    </div>
 </div>
 
-<th:block th:each="artEntry : ${articles}">
-    <th:block th:with="accName=${artEntry.key}, articleList=${artEntry.value}">
-    <div class="card">
-        <h2 th:text="${accName}">账号名</h2>
-        <table class="log-table" style="margin-top:8px;">
-            <thead><tr><th style="width:32px">ID</th><th style="width:125px">日期</th><th style="text-align:left">文章</th><th style="width:48px">阅读</th><th style="width:36px">👍</th><th style="width:36px">🔁</th></tr></thead>
-            <tbody>
-                <tr th:each="article : ${articleList}">
-                    <td th:text="${article.id}">ID</td>
-                    <td th:text="${article.publishDate}">日期</td>
-                    <td style="text-align:left">
-                        <span th:text="${article.topic}">文章</span>
-                        <th:block th:if="${article.fansGained != null}">
-                            <br><small class="text-muted" th:text="'增粉 ' + ${article.fansGained}"></small>
-                        </th:block>
-                    </td>
-                    <td th:text="${article.data != null and article.data.get('wechat') != null ? article.data.get('wechat').reads : '—'}">—</td>
-                    <td th:text="${article.data != null and article.data.get('wechat') != null ? article.data.get('wechat').likes : '—'}">—</td>
-                    <td th:text="${article.data != null and article.data.get('wechat') != null ? article.data.get('wechat').shares : '—'}">—</td>
-                </tr>
-            </tbody>
-        </table>
-        <th:block th:each="article : ${articleList}">
-            <th:block th:if="${article.notes != null and !article.notes.isEmpty()}">
-            <div class="text-muted" style="font-size:12px;margin-top:4px;">备注：<span th:text="${article.notes}"></span></div>
-            </th:block>
-        </th:block>
+<!-- 保存账号弹窗 -->
+<div class="modal-overlay" id="modal-account">
+    <div class="modal">
+        <h3>📋 添加/更新账号</h3>
+        <form onsubmit="return submitAccount(event)">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>账号名 *</label>
+                    <select name="accountName" required>
+                        <option value="码农老齐">码农老齐</option>
+                        <option value="启航电商ERP">启航电商ERP</option>
+                        <option value="老齐二三事">老齐二三事</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>平台 *</label>
+                    <select name="platformKey" required>
+                        <option value="wechat">微信</option>
+                        <option value="csdn">CSDN</option>
+                        <option value="zhihu">知乎</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group" style="margin-bottom:12px;">
+                <label>平台显示名称</label>
+                <input type="text" name="name" placeholder="如 码农老齐">
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>粉丝数</label><input type="number" name="fans" value="0"></div>
+                <div class="form-group"><label>总访问</label><input type="number" name="totalViews" value="0"></div>
+                <div class="form-group"><label>总文章</label><input type="number" name="totalArticles" value="0"></div>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('modal-account')">取消</button>
+                <button type="submit" class="btn btn-primary">保存</button>
+            </div>
+        </form>
     </div>
-    </th:block>
-</th:block>
-
-<div class="card">
-    <h2>发布节奏</h2>
-    <table class="log-table">
-        <thead><tr><th>账号</th><th>首发</th><th>次发</th><th>最后</th></tr></thead>
-        <tbody>
-            <tr><td>码农老齐</td><td>周二18:00-19:00 微信</td><td>周三09:00-10:00 CSDN</td><td>周四20:00-22:00 知乎</td></tr>
-            <tr><td>启航电商ERP</td><td>周四20:00 微信（电商干货、产品动态）</td><td>—</td><td>—</td></tr>
-        </tbody>
-    </table>
 </div>
-
-<th:block th:if="${analysis != null}">
-<div class="card">
-    <h2>📈 文章综合分析 & 建议</h2>
-
-    <th:block th:if="${analysis.topArticles != null and #lists.size(analysis.topArticles) > 0}">
-    <h3 style="font-size:14px;margin:12px 0 8px;">🏆 最佳表现文章 TOP</h3>
-    <table class="log-table">
-        <thead><tr><th>#</th><th>账号</th><th>文章</th><th>平台</th><th>阅读</th><th>增粉</th></tr></thead>
-        <tbody>
-            <tr th:each="a, iterStat : ${analysis.topArticles}">
-                <td th:text="${iterStat.count}">1</td>
-                <td th:text="${a.account}">账号</td>
-                <td th:text="${a.topic}">文章</td>
-                <td th:text="${@utils.platformName(a.platform)}">平台</td>
-                <td><strong th:text="${a.reads}">0</strong></td>
-                <td th:text="${a.fansGained != null ? a.fansGained : '—'}">—</td>
-            </tr>
-        </tbody>
-    </table>
-    </th:block>
-
-    <th:block th:if="${analysis.findings != null and #lists.size(analysis.findings) > 0}">
-    <h3 style="font-size:14px;margin:12px 0 8px;">🔬 关键发现</h3>
-    <th:block th:each="f : ${analysis.findings}">
-    <div style="background:#f8f9fa;border-radius:8px;padding:12px;margin-bottom:8px;">
-        <div style="font-weight:600;font-size:13px;margin-bottom:4px;" th:text="${f.icon + ' ' + f.title}">标题</div>
-        <div style="font-size:12px;color:#5c5f66;margin-bottom:4px;" th:text="${f.detail}">详情</div>
-        <div style="font-size:12px;color:#2b8a3e;" th:text="'→ ' + ${f.action}">动作</div>
-    </div>
-    </th:block>
-    </th:block>
-
-    <th:block th:if="${analysis.platformTips != null and #lists.size(analysis.platformTips) > 0}">
-    <h3 style="font-size:14px;margin:12px 0 8px;">🎯 平台优化建议</h3>
-    <table class="log-table">
-        <thead><tr><th>平台</th><th>问题</th><th>改进动作</th></tr></thead>
-        <tbody>
-            <tr th:each="t : ${analysis.platformTips}">
-                <td><strong th:text="${t.platform}">平台</strong></td>
-                <td th:text="${t.problem}">问题</td>
-                <td style="color:#2b8a3e;" th:text="'→ ' + ${t.action}">改进</td>
-            </tr>
-        </tbody>
-    </table>
-    </th:block>
-
-    <th:block th:if="${analysis.suggestionPriority != null and #lists.size(analysis.suggestionPriority) > 0}">
-    <h3 style="font-size:14px;margin:12px 0 8px;">📝 下一篇文章建议</h3>
-    <table class="log-table">
-        <thead><tr><th>优先级</th><th>建议选题</th><th>理由</th></tr></thead>
-        <tbody>
-            <tr th:each="s : ${analysis.suggestionPriority}">
-                <td th:text="${s.priority}">优先级</td>
-                <td th:text="${s.topic}">选题</td>
-                <td style="font-size:12px;color:#5c5f66;" th:text="${s.reason}">理由</td>
-            </tr>
-        </tbody>
-    </table>
-    </th:block>
-
-    <th:block th:if="${analysis.writingTemplate != null}">
-    <h3 style="font-size:14px;margin:12px 0 8px;">✍️ 数据驱动写作模板</h3>
-    <div style="background:#f0edff;border-radius:8px;padding:12px;margin-bottom:6px;">
-        <div style="font-size:13px;"><strong>标题公式：</strong><span th:text="${analysis.writingTemplate.formula}"></span></div>
-    </div>
-    <div th:if="${analysis.writingTemplate.goodExamples != null}" style="background:#d3f9d8;border-radius:8px;padding:8px 12px;margin-bottom:4px;font-size:12px;">
-        ✅ 好的：<span th:text="${#strings.listJoin(analysis.writingTemplate.goodExamples, '、')}"></span>
-    </div>
-    <div th:if="${analysis.writingTemplate.badExamples != null}" style="background:#ffe0e0;border-radius:8px;padding:8px 12px;margin-bottom:4px;font-size:12px;">
-        ❌ 避免：<span th:text="${#strings.listJoin(analysis.writingTemplate.badExamples, '、')}"></span>
-    </div>
-    <div style="font-size:12px;color:#5c5f66;margin-top:6px;">
-        <strong>内容优先级：</strong><span th:text="${analysis.writingTemplate.contentPipeline}"></span>
-    </div>
-    </th:block>
-</div>
-</th:block>
-
-</th:block>
 </body>
 </html>

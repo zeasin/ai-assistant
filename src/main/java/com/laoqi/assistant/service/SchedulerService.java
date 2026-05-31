@@ -22,7 +22,7 @@ public class SchedulerService {
         this.logService = logService;
     }
 
-    @Scheduled(cron = "0 0 9 * * ?", zone = "Asia/Shanghai")
+    @Scheduled(cron = "0 30 9 * * ?", zone = "Asia/Shanghai")
     public void morningReport() {
         log.info("[{}] ⏰ 定时任务：生成综合日报", TimeUtil.nowStr());
         reportService.generateAndPush();

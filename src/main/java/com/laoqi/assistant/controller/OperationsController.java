@@ -7,9 +7,14 @@ import com.laoqi.assistant.service.OperationsService;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.Executors;
 
 @Controller
 public class OperationsController {
@@ -63,5 +68,137 @@ public class OperationsController {
             model.addAttribute("daily_stats", Map.of());
         }
         return "operations";
+    }
+
+    @GetMapping("/api/operations/ai-analysis")
+    public SseEmitter aiAnalysis(@RequestParam(required = false, defaultValue = "false") boolean force) {
+        SseEmitter emitter = new SseEmitter(300_000L);
+
+        // Check cache first (non-forced)
+        if (!force) {
+            String cached = operationsService.getCachedAnalysis();
+            if (cached != null) {
+                try {
+                    emitter.send(SseEmitter.event().data(mapper.writeValueAsString(
+                            Map.of("type", "text", "content", cached))));
+                    emitter.send(SseEmitter.event().data(mapper.writeValueAsString(Map.of("type", "done"))));
+                    emitter.complete();
+                } catch (Exception ignored) {}
+                return emitter;
+            }
+        }
+
+        Executors.newSingleThreadExecutor().execute(() -> {
+            try {
+                Map<String, Object> statusEvent = Map.of("type", "status", "content", "⏳ AI 正在分析运营数据...");
+                emitter.send(SseEmitter.event().data(mapper.writeValueAsString(statusEvent)));
+
+                String result = operationsService.aiAnalyze(force);
+
+                Map<String, Object> textEvent = Map.of("type", "text", "content", result);
+                emitter.send(SseEmitter.event().data(mapper.writeValueAsString(textEvent)));
+
+                Map<String, Object> doneEvent = Map.of("type", "done");
+                emitter.send(SseEmitter.event().data(mapper.writeValueAsString(doneEvent)));
+                emitter.complete();
+            } catch (Exception e) {
+                try {
+                    Map<String, Object> errorEvent = Map.of("type", "error", "content", "AI 分析失败: " + e.getMessage());
+                    emitter.send(SseEmitter.event().data(mapper.writeValueAsString(errorEvent)));
+                    emitter.complete();
+                } catch (Exception ignored) {}
+            }
+        });
+
+        return emitter;
+    }
+
+    @PostMapping("/api/operations/article/add")
+    @ResponseBody
+    public Map<String, Object> addArticle(
+            @RequestParam String accountName,
+            @RequestParam String topic,
+            @RequestParam(required = false) String series,
+            @RequestParam String publishDate,
+            @RequestParam(required = false) String fansGained,
+            @RequestParam(required = false) String notes,
+            @RequestParam(required = false, defaultValue = "0") Integer wechatReads,
+            @RequestParam(required = false, defaultValue = "0") Integer wechatLikes,
+            @RequestParam(required = false, defaultValue = "0") Integer wechatShares,
+            @RequestParam(required = false, defaultValue = "0") Integer csdnReads,
+            @RequestParam(required = false, defaultValue = "0") Integer csdnLikes,
+            @RequestParam(required = false, defaultValue = "0") Integer zhihuReads,
+            @RequestParam(required = false, defaultValue = "0") Integer zhihuLikes) {
+        try {
+            // Generate a simple article ID
+            String id = "A" + System.currentTimeMillis() % 100000;
+            Map<String, OperationsData.PlatformArticleData> platformData = new LinkedHashMap<>();
+            if (wechatReads > 0) {
+                OperationsData.PlatformArticleData pd = new OperationsData.PlatformArticleData();
+                pd.reads = wechatReads; pd.likes = wechatLikes; pd.shares = wechatShares;
+                platformData.put("wechat", pd);
+            }
+            if (csdnReads > 0) {
+                OperationsData.PlatformArticleData pd = new OperationsData.PlatformArticleData();
+                pd.reads = csdnReads; pd.likes = csdnLikes;
+                platformData.put("csdn", pd);
+            }
+            if (zhihuReads > 0) {
+                OperationsData.PlatformArticleData pd = new OperationsData.PlatformArticleData();
+                pd.reads = zhihuReads; pd.likes = zhihuLikes;
+                platformData.put("zhihu", pd);
+            }
+            operationsService.addArticle(accountName, id, topic, series, publishDate, null, fansGained, notes, platformData);
+            logService.add("运营数据", "成功", "添加文章: " + topic);
+            return Map.of("ok", true);
+        } catch (Exception e) {
+            return Map.of("ok", false, "error", e.getMessage());
+        }
+    }
+
+    @PostMapping("/api/operations/daily-stats/add")
+    @ResponseBody
+    public Map<String, Object> addDailyStats(
+            @RequestParam String accountName,
+            @RequestParam String date,
+            @RequestParam(required = false, defaultValue = "0") Integer fans,
+            @RequestParam(required = false, defaultValue = "0") Integer reads,
+            @RequestParam(required = false, defaultValue = "0") Integer readArticles,
+            @RequestParam(required = false, defaultValue = "0") Integer sourceRecommend,
+            @RequestParam(required = false, defaultValue = "0") Integer sourceSearch) {
+        try {
+            OperationsData.DailyStats stats = new OperationsData.DailyStats();
+            stats.date = date; stats.fans = fans; stats.reads = reads;
+            stats.readArticles = readArticles;
+            stats.sourceRecommend = sourceRecommend;
+            stats.sourceSearch = sourceSearch;
+            operationsService.addDailyStats(accountName, stats);
+            logService.add("运营数据", "成功", "添加日统计: " + accountName + " " + date);
+            return Map.of("ok", true);
+        } catch (Exception e) {
+            return Map.of("ok", false, "error", e.getMessage());
+        }
+    }
+
+    @PostMapping("/api/operations/account/save")
+    @ResponseBody
+    public Map<String, Object> saveAccount(
+            @RequestParam String accountName,
+            @RequestParam String platformKey,
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false, defaultValue = "0") Integer fans,
+            @RequestParam(required = false, defaultValue = "0") Integer totalViews,
+            @RequestParam(required = false, defaultValue = "0") Integer totalArticles) {
+        try {
+            operationsService.saveAccount(accountName, platformKey,
+                    name != null ? name : accountName,
+                    fans > 0 ? fans : null,
+                    totalViews > 0 ? totalViews : null,
+                    totalArticles > 0 ? totalArticles : null);
+            logService.add("运营数据", "成功", "保存账号: " + accountName + "/" + platformKey);
+            return Map.of("ok", true);
+        } catch (Exception e) {
+            return Map.of("ok", false, "error", e.getMessage());
+        }
     }
 }

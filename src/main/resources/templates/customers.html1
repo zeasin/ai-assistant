@@ -12,32 +12,6 @@
     <div class="text-muted mb-2">数据来源：<code>企业/客户管理/客户数据.json</code> | 最后更新：<span th:text="${last_updated}">未知</span></div>
 </div>
 
-<div class="card" style="background:linear-gradient(135deg,#f0edff,#fafafe);border:1px solid #d9d0ff;">
-    <h2 style="margin-bottom:4px;">🤖 AI 客户分析报告</h2>
-    <div class="text-muted mb-2" style="font-size:12px;">
-        基于客户数据实时生成
-        <span id="customer-ai-elapsed" style="display:none;margin-left:8px;"></span>
-    </div>
-    <div id="customer-ai-status" class="text-muted" style="padding:20px 0;text-align:center;">
-        ⏳ 正在生成 AI 客户分析报告...
-    </div>
-    <div id="customer-ai-result" class="report"></div>
-    <div style="margin-top:12px;text-align:right;">
-        <button id="customer-ai-btn" class="btn btn-secondary" onclick="startCustomerAnalysis(true)" style="font-size:12px;">🔄 重新分析</button>
-    </div>
-</div>
-
-<details style="background:#fff;border:1px solid #e1e3e6;border-radius:12px;padding:16px 20px;margin-bottom:16px;">
-    <summary style="cursor:pointer;font-size:14px;font-weight:600;color:#5c5f66;outline:none;">
-        📁 原始客户数据详情
-    </summary>
-    <div style="margin-top:12px;">
-
-<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
-    <button class="btn btn-primary" onclick="showAddCustomerModal()" style="font-size:12px;">+ 添加客户</button>
-    <button class="btn btn-primary" onclick="showAddLeadModal()" style="font-size:12px;">+ 添加线索</button>
-</div>
-
 <div class="card">
     <h2>总览统计</h2>
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;">
@@ -249,125 +223,9 @@
         </tbody>
     </table>
 </div>
-</details>
 
 <div class="card" style="text-align:center;">
     <button class="btn btn-primary" onclick="showAddRecord()">+ 添加跟进记录</button>
-</div>
-
-<!-- 添加客户弹窗 -->
-<div class="modal-overlay" id="modal-customer">
-    <div class="modal">
-        <h3>📋 添加客户</h3>
-        <form onsubmit="return submitCustomer(event)">
-            <div class="form-row">
-                <div class="form-group">
-                    <label>客户名 *</label>
-                    <input type="text" name="name" required placeholder="客户名称">
-                </div>
-                <div class="form-group">
-                    <label>阶段 *</label>
-                    <select name="stage" required>
-                        <option value="潜在">潜在</option>
-                        <option value="意向">意向</option>
-                        <option value="已签约-待首款">已签约-待首款</option>
-                        <option value="进行中">进行中</option>
-                        <option value="售后中">售后中</option>
-                        <option value="已流失">已流失</option>
-                    </select>
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group"><label>公司</label><input type="text" name="company" placeholder="公司名"></div>
-                <div class="form-group"><label>地区</label><input type="text" name="region" placeholder="如 北京"></div>
-            </div>
-            <div class="form-row">
-                <div class="form-group"><label>合同金额</label><input type="number" name="contractAmount" value="0" step="0.01"></div>
-                <div class="form-group"><label>已收款</label><input type="number" name="paidAmount" value="0" step="0.01"></div>
-            </div>
-            <div class="form-group" style="margin-bottom:12px;">
-                <label>产品</label>
-                <input type="text" name="product" placeholder="如 ERP系统">
-            </div>
-            <div style="background:#f8f7ff;border-radius:8px;padding:12px;margin-bottom:12px;">
-                <div style="font-size:12px;font-weight:600;margin-bottom:8px;">联系人信息</div>
-                <div class="form-row">
-                    <div class="form-group"><label>姓名</label><input type="text" name="contactName" placeholder="联系人"></div>
-                    <div class="form-group"><label>电话</label><input type="text" name="contactPhone" placeholder="手机号"></div>
-                    <div class="form-group"><label>微信</label><input type="text" name="contactWechat" placeholder="微信号"></div>
-                </div>
-            </div>
-            <div class="form-group" style="margin-bottom:12px;">
-                <label>备注</label>
-                <input type="text" name="notes" placeholder="备注信息">
-            </div>
-            <div class="modal-actions">
-                <button type="button" class="btn btn-secondary" onclick="closeModal('modal-customer')">取消</button>
-                <button type="submit" class="btn btn-primary">保存</button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- 添加线索弹窗 -->
-<div class="modal-overlay" id="modal-lead">
-    <div class="modal">
-        <h3>📋 添加线索</h3>
-        <form onsubmit="return submitLead(event)">
-            <div class="form-row">
-                <div class="form-group">
-                    <label>线索名 *</label>
-                    <input type="text" name="name" required placeholder="线索名称/联系人">
-                </div>
-                <div class="form-group">
-                    <label>状态 *</label>
-                    <select name="status" required>
-                        <option value="待跟进">待跟进</option>
-                        <option value="跟进中">跟进中</option>
-                        <option value="已转化">已转化</option>
-                        <option value="已放弃">已放弃</option>
-                    </select>
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group"><label>公司</label><input type="text" name="company" placeholder="公司名"></div>
-                <div class="form-group"><label>地区</label><input type="text" name="region" placeholder="如 北京"></div>
-            </div>
-            <div class="form-row">
-                <div class="form-group"><label>来源 *</label>
-                    <select name="source" required>
-                        <option value="微信">微信</option>
-                        <option value="知乎">知乎</option>
-                        <option value="CSDN">CSDN</option>
-                        <option value="转介绍">转介绍</option>
-                        <option value="线下">线下</option>
-                        <option value="其他">其他</option>
-                    </select>
-                </div>
-                <div class="form-group"></div>
-            </div>
-            <div style="background:#f8f7ff;border-radius:8px;padding:12px;margin-bottom:12px;">
-                <div style="font-size:12px;font-weight:600;margin-bottom:8px;">联系人信息</div>
-                <div class="form-row">
-                    <div class="form-group"><label>姓名</label><input type="text" name="contactName" placeholder="联系人"></div>
-                    <div class="form-group"><label>电话</label><input type="text" name="contactPhone" placeholder="手机号"></div>
-                    <div class="form-group"><label>微信</label><input type="text" name="contactWechat" placeholder="微信号"></div>
-                </div>
-                <div class="form-group">
-                    <label>邮箱</label>
-                    <input type="email" name="contactEmail" placeholder="邮箱地址">
-                </div>
-            </div>
-            <div class="form-group" style="margin-bottom:12px;">
-                <label>备注</label>
-                <input type="text" name="notes" placeholder="备注信息">
-            </div>
-            <div class="modal-actions">
-                <button type="button" class="btn btn-secondary" onclick="closeModal('modal-lead')">取消</button>
-                <button type="submit" class="btn btn-primary">保存</button>
-            </div>
-        </form>
-    </div>
 </div>
 
 <div class="modal-overlay" id="addRecordModal">
@@ -425,61 +283,6 @@
 </div>
 
 <script>
-function showAddCustomerModal() {
-    document.getElementById('modal-customer').classList.add('active');
-}
-function showAddLeadModal() {
-    document.getElementById('modal-lead').classList.add('active');
-}
-
-async function aiSend(msg) {
-    const resp = await fetch('/api/ai/send?message=' + encodeURIComponent(msg), { method: 'POST' });
-    return resp.json();
-}
-
-async function submitCustomer(e) {
-    e.preventDefault();
-    const fd = new FormData(e.target);
-    const msg = '新增客户：姓名=' + fd.get('name')
-        + '，阶段=' + fd.get('stage')
-        + (fd.get('company') ? '，公司=' + fd.get('company') : '')
-        + (fd.get('region') ? '，地区=' + fd.get('region') : '')
-        + (fd.get('product') ? '，产品=' + fd.get('product') : '')
-        + (fd.get('contractAmount') > 0 ? '，合同金额=' + fd.get('contractAmount') : '')
-        + (fd.get('paidAmount') > 0 ? '，已收款=' + fd.get('paidAmount') : '')
-        + (fd.get('contactName') ? '，联系人=' + fd.get('contactName') : '')
-        + (fd.get('contactPhone') ? '，电话=' + fd.get('contactPhone') : '')
-        + (fd.get('contactWechat') ? '，微信=' + fd.get('contactWechat') : '')
-        + (fd.get('notes') ? '，备注=' + fd.get('notes') : '');
-    try {
-        const res = await aiSend(msg);
-        if (res.ok) { toast('✅ ' + res.reply); closeModal('modal-customer'); location.reload(); }
-        else { toast(res.error || '添加失败', 'error'); }
-    } catch(e) { toast('网络错误', 'error'); }
-    return false;
-}
-
-async function submitLead(e) {
-    e.preventDefault();
-    const fd = new FormData(e.target);
-    const msg = '新增线索：姓名=' + fd.get('name')
-        + '，来源=' + fd.get('source')
-        + '，状态=' + fd.get('status')
-        + (fd.get('company') ? '，公司=' + fd.get('company') : '')
-        + (fd.get('region') ? '，地区=' + fd.get('region') : '')
-        + (fd.get('contactName') ? '，联系人=' + fd.get('contactName') : '')
-        + (fd.get('contactPhone') ? '，电话=' + fd.get('contactPhone') : '')
-        + (fd.get('contactWechat') ? '，微信=' + fd.get('contactWechat') : '')
-        + (fd.get('contactEmail') ? '，邮箱=' + fd.get('contactEmail') : '')
-        + (fd.get('notes') ? '，备注=' + fd.get('notes') : '');
-    try {
-        const res = await aiSend(msg);
-        if (res.ok) { toast('✅ ' + res.reply); closeModal('modal-lead'); location.reload(); }
-        else { toast(res.error || '添加失败', 'error'); }
-    } catch(e) { toast('网络错误', 'error'); }
-    return false;
-}
-
 function showAddRecord() {
     document.getElementById('addRecordModal').classList.add('active');
     document.getElementById('recordDate').value = new Date().toISOString().slice(0,10);
@@ -490,76 +293,21 @@ function updateCustomerName() {
     const opt = sel.options[sel.selectedIndex];
     document.getElementById('recordCustomerName').value = opt ? opt.getAttribute('data-name') || '' : '';
 }
-async function submitRecord(e) {
+function submitRecord(e) {
     e.preventDefault();
-    const fd = new FormData(document.getElementById('addRecordForm'));
-    const name = document.getElementById('recordCustomerName').value || fd.get('customerName') || fd.get('customerId');
-    const msg = '记录跟进：客户名=' + name
-        + '，类型=' + (fd.get('actType') || '跟进')
-        + '，内容=' + fd.get('content')
-        + (fd.get('date') ? '，日期=' + fd.get('date') : '')
-        + (fd.get('nextFollowUp') ? '，下次跟进=' + fd.get('nextFollowUp') : '');
-    try {
-        const res = await aiSend(msg);
-        if (res.ok) { toast('✅ ' + res.reply); closeModal('addRecordModal'); location.reload(); }
+    const form = document.getElementById('addRecordForm');
+    const data = new FormData(form);
+    fetch('/api/records/add', { method: 'POST', body: data })
+    .then(r => r.json())
+    .then(res => {
+        if (res.ok) { toast('跟进记录添加成功'); closeModal('addRecordModal'); form.reset(); location.reload(); }
         else { toast(res.error || '添加失败', 'error'); }
-    } catch(e) { toast('网络错误', 'error'); }
+    })
+    .catch(() => toast('网络错误', 'error'));
     return false;
 }
-document.querySelectorAll('.modal-overlay').forEach(function(m) {
-    m.addEventListener('click', function(e) { if (e.target === this) closeModal(this.id); });
-});
-
-var customerStartTime;
-function startCustomerAnalysis(force) {
-    var btn = document.getElementById('customer-ai-btn');
-    var status = document.getElementById('customer-ai-status');
-    var result = document.getElementById('customer-ai-result');
-    var elapsed = document.getElementById('customer-ai-elapsed');
-
-    btn.disabled = true;
-    btn.textContent = '⏳ 分析中...';
-    status.style.display = 'block';
-    status.textContent = '⏳ AI 正在分析客户数据...';
-    result.innerHTML = '';
-    elapsed.style.display = 'none';
-    customerStartTime = Date.now();
-
-    var url = '/api/customers/ai-analysis' + (force ? '?force=true' : '');
-    var es = new EventSource(url);
-    es.onmessage = function(event) {
-        try {
-            var data = JSON.parse(event.data);
-            if (data.type === 'status') {
-                status.textContent = data.content;
-            } else if (data.type === 'text') {
-                status.style.display = 'none';
-                result.innerHTML = marked.parse(data.content);
-                var sec = Math.round((Date.now() - customerStartTime) / 1000);
-                elapsed.style.display = 'inline';
-                elapsed.textContent = '⏱️ ' + sec + 's';
-            } else if (data.type === 'error') {
-                status.style.display = 'none';
-                result.innerHTML = '<div style="color:#e03131;padding:20px;text-align:center;">❌ ' + data.content + '</div>';
-            } else if (data.type === 'done') {
-                es.close();
-                btn.disabled = false;
-                btn.textContent = '🔄 重新分析';
-            }
-        } catch (e) { result.innerHTML += event.data + '<br>'; }
-    };
-    es.onerror = function() {
-        es.close();
-        btn.disabled = false;
-        btn.textContent = '🔄 重新分析';
-        if (result.innerHTML === '') {
-            status.style.display = 'none';
-            result.innerHTML = '<div style="color:#e03131;padding:20px;text-align:center;">❌ AI 分析连接中断，请重试</div>';
-        }
-    };
-}
-window.addEventListener('DOMContentLoaded', function() {
-    setTimeout(function() { startCustomerAnalysis(false); }, 300);
+document.getElementById('addRecordModal').addEventListener('click', function(e) {
+    if (e.target === this) closeModal('addRecordModal');
 });
 </script>
 

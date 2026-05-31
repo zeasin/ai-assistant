@@ -11,6 +11,32 @@
     <h2>📋 工作看板</h2>
 </div>
 
+<div class="card" style="background:linear-gradient(135deg,#f0edff,#fafafe);border:1px solid #d9d0ff;">
+    <h2 style="margin-bottom:4px;">🤖 AI 工作分析报告</h2>
+    <div class="text-muted mb-2" style="font-size:12px;">
+        基于日报和周报内容实时生成
+        <span id="work-ai-elapsed" style="display:none;margin-left:8px;"></span>
+    </div>
+    <div id="work-ai-status" class="text-muted" style="padding:20px 0;text-align:center;">
+        ⏳ 正在生成 AI 工作分析报告...
+    </div>
+    <div id="work-ai-result" class="report"></div>
+    <div style="margin-top:12px;text-align:right;">
+        <button id="work-ai-btn" class="btn btn-secondary" onclick="startWorkAnalysis(true)" style="font-size:12px;">🔄 重新分析</button>
+    </div>
+</div>
+
+<details style="background:#fff;border:1px solid #e1e3e6;border-radius:12px;padding:16px 20px;margin-bottom:16px;">
+    <summary style="cursor:pointer;font-size:14px;font-weight:600;color:#5c5f66;outline:none;">
+        📁 原始工作记录详情
+    </summary>
+    <div style="margin-top:12px;">
+
+<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+    <button class="btn btn-primary" onclick="showAddDailyModal()" style="font-size:12px;">+ 添加日报</button>
+    <button class="btn btn-primary" onclick="showAddWeeklyModal()" style="font-size:12px;">+ 添加周报</button>
+</div>
+
 <div class="work-reminders">
     <div class="reminder-item" style="border-left: 4px solid #e03131;">
         <span class="reminder-icon">📱</span>
@@ -86,6 +112,8 @@
     </div>
     </th:block>
 </div>
+
+</details>
 
 <div class="modal-overlay" id="add-daily-modal">
     <div class="modal">
@@ -232,77 +260,91 @@ function showAddWeeklyModal() {
 function closeModal(id) {
     document.getElementById(id).classList.remove('active');
 }
+document.querySelectorAll('.modal-overlay').forEach(function(m) {
+    m.addEventListener('click', function(e) { if (e.target === this) closeModal(this.id); });
+});
+
+async function aiSend(msg) {
+    const resp = await fetch('/api/ai/send?message=' + encodeURIComponent(msg), { method: 'POST' });
+    return resp.json();
+}
 
 async function submitDailyReport() {
     const date = document.getElementById('daily-date').value;
     const content = document.getElementById('daily-content').value;
-
-    if (!date) {
-        toast('请选择日期', 'error');
-        return;
-    }
-    if (!content.trim()) {
-        toast('请输入日报内容', 'error');
-        return;
-    }
-
-    const formData = new FormData();
-    formData.append('date', date);
-    formData.append('content', content);
-
+    if (!date) { toast('请选择日期', 'error'); return; }
+    if (!content.trim()) { toast('请输入日报内容', 'error'); return; }
     try {
-        const resp = await fetch('/api/daily-reports/add', {
-            method: 'POST',
-            body: formData,
-        });
-        const data = await resp.json();
-        if (data.ok) {
-            toast('日报添加成功');
-            closeModal('add-daily-modal');
-            setTimeout(() => { window.location.href = '/work-reports?tab=daily'; }, 500);
-        } else {
-            toast(data.error || '添加失败', 'error');
-        }
-    } catch (e) {
-        toast('请求失败: ' + e.message, 'error');
-    }
+        const res = await aiSend('记录日报：日期=' + date + '，内容=' + content);
+        if (res.ok) { toast('✅ ' + res.reply); closeModal('add-daily-modal'); setTimeout(() => { window.location.href = '/work-reports?tab=daily'; }, 500); }
+        else { toast(res.error || '添加失败', 'error'); }
+    } catch (e) { toast('请求失败: ' + e.message, 'error'); }
 }
+
+var workStartTime;
+function startWorkAnalysis(force) {
+    var btn = document.getElementById('work-ai-btn');
+    var status = document.getElementById('work-ai-status');
+    var result = document.getElementById('work-ai-result');
+    var elapsed = document.getElementById('work-ai-elapsed');
+
+    btn.disabled = true;
+    btn.textContent = '⏳ 分析中...';
+    status.style.display = 'block';
+    status.textContent = '⏳ AI 正在分析工作记录...';
+    result.innerHTML = '';
+    elapsed.style.display = 'none';
+    workStartTime = Date.now();
+
+    var url = '/api/work-reports/ai-analysis' + (force ? '?force=true' : '');
+    var es = new EventSource(url);
+    es.onmessage = function(event) {
+        try {
+            var data = JSON.parse(event.data);
+            if (data.type === 'status') {
+                status.textContent = data.content;
+            } else if (data.type === 'text') {
+                status.style.display = 'none';
+                result.innerHTML = marked.parse(data.content);
+                var sec = Math.round((Date.now() - workStartTime) / 1000);
+                elapsed.style.display = 'inline';
+                elapsed.textContent = '⏱️ ' + sec + 's';
+            } else if (data.type === 'error') {
+                status.style.display = 'none';
+                result.innerHTML = '<div style="color:#e03131;padding:20px;text-align:center;">❌ ' + data.content + '</div>';
+            } else if (data.type === 'done') {
+                es.close();
+                btn.disabled = false;
+                btn.textContent = '🔄 重新分析';
+            }
+        } catch (e) { result.innerHTML += event.data + '<br>'; }
+    };
+    es.onerror = function() {
+        es.close();
+        btn.disabled = false;
+        btn.textContent = '🔄 重新分析';
+        if (result.innerHTML === '') {
+            status.style.display = 'none';
+            result.innerHTML = '<div style="color:#e03131;padding:20px;text-align:center;">❌ AI 分析连接中断，请重试</div>';
+        }
+    };
+}
+window.addEventListener('DOMContentLoaded', function() {
+    setTimeout(function() { startWorkAnalysis(false); }, 300);
+});
 
 async function submitWeeklyReport() {
     const yearWeek = document.getElementById('weekly-year-week').value;
     const dateRange = document.getElementById('weekly-date-range').value;
     const content = document.getElementById('weekly-content').value;
-
-    if (!yearWeek) {
-        toast('请输入年-周', 'error');
-        return;
-    }
-    if (!content.trim()) {
-        toast('请输入周报内容', 'error');
-        return;
-    }
-
-    const formData = new FormData();
-    formData.append('year_week', yearWeek);
-    formData.append('date_range', dateRange);
-    formData.append('content', content);
-
+    if (!yearWeek) { toast('请输入年-周', 'error'); return; }
+    if (!content.trim()) { toast('请输入周报内容', 'error'); return; }
     try {
-        const resp = await fetch('/api/weekly-reports/add', {
-            method: 'POST',
-            body: formData,
-        });
-        const data = await resp.json();
-        if (data.ok) {
-            toast('周报添加成功');
-            closeModal('add-weekly-modal');
-            setTimeout(() => { window.location.href = '/work-reports?tab=weekly'; }, 500);
-        } else {
-            toast(data.error || '添加失败', 'error');
-        }
-    } catch (e) {
-        toast('请求失败: ' + e.message, 'error');
-    }
+        const msg = '记录周报：年周=' + yearWeek + (dateRange ? '，日期范围=' + dateRange : '') + '，内容=' + content;
+        const res = await aiSend(msg);
+        if (res.ok) { toast('✅ ' + res.reply); closeModal('add-weekly-modal'); setTimeout(() => { window.location.href = '/work-reports?tab=weekly'; }, 500); }
+        else { toast(res.error || '添加失败', 'error'); }
+    } catch (e) { toast('请求失败: ' + e.message, 'error'); }
 }
 </script>
 
