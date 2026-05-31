@@ -1,0 +1,680 @@
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title layout:fragment="title">数据编辑器</title>
+    <style>
+        .data-table-container {
+            overflow-x: auto;
+        }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        .data-table th {
+            text-align: left;
+            padding: 10px 12px;
+            border-bottom: 2px solid #7c5cfc;
+            color: #5c5f66;
+            font-weight: 600;
+            white-space: nowrap;
+            background: #fafafe;
+        }
+        .data-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #e1e3e6;
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .data-table tr:hover {
+            background: #f8f7ff;
+        }
+        .row-actions {
+            display: flex;
+            gap: 6px;
+            white-space: nowrap;
+        }
+        .row-actions .btn {
+            padding: 4px 10px;
+            font-size: 12px;
+        }
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+        .detail-item {
+            padding: 10px 12px;
+            background: #f8f7ff;
+            border-radius: 8px;
+            border: 1px solid #eef0f4;
+        }
+        .detail-item .label {
+            font-size: 11px;
+            color: #5c5f66;
+            margin-bottom: 4px;
+        }
+        .detail-item .value {
+            font-size: 14px;
+            color: #1a1b1e;
+            word-break: break-all;
+        }
+        .edit-form {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+        .edit-form .full-width {
+            grid-column: span 2;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #909296;
+        }
+        .empty-state .icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+        .loading-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #5c5f66;
+        }
+        .search-box {
+            margin-bottom: 16px;
+        }
+        .search-box input {
+            width: 100%;
+            max-width: 400px;
+            padding: 8px 12px;
+            border: 1px solid #e1e3e6;
+            border-radius: 8px;
+            font-size: 13px;
+            outline: none;
+        }
+        .search-box input:focus {
+            border-color: #7c5cfc;
+        }
+        .stats-bar {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+        .stat-item {
+            background: #fff;
+            border: 1px solid #e1e3e6;
+            border-radius: 8px;
+            padding: 10px 16px;
+        }
+        .stat-item .label {
+            font-size: 11px;
+            color: #5c5f66;
+        }
+        .stat-item .value {
+            font-size: 18px;
+            font-weight: 600;
+            color: #7c5cfc;
+        }
+    </style>
+</head>
+<body>
+<th:block layout:fragment="content">
+
+<div class="card">
+    <h2>📝 数据编辑器</h2>
+    <div class="text-muted mb-2" id="data-source-info">直接编辑 JSON 数据，无需 AI 参与</div>
+</div>
+
+<div class="card">
+    <div class="search-box">
+        <input type="text" id="search-input" placeholder="搜索...">
+    </div>
+    
+    <div class="stats-bar" id="stats-bar"></div>
+    
+    <div id="data-container">
+        <div class="loading-state">⏳ 加载中...</div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="modal-detail">
+    <div class="modal" style="width: 720px;">
+        <h3 id="modal-detail-title">📋 详情</h3>
+        <div id="modal-detail-content"></div>
+        <div class="modal-actions">
+            <button class="btn btn-secondary" onclick="closeModal('modal-detail')">关闭</button>
+            <button class="btn btn-primary" id="btn-edit-from-detail">编辑</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="modal-edit">
+    <div class="modal" style="width: 800px;">
+        <h3 id="modal-edit-title">✏️ 编辑</h3>
+        <form id="edit-form" onsubmit="return submitEdit(event)">
+            <input type="hidden" id="edit-fileName">
+            <input type="hidden" id="edit-group">
+            <input type="hidden" id="edit-idField">
+            <input type="hidden" id="edit-idValue">
+            <div id="edit-fields"></div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('modal-edit')">取消</button>
+                <button type="submit" class="btn btn-primary" id="btn-save-edit">保存</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="modal-overlay" id="modal-add">
+    <div class="modal" style="width: 800px;">
+        <h3 id="modal-add-title">➕ 添加记录</h3>
+        <form id="add-form" onsubmit="return submitAdd(event)">
+            <input type="hidden" id="add-fileName">
+            <input type="hidden" id="add-group">
+            <div id="add-fields"></div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('modal-add')">取消</button>
+                <button type="submit" class="btn btn-primary" id="btn-save-add">添加</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="modal-overlay" id="modal-delete">
+    <div class="modal" style="width: 400px;">
+        <h3>🗑️ 确认删除</h3>
+        <p style="margin: 16px 0; color: #5c5f66;">确定要删除这条记录吗？此操作不可恢复。</p>
+        <input type="hidden" id="delete-fileName">
+        <input type="hidden" id="delete-group">
+        <input type="hidden" id="delete-idField">
+        <input type="hidden" id="delete-idValue">
+        <div class="modal-actions">
+            <button class="btn btn-secondary" onclick="closeModal('modal-delete')">取消</button>
+            <button class="btn btn-danger" id="btn-confirm-delete">删除</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentType = 'customer';
+let currentFile = null;
+let currentGroup = null;
+let allData = {};
+let tableColumns = [];
+let currentRowData = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    var params = new URLSearchParams(window.location.search);
+    var typeParam = params.get('type');
+    var dataParam = params.get('data');
+    
+    if (typeParam) {
+        currentType = typeParam;
+    }
+    if (dataParam) {
+        currentFile = dataParam;
+    }
+    
+    if (!typeParam || !dataParam) {
+        document.getElementById('data-source-info').textContent = '请通过看板页面的「编辑」按钮进入';
+        document.getElementById('data-container').innerHTML = '<div class="empty-state"><div class="icon">📋</div><div>此页面需要通过参数指定数据源</div><div style="margin-top:12px;font-size:13px;color:#909296;">请从客户、运营等看板页面的原始数据区域点击「✏️ 编辑」按钮进入</div></div>';
+        return;
+    }
+    
+    loadData();
+    
+    document.getElementById('btn-edit-from-detail').addEventListener('click', function() {
+        if (currentRowData) {
+            closeModal('modal-detail');
+            showEditModal(currentRowData);
+        }
+    });
+    
+    document.getElementById('btn-confirm-delete').addEventListener('click', confirmDelete);
+    
+    document.getElementById('search-input').addEventListener('input', function(e) {
+        renderTable();
+    });
+});
+
+async function loadData() {
+    var container = document.getElementById('data-container');
+    container.innerHTML = '<div class="loading-state">⏳ 加载中...</div>';
+    
+    try {
+        var response = await fetch('/api/data/list?type=' + currentType + '&includeData=true');
+        var result = await response.json();
+        
+        if (!result.ok) {
+            container.innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><div>' + (result.error || '加载失败') + '</div></div>';
+            return;
+        }
+        
+        allData = result;
+        
+        if (result.fileCount === 0) {
+            container.innerHTML = '<div class="empty-state"><div class="icon">📁</div><div>目录为空，暂无数据文件</div></div>';
+            return;
+        }
+        
+        if (!currentFile && result.dataGroups && result.dataGroups.length > 0) {
+            currentFile = result.dataGroups[0].fileName;
+        }
+        
+        var fileLabel = currentFile;
+        if (allData.dataGroups) {
+            var fileInfo = allData.dataGroups.find(function(f) { return f.fileName === currentFile; });
+            if (fileInfo) {
+                fileLabel = currentFile;
+            }
+        }
+        document.getElementById('data-source-info').textContent = '数据来源：' + fileLabel + ' | 直接编辑 JSON 数据，无需 AI 参与';
+        
+        var fileData = allData.dataGroups.find(function(f) { return f.fileName === currentFile; });
+        if (fileData && fileData.groups) {
+            var firstArrayGroup = Object.keys(fileData.groups).find(function(g) { return fileData.groups[g].type === 'array'; });
+            if (firstArrayGroup) {
+                currentGroup = firstArrayGroup;
+                await loadGroupData();
+            } else {
+                container.innerHTML = '<div class="empty-state"><div class="icon">📋</div><div>暂无数组类型的数据分组</div></div>';
+            }
+        } else {
+            container.innerHTML = '<div class="empty-state"><div class="icon">📋</div><div>无法读取数据结构</div></div>';
+        }
+    } catch (e) {
+        container.innerHTML = '<div class="empty-state"><div class="icon">❌</div><div>加载失败: ' + e.message + '</div></div>';
+    }
+}
+
+async function loadGroupData() {
+    var container = document.getElementById('data-container');
+    container.innerHTML = '<div class="loading-state">⏳ 加载数据...</div>';
+    
+    try {
+        var response = await fetch('/api/data/group?type=' + currentType + '&fileName=' + encodeURIComponent(currentFile) + '&group=' + encodeURIComponent(currentGroup));
+        var result = await response.json();
+        
+        if (!result.ok) {
+            container.innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><div>' + (result.error || '加载失败') + '</div></div>';
+            return;
+        }
+        
+        var data = result.data;
+        if (!Array.isArray(data)) {
+            container.innerHTML = '<div class="empty-state"><div class="icon">📋</div><div>数据格式不支持</div></div>';
+            return;
+        }
+        
+        allData.currentRecords = data;
+        
+        var colSet = new Set();
+        data.forEach(function(row) {
+            if (typeof row === 'object' && row !== null) {
+                Object.keys(row).forEach(function(key) { colSet.add(key); });
+            }
+        });
+        tableColumns = Array.from(colSet);
+        
+        renderTable();
+    } catch (e) {
+        container.innerHTML = '<div class="empty-state"><div class="icon">❌</div><div>加载失败: ' + e.message + '</div></div>';
+    }
+}
+
+function renderTable() {
+    var container = document.getElementById('data-container');
+    var records = allData.currentRecords || [];
+    var searchTerm = document.getElementById('search-input').value.toLowerCase();
+    
+    var filteredRecords = records.filter(function(row) {
+        if (!searchTerm) return true;
+        return Object.values(row).some(function(val) {
+            return val != null && String(val).toLowerCase().includes(searchTerm);
+        });
+    });
+    
+    var statsHtml = '<div class="stat-item"><div class="label">总记录数</div><div class="value">' + records.length + '</div></div>';
+    if (searchTerm) {
+        statsHtml += '<div class="stat-item"><div class="label">匹配结果</div><div class="value">' + filteredRecords.length + '</div></div>';
+    }
+    document.getElementById('stats-bar').innerHTML = statsHtml;
+    
+    if (filteredRecords.length === 0) {
+        container.innerHTML = '<div class="empty-state"><div class="icon">🔍</div><div>' + (searchTerm ? '未找到匹配记录' : '暂无数据') + '</div></div>';
+        return;
+    }
+    
+    var idField = findIdField(filteredRecords);
+    
+    var html = '<div class="data-table-container">';
+    html += '<div style="margin-bottom: 12px;"><button class="btn btn-primary" onclick="showAddModal()">➕ 添加记录</button></div>';
+    html += '<table class="data-table">';
+    html += '<thead><tr>';
+    html += '<th style="width: 60px;">#</th>';
+    tableColumns.forEach(function(col) {
+        html += '<th>' + col + '</th>';
+    });
+    html += '<th style="width: 140px;">操作</th>';
+    html += '</tr></thead>';
+    html += '<tbody>';
+    
+    filteredRecords.forEach(function(row, index) {
+        html += '<tr>';
+        html += '<td>' + (index + 1) + '</td>';
+        tableColumns.forEach(function(col) {
+            var val = row[col];
+            if (val == null) {
+                html += '<td style="color: #909296;">—</td>';
+            } else if (typeof val === 'object') {
+                html += '<td style="color: #7c5cfc;">{...}</td>';
+            } else {
+                var displayVal = String(val);
+                if (displayVal.length > 50) {
+                    displayVal = displayVal.substring(0, 50) + '...';
+                }
+                html += '<td title="' + escapeHtml(String(val)) + '">' + escapeHtml(displayVal) + '</td>';
+            }
+        });
+        html += '<td class="row-actions">';
+        html += '<button class="btn btn-secondary" onclick="showDetailModal(' + index + ')">详情</button>';
+        html += '<button class="btn btn-secondary" onclick="showEditModalByIndex(' + index + ')">编辑</button>';
+        html += '<button class="btn btn-danger" onclick="showDeleteModal(' + index + ')">删除</button>';
+        html += '</td>';
+        html += '</tr>';
+    });
+    
+    html += '</tbody></table></div>';
+    container.innerHTML = html;
+}
+
+function findIdField(records) {
+    var idCandidates = ['id', 'ID', 'Id', '_id', 'key', 'name'];
+    for (var i = 0; i < idCandidates.length; i++) {
+        var field = idCandidates[i];
+        if (tableColumns.includes(field)) {
+            return field;
+        }
+    }
+    return tableColumns[0];
+}
+
+function escapeHtml(str) {
+    var div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+function showDetailModal(index) {
+    var records = allData.currentRecords || [];
+    var row = records[index];
+    if (!row) return;
+    
+    currentRowData = row;
+    
+    var title = row.name || row.id || row.title || '详情';
+    document.getElementById('modal-detail-title').textContent = '📋 ' + title;
+    
+    var html = '<div class="detail-grid">';
+    Object.keys(row).forEach(function(key) {
+        var val = row[key];
+        var displayVal;
+        if (val == null) {
+            displayVal = '<span style="color:#909296;">—</span>';
+        } else if (typeof val === 'object') {
+            displayVal = '<pre style="margin:0;font-size:12px;white-space:pre-wrap;">' + JSON.stringify(val, null, 2) + '</pre>';
+        } else {
+            displayVal = escapeHtml(String(val));
+        }
+        html += '<div class="detail-item"><div class="label">' + key + '</div><div class="value">' + displayVal + '</div></div>';
+    });
+    html += '</div>';
+    
+    document.getElementById('modal-detail-content').innerHTML = html;
+    document.getElementById('modal-detail').classList.add('active');
+}
+
+function showEditModalByIndex(index) {
+    var records = allData.currentRecords || [];
+    var row = records[index];
+    if (!row) return;
+    showEditModal(row);
+}
+
+function showEditModal(row) {
+    var idField = findIdField(allData.currentRecords || []);
+    var idValue = String(row[idField]);
+    
+    document.getElementById('modal-edit-title').textContent = '✏️ 编辑: ' + (row.name || row.id || idValue);
+    document.getElementById('edit-fileName').value = currentFile;
+    document.getElementById('edit-group').value = currentGroup;
+    document.getElementById('edit-idField').value = idField;
+    document.getElementById('edit-idValue').value = idValue;
+    
+    var fieldsHtml = '<div class="edit-form">';
+    Object.keys(row).forEach(function(key) {
+        var val = row[key];
+        var inputType = 'text';
+        var inputClass = '';
+        
+        if (typeof val === 'number') {
+            inputType = 'number';
+        }
+        
+        if (key === 'notes' || key === 'content' || key === 'description') {
+            inputClass = 'full-width';
+        }
+        
+        fieldsHtml += '<div class="form-group ' + inputClass + '">';
+        fieldsHtml += '<label>' + key + '</label>';
+        
+        if (inputClass === 'full-width' || (typeof val === 'string' && val.length > 100)) {
+            fieldsHtml += '<textarea name="' + key + '" rows="3">' + (val != null ? escapeHtml(String(val)) : '') + '</textarea>';
+        } else if (typeof val === 'object' && val !== null) {
+            fieldsHtml += '<textarea name="' + key + '" rows="3">' + JSON.stringify(val, null, 2) + '</textarea>';
+        } else {
+            fieldsHtml += '<input type="' + inputType + '" name="' + key + '" value="' + (val != null ? escapeHtml(String(val)) : '') + '">';
+        }
+        fieldsHtml += '</div>';
+    });
+    fieldsHtml += '</div>';
+    
+    document.getElementById('edit-fields').innerHTML = fieldsHtml;
+    document.getElementById('modal-edit').classList.add('active');
+}
+
+async function submitEdit(event) {
+    event.preventDefault();
+    
+    var btn = document.getElementById('btn-save-edit');
+    btn.disabled = true;
+    btn.textContent = '⏳ 保存中...';
+    
+    var form = document.getElementById('edit-form');
+    var formData = new FormData(form);
+    var updates = {};
+    
+    var originalRow = allData.currentRecords.find(function(r) {
+        return String(r[document.getElementById('edit-idField').value]) === document.getElementById('edit-idValue').value;
+    });
+    
+    formData.forEach(function(value, key) {
+        if (originalRow && typeof originalRow[key] === 'object' && originalRow[key] !== null) {
+            try {
+                updates[key] = JSON.parse(value);
+            } catch (e) {
+                updates[key] = value;
+            }
+        } else if (originalRow && typeof originalRow[key] === 'number') {
+            updates[key] = value === '' ? null : parseFloat(value);
+        } else {
+            updates[key] = value === '' ? null : value;
+        }
+    });
+    
+    try {
+        var params = new URLSearchParams({
+            fileName: document.getElementById('edit-fileName').value,
+            group: document.getElementById('edit-group').value,
+            idField: document.getElementById('edit-idField').value,
+            idValue: document.getElementById('edit-idValue').value,
+            type: currentType
+        });
+        
+        var response = await fetch('/api/data/update?' + params.toString(), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updates)
+        });
+        
+        var result = await response.json();
+        
+        if (result.ok) {
+            toast('✅ 保存成功');
+            closeModal('modal-edit');
+            loadGroupData();
+        } else {
+            toast(result.error || '保存失败', 'error');
+        }
+    } catch (e) {
+        toast('保存失败: ' + e.message, 'error');
+    }
+    
+    btn.disabled = false;
+    btn.textContent = '保存';
+    return false;
+}
+
+function showAddModal() {
+    document.getElementById('modal-add-title').textContent = '➕ 添加记录';
+    document.getElementById('add-fileName').value = currentFile;
+    document.getElementById('add-group').value = currentGroup;
+    
+    var fieldsHtml = '<div class="edit-form">';
+    tableColumns.forEach(function(key) {
+        fieldsHtml += '<div class="form-group">';
+        fieldsHtml += '<label>' + key + '</label>';
+        if (key === 'notes' || key === 'content' || key === 'description') {
+            fieldsHtml += '<textarea name="' + key + '" rows="3"></textarea>';
+        } else {
+            fieldsHtml += '<input type="text" name="' + key + '" value="">';
+        }
+        fieldsHtml += '</div>';
+    });
+    fieldsHtml += '</div>';
+    
+    document.getElementById('add-fields').innerHTML = fieldsHtml;
+    document.getElementById('modal-add').classList.add('active');
+}
+
+async function submitAdd(event) {
+    event.preventDefault();
+    
+    var btn = document.getElementById('btn-save-add');
+    btn.disabled = true;
+    btn.textContent = '⏳ 添加中...';
+    
+    var form = document.getElementById('add-form');
+    var formData = new FormData(form);
+    var record = {};
+    
+    formData.forEach(function(value, key) {
+        if (value !== '') {
+            record[key] = value;
+        }
+    });
+    
+    try {
+        var params = new URLSearchParams({
+            fileName: document.getElementById('add-fileName').value,
+            group: document.getElementById('add-group').value,
+            type: currentType
+        });
+        
+        var response = await fetch('/api/data/add?' + params.toString(), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(record)
+        });
+        
+        var result = await response.json();
+        
+        if (result.ok) {
+            toast('✅ 添加成功');
+            closeModal('modal-add');
+            loadGroupData();
+        } else {
+            toast(result.error || '添加失败', 'error');
+        }
+    } catch (e) {
+        toast('添加失败: ' + e.message, 'error');
+    }
+    
+    btn.disabled = false;
+    btn.textContent = '添加';
+    return false;
+}
+
+function showDeleteModal(index) {
+    var records = allData.currentRecords || [];
+    var row = records[index];
+    if (!row) return;
+    
+    var idField = findIdField(records);
+    var idValue = String(row[idField]);
+    
+    document.getElementById('delete-fileName').value = currentFile;
+    document.getElementById('delete-group').value = currentGroup;
+    document.getElementById('delete-idField').value = idField;
+    document.getElementById('delete-idValue').value = idValue;
+    document.getElementById('modal-delete').classList.add('active');
+}
+
+async function confirmDelete() {
+    var btn = document.getElementById('btn-confirm-delete');
+    btn.disabled = true;
+    btn.textContent = '⏳ 删除中...';
+    
+    try {
+        var params = new URLSearchParams({
+            fileName: document.getElementById('delete-fileName').value,
+            group: document.getElementById('delete-group').value,
+            idField: document.getElementById('delete-idField').value,
+            idValue: document.getElementById('delete-idValue').value,
+            type: currentType
+        });
+        
+        var response = await fetch('/api/data/delete?' + params.toString(), {
+            method: 'POST'
+        });
+        
+        var result = await response.json();
+        
+        if (result.ok) {
+            toast('✅ 删除成功');
+            closeModal('modal-delete');
+            loadGroupData();
+        } else {
+            toast(result.error || '删除失败', 'error');
+        }
+    } catch (e) {
+        toast('删除失败: ' + e.message, 'error');
+    }
+    
+    btn.disabled = false;
+    btn.textContent = '删除';
+}
+
+function closeModal(id) {
+    document.getElementById(id).classList.remove('active');
+}
+</script>
+
+</th:block>
+</body>
+</html>

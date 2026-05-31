@@ -196,7 +196,10 @@ function renderData() {
     for (let fileKey in appData.rawDataGroups) {
         let fileGroups = appData.rawDataGroups[fileKey];
         html += '<div style="margin-bottom:20px;">';
-        html += '<h3>' + fileKey + '</h3>';
+        html += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">';
+        html += '<h3 style="margin:0;">' + fileKey + '</h3>';
+        html += '<a href="/data-editor?type=customer&data=' + encodeURIComponent(fileKey) + '" class="btn btn-secondary" style="font-size:12px;">✏️ 编辑</a>';
+        html += '</div>';
         
         for (let groupKey in fileGroups) {
             let rows = fileGroups[groupKey];

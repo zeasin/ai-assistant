@@ -254,6 +254,212 @@ public class DataController {
         return ResponseEntity.ok(result);
     }
 
+    @PostMapping(value = "/update", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<Map<String, Object>> updateRecord(
+            @RequestParam String fileName,
+            @RequestParam String group,
+            @RequestParam String idField,
+            @RequestParam String idValue,
+            @RequestBody Map<String, Object> updates,
+            @RequestParam(required = false) String type) {
+        
+        Map<String, Object> result = new LinkedHashMap<>();
+        
+        Path baseDir;
+        try {
+            baseDir = getBaseDir();
+        } catch (IllegalStateException e) {
+            result.put("ok", false);
+            result.put("error", e.getMessage());
+            return ResponseEntity.ok(result);
+        }
+        
+        String dataDir = getDataDirByType(type);
+        if (dataDir == null || dataDir.isEmpty()) {
+            result.put("ok", false);
+            result.put("error", "「" + getTypeLabel(type) + "」未配置，请在 config.json 中设置");
+            return ResponseEntity.ok(result);
+        }
+        
+        Path targetDir = baseDir.resolve(dataDir).resolve("data");
+        Path filePath = targetDir.resolve(fileName + ".json");
+        
+        if (!Files.exists(filePath)) {
+            result.put("ok", false);
+            result.put("error", "文件不存在");
+            return ResponseEntity.ok(result);
+        }
+        
+        try {
+            Map<String, Object> fileData = FileUtil.readJson(filePath, mapType, new HashMap<>());
+            Object groupData = fileData.get(group);
+            
+            if (!(groupData instanceof List)) {
+                result.put("ok", false);
+                result.put("error", "分组不存在或不是数组类型");
+                return ResponseEntity.ok(result);
+            }
+            
+            List<Map<String, Object>> records = (List<Map<String, Object>>) groupData;
+            boolean found = false;
+            
+            for (int i = 0; i < records.size(); i++) {
+                Map<String, Object> record = records.get(i);
+                if (idValue.equals(String.valueOf(record.get(idField)))) {
+                    for (Map.Entry<String, Object> entry : updates.entrySet()) {
+                        record.put(entry.getKey(), entry.getValue());
+                    }
+                    found = true;
+                    break;
+                }
+            }
+            
+            if (!found) {
+                result.put("ok", false);
+                result.put("error", "未找到记录: " + idField + "=" + idValue);
+                return ResponseEntity.ok(result);
+            }
+            
+            FileUtil.writeJson(filePath, fileData);
+            result.put("ok", true);
+            result.put("message", "更新成功");
+            
+        } catch (Exception e) {
+            log.error("更新数据失败: {}", filePath, e);
+            result.put("ok", false);
+            result.put("error", "更新失败: " + e.getMessage());
+        }
+        
+        return ResponseEntity.ok(result);
+    }
+
+    @PostMapping(value = "/add", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<Map<String, Object>> addRecord(
+            @RequestParam String fileName,
+            @RequestParam String group,
+            @RequestBody Map<String, Object> record,
+            @RequestParam(required = false) String type) {
+        
+        Map<String, Object> result = new LinkedHashMap<>();
+        
+        Path baseDir;
+        try {
+            baseDir = getBaseDir();
+        } catch (IllegalStateException e) {
+            result.put("ok", false);
+            result.put("error", e.getMessage());
+            return ResponseEntity.ok(result);
+        }
+        
+        String dataDir = getDataDirByType(type);
+        if (dataDir == null || dataDir.isEmpty()) {
+            result.put("ok", false);
+            result.put("error", "「" + getTypeLabel(type) + "」未配置，请在 config.json 中设置");
+            return ResponseEntity.ok(result);
+        }
+        
+        Path targetDir = baseDir.resolve(dataDir).resolve("data");
+        Path filePath = targetDir.resolve(fileName + ".json");
+        
+        if (!Files.exists(filePath)) {
+            result.put("ok", false);
+            result.put("error", "文件不存在");
+            return ResponseEntity.ok(result);
+        }
+        
+        try {
+            Map<String, Object> fileData = FileUtil.readJson(filePath, mapType, new HashMap<>());
+            Object groupData = fileData.get(group);
+            
+            if (!(groupData instanceof List)) {
+                result.put("ok", false);
+                result.put("error", "分组不存在或不是数组类型");
+                return ResponseEntity.ok(result);
+            }
+            
+            List<Map<String, Object>> records = (List<Map<String, Object>>) groupData;
+            records.add(record);
+            
+            FileUtil.writeJson(filePath, fileData);
+            result.put("ok", true);
+            result.put("message", "添加成功");
+            
+        } catch (Exception e) {
+            log.error("添加数据失败: {}", filePath, e);
+            result.put("ok", false);
+            result.put("error", "添加失败: " + e.getMessage());
+        }
+        
+        return ResponseEntity.ok(result);
+    }
+
+    @PostMapping(value = "/delete", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<Map<String, Object>> deleteRecord(
+            @RequestParam String fileName,
+            @RequestParam String group,
+            @RequestParam String idField,
+            @RequestParam String idValue,
+            @RequestParam(required = false) String type) {
+        
+        Map<String, Object> result = new LinkedHashMap<>();
+        
+        Path baseDir;
+        try {
+            baseDir = getBaseDir();
+        } catch (IllegalStateException e) {
+            result.put("ok", false);
+            result.put("error", e.getMessage());
+            return ResponseEntity.ok(result);
+        }
+        
+        String dataDir = getDataDirByType(type);
+        if (dataDir == null || dataDir.isEmpty()) {
+            result.put("ok", false);
+            result.put("error", "「" + getTypeLabel(type) + "」未配置，请在 config.json 中设置");
+            return ResponseEntity.ok(result);
+        }
+        
+        Path targetDir = baseDir.resolve(dataDir).resolve("data");
+        Path filePath = targetDir.resolve(fileName + ".json");
+        
+        if (!Files.exists(filePath)) {
+            result.put("ok", false);
+            result.put("error", "文件不存在");
+            return ResponseEntity.ok(result);
+        }
+        
+        try {
+            Map<String, Object> fileData = FileUtil.readJson(filePath, mapType, new HashMap<>());
+            Object groupData = fileData.get(group);
+            
+            if (!(groupData instanceof List)) {
+                result.put("ok", false);
+                result.put("error", "分组不存在或不是数组类型");
+                return ResponseEntity.ok(result);
+            }
+            
+            List<Map<String, Object>> records = (List<Map<String, Object>>) groupData;
+            boolean removed = records.removeIf(r -> idValue.equals(String.valueOf(r.get(idField))));
+            
+            if (!removed) {
+                result.put("ok", false);
+                result.put("error", "未找到记录: " + idField + "=" + idValue);
+                return ResponseEntity.ok(result);
+            }
+            
+            FileUtil.writeJson(filePath, fileData);
+            result.put("ok", true);
+            result.put("message", "删除成功");
+            
+        } catch (Exception e) {
+            log.error("删除数据失败: {}", filePath, e);
+            result.put("ok", false);
+            result.put("error", "删除失败: " + e.getMessage());
+        }
+        
+        return ResponseEntity.ok(result);
+    }
+
     private Map<String, Object> extractGroups(Map<String, Object> data) {
         Map<String, Object> groups = new LinkedHashMap<>();
         
