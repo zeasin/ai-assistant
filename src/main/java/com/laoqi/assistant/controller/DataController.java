@@ -1,6 +1,7 @@
 package com.laoqi.assistant.controller;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.laoqi.assistant.model.Config;
 import com.laoqi.assistant.service.ConfigService;
 import com.laoqi.assistant.util.FileUtil;
 import org.slf4j.Logger;
@@ -22,6 +23,12 @@ public class DataController {
     private static final Logger log = LoggerFactory.getLogger(DataController.class);
     private static final TypeReference<Map<String, Object>> mapType = new TypeReference<Map<String, Object>>() {};
 
+    private static final Map<String, String> TYPE_CONFIG_MAP = new LinkedHashMap<>();
+    static {
+        TYPE_CONFIG_MAP.put("customer", "客户数据目录");
+        TYPE_CONFIG_MAP.put("operations", "运营数据目录");
+    }
+
     private final ConfigService configService;
 
     public DataController(ConfigService configService) {
@@ -30,40 +37,63 @@ public class DataController {
 
     private Path getBaseDir() {
         String baseDir = configService.load().getBaseDir();
-        if (baseDir != null && !baseDir.isEmpty()) {
-            return Paths.get(baseDir);
+        if (baseDir == null || baseDir.isEmpty()) {
+            throw new IllegalStateException("baseDir 未配置，请在 config.json 中设置");
         }
-        return Paths.get("D:\\projects\\richie_learning_notes");
+        return Paths.get(baseDir);
+    }
+
+    private String getDataDirByType(String type) {
+        if (type == null || type.isEmpty()) {
+            type = "customer";
+        }
+        Config config = configService.load();
+        switch (type) {
+            case "customer":
+                return config.getCustomerDataDir();
+            case "operations":
+                return config.getOperationsDataPath();
+            default:
+                return null;
+        }
+    }
+
+    private String getTypeLabel(String type) {
+        return TYPE_CONFIG_MAP.getOrDefault(type, type);
     }
 
     @GetMapping(value = "/list", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Map<String, Object>> listData(
-            @RequestParam(required = false) String dir,
+            @RequestParam(required = false) String type,
             @RequestParam(required = false, defaultValue = "false") boolean includeData) {
         
         Map<String, Object> result = new LinkedHashMap<>();
         
-        Path baseDir = getBaseDir();
-        Path targetDir;
-        
-        if (dir != null && !dir.isEmpty()) {
-            targetDir = baseDir.resolve(dir).resolve("data");
-        } else {
-            String configDir = configService.load().getCustomerDataDir();
-            if (configDir == null || configDir.isEmpty()) {
-                result.put("ok", false);
-                result.put("error", "目录未配置");
-                return ResponseEntity.ok(result);
-            }
-            targetDir = baseDir.resolve(configDir).resolve("data");
+        Path baseDir;
+        try {
+            baseDir = getBaseDir();
+        } catch (IllegalStateException e) {
+            result.put("ok", false);
+            result.put("error", e.getMessage());
+            return ResponseEntity.ok(result);
         }
         
-        result.put("directory", dir != null ? dir : configService.load().getCustomerDataDir());
+        String dataDir = getDataDirByType(type);
+        if (dataDir == null || dataDir.isEmpty()) {
+            result.put("ok", false);
+            result.put("error", "「" + getTypeLabel(type) + "」未配置，请在 config.json 中设置");
+            return ResponseEntity.ok(result);
+        }
+        
+        Path targetDir = baseDir.resolve(dataDir).resolve("data");
+        
+        result.put("type", type);
+        result.put("directory", dataDir);
         result.put("fullPath", targetDir.toString());
         
         if (!Files.exists(targetDir)) {
             result.put("ok", false);
-            result.put("error", "目录不存在");
+            result.put("error", "目录不存在: " + targetDir);
             result.put("exists", false);
             return ResponseEntity.ok(result);
         }
@@ -119,25 +149,27 @@ public class DataController {
     @GetMapping(value = "/file/{fileName}", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Map<String, Object>> getFileData(
             @PathVariable String fileName,
-            @RequestParam(required = false) String dir) {
+            @RequestParam(required = false) String type) {
         
         Map<String, Object> result = new LinkedHashMap<>();
         
-        Path baseDir = getBaseDir();
-        Path targetDir;
-        
-        if (dir != null && !dir.isEmpty()) {
-            targetDir = baseDir.resolve(dir).resolve("data");
-        } else {
-            String configDir = configService.load().getCustomerDataDir();
-            if (configDir == null || configDir.isEmpty()) {
-                result.put("ok", false);
-                result.put("error", "目录未配置");
-                return ResponseEntity.ok(result);
-            }
-            targetDir = baseDir.resolve(configDir).resolve("data");
+        Path baseDir;
+        try {
+            baseDir = getBaseDir();
+        } catch (IllegalStateException e) {
+            result.put("ok", false);
+            result.put("error", e.getMessage());
+            return ResponseEntity.ok(result);
         }
         
+        String dataDir = getDataDirByType(type);
+        if (dataDir == null || dataDir.isEmpty()) {
+            result.put("ok", false);
+            result.put("error", "「" + getTypeLabel(type) + "」未配置，请在 config.json 中设置");
+            return ResponseEntity.ok(result);
+        }
+        
+        Path targetDir = baseDir.resolve(dataDir).resolve("data");
         Path filePath = targetDir.resolve(fileName + ".json");
         
         if (!Files.exists(filePath)) {
@@ -165,25 +197,27 @@ public class DataController {
     public ResponseEntity<Map<String, Object>> getGroupData(
             @RequestParam String fileName,
             @RequestParam String group,
-            @RequestParam(required = false) String dir) {
+            @RequestParam(required = false) String type) {
         
         Map<String, Object> result = new LinkedHashMap<>();
         
-        Path baseDir = getBaseDir();
-        Path targetDir;
-        
-        if (dir != null && !dir.isEmpty()) {
-            targetDir = baseDir.resolve(dir).resolve("data");
-        } else {
-            String configDir = configService.load().getCustomerDataDir();
-            if (configDir == null || configDir.isEmpty()) {
-                result.put("ok", false);
-                result.put("error", "目录未配置");
-                return ResponseEntity.ok(result);
-            }
-            targetDir = baseDir.resolve(configDir).resolve("data");
+        Path baseDir;
+        try {
+            baseDir = getBaseDir();
+        } catch (IllegalStateException e) {
+            result.put("ok", false);
+            result.put("error", e.getMessage());
+            return ResponseEntity.ok(result);
         }
         
+        String dataDir = getDataDirByType(type);
+        if (dataDir == null || dataDir.isEmpty()) {
+            result.put("ok", false);
+            result.put("error", "「" + getTypeLabel(type) + "」未配置，请在 config.json 中设置");
+            return ResponseEntity.ok(result);
+        }
+        
+        Path targetDir = baseDir.resolve(dataDir).resolve("data");
         Path filePath = targetDir.resolve(fileName + ".json");
         
         if (!Files.exists(filePath)) {

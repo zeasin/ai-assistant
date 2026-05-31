@@ -84,6 +84,7 @@
 let appData = null;
 let currentEventSource = null;
 let customerDataDir = null;
+const DATA_TYPE = 'customer';
 
 document.addEventListener('DOMContentLoaded', function() {
     loadCustomerData();
@@ -91,20 +92,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
 async function loadCustomerData() {
     try {
-        const response = await fetch('/api/data/list?includeData=true');
+        const response = await fetch('/api/data/list?type=' + DATA_TYPE + '&includeData=true');
         if (!response.ok) {
             throw new Error('HTTP ' + response.status + ': ' + response.statusText);
         }
         const apiResult = await response.json();
         
         if (!apiResult.ok) {
-            if (apiResult.error === '目录未配置') {
-                document.getElementById('config-card').style.display = 'block';
-                document.getElementById('customer-ai-status').textContent = '⚠️ 请先在配置页面设置「客户数据目录」，然后再进行 AI 分析。';
-                document.getElementById('data-source-info').innerHTML = '数据来源：<code>未配置</code>';
-            } else {
-                document.getElementById('data-source-info').innerHTML = '数据加载失败: ' + apiResult.error;
-            }
+            document.getElementById('config-card').style.display = 'block';
+            document.getElementById('customer-ai-status').textContent = '⚠️ ' + apiResult.error;
+            document.getElementById('data-source-info').innerHTML = '数据来源：<code>未配置</code>';
             return;
         }
         
@@ -125,7 +122,7 @@ async function loadCustomerData() {
             for (let groupKey in fileData.groups) {
                 let groupInfo = fileData.groups[groupKey];
                 if (groupInfo.type === 'array') {
-                    let groupResp = await fetch('/api/data/group?fileName=' + encodeURIComponent(fileName) + '&group=' + encodeURIComponent(groupKey));
+                    let groupResp = await fetch('/api/data/group?type=' + DATA_TYPE + '&fileName=' + encodeURIComponent(fileName) + '&group=' + encodeURIComponent(groupKey));
                     let groupData = await groupResp.json();
                     if (groupData.ok && Array.isArray(groupData.data)) {
                         let entries = [];
@@ -151,7 +148,8 @@ async function loadCustomerData() {
             }
         }
         
-        let metaResp = await fetch('/api/data/group?fileName=' + encodeURIComponent(Object.keys(appData.rawDataGroups)[0] || '客户数据') + '&group=meta');
+        let firstFile = Object.keys(appData.rawDataGroups)[0] || '客户数据';
+        let metaResp = await fetch('/api/data/group?type=' + DATA_TYPE + '&fileName=' + encodeURIComponent(firstFile) + '&group=meta');
         if (metaResp.ok) {
             let metaData = await metaResp.json();
             if (metaData.ok && metaData.data && metaData.data.lastUpdated) {
