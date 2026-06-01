@@ -14,12 +14,14 @@ public class ConfigController {
     private final ConfigService configService;
     private final LogService logService;
     private final FeishuService feishuService;
+    private final ReportService reportService;
 
     public ConfigController(ConfigService configService, LogService logService,
-                             FeishuService feishuService) {
+                             FeishuService feishuService, ReportService reportService) {
         this.configService = configService;
         this.logService = logService;
         this.feishuService = feishuService;
+        this.reportService = reportService;
     }
 
     @GetMapping
@@ -38,6 +40,13 @@ public class ConfigController {
     @ResponseBody
     public Map<String, Object> triggerJob(@RequestParam String job) {
         try {
+            switch (job) {
+                case "daily_report" -> feishuService.dailyReportReminder();
+                case "article_tue" -> feishuService.articleReminder("码农老齐", "周二");
+                case "article_thu" -> feishuService.articleReminder("启航电商ERP", "周四");
+                case "generate_report" -> reportService.generateAndPush();
+                default -> throw new IllegalArgumentException("未知任务: " + job);
+            }
             logService.add("手动触发", "成功", job);
             return Map.of("ok", true);
         } catch (Exception e) {

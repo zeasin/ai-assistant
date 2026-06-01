@@ -1,6 +1,7 @@
 package com.laoqi.assistant.service;
 
 import com.laoqi.assistant.model.Config;
+import com.laoqi.assistant.model.ReminderData.Reminder;
 import com.laoqi.assistant.util.TimeUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -8,6 +9,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalTime;
+import java.util.List;
 
 @Service
 public class SchedulerService {
@@ -19,16 +21,19 @@ public class SchedulerService {
     private final LogService logService;
     private final MediaDataCollectorService mediaDataCollectorService;
     private final ConfigService configService;
+    private final ReminderService reminderService;
 
     public SchedulerService(ReportService reportService, FeishuService feishuService,
                             LogService logService,
                             MediaDataCollectorService mediaDataCollectorService,
-                            ConfigService configService) {
+                            ConfigService configService,
+                            ReminderService reminderService) {
         this.reportService = reportService;
         this.feishuService = feishuService;
         this.logService = logService;
         this.mediaDataCollectorService = mediaDataCollectorService;
         this.configService = configService;
+        this.reminderService = reminderService;
     }
 
     @Scheduled(cron = "0 30 9 * * ?", zone = "Asia/Shanghai")
@@ -74,5 +79,19 @@ public class SchedulerService {
         log.info("[{}] ⏰ 定时任务：周四发文提醒", TimeUtil.nowStr());
         feishuService.articleReminder("启航电商ERP", "周四");
         logService.add("周四发文提醒", "成功");
+    }
+
+    @Scheduled(cron = "0 * * * * ?", zone = "Asia/Shanghai")
+    public void checkDynamicReminders() {
+        try {
+            List<Reminder> dueReminders = reminderService.getDueReminders();
+            for (Reminder r : dueReminders) {
+                log.info("[{}] ⏰ 触发动态提醒：{}", TimeUtil.nowStr(), r.name);
+                reminderService.triggerReminder(r);
+                logService.add("定时提醒", "成功", r.name);
+            }
+        } catch (Exception e) {
+            log.error("[提醒] 检查动态提醒失败: {}", e.getMessage());
+        }
     }
 }
