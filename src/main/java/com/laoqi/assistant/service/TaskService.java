@@ -26,11 +26,19 @@ public class TaskService {
     }
 
     private Path dataFile() {
-        String dir = configService.load().getTodoDataDir();
-        if (dir == null || dir.isEmpty()) {
-            throw new IllegalStateException("任务数据目录未配置");
+        String workDir = configService.load().getWorkDir();
+        if (workDir == null || workDir.isEmpty()) {
+            workDir = "工作";
         }
-        return getBaseDir().resolve(dir).resolve("data.json");
+        Path taskDir = getBaseDir().resolve(workDir).resolve("任务");
+        if (!java.nio.file.Files.exists(taskDir)) {
+            try {
+                java.nio.file.Files.createDirectories(taskDir);
+            } catch (Exception e) {
+                log.warn("[任务] 创建目录失败: {}", taskDir);
+            }
+        }
+        return taskDir.resolve("data.json");
     }
 
     public Root loadData() {

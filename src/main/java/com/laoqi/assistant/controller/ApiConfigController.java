@@ -55,13 +55,11 @@ public class ApiConfigController {
     @PostMapping("/api/config/dataDirs")
     public Map<String, Object> updateDataDirs(
             @RequestParam String customerDataDir,
-            @RequestParam(required = false, defaultValue = "") String operationsDataDir,
-            @RequestParam(required = false, defaultValue = "") String todoDataDir) {
+            @RequestParam(required = false, defaultValue = "") String operationsDataDir) {
         try {
             Config config = configService.load();
             config.setCustomerDataDir(customerDataDir);
             config.setOperationsDataDir(operationsDataDir);
-            config.setTodoDataDir(todoDataDir);
             configService.save(config);
             logService.add("数据目录配置", "保存成功", "");
             return Map.of("ok", true);
@@ -84,13 +82,13 @@ public class ApiConfigController {
         }
     }
 
-    @PostMapping("/api/config/comprehensiveReportDir")
-    public Map<String, Object> updateComprehensiveReportDir(@RequestParam String comprehensiveReportDir) {
+    @PostMapping("/api/config/workDir")
+    public Map<String, Object> updateWorkDir(@RequestParam String workDir) {
         try {
             Config cfg = configService.load();
-            cfg.setComprehensiveReportDir(comprehensiveReportDir);
+            cfg.setWorkDir(workDir);
             configService.save(cfg);
-            logService.add("配置更新", "成功", "综合日报目录已更新为: " + comprehensiveReportDir);
+            logService.add("配置更新", "成功", "工作目录已更新为: " + workDir);
             return Map.of("ok", true);
         } catch (Exception e) {
             return Map.of("ok", false, "error", e.getMessage());

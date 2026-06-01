@@ -21,14 +21,13 @@ public class Config {
     private String customerDataDir;
     private String operationsDataPath;
     private String operationsDataDir;
-    private String todoDataDir;
     
+    private String workDir;
     private String chatSessionsDir;
     private String chatSessionsFile;
     private String logFile;
     private String dailyDir;
     private String weeklyDir;
-    private String comprehensiveReportDir;
     private String remindFile;
     private boolean mediaCollectEnabled;
     private String mediaCollectTime;
@@ -45,9 +44,9 @@ public class Config {
         c.chatSessionsDir = "chat";
         c.chatSessionsFile = "chat_sessions.json";
         c.logFile = "assistant_log.json";
-        c.dailyDir = "工作/日报";
-        c.weeklyDir = "工作/周报";
-        c.comprehensiveReportDir = "工作/综合日报";
+        c.dailyDir = "日报";
+        c.weeklyDir = "周报";
+        c.workDir = "工作";
         c.remindFile = "提醒.md";
         c.mediaCollectEnabled = false;
         c.mediaCollectTime = "08:00";
@@ -80,8 +79,8 @@ public class Config {
     public void setOperationsDataPath(String operationsDataPath) { this.operationsDataPath = operationsDataPath; }
     public String getOperationsDataDir() { return operationsDataDir; }
     public void setOperationsDataDir(String operationsDataDir) { this.operationsDataDir = operationsDataDir; }
-    public String getTodoDataDir() { return todoDataDir; }
-    public void setTodoDataDir(String todoDataDir) { this.todoDataDir = todoDataDir; }
+    public String getWorkDir() { return workDir; }
+    public void setWorkDir(String workDir) { this.workDir = workDir; }
     public String getChatSessionsDir() { return chatSessionsDir; }
     public void setChatSessionsDir(String chatSessionsDir) { this.chatSessionsDir = chatSessionsDir; }
     public String getChatSessionsFile() { return chatSessionsFile; }
@@ -92,8 +91,6 @@ public class Config {
     public void setDailyDir(String dailyDir) { this.dailyDir = dailyDir; }
     public String getWeeklyDir() { return weeklyDir; }
     public void setWeeklyDir(String weeklyDir) { this.weeklyDir = weeklyDir; }
-    public String getComprehensiveReportDir() { return comprehensiveReportDir; }
-    public void setComprehensiveReportDir(String comprehensiveReportDir) { this.comprehensiveReportDir = comprehensiveReportDir; }
     public String getRemindFile() { return remindFile; }
     public void setRemindFile(String remindFile) { this.remindFile = remindFile; }
     public boolean isMediaCollectEnabled() { return mediaCollectEnabled; }

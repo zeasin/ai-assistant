@@ -80,19 +80,21 @@
 </div>
 
 <div class="card">
-    <h2>📊 综合日报目录配置</h2>
-    <div class="text-muted mb-2">综合日报将保存在笔记库根目录下的指定文件夹中，按日期命名（如 2026-05-31.md）。首页将优先从该目录读取今日日报。</div>
-    <form id="comprehensiveReportDirForm" onsubmit="return saveComprehensiveReportDir(event)">
+    <h2>📁 工作目录配置</h2>
+    <div class="text-muted mb-2">工作相关数据（日报、周报、任务、提醒）将保存在此目录下。</div>
+    <form id="workDirForm" onsubmit="return saveWorkDir(event)">
         <div class="form-group">
-            <label>综合日报文件夹</label>
-            <input type="text" id="comprehensiveReportDir" placeholder="工作/综合日报" style="font-family:monospace;">
+            <label>工作目录</label>
+            <input type="text" id="workDir" placeholder="工作" style="font-family:monospace;">
             <div class="text-muted" style="font-size:12px;margin-top:4px;">
-                相对于笔记库根目录的路径，首页按 <code>{根目录}/{综合日报文件夹}/{今日日期}.md</code> 读取文件
+                相对于笔记库根目录的路径<br>
+                例如：<code>工作</code> → <code>{笔记库根目录}/工作/日报/</code><br>
+                例如：<code>我的工作</code> → <code>{笔记库根目录}/我的工作/日报/</code>
             </div>
         </div>
         <div class="flex" style="gap:8px;">
-            <button type="submit" class="btn btn-primary">保存目录</button>
-            <span id="comprehensiveReportDirStatus" class="text-muted" style="margin-left:4px;"></span>
+            <button type="submit" class="btn btn-primary">保存</button>
+            <span id="workDirStatus" class="text-muted" style="margin-left:4px;"></span>
         </div>
     </form>
 </div>
@@ -110,11 +112,6 @@
             <label>运营数据目录</label>
             <input type="text" id="operationsDataDir" placeholder="自媒体">
             <div class="text-muted" style="font-size:12px;margin-top:4px;">程序将自动读取此目录下所有 .json 文件（目录/data/*.json）</div>
-        </div>
-        <div class="form-group">
-            <label>任务数据目录</label>
-            <input type="text" id="todoDataDir" placeholder="工作/任务">
-            <div class="text-muted" style="font-size:12px;margin-top:4px;">程序将读取此目录下的 data.json 文件作为任务数据</div>
         </div>
         <div class="flex" style="gap:8px;">
             <button type="submit" class="btn btn-primary">保存</button>
@@ -257,9 +254,8 @@ fetch('/api/config')
         if (cfg.baseDir) document.getElementById('baseDirPath').value = cfg.baseDir;
         if (cfg.customerDataDir) document.getElementById('customerDataDir').value = cfg.customerDataDir;
         if (cfg.operationsDataDir) document.getElementById('operationsDataDir').value = cfg.operationsDataDir;
-        if (cfg.todoDataDir) document.getElementById('todoDataDir').value = cfg.todoDataDir;
         if (cfg.chatSessionsDir) document.getElementById('chatSessionsDir').value = cfg.chatSessionsDir;
-        if (cfg.comprehensiveReportDir) document.getElementById('comprehensiveReportDir').value = cfg.comprehensiveReportDir;
+        if (cfg.workDir) document.getElementById('workDir').value = cfg.workDir;
         const enabledCheckbox = document.getElementById('mediaCollectEnabled');
         const toggleText = document.getElementById('mediaCollectToggleText');
         if (cfg.mediaCollectEnabled) {
@@ -323,13 +319,13 @@ async function saveChatDir(e) {
     return false;
 }
 
-async function saveComprehensiveReportDir(e) {
+async function saveWorkDir(e) {
     e.preventDefault();
     const form = new FormData();
-    form.append('comprehensiveReportDir', document.getElementById('comprehensiveReportDir').value.trim());
-    const res = await fetch('/api/config/comprehensiveReportDir', { method: 'POST', body: form });
+    form.append('workDir', document.getElementById('workDir').value.trim());
+    const res = await fetch('/api/config/workDir', { method: 'POST', body: form });
     const data = await res.json();
-    const status = document.getElementById('comprehensiveReportDirStatus');
+    const status = document.getElementById('workDirStatus');
     if (data.ok) {
         status.textContent = '✅ 已保存';
         setTimeout(() => status.textContent = '', 3000);
@@ -344,7 +340,6 @@ async function saveDataDirs(e) {
     const form = new FormData();
     form.append('customerDataDir', document.getElementById('customerDataDir').value.trim());
     form.append('operationsDataDir', document.getElementById('operationsDataDir').value.trim());
-    form.append('todoDataDir', document.getElementById('todoDataDir').value.trim());
     const res = await fetch('/api/config/dataDirs', { method: 'POST', body: form });
     const data = await res.json();
     const status = document.getElementById('dataDirsStatus');
@@ -360,7 +355,6 @@ async function saveDataDirs(e) {
 function resetDataDirs() {
     document.getElementById('customerDataDir').value = '';
     document.getElementById('operationsDataDir').value = '';
-    document.getElementById('todoDataDir').value = '';
 }
 
 function saveWebhook() {

@@ -9,6 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
@@ -28,14 +29,33 @@ public class ReminderService {
 
     private final AppConfig appConfig;
     private final FeishuService feishuService;
+    private final ConfigService configService;
 
-    public ReminderService(AppConfig appConfig, FeishuService feishuService) {
+    public ReminderService(AppConfig appConfig, FeishuService feishuService, ConfigService configService) {
         this.appConfig = appConfig;
         this.feishuService = feishuService;
+        this.configService = configService;
+    }
+
+    private Path getRemindersDir() {
+        String baseDir = configService.getBaseDir();
+        String workDir = configService.load().getWorkDir();
+        if (workDir == null || workDir.isEmpty()) {
+            workDir = "工作";
+        }
+        Path reminderDir = Paths.get(baseDir, workDir, "提醒");
+        if (!Files.exists(reminderDir)) {
+            try {
+                Files.createDirectories(reminderDir);
+            } catch (Exception e) {
+                log.warn("[提醒] 创建目录失败: {}", reminderDir);
+            }
+        }
+        return reminderDir;
     }
 
     private Path getRemindersFile() {
-        return appConfig.getConfigFile().getParent().resolve("reminders.json");
+        return getRemindersDir().resolve("reminders.json");
     }
 
     public Root load() {
@@ -71,7 +91,7 @@ public class ReminderService {
         r.name = name;
         r.message = message;
         r.type = type;
-        r.time = time;
+        r.time = normalizeTime(time);
         r.dayOfWeek = dayOfWeek;
         r.dayOfMonth = dayOfMonth;
         r.monthDay = monthDay;
@@ -86,18 +106,18 @@ public class ReminderService {
         return r;
     }
 
-    public Reminder updateReminder(String id, String name, String message, String type,
+    public boolean updateReminder(String id, String name, String message, String type,
                                     String time, String dayOfWeek, String dayOfMonth,
                                     String monthDay, Boolean enabled) {
         Root root = load();
-        if (root.reminders == null) return null;
+        if (root.reminders == null) return false;
 
         for (Reminder r : root.reminders) {
             if (r.id.equals(id)) {
                 if (name != null) r.name = name;
                 if (message != null) r.message = message;
                 if (type != null) r.type = type;
-                if (time != null) r.time = time;
+                if (time != null) r.time = normalizeTime(time);
                 if (dayOfWeek != null) r.dayOfWeek = dayOfWeek;
                 if (dayOfMonth != null) r.dayOfMonth = dayOfMonth;
                 if (monthDay != null) r.monthDay = monthDay;
@@ -105,10 +125,23 @@ public class ReminderService {
                 root.meta.put("lastUpdated", LocalDate.now(TZ).toString());
                 save(root);
                 log.info("[提醒] 更新提醒: {} ({})", r.name, type);
-                return r;
+                return true;
             }
         }
-        return null;
+        return false;
+    }
+
+    private String normalizeTime(String time) {
+        if (time == null || time.isBlank()) return "09:00";
+        String[] parts = time.split(":");
+        if (parts.length != 2) return "09:00";
+        try {
+            int hour = Integer.parseInt(parts[0]);
+            int minute = Integer.parseInt(parts[1]);
+            return String.format("%02d:%02d", hour, minute);
+        } catch (NumberFormatException e) {
+            return "09:00";
+        }
     }
 
     public boolean deleteReminder(String id) {

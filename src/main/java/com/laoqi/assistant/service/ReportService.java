@@ -42,9 +42,9 @@ public class ReportService {
 
     private Path getComprehensiveReportDir() {
         Config config = configService.load();
-        String comprehensiveReportDir = config.getComprehensiveReportDir();
-        if (comprehensiveReportDir == null || comprehensiveReportDir.isEmpty()) comprehensiveReportDir = "工作\\综合日报";
-        return Paths.get(configService.getBaseDir()).resolve(comprehensiveReportDir);
+        String workDir = config.getWorkDir();
+        if (workDir == null || workDir.isEmpty()) workDir = "工作";
+        return Paths.get(configService.getBaseDir()).resolve(workDir).resolve("综合日报");
     }
 
     public static class ReportResult {

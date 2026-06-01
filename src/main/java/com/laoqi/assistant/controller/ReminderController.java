@@ -109,13 +109,13 @@ public class ReminderController {
             @RequestParam(required = false) String monthDay,
             @RequestParam(required = false) Boolean enabled) {
         try {
-            Reminder r = reminderService.updateReminder(id, name, message, type, time,
+            boolean ok = reminderService.updateReminder(id, name, message, type, time,
                     dayOfWeek, dayOfMonth, monthDay, enabled);
-            if (r == null) {
+            if (!ok) {
                 return Map.of("ok", false, "error", "提醒不存在");
             }
             logService.add("提醒管理", "成功", "更新提醒: " + name);
-            return Map.of("ok", true, "reminder", r);
+            return Map.of("ok", true);
         } catch (Exception e) {
             return Map.of("ok", false, "error", e.getMessage());
         }
