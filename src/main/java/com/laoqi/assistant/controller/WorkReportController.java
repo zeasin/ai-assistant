@@ -20,6 +20,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.Executors;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 @Controller
@@ -275,6 +276,11 @@ modified: %s
 
         String raw = FileUtil.readText(file);
         String content = com.laoqi.assistant.util.MarkdownUtil.stripFrontmatter(raw);
+        
+        // 去掉标题行，避免重复标题
+        String titlePattern = "^#\\s+" + Pattern.quote(date) + "\\s+日报\\s*";
+        content = content.replaceFirst(titlePattern, "").strip();
+        
         return Map.of("ok", true, "content", content);
     }
 

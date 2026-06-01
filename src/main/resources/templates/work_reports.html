@@ -149,27 +149,11 @@
 </div>
 
 <div class="modal-overlay" id="edit-daily-modal">
-    <div class="modal" style="max-width:600px;">
+    <div class="modal">
         <h3>✏️ 编辑日报 <span id="edit-daily-date" style="font-weight:normal;font-size:14px;color:#666;"></span></h3>
-        <div class="form-group" style="margin-bottom:12px;">
-            <label>工作任务</label>
-            <div id="edit-task-list" style="margin-bottom:8px;"></div>
-            <div style="display:flex;gap:8px;">
-                <input type="text" id="edit-new-task" placeholder="输入工作任务，按回车添加" style="flex:1;" onkeypress="if(event.key==='Enter'){event.preventDefault();editAddTask();}">
-                <button class="btn btn-secondary" onclick="editAddTask()" style="white-space:nowrap;">+ 添加</button>
-            </div>
-        </div>
-        <div class="form-group" style="margin-bottom:12px;">
-            <label>明日计划</label>
-            <div id="edit-plan-list" style="margin-bottom:8px;"></div>
-            <div style="display:flex;gap:8px;">
-                <input type="text" id="edit-new-plan" placeholder="输入计划事项，按回车添加" style="flex:1;" onkeypress="if(event.key==='Enter'){event.preventDefault();editAddPlan();}">
-                <button class="btn btn-secondary" onclick="editAddPlan()" style="white-space:nowrap;">+ 添加</button>
-            </div>
-        </div>
         <div class="form-group" style="margin-bottom:16px;">
-            <label>备注</label>
-            <textarea id="edit-daily-note" rows="3" placeholder="其他备注（可选）"></textarea>
+            <label>内容（Markdown 格式）</label>
+            <textarea id="edit-daily-content" rows="12"></textarea>
         </div>
         <div class="modal-actions">
             <button class="btn btn-secondary" onclick="closeModal('edit-daily-modal')">取消</button>
@@ -298,158 +282,32 @@ function showAddDailyModal() {
     document.getElementById('add-daily-modal').classList.add('active');
 }
 
-var editTaskCount = 0;
-var editPlanCount = 0;
 var editCurrentDate = '';
 
 async function showEditDailyModal(date) {
     editCurrentDate = date;
     document.getElementById('edit-daily-date').textContent = date;
-    document.getElementById('edit-task-list').innerHTML = '';
-    document.getElementById('edit-plan-list').innerHTML = '';
-    document.getElementById('edit-new-task').value = '';
-    document.getElementById('edit-new-plan').value = '';
-    document.getElementById('edit-daily-note').value = '';
-    editTaskCount = 0;
-    editPlanCount = 0;
+    document.getElementById('edit-daily-content').value = '⏳ 加载中...';
 
     try {
         const res = await fetch('/api/daily-reports/content?date=' + encodeURIComponent(date));
         const result = await res.json();
         if (result.ok && result.content) {
-            parseContentToForm(result.content);
+            document.getElementById('edit-daily-content').value = result.content;
+        } else {
+            document.getElementById('edit-daily-content').value = '加载失败: ' + (result.error || '未知错误');
+            toast('加载失败: ' + (result.error || '未知错误'), 'error');
         }
     } catch (e) {
-        toast('加载内容失败', 'error');
+        document.getElementById('edit-daily-content').value = '加载内容失败';
+        toast('加载内容失败: ' + e.message, 'error');
     }
 
     document.getElementById('edit-daily-modal').classList.add('active');
 }
 
-function parseContentToForm(content) {
-    var lines = content.split('\n');
-    var currentSection = '';
-    var inWork = false;
-    var inPlan = false;
-    var noteLines = [];
-
-    for (var i = 0; i < lines.length; i++) {
-        var line = lines[i].trim();
-        if (line === '## 工作' || line === '## 工作内容' || line === '## 今日工作') {
-            currentSection = 'work';
-            inWork = true;
-            inPlan = false;
-        } else if (line === '## 明日计划' || line === '## 明日工作计划' || line === '## 计划') {
-            currentSection = 'plan';
-            inWork = false;
-            inPlan = true;
-        } else if (line === '## 备注' || line === '## 备注说明') {
-            currentSection = 'note';
-            inWork = false;
-            inPlan = false;
-        } else if (line === '##' || line === '') {
-            currentSection = '';
-            inWork = false;
-            inPlan = false;
-        } else if (inWork && line) {
-            var task = line.replace(/^\d+[\.\)]\s*/, '').replace(/\*\*/g, '').trim();
-            if (task && task !== '暂无' && task !== '无') {
-                addEditTaskDirect(task);
-            }
-        } else if (inPlan && line) {
-            var plan = line.replace(/^-\s*\[\s*[xX]?\s*\]\s*/, '').replace(/\*\*/g, '').trim();
-            if (plan && plan !== '暂无' && plan !== '无') {
-                addEditPlanDirect(plan);
-            }
-        } else if (currentSection === 'note' && line) {
-            noteLines.push(line);
-        }
-    }
-
-    if (noteLines.length > 0) {
-        document.getElementById('edit-daily-note').value = noteLines.join('\n');
-    }
-}
-
-function addEditTaskDirect(text) {
-    var id = 'edit-task-' + (++editTaskCount);
-    var div = document.createElement('div');
-    div.id = id;
-    div.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 12px;background:#fff;border:1px solid #e1e3e6;border-radius:8px;margin-bottom:6px;';
-    div.innerHTML = '<span style="flex:1;font-size:13px;">' + text.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</span><button onclick="removeEditTask(\'' + id + '\')" style="background:none;border:none;cursor:pointer;color:#e03131;font-size:16px;">×</button>';
-    document.getElementById('edit-task-list').appendChild(div);
-}
-
-function addEditPlanDirect(text) {
-    var id = 'edit-plan-' + (++editPlanCount);
-    var div = document.createElement('div');
-    div.id = id;
-    div.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 12px;background:#fff;border:1px solid #e1e3e6;border-radius:8px;margin-bottom:6px;';
-    div.innerHTML = '<span style="flex:1;font-size:13px;">' + text.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</span><button onclick="removeEditPlan(\'' + id + '\')" style="background:none;border:none;cursor:pointer;color:#e03131;font-size:16px;">×</button>';
-    document.getElementById('edit-plan-list').appendChild(div);
-}
-
-function editAddTask() {
-    var input = document.getElementById('edit-new-task');
-    var task = input.value.trim();
-    if (!task) return;
-    addEditTaskDirect(task);
-    input.value = '';
-}
-
-function removeEditTask(id) {
-    document.getElementById(id).remove();
-}
-
-function editAddPlan() {
-    var input = document.getElementById('edit-new-plan');
-    var plan = input.value.trim();
-    if (!plan) return;
-    addEditPlanDirect(plan);
-    input.value = '';
-}
-
-function removeEditPlan(id) {
-    document.getElementById(id).remove();
-}
-
 async function submitEditDailyReport() {
-    var tasks = [];
-    document.querySelectorAll('#edit-task-list > div').forEach(function(div) {
-        var text = div.querySelector('span').textContent;
-        if (text) tasks.push(text);
-    });
-
-    var plans = [];
-    document.querySelectorAll('#edit-plan-list > div').forEach(function(div) {
-        var text = div.querySelector('span').textContent;
-        if (text) plans.push(text);
-    });
-
-    var note = document.getElementById('edit-daily-note').value.trim();
-
-    var content = '## 工作\n';
-    if (tasks.length > 0) {
-        tasks.forEach(function(task, i) {
-            content += (i + 1) + '. ' + task + '\n';
-        });
-    } else {
-        content += '暂无\n';
-    }
-
-    content += '\n## 明日计划\n';
-    if (plans.length > 0) {
-        plans.forEach(function(plan) {
-            content += '- [ ] ' + plan + '\n';
-        });
-    } else {
-        content += '暂无\n';
-    }
-
-    if (note) {
-        content += '\n## 备注\n' + note + '\n';
-    }
-
+    var content = document.getElementById('edit-daily-content').value;
     try {
         const res = await fetch('/api/daily-reports/update', {
             method: 'POST',
