@@ -11,47 +11,50 @@
     <h2>📖 老齐AI个人助理</h2>
     <p class="text-muted" style="line-height:1.7;">
         一站式个人工作台，集成 AI 综合日报、对话问答、笔记管理、公众号运营分析、客户管理等功能。
-        所有 AI 能力基于本地笔记库，无需联网第三方知识库。
+        所有 AI 能力基于本地笔记库和 <strong>opencode serve</strong>，不依赖任何第三方云服务。
     </p>
 </div>
 
 <div class="card">
     <h2>🚀 快速启动</h2>
-    <h3 style="font-size:15px;margin:16px 0 8px;">本地运行（Java 版）</h3>
-    <pre style="background:#1e1e2e;color:#cdd6f4;padding:16px;border-radius:8px;font-size:13px;line-height:1.6;overflow-x:auto;"># 1. 编译
-mvn clean package -DskipTests
-
-# 2. 运行
-java -jar target/assistant-v2-2.0.0.jar
-
-# 服务默认运行在 http://localhost:6789</pre>
     <h3 style="font-size:15px;margin:16px 0 8px;">环境要求</h3>
     <table class="log-table">
         <thead><tr><th>依赖</th><th>版本</th><th>用途</th></tr></thead>
         <tbody>
-            <tr><td>Java</td><td>≥21</td><td>Web 服务运行环境</td></tr>
+            <tr><td>Java</td><td>≥17</td><td>Web 服务运行环境</td></tr>
+            <tr><td>opencode</td><td>latest</td><td>AI 引擎（必须启动两个实例）</td></tr>
         </tbody>
     </table>
+    <h3 style="font-size:15px;margin:16px 0 8px;">启动步骤</h3>
+    <pre style="background:#1e1e2e;color:#cdd6f4;padding:16px;border-radius:8px;font-size:13px;line-height:1.6;overflow-x:auto;"># 1. 先启动两个 opencode serve 服务（必须）
+opencode serve --port 14096  # AI聊天/笔记库服务
+opencode serve --port 14099  # 代码分析服务
+
+# 2. 编译项目
+mvn package -q
+
+# 3. 启动应用
+java -jar target/assistant-v2-2.0.0.jar
+
+# 访问地址
+# - Web UI: http://localhost:6790
+# - 健康检查: http://localhost:6790/health</pre>
 </div>
 
 <div class="card">
-    <h2>🧠 AI 引擎</h2>
+    <h2>🧠 AI 引擎（opencode serve）</h2>
     <p class="text-muted" style="line-height:1.7;">
-        系统通过两个服务端口提供 AI 能力，需确保对应服务已启动：
+        系统依赖两个 <strong>opencode serve</strong> 实例提供所有 AI 能力，缺一不可：
     </p>
     <table class="log-table">
         <thead><tr><th>服务</th><th>端口</th><th>用途</th></tr></thead>
         <tbody>
-            <tr><td><strong>笔记库服务</strong></td><td>14096</td><td>查资料、记笔记、更新数据、添加客户跟进等</td></tr>
-            <tr><td><strong>Java项目服务</strong></td><td>14099</td><td>Java编程、代码问答</td></tr>
+            <tr><td><strong>AI聊天/笔记库</strong></td><td>14096</td><td>综合日报、智能问答、数据采集、客户跟进分析</td></tr>
+            <tr><td><strong>代码分析</strong></td><td>14099</td><td>Java 项目分析、代码知识库</td></tr>
         </tbody>
     </table>
-</div>
-
-<div class="card">
-    <h2>🤖 Agent 体系</h2>
-    <p class="text-muted" style="line-height:1.7;">
-        AI 引擎待配置。配置完成后，系统将通过 AI 引擎提供智能对话和日报生成能力。
+    <p class="text-muted" style="line-height:1.7;margin-top:8px;">
+        启动后可在顶部导航栏看到连接状态指示器。红色表示服务未启动，绿色表示正常。
     </p>
 </div>
 
@@ -64,14 +67,33 @@ java -jar target/assistant-v2-2.0.0.jar
             <tr><td><strong>AI 对话</strong></td><td><code>/chat</code></td><td>与 AI 对话，AI 读取笔记库回答问题，支持流式响应和会话管理</td></tr>
             <tr><td><strong>笔记浏览</strong></td><td><code>/browse</code></td><td>文件浏览器，支持查看/新建/删除 Markdown 文件</td></tr>
             <tr><td><strong>运营看板</strong></td><td><code>/operations</code></td><td>公众号阅读数据分析、平台对比、AI 内容策略建议</td></tr>
+            <tr><td><strong>数据编辑器</strong></td><td><code>/data-editor</code></td><td>通用 JSON 数据编辑器，支持增删改查任意数据文件</td></tr>
             <tr><td><strong>客户管理</strong></td><td><code>/customers</code></td><td>客户/线索看板、销售漏斗、合同金额统计、跟进记录</td></tr>
             <tr><td><strong>日报浏览</strong></td><td><code>/daily-reports</code></td><td>浏览已保存的工作日报</td></tr>
             <tr><td><strong>周报浏览</strong></td><td><code>/weekly-reports</code></td><td>浏览已保存的工作周报</td></tr>
-            <tr><td><strong>系统配置</strong></td><td><code>/config</code></td><td>飞书 Webhook/API 配置、定时任务</td></tr>
+            <tr><td><strong>系统配置</strong></td><td><code>/config</code></td><td>笔记库根目录、数据路径、飞书 Webhook/API、定时任务、字段标签</td></tr>
             <tr><td><strong>操作日志</strong></td><td><code>/log</code></td><td>查看最近 100 条操作记录</td></tr>
             <tr><td><strong>健康检查</strong></td><td><code>/health</code></td><td>服务健康状态 API</td></tr>
+            <tr><td><strong>帮助页面</strong></td><td><code>/help</code></td><td>当前页面</td></tr>
         </tbody>
     </table>
+</div>
+
+<div class="card">
+    <h2>⚙️ 首次使用配置</h2>
+    <p class="text-muted" style="line-height:1.7;">
+        首次启动后，请先前往 <a href="/config">配置页</a> 完成以下设置：
+    </p>
+    <ol class="text-muted" style="line-height:1.7;padding-left:20px;">
+        <li><strong>笔记库根目录</strong> — 设置笔记库的绝对路径（如 <code>D:\projects\richie_learning_notes</code>），所有数据文件的相对路径都基于此目录</li>
+        <li><strong>聊天记录目录</strong> — 默认 <code>chat</code>，对话记录保存在 <code>{根目录}/chat/chat_sessions.json</code></li>
+        <li><strong>综合日报目录</strong> — 默认 <code>工作/综合日报</code>，AI 日报保存到此目录</li>
+        <li><strong>数据目录</strong> — 客户、运营、任务数据所在的子目录</li>
+        <li><strong>飞书 Webhook</strong> — 可选，配置后可接收推送通知</li>
+    </ol>
+    <p class="text-muted" style="line-height:1.7;">
+        未配置前，任何需要访问笔记库的操作会提示你去配置。
+    </p>
 </div>
 
 <div class="card">
@@ -82,10 +104,11 @@ java -jar target/assistant-v2-2.0.0.jar
     <table class="log-table">
         <thead><tr><th>任务</th><th>时间</th><th>说明</th></tr></thead>
         <tbody>
-            <tr><td><strong>综合日报生成</strong></td><td>每天 09:00</td><td>AI 读取笔记库生成日报，推送飞书并保存到 <code>工作/综合日报/</code></td></tr>
-            <tr><td><strong>下班提醒</strong></td><td>每天 18:00</td><td>提醒写工作记录</td></tr>
+            <tr><td><strong>综合日报生成</strong></td><td>工作日 09:00</td><td>AI 读取笔记库生成日报，推送飞书并保存到 <code>工作/综合日报/</code></td></tr>
+            <tr><td><strong>下班提醒</strong></td><td>工作日 18:00</td><td>提醒写工作记录</td></tr>
             <tr><td><strong>周二发文提醒</strong></td><td>每周二 09:00</td><td>提醒发布「码农老齐」公众号</td></tr>
             <tr><td><strong>周四发文提醒</strong></td><td>每周四 09:00</td><td>提醒发布「启航电商ERP」公众号</td></tr>
+            <tr><td><strong>CSDN 数据采集</strong></td><td>每天 08:00（可配置）</td><td>自动抓取 CSDN 阅读/点赞等数据</td></tr>
         </tbody>
     </table>
     <p class="text-muted" style="line-height:1.7;margin-top:8px;">
@@ -97,6 +120,7 @@ java -jar target/assistant-v2-2.0.0.jar
     <h2>📊 综合日报</h2>
     <p class="text-muted" style="line-height:1.7;">
         首页展示 AI 综合日报，数据源为笔记库中的记忆文件，涵盖：项目进展、客户动态、今日 TODO、昨日回顾、学习方向、生活提醒、个人目标、AI 建议。
+        日报文件保存在 <code>{笔记库根目录}/工作/综合日报/{日期}.md</code>，可由定时任务自动生成，也支持 AI 对话手动触发。
     </p>
 </div>
 
@@ -116,11 +140,11 @@ java -jar target/assistant-v2-2.0.0.jar
 <div class="card">
     <h2>📝 快速数据录入</h2>
     <p class="text-muted" style="line-height:1.7;">
-        <strong>核心原则：规则由你在 AI 中制定，AI 自己保存数据。</strong>
+        <strong>核心原则：规则由你在 AI 的 AGENTS.md 中制定，AI 自己保存数据。</strong>
         Java 代码只做消息转发，不参与任何业务逻辑。
     </p>
     <p class="text-muted" style="line-height:1.7;">
-        你只需在笔记库的 <code>AGENTS.md</code> 中定义录入规则（字段映射、计算方式、保存格式等），
+        你只需在笔记库根目录的 <code>AGENTS.md</code> 中定义录入规则（字段映射、计算方式、保存格式等），
         所有入口的消息都会原样发给 AI，AI 按你的规则解析并直接写入数据文件。
     </p>
     <table class="log-table">
@@ -141,10 +165,34 @@ java -jar target/assistant-v2-2.0.0.jar
 </div>
 
 <div class="card">
+    <h2>📈 运营看板</h2>
+    <p class="text-muted" style="line-height:1.7;">
+        公众号运营数据分析，数据自动读取 <code>{笔记库根目录}/自媒体/data/</code> 目录下所有 JSON 文件，
+        包括文章数据、账号平台数据、每日流量统计。
+        提供各公众号粉丝走势、文章阅读量排名、平台对比、AI 自动分析内容策略效果、写作建议和选题推荐。
+    </p>
+</div>
+
+<div class="card">
+    <h2>📂 数据编辑器</h2>
+    <p class="text-muted" style="line-height:1.7;">
+        通用 JSON 数据编辑器，支持对所有已配置的数据目录进行增删改查操作。
+        在 <a href="/config">配置页</a> 设置数据目录后，编辑器会自动发现并展示目录下的所有 JSON 文件，
+        以表格形式展示数据，支持列设置、排序、搜索。
+    </p>
+</div>
+
+<div class="card">
     <h2>📩 飞书集成</h2>
     <p class="text-muted" style="line-height:1.7;">
-        配置 Webhook URL 后，AI 综合日报、发文提醒、下班提醒等自动推送到飞书群。
-        在 <a href="/config">配置页</a> 设置 Webhook 地址。
+        支持两种飞书集成方式：
+    </p>
+    <ul class="text-muted" style="line-height:1.7;padding-left:20px;">
+        <li><strong>Webhook 推送</strong> — 配置 Webhook URL 后，AI 综合日报、发文提醒、下班提醒等自动推送到飞书群</li>
+        <li><strong>消息轮询（API）</strong> — 配置自建应用凭据后，AI 助理可轮询指定群的未读消息并自动回复</li>
+    </ul>
+    <p class="text-muted" style="line-height:1.7;">
+        均在 <a href="/config">配置页</a> 中设置。
     </p>
 </div>
 
@@ -152,15 +200,7 @@ java -jar target/assistant-v2-2.0.0.jar
     <h2>👥 客户管理</h2>
     <p class="text-muted" style="line-height:1.7;">
         客户管理看板展示概览、销售漏斗、合同金额、线索漏斗、近期活动、待跟进等数据。
-        数据存储在 <code>企业/客户管理/</code> 目录。
-    </p>
-</div>
-
-<div class="card">
-    <h2>📈 运营看板</h2>
-    <p class="text-muted" style="line-height:1.7;">
-        公众号运营数据分析，数据来自 <code>自媒体/运营数据.json</code>。
-        提供各公众号粉丝数据、文章阅读量排名、平台对比、AI 自动分析内容策略效果、写作建议和选题推荐。
+        数据存储在 <code>{笔记库根目录}/企业/客户管理/</code> 目录，支持通过 AI 对话录入和更新。
     </p>
 </div>
 
@@ -183,28 +223,31 @@ java -jar target/assistant-v2-2.0.0.jar
     <table class="log-table">
         <thead><tr><th>问题</th><th>原因</th><th>解决</th></tr></thead>
         <tbody>
-            <tr><td>日报生成失败</td><td>AI 引擎未配置</td><td>在 <code>application.yml</code> 中配置 AI 服务连接信息</td></tr>
-            <tr><td>AI 对话无响应</td><td>AI 引擎未配置</td><td>在 <code>application.yml</code> 中配置 AI 服务连接信息</td></tr>
+            <tr><td>页面提示"未配置笔记库根目录"</td><td>未在设置页配置笔记库路径</td><td>前往 <a href="/config">配置页</a> 设置「笔记库根目录」</td></tr>
+            <tr><td>AI 对话/日报/分析无响应</td><td>opencode serve 未启动</td><td>确保已启动 <code>opencode serve --port 14096</code></td></tr>
+            <tr><td>顶部导航栏显示服务红色</td><td>opencode serve 端口未连接</td><td>检查 14096/14099 端口是否正常启动</td></tr>
             <tr><td>飞书推送失败</td><td>Webhook URL 错误或网络问题</td><td>在 <a href="/config">配置页</a> 检查并更新 Webhook 地址</td></tr>
             <tr><td>获取飞书 token 失败</td><td>App ID 或 App Secret 错误</td><td>去飞书开发者后台复制正确的凭据</td></tr>
-            <tr><td>客户端访问页面白屏</td><td>端口被占用或服务未启动</td><td>检查 6789 端口是否被占用；查看后台日志</td></tr>
+            <tr><td>客户端访问页面白屏</td><td>端口被占用或服务未启动</td><td>检查 6790 端口是否被占用；查看后台日志</td></tr>
         </tbody>
     </table>
 </div>
 
 <div class="card">
     <h2>🗂️ 数据文件</h2>
+    <p class="text-muted" style="line-height:1.7;">
+        所有数据以 JSON 文件形式存储在笔记库根目录下，无数据库依赖。
+        以下路径均为相对于笔记库根目录：
+    </p>
     <table class="log-table">
         <thead><tr><th>文件</th><th>读写</th><th>说明</th></tr></thead>
         <tbody>
-            <tr><td><code>config.json</code></td><td>读写</td><td>飞书 Webhook、App 凭据、轮询开关、ERP 项目路径等配置</td></tr>
-            <tr><td><code>chat_sessions.json</code></td><td>读写</td><td>对话历史记录</td></tr>
-            <tr><td><code>assistant_log.json</code></td><td>读写</td><td>操作日志（最多保留 100 条）</td></tr>
-            <tr><td><code>工作/综合日报/</code></td><td>读写</td><td>AI 生成的综合日报文件</td></tr>
-            <tr><td><code>自媒体/data/</code></td><td>读写</td><td>公众号运营原始数据（自媒体文章.json、自媒体账号.json、自媒体数据.json）</td></tr>
-            <tr><td><code>企业/客户管理/客户数据.json</code></td><td>只读</td><td>已合作客户信息</td></tr>
-            <tr><td><code>企业/客户管理/线索数据.json</code></td><td>只读</td><td>线索客户信息</td></tr>
-            <tr><td><code>企业/客户管理/跟进记录.json</code></td><td>只读</td><td>跟进记录</td></tr>
+            <tr><td><code>{config-dir}/config.json</code></td><td>读写</td><td>应用配置（飞书、笔记库路径、数据目录等）</td></tr>
+            <tr><td><code>{config-dir}/assistant_log.json</code></td><td>读写</td><td>操作日志（最多保留 100 条）</td></tr>
+            <tr><td><code>chat/chat_sessions.json</code></td><td>读写</td><td>对话历史记录</td></tr>
+            <tr><td><code>工作/综合日报/</code></td><td>读写</td><td>AI 生成的综合日报文件（按日期命名）</td></tr>
+            <tr><td><code>自媒体/data/*.json</code></td><td>读写</td><td>公众号运营数据（文章、账号、日统计三个文件）</td></tr>
+            <tr><td><code>企业/客户管理/*.json</code></td><td>读写</td><td>客户、线索、跟进记录数据</td></tr>
             <tr><td><code>记忆/当前重点.md</code></td><td>只读</td><td>TODO、近期动态、关键数据</td></tr>
             <tr><td><code>记忆/项目状态.md</code></td><td>只读</td><td>各项目进展</td></tr>
             <tr><td><code>AI记忆.md</code></td><td>只读</td><td>全局背景、产品矩阵、客户规模、战略决策</td></tr>
@@ -221,9 +264,10 @@ java -jar target/assistant-v2-2.0.0.jar
             <tr><td>Web 框架</td><td>Spring Boot 3.4.4</td></tr>
             <tr><td>模板引擎</td><td>Thymeleaf + Layout Dialect</td></tr>
             <tr><td>定时任务</td><td>Spring @Scheduled</td></tr>
-            <tr><td>前端渲染</td><td>commonmark 库</td></tr>
-            <tr><td>消息推送</td><td>飞书 Webhook / API</td></tr>
-            <tr><td>运行环境</td><td>Java ≥21</td></tr>
+            <tr><td>AI 引擎</td><td>opencode serve（外部进程）</td></tr>
+            <tr><td>消息推送</td><td>飞书 Webhook / Bot API</td></tr>
+            <tr><td>数据持久化</td><td>JSON 文件（无数据库）</td></tr>
+            <tr><td>运行环境</td><td>Java ≥17 + Maven</td></tr>
         </tbody>
     </table>
 </div>
