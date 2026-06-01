@@ -64,12 +64,14 @@ java -jar target/assistant-v2-2.0.0.jar
         <thead><tr><th>功能</th><th>路由</th><th>说明</th></tr></thead>
         <tbody>
             <tr><td><strong>综合日报</strong></td><td><code>/</code></td><td>AI 每日综合报告，含项目进展、客户动态、TODO、学习、生活、AI建议</td></tr>
+            <tr><td><strong>工作看板</strong></td><td><code>/work-reports</code></td><td>日报/周报管理，支持添加、编辑，AI 分析工作趋势</td></tr>
             <tr><td><strong>AI 对话</strong></td><td><code>/chat</code></td><td>与 AI 对话，AI 读取笔记库回答问题，支持流式响应和会话管理</td></tr>
             <tr><td><strong>笔记浏览</strong></td><td><code>/browse</code></td><td>文件浏览器，支持查看/新建/删除 Markdown 文件</td></tr>
             <tr><td><strong>运营看板</strong></td><td><code>/operations</code></td><td>公众号阅读数据分析、平台对比、AI 内容策略建议</td></tr>
             <tr><td><strong>数据编辑器</strong></td><td><code>/data-editor</code></td><td>通用 JSON 数据编辑器，支持增删改查任意数据文件</td></tr>
             <tr><td><strong>客户管理</strong></td><td><code>/customers</code></td><td>客户/线索看板、销售漏斗、合同金额统计、跟进记录</td></tr>
             <tr><td><strong>任务看板</strong></td><td><code>/tasks</code></td><td>任务管理，支持增删改、优先级、完成状态</td></tr>
+            <tr><td><strong>定时提醒</strong></td><td><code>/reminders</code></td><td>定时提醒管理，支持每天/每周/每月/每年循环</td></tr>
             <tr><td><strong>系统配置</strong></td><td><code>/config</code></td><td>笔记库根目录、数据路径、飞书 Webhook/API、定时任务、字段标签</td></tr>
             <tr><td><strong>操作日志</strong></td><td><code>/log</code></td><td>查看最近 100 条操作记录</td></tr>
             <tr><td><strong>健康检查</strong></td><td><code>/health</code></td><td>服务健康状态 API</td></tr>
@@ -86,9 +88,11 @@ java -jar target/assistant-v2-2.0.0.jar
     <ol class="text-muted" style="line-height:1.7;padding-left:20px;">
         <li><strong>笔记库根目录</strong> — 设置笔记库的绝对路径（如 <code>D:\projects\richie_learning_notes</code>），所有数据文件的相对路径都基于此目录</li>
         <li><strong>聊天记录目录</strong> — 默认 <code>chat</code>，对话记录保存在 <code>{根目录}/chat/chat_sessions.json</code></li>
-        <li><strong>综合日报目录</strong> — 默认 <code>工作/综合日报</code>，AI 日报保存到此目录</li>
-        <li><strong>数据目录</strong> — 客户、运营、任务数据所在的子目录</li>
+        <li><strong>工作目录</strong> — 默认 <code>工作</code>，日报/周报保存在 <code>{根目录}/工作/日报/</code> 和 <code>{根目录}/工作/周报/</code></li>
+        <li><strong>客户数据目录</strong> — 默认 <code>企业/客户管理</code>，客户、线索、跟进记录数据</li>
+        <li><strong>运营数据目录</strong> — 默认 <code>自媒体</code>，公众号运营数据</li>
         <li><strong>飞书 Webhook</strong> — 可选，配置后可接收推送通知</li>
+        <li><strong>字段标签</strong> — 可选，自定义数据表格中英文 key 显示为中文标签</li>
     </ol>
     <p class="text-muted" style="line-height:1.7;">
         未配置前，任何需要访问笔记库的操作会提示你去配置。
@@ -124,6 +128,21 @@ java -jar target/assistant-v2-2.0.0.jar
 </div>
 
 <div class="card">
+    <h2>📋 工作看板</h2>
+    <p class="text-muted" style="line-height:1.7;">
+        工作看板用于管理日报和周报，支持添加、编辑、AI 分析工作趋势。
+    </p>
+    <ul class="text-muted" style="line-height:1.7;padding-left:20px;margin-top:8px;">
+        <li><strong>日报管理</strong> — 添加/编辑日报，支持逐条添加工作任务和明日计划</li>
+        <li><strong>周报管理</strong> — 添加/编辑周报，Markdown 格式自由编辑</li>
+        <li><strong>AI 分析</strong> — 基于近期日报和周报，AI 自动生成工作趋势分析和改进建议</li>
+    </ul>
+    <p class="text-muted" style="line-height:1.7;margin-top:8px;">
+        数据存储：<code>工作/日报/{日期}.md</code> 和 <code>工作/周报/{年-周}.md</code>
+    </p>
+</div>
+
+<div class="card">
     <h2>💬 AI 对话</h2>
     <p class="text-muted" style="line-height:1.7;">
         与 AI 助理对话，它会读取整个笔记库来回答问题。支持流式响应、实时状态显示、历史会话管理。
@@ -149,14 +168,14 @@ java -jar target/assistant-v2-2.0.0.jar
     <table class="log-table">
         <thead><tr><th style="width:100px;">入口</th><th>方式</th><th>说明</th></tr></thead>
         <tbody>
-            <tr><td><strong>页面表单</strong></td><td>运营/客户/工作页面点按钮弹窗填写</td><td>字段拼成文本发给 AI，AI 按规则保存</td></tr>
+            <tr><td><strong>页面表单</strong></td><td>运营/客户页面点按钮弹窗填写</td><td>字段拼成文本发给 AI，AI 按规则保存</td></tr>
+            <tr><td><strong>工作看板</strong></td><td>日报/周报页面直接填写</td><td>直接保存到文件，无需 AI 处理</td></tr>
             <tr><td><strong>飞书消息</strong></td><td>以"记录/新增/添加/创建/录入"开头发消息</td><td>原样转发 AI，AI 按规则保存并回复</td></tr>
             <tr><td><strong>AI对话</strong></td><td>聊天框以"记录/新增/添加/创建/录入"开头输入</td><td>原样转发 AI，AI 按规则保存并回复</td></tr>
         </tbody>
     </table>
     <h3 style="font-size:14px;margin:16px 0 8px;">示例消息（AI 按 AGENTS.md 规则解析）</h3>
-    <pre style="background:#1e1e2e;color:#cdd6f4;padding:16px;border-radius:8px;font-size:13px;line-height:1.6;overflow-x:auto;">记录日报：今天修复了导出bug，下午跟进了张三的合同
-记录文章：《实战指南》微信阅读3200点赞85，增粉12
+    <pre style="background:#1e1e2e;color:#cdd6f4;padding:16px;border-radius:8px;font-size:13px;line-height:1.6;overflow-x:auto;">记录文章：《实战指南》微信阅读3200点赞85，增粉12
 新增客户：王五，公司启航科技，阶段意向，产品ERP
 新增线索：赵六，来源转介绍，备注朋友推荐
 记录跟进：张三 谈了合同细节，下周二再约
@@ -204,6 +223,22 @@ java -jar target/assistant-v2-2.0.0.jar
 </div>
 
 <div class="card">
+    <h2>⏰ 定时提醒</h2>
+    <p class="text-muted" style="line-height:1.7;">
+        定时提醒功能支持创建和管理各种循环提醒任务，到时间自动推送消息到飞书。
+    </p>
+    <ul class="text-muted" style="line-height:1.7;padding-left:20px;margin-top:8px;">
+        <li><strong>每天</strong> — 每天固定时间提醒，如每日站会、下班日报</li>
+        <li><strong>每周</strong> — 每周特定星期几提醒，如周例会、周报</li>
+        <li><strong>每月</strong> — 每月特定几号提醒，如月度总结、账单日</li>
+        <li><strong>每年</strong> — 每年特定日期提醒，如生日、纪念日</li>
+    </ul>
+    <p class="text-muted" style="line-height:1.7;margin-top:8px;">
+        支持启用/禁用、编辑、删除、立即触发等操作。提醒触发后会推送到配置的飞书群。
+    </p>
+</div>
+
+<div class="card">
     <h2>📂 笔记管理</h2>
     <p class="text-muted" style="line-height:1.7;">
         内置文件浏览器，无需 Obsidian 即可管理笔记库中的 Markdown 文件：
@@ -245,8 +280,11 @@ java -jar target/assistant-v2-2.0.0.jar
             <tr><td><code>{config-dir}/assistant_log.json</code></td><td>读写</td><td>操作日志（最多保留 100 条）</td></tr>
             <tr><td><code>chat/chat_sessions.json</code></td><td>读写</td><td>对话历史记录</td></tr>
             <tr><td><code>工作/综合日报/</code></td><td>读写</td><td>AI 生成的综合日报文件（按日期命名）</td></tr>
+            <tr><td><code>工作/日报/</code></td><td>读写</td><td>手动记录的日报文件（按日期命名）</td></tr>
+            <tr><td><code>工作/周报/</code></td><td>读写</td><td>手动记录的周报文件（按年-周命名）</td></tr>
             <tr><td><code>自媒体/data/*.json</code></td><td>读写</td><td>公众号运营数据（文章、账号、日统计三个文件）</td></tr>
             <tr><td><code>企业/客户管理/*.json</code></td><td>读写</td><td>客户、线索、跟进记录数据</td></tr>
+            <tr><td><code>reminders.json</code></td><td>读写</td><td>定时提醒数据（在笔记库根目录下）</td></tr>
             <tr><td><code>记忆/当前重点.md</code></td><td>只读</td><td>TODO、近期动态、关键数据</td></tr>
             <tr><td><code>记忆/项目状态.md</code></td><td>只读</td><td>各项目进展</td></tr>
             <tr><td><code>AI记忆.md</code></td><td>只读</td><td>全局背景、产品矩阵、客户规模、战略决策</td></tr>
