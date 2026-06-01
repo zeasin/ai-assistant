@@ -29,13 +29,11 @@ public class ChatSessionService {
 
     private Path getChatSessionsFile() {
         Config config = configService.load();
-        String baseDir = config.getBaseDir();
-        if (baseDir == null || baseDir.isEmpty()) baseDir = "D:\\projects\\richie_learning_notes";
         String chatDir = config.getChatSessionsDir();
         if (chatDir == null || chatDir.isEmpty()) chatDir = "chat";
         String chatSessionsFile = config.getChatSessionsFile();
         if (chatSessionsFile == null || chatSessionsFile.isEmpty()) chatSessionsFile = "chat_sessions.json";
-        return Paths.get(baseDir).resolve(chatDir).resolve(chatSessionsFile);
+        return Paths.get(configService.getBaseDir()).resolve(chatDir).resolve(chatSessionsFile);
     }
 
     public static class SessionsData {

@@ -44,20 +44,16 @@ public class WorkReportController {
 
     private Path getDailyDir() {
         Config config = configService.load();
-        String baseDir = config.getBaseDir();
-        if (baseDir == null || baseDir.isEmpty()) baseDir = "D:\\projects\\richie_learning_notes";
         String dailyDir = config.getDailyDir();
         if (dailyDir == null || dailyDir.isEmpty()) dailyDir = "工作\\日报";
-        return Paths.get(baseDir).resolve(dailyDir);
+        return Paths.get(configService.getBaseDir()).resolve(dailyDir);
     }
 
     private Path getWeeklyDir() {
         Config config = configService.load();
-        String baseDir = config.getBaseDir();
-        if (baseDir == null || baseDir.isEmpty()) baseDir = "D:\\projects\\richie_learning_notes";
         String weeklyDir = config.getWeeklyDir();
         if (weeklyDir == null || weeklyDir.isEmpty()) weeklyDir = "工作\\周报";
-        return Paths.get(baseDir).resolve(weeklyDir);
+        return Paths.get(configService.getBaseDir()).resolve(weeklyDir);
     }
 
     record ReportItem(String name, String modified, String content) {}

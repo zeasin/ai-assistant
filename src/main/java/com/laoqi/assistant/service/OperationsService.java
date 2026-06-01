@@ -1,7 +1,7 @@
 package com.laoqi.assistant.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.laoqi.assistant.config.AppConfig;
-import com.laoqi.assistant.model.OperationsData.*;
 import com.laoqi.assistant.util.FileUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -10,18 +10,17 @@ import org.springframework.stereotype.Service;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 public class OperationsService {
 
     private static final Logger log = LoggerFactory.getLogger(OperationsService.class);
+    private static final TypeReference<Map<String, List<Map<String, Object>>>> MAP_LIST_TYPE = new TypeReference<>() {};
 
     private final AppConfig appConfig;
     private final ConfigService configService;
     private final OpenCodeService openCodeService;
 
-    // AI analysis cache
     private String cachedAnalysis = "";
     private String cachedDate = "";
 
@@ -32,93 +31,73 @@ public class OperationsService {
     }
 
     private Path getBaseDir() {
-        String baseDir = configService.load().getBaseDir();
-        if (baseDir != null && !baseDir.isEmpty()) {
-            return Paths.get(baseDir);
-        }
-        return Paths.get("D:\\projects\\richie_learning_notes");
+        return Paths.get(configService.getBaseDir());
     }
 
-    private Path dataFile() {
+    private Path getDataDir() {
         var config = configService.load();
         String dir = config.getOperationsDataDir();
         if (dir == null || dir.isEmpty()) {
             throw new IllegalStateException("运营数据目录未配置");
         }
-        Path dataDir = getBaseDir().resolve(dir).resolve("data");
-        if (!java.nio.file.Files.exists(dataDir)) {
-            throw new IllegalStateException("运营数据目录不存在: " + dataDir);
-        }
-        try (var stream = java.nio.file.Files.list(dataDir)) {
-            var files = stream.filter(f -> f.getFileName().toString().endsWith(".json")).collect(java.util.stream.Collectors.toList());
-            if (!files.isEmpty()) {
-                return files.get(0);
-            }
-        } catch (java.io.IOException e) {
-            log.warn("无法读取运营数据目录: {}", dataDir, e);
-        }
-        throw new IllegalStateException("运营数据目录下没有 JSON 文件: " + dataDir);
+        return getBaseDir().resolve(dir).resolve("data");
     }
 
-    public Root loadData() {
-        return FileUtil.readJson(dataFile(), Root.class, new Root());
+    private Map<String, List<Map<String, Object>>> readJsonFile(String fileName) {
+        Path file = getDataDir().resolve(fileName);
+        return FileUtil.readJson(file, MAP_LIST_TYPE, new LinkedHashMap<>());
     }
 
     /**
      * Build a text summary of the operations data for use as AI prompt context
      */
-    public String buildDataSummary(Root data) {
+    public String buildDataSummary() {
+        var accounts = readJsonFile("自媒体账号.json");
+        var articles = readJsonFile("自媒体文章.json");
+        var dailyStats = readJsonFile("自媒体数据.json");
+
         StringBuilder sb = new StringBuilder();
 
         // Account summary
-        if (data.accounts != null && !data.accounts.isEmpty()) {
+        if (accounts != null && !accounts.isEmpty()) {
             sb.append("## 账号概况\n\n");
-            for (var accEntry : data.accounts.entrySet()) {
+            for (var accEntry : accounts.entrySet()) {
                 sb.append("账号：").append(accEntry.getKey()).append("\n");
-                for (var platEntry : accEntry.getValue().entrySet()) {
-                    sb.append("  - 平台：").append(platEntry.getKey());
-                    if (platEntry.getValue() instanceof Map) {
-                        @SuppressWarnings("unchecked")
-                        Map<String, Object> info = (Map<String, Object>) platEntry.getValue();
+                List<Map<String, Object>> platforms = accEntry.getValue();
+                if (platforms != null) {
+                    for (Map<String, Object> info : platforms) {
+                        sb.append("  - 平台：").append(info.get("platform"));
                         if (info.get("name") != null) sb.append("，名称：").append(info.get("name"));
                         if (info.get("fans") != null) sb.append("，粉丝：").append(info.get("fans"));
                         if (info.get("totalViews") != null) sb.append("，总访问：").append(info.get("totalViews"));
                         if (info.get("totalArticles") != null) sb.append("，总文章：").append(info.get("totalArticles"));
+                        sb.append("\n");
                     }
-                    sb.append("\n");
                 }
                 sb.append("\n");
             }
         }
 
         // Recent articles
-        if (data.articles != null && !data.articles.isEmpty()) {
+        if (articles != null && !articles.isEmpty()) {
             sb.append("## 近期文章\n\n");
-            for (var artEntry : data.articles.entrySet()) {
+            for (var artEntry : articles.entrySet()) {
                 sb.append("账号：").append(artEntry.getKey()).append("\n");
-                List<ArticleData> articles = artEntry.getValue();
-                if (articles != null) {
-                    for (ArticleData a : articles) {
-                        sb.append("  - [").append(a.id).append("] ").append(a.topic);
-                        if (a.series != null) sb.append(" (系列：").append(a.series).append(")");
-                        if (a.publishDate != null) sb.append(" 发布于：").append(a.publishDate);
+                List<Map<String, Object>> articleList = artEntry.getValue();
+                if (articleList != null) {
+                    for (Map<String, Object> a : articleList) {
+                        sb.append("  - [").append(a.get("id")).append("] ").append(a.get("title"));
+                        if (a.get("series") != null) sb.append(" (系列：").append(a.get("series")).append(")");
+                        if (a.get("publishDate") != null) sb.append(" 发布于：").append(a.get("publishDate"));
                         sb.append("\n");
-                        if (a.fansGained != null) sb.append("    增粉：").append(a.fansGained);
-                        if (a.notes != null) sb.append(" 备注：").append(a.notes);
+                        if (a.get("fansGained") != null) sb.append("    增粉：").append(a.get("fansGained"));
+                        if (a.get("notes") != null) sb.append(" 备注：").append(a.get("notes"));
                         sb.append("\n");
-                        if (a.data != null) {
-                            for (var pEntry : a.data.entrySet()) {
-                                PlatformArticleData pd = pEntry.getValue();
-                                if (pd != null) {
-                                    sb.append("    ").append(pEntry.getKey()).append("：");
-                                    if (pd.reads != null) sb.append("阅读").append(pd.reads).append(" ");
-                                    if (pd.likes != null) sb.append("点赞").append(pd.likes).append(" ");
-                                    if (pd.shares != null) sb.append("分享").append(pd.shares).append(" ");
-                                    if (pd.favorites != null) sb.append("收藏").append(pd.favorites);
-                                    sb.append("\n");
-                                }
-                            }
-                        }
+                        if (a.get("reads") != null) sb.append("    阅读：").append(a.get("reads")).append(" ");
+                        if (a.get("likes") != null) sb.append("点赞：").append(a.get("likes")).append(" ");
+                        if (a.get("shares") != null) sb.append("分享：").append(a.get("shares")).append(" ");
+                        if (a.get("favorites") != null) sb.append("收藏：").append(a.get("favorites"));
+                        sb.append("\n");
                     }
                 }
                 sb.append("\n");
@@ -126,21 +105,20 @@ public class OperationsService {
         }
 
         // Daily stats summary
-        if (data.dailyStats != null && !data.dailyStats.isEmpty()) {
+        if (dailyStats != null && !dailyStats.isEmpty()) {
             sb.append("## 每日统计\n\n");
-            for (var statsEntry : data.dailyStats.entrySet()) {
+            for (var statsEntry : dailyStats.entrySet()) {
                 sb.append("账号：").append(statsEntry.getKey()).append("\n");
-                List<DailyStats> stats = statsEntry.getValue();
+                List<Map<String, Object>> stats = statsEntry.getValue();
                 if (stats != null) {
-                    // Only include recent 7 days
                     int count = Math.min(stats.size(), 7);
                     for (int i = stats.size() - count; i < stats.size(); i++) {
-                        DailyStats d = stats.get(i);
+                        Map<String, Object> d = stats.get(i);
                         if (d != null) {
-                            sb.append("  - ").append(d.date);
-                            if (d.fans != null) sb.append(" 粉丝：").append(d.fans);
-                            if (d.reads != null) sb.append(" 阅读：").append(d.reads);
-                            if (d.readArticles != null) sb.append(" 文章：").append(d.readArticles);
+                            sb.append("  - ").append(d.get("date"));
+                            if (d.get("fans") != null) sb.append(" 粉丝：").append(d.get("fans"));
+                            if (d.get("reads") != null) sb.append(" 阅读：").append(d.get("reads"));
+                            if (d.get("readArticles") != null) sb.append(" 文章：").append(d.get("readArticles"));
                             sb.append("\n");
                         }
                     }
@@ -176,8 +154,7 @@ public class OperationsService {
             }
         }
 
-        Root data = loadData();
-        String dataSummary = buildDataSummary(data);
+        String dataSummary = buildDataSummary();
 
         String prompt = "你是一个自媒体运营分析专家。以下是我的自媒体运营数据：\n\n"
                 + dataSummary
@@ -207,197 +184,4 @@ public class OperationsService {
         }
     }
 
-    public AnalysisResult analyze(Map<String, List<ArticleData>> articles) {
-        AnalysisResult result = new AnalysisResult();
-        if (articles == null || articles.isEmpty()) return result;
-
-        List<TopArticle> allRanked = new ArrayList<>();
-        Map<String, PlatformStats> platformStats = new HashMap<>();
-
-        for (Map.Entry<String, List<ArticleData>> entry : articles.entrySet()) {
-            String accountName = entry.getKey();
-            for (ArticleData article : entry.getValue()) {
-                if (article.data == null) continue;
-                for (Map.Entry<String, PlatformArticleData> pEntry : article.data.entrySet()) {
-                    String pkey = pEntry.getKey();
-                    PlatformArticleData pdata = pEntry.getValue();
-                    if (pdata != null && pdata.reads != null && pdata.reads > 0) {
-                        TopArticle ta = new TopArticle();
-                        ta.account = accountName;
-                        ta.topic = article.topic;
-                        ta.id = article.id;
-                        ta.platform = pkey;
-                        ta.reads = pdata.reads;
-                        ta.fansAtPublish = article.fansAtPublish;
-                        ta.fansGained = article.fansGained;
-                        allRanked.add(ta);
-
-                        String key = switch (pkey) { case "wechat" -> "微信"; case "csdn" -> "CSDN"; case "zhihu" -> "知乎"; default -> pkey; };
-                        platformStats.computeIfAbsent(key, k -> new PlatformStats());
-                        platformStats.get(key).reads += pdata.reads;
-                        platformStats.get(key).count++;
-                    }
-                }
-            }
-        }
-
-        allRanked.sort((a, b) -> b.reads - a.reads);
-        result.topArticles = allRanked.size() > 6 ? allRanked.subList(0, 6) : allRanked;
-
-        result.findings = new ArrayList<>();
-        result.platformTips = new ArrayList<>();
-        result.suggestionPriority = new ArrayList<>();
-
-        List<ArticleReads> wxArticles = new ArrayList<>();
-        for (Map.Entry<String, List<ArticleData>> entry : articles.entrySet()) {
-            for (ArticleData a : entry.getValue()) {
-                if (a.data != null && a.data.containsKey("wechat") && a.data.get("wechat").reads != null) {
-                    wxArticles.add(new ArticleReads(a.topic, a.data.get("wechat").reads));
-                }
-            }
-        }
-        wxArticles.sort((a, b) -> b.reads - a.reads);
-        if (wxArticles.size() >= 2) {
-            String bestTopic = wxArticles.get(0).topic;
-            String worstTopic = wxArticles.get(wxArticles.size() - 1).topic;
-            int bestReads = wxArticles.get(0).reads;
-            int worstReads = wxArticles.get(wxArticles.size() - 1).reads;
-            int ratio = worstReads > 0 ? bestReads / worstReads : 0;
-            Finding f = new Finding();
-            f.icon = "🔍"; f.title = "标题含搜索热词 = 微信阅读量x" + ratio + "倍";
-            f.detail = "最佳「" + bestTopic + "」" + bestReads + "阅读 vs 最差「" + worstTopic + "」" + worstReads + "阅读";
-            f.action = "每篇标题必含1-2个搜一搜可搜关键词";
-            result.findings.add(f);
-        }
-
-        List<CsdnWxGap> gaps = new ArrayList<>();
-        for (Map.Entry<String, List<ArticleData>> entry : articles.entrySet()) {
-            for (ArticleData a : entry.getValue()) {
-                if (a.data == null) continue;
-                PlatformArticleData w = a.data.get("wechat");
-                PlatformArticleData c = a.data.get("csdn");
-                if (w != null && c != null && w.reads != null && c.reads != null && w.reads > 0 && c.reads > 0) {
-                    gaps.add(new CsdnWxGap(a.topic, c.reads, w.reads, c.reads - w.reads));
-                }
-            }
-        }
-        gaps.sort((a, b) -> b.gap - a.gap);
-        if (!gaps.isEmpty() && gaps.get(0).gap > 100) {
-            CsdnWxGap best = gaps.get(0);
-            Finding f = new Finding();
-            f.icon = "⚡"; f.title = "CSDN吃冲突感标题";
-            f.detail = "「" + best.topic + "」CSDN " + best.csdnReads + "阅读，是微信" + best.wxReads + "阅读的" + (best.wxReads > 0 ? best.csdnReads / best.wxReads : 0) + "倍";
-            f.action = "CSDN标题用冲突/悬念句式，可更激进";
-            result.findings.add(f);
-        }
-
-        List<String> hotKeywords = Arrays.asList("OpenMemory", "AI", "OpenCode", "记忆体");
-        for (Map.Entry<String, List<ArticleData>> entry : articles.entrySet()) {
-            for (ArticleData a : entry.getValue()) {
-                boolean isHot = hotKeywords.stream().anyMatch(kw ->
-                        (a.topic != null && a.topic.contains(kw)) ||
-                        (a.series != null && a.series.contains(kw)));
-                if (!isHot) continue;
-                if (a.data != null && a.data.containsKey("wechat") && a.data.get("wechat").reads != null) {
-                    Finding f = new Finding();
-                    f.icon = "🔥"; f.title = "热门AI概念 = 微信推荐起量";
-                    f.detail = "「" + a.topic + "」微信" + a.data.get("wechat").reads + "阅读，蹭热点吃搜一搜+推荐双流量";
-                    f.action = "紧跟AI热门概念写文";
-                    result.findings.add(f);
-                    break;
-                }
-            }
-        }
-
-        result.platformTips.add(createTip("微信·码农老齐", "标题搜索词覆盖不稳定", "每篇检查搜一搜关键词热度，标题含≥1个热词"));
-        result.platformTips.add(createTip("CSDN", "已验证冲突标题有效但未持续优化", "标题用「冲突/悬念」句式，内容保持技术深度"));
-        result.platformTips.add(createTip("知乎", "只发文章不答题，曝光不足", "每周回答2-3个相关知乎问题，文末引导关注"));
-
-        boolean hasHot = false;
-        for (Map.Entry<String, List<ArticleData>> entry : articles.entrySet()) {
-            for (ArticleData a : entry.getValue()) {
-                if ((a.topic != null && a.topic.contains("AI")) ||
-                    (a.series != null && a.series.contains("AI"))) {
-                    hasHot = true; break;
-                }
-            }
-            if (hasHot) break;
-        }
-        if (hasHot) {
-            Suggestion s = new Suggestion();
-            s.priority = "🔴 高"; s.topic = "AI热门概念实操教程";
-            s.reason = "已验证：搜一搜热词+实操=最高流量，建议持续输出";
-            result.suggestionPriority.add(s);
-        }
-        Suggestion s2 = new Suggestion();
-        s2.priority = "🟡 中"; s2.topic = "开发效率/避坑经验（冲突感标题）";
-        s2.reason = "CSDN已验证冲突标题效果6倍于平淡标题";
-        result.suggestionPriority.add(s2);
-
-        WritingTemplate wt = new WritingTemplate();
-        wt.formula = "[热门AI概念/工具] + [实操/避坑] + [结果暗示]";
-        wt.goodExamples = Arrays.asList("OpenCode安装与使用", "OpenMemory记忆体");
-        wt.badExamples = Arrays.asList("子代理系统");
-        wt.contentPipeline = "热门概念 → 实操教程 → 避坑经验 → 开源互动 → 产品痛点方案";
-        result.writingTemplate = wt;
-
-        return result;
-    }
-
-    private PlatformTip createTip(String platform, String problem, String action) {
-        PlatformTip t = new PlatformTip();
-        t.platform = platform; t.problem = problem; t.action = action;
-        return t;
-    }
-
-    static class ArticleReads { String topic; int reads; ArticleReads(String t, int r) { topic = t; reads = r; } }
-    static class CsdnWxGap { String topic; int csdnReads, wxReads, gap; CsdnWxGap(String t, int c, int w, int g) { topic = t; csdnReads = c; wxReads = w; gap = g; } }
-    static class PlatformStats { int reads, count; }
-
-    public void saveData(Root data) {
-        FileUtil.writeJson(dataFile(), data);
-    }
-
-    public void addArticle(String accountName, String id, String topic, String series, String publishDate,
-                            String fansAtPublish, String fansGained, String notes,
-                            Map<String, PlatformArticleData> platformData) {
-        Root data = loadData();
-        if (data.articles == null) data.articles = new LinkedHashMap<>();
-        data.articles.computeIfAbsent(accountName, k -> new ArrayList<>());
-
-        ArticleData article = new ArticleData();
-        article.id = id;
-        article.topic = topic;
-        article.series = series;
-        article.publishDate = publishDate;
-        article.fansAtPublish = fansAtPublish;
-        article.fansGained = fansGained;
-        article.notes = notes;
-        article.data = platformData;
-        data.articles.get(accountName).add(article);
-        saveData(data);
-    }
-
-    public void addDailyStats(String accountName, DailyStats stats) {
-        Root data = loadData();
-        if (data.dailyStats == null) data.dailyStats = new LinkedHashMap<>();
-        data.dailyStats.computeIfAbsent(accountName, k -> new ArrayList<>());
-        data.dailyStats.get(accountName).add(stats);
-        saveData(data);
-    }
-
-    public void saveAccount(String accountName, String platformKey, String name, Integer fans,
-                             Integer totalViews, Integer totalArticles) {
-        Root data = loadData();
-        if (data.accounts == null) data.accounts = new LinkedHashMap<>();
-        data.accounts.computeIfAbsent(accountName, k -> new LinkedHashMap<>());
-
-        Map<String, Object> info = new LinkedHashMap<>();
-        info.put("name", name);
-        if (fans != null) info.put("fans", fans);
-        if (totalViews != null) info.put("totalViews", totalViews);
-        if (totalArticles != null) info.put("totalArticles", totalArticles);
-        data.accounts.get(accountName).put(platformKey, info);
-        saveData(data);
-    }
 }

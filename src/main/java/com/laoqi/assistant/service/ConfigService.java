@@ -16,7 +16,16 @@ public class ConfigService {
 
     public Config load() {
         return FileUtil.readJson(appConfig.getConfigFile(), Config.class,
-                Config.defaultConfig("", "D:\\projects\\richie_learning_notes"));
+                Config.defaultConfig("", ""));
+    }
+
+    public String getBaseDir() {
+        Config config = load();
+        String dir = config.getBaseDir();
+        if (dir == null || dir.isEmpty()) {
+            throw new IllegalStateException("未配置笔记库根目录，请先在「设置」页面配置");
+        }
+        return dir;
     }
 
     public void save(Config config) {

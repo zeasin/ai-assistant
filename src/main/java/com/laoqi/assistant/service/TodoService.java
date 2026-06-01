@@ -21,10 +21,7 @@ public class TodoService {
     }
 
     private Path getBaseDir() {
-        Config config = configService.load();
-        String baseDir = config.getBaseDir();
-        if (baseDir == null || baseDir.isEmpty()) baseDir = "D:\\projects\\richie_learning_notes";
-        return Paths.get(baseDir);
+        return Paths.get(configService.getBaseDir());
     }
 
     private Path getRemindFile() {

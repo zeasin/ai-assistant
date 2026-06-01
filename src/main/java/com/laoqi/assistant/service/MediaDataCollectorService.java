@@ -41,11 +41,9 @@ public class MediaDataCollectorService {
 
     private Path getDataDir() {
         Config config = configService.load();
-        String baseDir = config.getBaseDir();
-        if (baseDir == null || baseDir.isEmpty()) baseDir = "D:\\projects\\richie_learning_notes";
         String opDir = config.getOperationsDataDir();
         if (opDir == null || opDir.isEmpty()) opDir = "自媒体";
-        return Paths.get(baseDir).resolve(opDir).resolve("data");
+        return Paths.get(configService.getBaseDir()).resolve(opDir).resolve("data");
     }
 
     private Map<String, List<Map<String, Object>>> readJsonFile(String fileName) {
@@ -142,7 +140,6 @@ public class MediaDataCollectorService {
     private int mergeArticleData(Map<String, List<Map<String, Object>>> articles, Map<String, Object> parsed) {
         int updates = 0;
         int nextId = 1;
-        List<Map<String, Object>> list = articles.computeIfAbsent("码农老齐", k -> new ArrayList<>());
 
         String[] platforms = {"csdn", "zhihu"};
         for (String platform : platforms) {
@@ -151,6 +148,9 @@ public class MediaDataCollectorService {
             Map<String, Object> platformBlock = (Map<String, Object>) rawPlatform;
             Object rawArticles = platformBlock.get("articles");
             if (!(rawArticles instanceof List)) continue;
+
+            String groupKey = "码农老齐-" + platform;
+            List<Map<String, Object>> list = articles.computeIfAbsent(groupKey, k -> new ArrayList<>());
 
             List<Map<String, Object>> aiArticles = (List<Map<String, Object>>) rawArticles;
             for (Map<String, Object> aiArt : aiArticles) {
@@ -162,9 +162,10 @@ public class MediaDataCollectorService {
                 if (existing == null) {
                     existing = new LinkedHashMap<>();
                     existing.put("id", "A" + ((System.currentTimeMillis() + nextId++) % 100000));
-                    existing.put("topic", aiTopic);
+                    existing.put("title", aiTopic);
                     existing.put("publishDate", aiArt.getOrDefault("publishDate", TimeUtil.todayStr()));
                     existing.put("series", null);
+                    existing.put("link", null);
                     existing.put("fansAtPublish", null);
                     existing.put("fansGained", null);
                     existing.put("notes", null);
@@ -172,28 +173,15 @@ public class MediaDataCollectorService {
                     updates++;
                 }
 
-                Map<String, Object> existingData = (Map<String, Object>) existing.get("data");
-                if (existingData == null) {
-                    existingData = new LinkedHashMap<>();
-                    existing.put("data", existingData);
-                }
-
-                Map<String, Object> existingPlatform = (Map<String, Object>) existingData.get(platform);
-                if (existingPlatform == null) {
-                    existingPlatform = new LinkedHashMap<>();
-                    existingData.put(platform, existingPlatform);
-                }
-
                 boolean changed = false;
                 String[] fields = {"reads", "likes", "favorites", "shares", "comments"};
                 for (String f : fields) {
                     Object val = aiArt.get(f);
                     if (val != null) {
-                        existingPlatform.put(f, val);
+                        existing.put(f, val);
                         changed = true;
                     }
                 }
-                // 更新文章发布时间（如果有）
                 Object publishDate = aiArt.get("publishDate");
                 if (publishDate != null && existing.get("publishDate") == null) {
                     existing.put("publishDate", publishDate);
@@ -209,7 +197,7 @@ public class MediaDataCollectorService {
         Map<String, Object> bestMatch = null;
         int bestScore = 0;
         for (Map<String, Object> art : list) {
-            String t = (String) art.get("topic");
+            String t = (String) art.get("title");
             if (t == null) continue;
             String tNorm = t.replaceAll("[\\s　,，、：:。.；;！!？?（）()\\[\\]【】「」『》》]|^【.*?】", "").toLowerCase();
             if (tNorm.isEmpty()) continue;
@@ -277,7 +265,7 @@ public class MediaDataCollectorService {
             List<Map<String, Object>> list = entry.getValue();
             if (list == null || list.isEmpty()) continue;
             Map<String, Object> last = list.get(list.size() - 1);
-            String topic = (String) last.getOrDefault("topic", "");
+            String topic = (String) last.getOrDefault("title", "");
             String date = (String) last.getOrDefault("publishDate", "");
             paragraphs.add(List.of(Map.of("tag", "text", "text",
                     "· " + entry.getKey() + " 最新: " + topic + " (" + date + ")")));

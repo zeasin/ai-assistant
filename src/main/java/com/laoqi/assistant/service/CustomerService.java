@@ -34,11 +34,7 @@ public class CustomerService {
     }
 
     private Path getBaseDir() {
-        String baseDir = configService.load().getBaseDir();
-        if (baseDir != null && !baseDir.isEmpty()) {
-            return Paths.get(baseDir);
-        }
-        return Paths.get("D:\\projects\\richie_learning_notes");
+        return Paths.get(configService.getBaseDir());
     }
 
     private Path customerFile() {
