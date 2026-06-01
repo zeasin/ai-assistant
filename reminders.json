@@ -4,7 +4,7 @@
     "name" : "下班提醒",
     "message" : "",
     "type" : "daily",
-    "time" : "19:30",
+    "time" : "19:45",
     "dayOfWeek" : "1",
     "dayOfMonth" : "",
     "monthDay" : "",

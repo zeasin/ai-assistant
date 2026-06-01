@@ -169,13 +169,20 @@ public class ReminderService {
         String currentMonth = String.valueOf(now.getMonthValue());
         String currentDayOfMonth = String.valueOf(now.getDayOfMonth());
 
+        log.info("[提醒] 检查提醒: 当前时间={}, 周几={}, 日期={}", now.toLocalTime(), currentWeekday, now.toLocalDate());
+
         for (Reminder r : getEnabledReminders()) {
+            log.info("[提醒] 检查提醒: {}, 时间={}, 类型={}, 启用={}", r.name, r.time, r.type, r.enabled);
+            
             if (!shouldTriggerNow(r, now, currentTime, currentWeekday, currentMonth, currentDayOfMonth)) {
+                log.info("[提醒] 时间不匹配，跳过: {}", r.name);
                 continue;
             }
             if (wasTriggeredToday(r, now)) {
+                log.info("[提醒] 今日已触发，跳过: {}", r.name);
                 continue;
             }
+            log.info("[提醒] 准备触发: {}", r.name);
             due.add(r);
         }
         return due;
@@ -186,12 +193,14 @@ public class ReminderService {
         String[] parts = r.time.split(":");
         if (parts.length != 2) return false;
 
-        LocalTime triggerTime = LocalTime.of(
-                Integer.parseInt(parts[0]),
-                Integer.parseInt(parts[1])
-        );
+        int triggerHour = Integer.parseInt(parts[0]);
+        int triggerMinute = Integer.parseInt(parts[1]);
+        int currentHour = currentTime.getHour();
+        int currentMinute = currentTime.getMinute();
 
-        if (!currentTime.equals(triggerTime)) {
+        // 只比较小时和分钟，忽略秒，确保整分钟内都能触发
+        if (triggerHour != currentHour || triggerMinute != currentMinute) {
+            log.info("[提醒] 时间不匹配: 期望{}:{} vs 当前{}:{}", triggerHour, triggerMinute, currentHour, currentMinute);
             return false;
         }
 
