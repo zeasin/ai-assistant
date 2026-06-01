@@ -44,13 +44,31 @@ public class SchedulerService {
 
     @Scheduled(cron = "0 * * * * ?", zone = "Asia/Shanghai")
     public void collectPlatformData() {
-        Config config = configService.load();
-        if (!config.isMediaCollectEnabled()) return;
-        String expected = config.getMediaCollectTime();
-        if (expected == null || expected.isBlank()) return;
         String now = LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"));
-        if (!expected.equals(now)) return;
-        log.info("[{}] ⏰ 定时任务：CSDN数据采集", TimeUtil.nowStr());
+        log.debug("[{}] ⏰ 每分钟检查：是否需要执行CSDN数据采集", TimeUtil.nowStr());
+        
+        Config config = configService.load();
+        Boolean enabled = config.isMediaCollectEnabled();
+        String expected = config.getMediaCollectTime();
+        
+        log.debug("[{}]  配置检查：enabled={}, 期望时间={}, 当前时间={}", 
+                TimeUtil.nowStr(), enabled, expected, now);
+        
+        if (!Boolean.TRUE.equals(enabled)) {
+            log.debug("[{}]  跳过：采集开关未开启", TimeUtil.nowStr());
+            return;
+        }
+        if (expected == null || expected.isBlank()) {
+            log.debug("[{}]  跳过：采集时间未配置", TimeUtil.nowStr());
+            return;
+        }
+        if (!expected.equals(now)) {
+            log.debug("[{}]  跳过：当前时间 {} != 配置时间 {}", TimeUtil.nowStr(), now, expected);
+            return;
+        }
+        
+        log.info("[{}] ⏰ 定时任务：CSDN数据采集 开始执行！", TimeUtil.nowStr());
+        logService.add("定时任务", "开始", "CSDN数据采集（定时触发）");
         mediaDataCollectorService.collect();
     }
 

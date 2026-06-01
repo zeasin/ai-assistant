@@ -1,6 +1,8 @@
 package com.laoqi.assistant.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.laoqi.assistant.model.Config;
+import com.laoqi.assistant.service.ConfigService;
 import com.laoqi.assistant.service.LogService;
 import com.laoqi.assistant.service.MediaDataCollectorService;
 import com.laoqi.assistant.service.OperationsService;
@@ -20,13 +22,16 @@ public class OperationsController {
     private final OperationsService operationsService;
     private final LogService logService;
     private final MediaDataCollectorService mediaDataCollectorService;
+    private final ConfigService configService;
     private static final ObjectMapper mapper = new ObjectMapper();
 
     public OperationsController(OperationsService operationsService, LogService logService,
-                                MediaDataCollectorService mediaDataCollectorService) {
+                                MediaDataCollectorService mediaDataCollectorService,
+                                ConfigService configService) {
         this.operationsService = operationsService;
         this.logService = logService;
         this.mediaDataCollectorService = mediaDataCollectorService;
+        this.configService = configService;
     }
 
     @GetMapping("/operations")
@@ -83,6 +88,14 @@ public class OperationsController {
         logService.add("运营数据", "手动触发采集", "");
         return mediaDataCollectorService.collectSync();
     }
+    
+    @PostMapping("/api/operations/test-scheduled-collect")
+    @ResponseBody
+    public Map<String, Object> testScheduledCollect() {
+        logService.add("运营数据", "测试定时采集", "");
+        Config config = configService.load();
+        return mediaDataCollectorService.collectSync();
+    }
 
     @GetMapping("/api/operations/collect/preview")
     @ResponseBody
@@ -95,6 +108,13 @@ public class OperationsController {
     public Map<String, Object> requestData() {
         logService.add("运营数据", "手动请求数据", "");
         return mediaDataCollectorService.requestSync();
+    }
+
+    @GetMapping("/api/operations/last-collect")
+    @ResponseBody
+    public Map<String, Object> getLastCollectTime() {
+        String time = mediaDataCollectorService.getLastCollectTime();
+        return Map.of("ok", true, "lastCollectTime", time != null ? time : "从未采集");
     }
 
 }

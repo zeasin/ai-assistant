@@ -79,6 +79,11 @@ public class MediaDataCollectorService {
             int articleUpdates = mergeArticleData(articles, parsed);
             int accountUpdates = mergeAccountsDirect(accounts, parsed);
 
+            Map<String, Object> meta = new LinkedHashMap<>();
+            meta.put("_lastCollectTime", TimeUtil.nowStr());
+            meta.put("_lastCollectResult", String.format("文章更新%d条, 账号更新%d条", articleUpdates, accountUpdates));
+            accounts.put("_meta", List.of(meta));
+
             writeJsonFile("自媒体文章.json", articles);
             writeJsonFile("自媒体账号.json", accounts);
 
@@ -318,5 +323,20 @@ public class MediaDataCollectorService {
         result.put("ok", true);
         result.put("time", TimeUtil.nowStr());
         return result;
+    }
+
+    public String getLastCollectTime() {
+        try {
+            var accounts = readJsonFile("自媒体账号.json");
+            var meta = accounts.get("_meta");
+            if (meta != null && !meta.isEmpty()) {
+                var m = meta.get(0);
+                if (m instanceof Map) {
+                    Object time = ((Map<?, ?>) m).get("_lastCollectTime");
+                    if (time != null) return time.toString();
+                }
+            }
+        } catch (Exception ignored) {}
+        return null;
     }
 }

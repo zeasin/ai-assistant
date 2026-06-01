@@ -300,7 +300,15 @@ function renderData() {
                 html += '<tr class="' + rowClass + '">';
                 for (let col of columns) {
                     let val = row[col] != null ? row[col] : '—';
-                    html += '<td>' + val + '</td>';
+                    if (col === '状态') {
+                        let badgeClass = 'badge-info';
+                        if (val === '成功' || val === '✓ 成功') badgeClass = 'badge-ok';
+                        else if (val === '失败' || val === '✗ 失败') badgeClass = 'badge-fail';
+                        else if (val === '开始' || val === 'ℹ 开始') badgeClass = 'badge-info';
+                        html += '<td><span class="badge ' + badgeClass + '">' + val + '</span></td>';
+                    } else {
+                        html += '<td>' + val + '</td>';
+                    }
                 }
                 html += '</tr>';
             }

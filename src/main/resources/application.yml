@@ -24,6 +24,8 @@ logging:
   level:
     root: INFO
     com.laoqi.assistant.service.SchedulerService: DEBUG
+    com.laoqi.assistant.service.MediaDataCollectorService: DEBUG
+    com.laoqi.assistant.service.ConfigService: DEBUG
     com.laoqi.assistant.service.FeishuService: DEBUG
     com.laoqi.assistant.service.OpenCodeService: DEBUG
   pattern:

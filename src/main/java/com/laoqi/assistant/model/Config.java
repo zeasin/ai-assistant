@@ -1,11 +1,13 @@
 package com.laoqi.assistant.model;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
+@JsonInclude(JsonInclude.Include.ALWAYS)
 public class Config {
     private Map<String, String> keyLabels = new HashMap<>();
     private String baseDir;
@@ -13,7 +15,7 @@ public class Config {
     private String feishuAppId;
     private String feishuAppSecret;
     private String feishuChatId;
-    private boolean feishuPollingEnabled;
+    private Boolean feishuPollingEnabled;
     
     private String customerDataPath;
     private String leadDataPath;
@@ -29,7 +31,7 @@ public class Config {
     private String dailyDir;
     private String weeklyDir;
     private String remindFile;
-    private boolean mediaCollectEnabled;
+    private Boolean mediaCollectEnabled;
     private String mediaCollectTime;
     private Map<String, Map<String, List<String>>> columnSettings = new HashMap<>();
 
@@ -65,8 +67,8 @@ public class Config {
     public void setFeishuAppSecret(String feishuAppSecret) { this.feishuAppSecret = feishuAppSecret; }
     public String getFeishuChatId() { return feishuChatId; }
     public void setFeishuChatId(String feishuChatId) { this.feishuChatId = feishuChatId; }
-    public boolean isFeishuPollingEnabled() { return feishuPollingEnabled; }
-    public void setFeishuPollingEnabled(boolean feishuPollingEnabled) { this.feishuPollingEnabled = feishuPollingEnabled; }
+    public Boolean isFeishuPollingEnabled() { return feishuPollingEnabled; }
+    public void setFeishuPollingEnabled(Boolean feishuPollingEnabled) { this.feishuPollingEnabled = feishuPollingEnabled; }
     public String getCustomerDataPath() { return customerDataPath; }
     public void setCustomerDataPath(String customerDataPath) { this.customerDataPath = customerDataPath; }
     public String getLeadDataPath() { return leadDataPath; }
@@ -93,8 +95,8 @@ public class Config {
     public void setWeeklyDir(String weeklyDir) { this.weeklyDir = weeklyDir; }
     public String getRemindFile() { return remindFile; }
     public void setRemindFile(String remindFile) { this.remindFile = remindFile; }
-    public boolean isMediaCollectEnabled() { return mediaCollectEnabled; }
-    public void setMediaCollectEnabled(boolean mediaCollectEnabled) { this.mediaCollectEnabled = mediaCollectEnabled; }
+    public Boolean isMediaCollectEnabled() { return mediaCollectEnabled; }
+    public void setMediaCollectEnabled(Boolean mediaCollectEnabled) { this.mediaCollectEnabled = mediaCollectEnabled; }
     public String getMediaCollectTime() { return mediaCollectTime; }
     public void setMediaCollectTime(String mediaCollectTime) { this.mediaCollectTime = mediaCollectTime; }
     public Map<String, Map<String, List<String>>> getColumnSettings() { return columnSettings; }

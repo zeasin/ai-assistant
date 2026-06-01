@@ -41,9 +41,20 @@ public class FileUtil {
     public static void writeJson(Path path, Object obj) {
         try {
             Files.createDirectories(path.getParent());
+            log.info("Writing JSON to {}, class={}", path, obj.getClass().getSimpleName());
+            
+            // 先序列化到字符串查看
+            String json = mapper.writeValueAsString(obj);
+            log.info("Serialized JSON length={}, contains mediaCollectEnabled={}", 
+                    json.length(), json.contains("mediaCollectEnabled"));
+            if (json.length() < 2000) {
+                log.info("JSON content: {}", json);
+            }
+            
             mapper.writeValue(path.toFile(), obj);
+            log.info("Successfully wrote JSON to {}", path);
         } catch (IOException e) {
-            log.error("Failed to write JSON {}: {}", path, e.getMessage());
+            log.error("Failed to write JSON {}: {}", path, e.getMessage(), e);
         }
     }
 
