@@ -8,6 +8,7 @@
 <th:block layout:fragment="content">
 
 <div class="card">
+    <div th:if="${error != null and !error.isEmpty()}" class="alert alert-error" style="background:#fff0f0;color:#c92a2a;padding:10px 16px;border-radius:8px;margin-bottom:12px;font-size:14px;border:1px solid #ffc9c9;" th:text="${error}">错误</div>
     <div class="flex" style="justify-content:space-between;margin-bottom:16px;">
         <h2>📂 笔记文件浏览</h2>
         <div class="flex">
@@ -18,11 +19,11 @@
         </div>
     </div>
 
-    <th:block th:if="${breadcrumbs != null && #lists.size(breadcrumbs) > 0}">
+    <th:block th:if="${#lists.size(breadcrumbs) > 0}">
     <div class="text-muted mb-2" style="font-size:13px;">
-        / <a th:href="'/browse'">root</a>
+        / <a th:href="@{/browse}">root</a>
         <th:block th:each="crumb, iterStat : ${breadcrumbs}">
-            / <a th:href="|/browse?dir=${#strings.arrayJoin(#arrays.copyOfRange(#arrays.toArray(breadcrumbs), 0, iterStat.index + 1), '/')}|" th:text="${crumb}">folder</a>
+            / <a th:href="|/browse?dir=${breadcrumbPaths[iterStat.index]}|" th:text="${crumb}">folder</a>
         </th:block>
     </div>
     </th:block>
@@ -136,7 +137,7 @@ async function submitNew(e) {
     if (!filename) { toast('请输入文件名', 'error'); return; }
 
     const form = new FormData();
-    form.set('dir', '[[${rel}]]');
+    form.set('dir', [[${rel}]]);
     form.set('filename', filename);
     form.set('content', content);
 

@@ -7,6 +7,8 @@ import com.laoqi.assistant.service.LogService;
 import com.laoqi.assistant.util.FileUtil;
 import com.laoqi.assistant.util.MarkdownUtil;
 import com.laoqi.assistant.util.TimeUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -19,6 +21,8 @@ import java.util.stream.Collectors;
 
 @Controller
 public class BrowseController {
+
+    private static final Logger log = LoggerFactory.getLogger(BrowseController.class);
 
     private static final Set<String> IGNORED = Set.of(
             ".git", ".obsidian", "__pycache__", ".DS_Store",
@@ -76,19 +80,29 @@ public class BrowseController {
                         if (Files.isDirectory(p)) dirs.add(entry);
                         else files.add(entry);
                     });
+        } catch (DirectoryIteratorException e) {
+            log.error("遍历目录失败: target={}", target, e);
+            model.addAttribute("error", "读取目录失败: " + e.getCause().getMessage());
         } catch (IOException e) {
-            model.addAttribute("error", "读取目录失败");
+            log.error("读取目录失败: target={}", target, e);
+            model.addAttribute("error", "读取目录失败: " + e.getMessage());
         }
 
         String rel = dir != null && !dir.isEmpty() ? dir : "";
         String parent = rel.contains("/") ? rel.substring(0, rel.lastIndexOf('/')) : "";
-        List<String> breadcrumbs = rel.isEmpty() ? List.of() : Arrays.asList(rel.split("/"));
+        String[] parts = rel.isEmpty() ? new String[0] : rel.split("/");
+        List<String> breadcrumbs = Arrays.asList(parts);
+        List<String> breadcrumbPaths = new ArrayList<>();
+        for (int i = 0; i < parts.length; i++) {
+            breadcrumbPaths.add(String.join("/", Arrays.copyOf(parts, i + 1)));
+        }
 
         model.addAttribute("dirs", dirs);
         model.addAttribute("files", files);
         model.addAttribute("rel", rel);
         model.addAttribute("parent", parent);
         model.addAttribute("breadcrumbs", breadcrumbs);
+        model.addAttribute("breadcrumbPaths", breadcrumbPaths);
         return "browse";
     }
 
