@@ -169,6 +169,13 @@ public class WorkReportController {
         }
     }
 
+    @GetMapping("/work-reports")
+    public String workReportsPage(Model model) {
+        model.addAttribute("daily_reports", loadReports(getDailyDir()));
+        model.addAttribute("weekly_reports", loadReports(getWeeklyDir()));
+        return "work_reports";
+    }
+
     @GetMapping("/daily-reports")
     public String dailyReportsPage(Model model) {
         model.addAttribute("reports", loadReports(getDailyDir()));

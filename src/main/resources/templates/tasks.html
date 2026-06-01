@@ -303,9 +303,7 @@ function showAddModal() {
     document.getElementById('task-dueDate').value = '';
     document.getElementById('edit-status-group').style.display = 'none';
     document.getElementById('task-modal').classList.add('active');
-    setTimeout(function() {
-        document.getElementById('task-title').focus();
-    }, 100);
+    setTimeout(function() { document.getElementById('task-title').focus(); }, 100);
 }
 
 function editTask(id) {

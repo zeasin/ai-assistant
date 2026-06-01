@@ -275,16 +275,8 @@ async function submitDailyReport() {
     if (!date) { toast('请选择日期', 'error'); return; }
     if (!content.trim()) { toast('请输入日报内容', 'error'); return; }
     try {
-        const formData = new URLSearchParams();
-        formData.append('content', content);
-        formData.append('date', date);
-        const resp = await fetch('/api/daily-reports/add', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: formData
-        });
-        const res = await resp.json();
-        if (res.ok) { toast('✅ 日报已保存'); closeModal('add-daily-modal'); setTimeout(() => { window.location.href = '/work-reports?tab=daily'; }, 500); }
+        const res = await aiSend('记录日报：日期=' + date + '，内容=' + content);
+        if (res.ok) { toast('✅ ' + res.reply); closeModal('add-daily-modal'); setTimeout(() => { window.location.href = '/work-reports?tab=daily'; }, 500); }
         else { toast(res.error || '添加失败', 'error'); }
     } catch (e) { toast('请求失败: ' + e.message, 'error'); }
 }
