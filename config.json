@@ -26,7 +26,8 @@
       "线索数据_leads" : [ "id", "name", "status", "source", "contacts", "createdAt", "lastContactedAt", "notes" ]
     },
     "operations" : {
-      "自媒体文章_码农老齐" : [ "id", "topic", "series", "publishDate", "fansAtPublish", "fansGained" ]
+      "自媒体文章_码农老齐" : [ "id", "topic", "series", "publishDate", "fansAtPublish", "fansGained" ],
+      "自媒体数据_启航电商ERP" : [ "date", "fans", "reads", "shares", "sourceMessage", "sourceAccount", "sourceSearch", "sourceChat" ]
     }
   }
 }

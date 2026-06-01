@@ -3,6 +3,7 @@ package com.laoqi.assistant.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.laoqi.assistant.model.OperationsData;
 import com.laoqi.assistant.service.LogService;
+import com.laoqi.assistant.service.MediaDataCollectorService;
 import com.laoqi.assistant.service.OperationsService;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -20,11 +21,14 @@ public class OperationsController {
 
     private final OperationsService operationsService;
     private final LogService logService;
+    private final MediaDataCollectorService mediaDataCollectorService;
     private static final ObjectMapper mapper = new ObjectMapper();
 
-    public OperationsController(OperationsService operationsService, LogService logService) {
+    public OperationsController(OperationsService operationsService, LogService logService,
+                                MediaDataCollectorService mediaDataCollectorService) {
         this.operationsService = operationsService;
         this.logService = logService;
+        this.mediaDataCollectorService = mediaDataCollectorService;
     }
 
     @GetMapping("/operations")
@@ -132,6 +136,26 @@ public class OperationsController {
         });
 
         return emitter;
+    }
+
+    @PostMapping("/api/operations/collect")
+    @ResponseBody
+    public Map<String, Object> triggerCollect() {
+        logService.add("运营数据", "手动触发采集", "");
+        return mediaDataCollectorService.collectSync();
+    }
+
+    @GetMapping("/api/operations/collect/preview")
+    @ResponseBody
+    public Map<String, Object> previewCollect() {
+        return mediaDataCollectorService.dryRun();
+    }
+
+    @PostMapping("/api/operations/request-data")
+    @ResponseBody
+    public Map<String, Object> requestData() {
+        logService.add("运营数据", "手动请求数据", "");
+        return mediaDataCollectorService.requestSync();
     }
 
     @PostMapping("/api/operations/article/add")

@@ -19,6 +19,29 @@
 </div>
 
 <div class="card">
+    <h2>📡 CSDN 数据采集</h2>
+    <div class="text-muted mb-2">定时抓取 CSDN 主页文章数据（阅读、点赞、收藏等），数据写入自媒体运营文件。</div>
+    <form id="mediaCollectForm" onsubmit="return saveMediaCollect(event)">
+        <div class="form-group">
+            <label class="toggle-label">
+                <input type="checkbox" id="mediaCollectEnabled">
+                <span class="toggle-slider"></span>
+                <span id="mediaCollectToggleText" style="font-weight:500;font-size:14px;">已关闭</span>
+            </label>
+        </div>
+        <div class="form-group">
+            <label>采集时间</label>
+            <input type="time" id="mediaCollectTime" value="08:00" style="padding:10px 12px;border:1px solid #e1e3e6;border-radius:8px;font-size:14px;outline:none;">
+            <div class="text-muted" style="font-size:12px;margin-top:4px;">每天这个时间自动抓取 CSDN 数据</div>
+        </div>
+        <div class="flex" style="gap:8px;">
+            <button type="submit" class="btn btn-primary">保存配置</button>
+            <span id="mediaCollectStatus" class="text-muted" style="margin-left:4px;"></span>
+        </div>
+    </form>
+</div>
+
+<div class="card">
     <h2>📁 笔记库根目录配置</h2>
     <div class="text-muted mb-2">配置笔记库的根目录路径，修改后所有数据文件的相对路径都将基于此目录。</div>
     <form id="baseDirForm" onsubmit="return saveBaseDir(event)">
@@ -190,6 +213,22 @@
 }
 .form-group input[type="checkbox"] { margin-right: 6px; }
 .form-group input:focus { border-color: #7c5cfc; }
+.form-group .toggle-label {
+    display: inline-flex; align-items: center; gap: 12px; cursor: pointer;
+    font-size: inherit; font-weight: inherit; color: inherit; margin-bottom: 0;
+}
+.toggle-label input[type="checkbox"] { display:none; }
+.toggle-slider {
+    width:44px; height:24px; background:#ccc; border-radius:12px;
+    position:relative; transition:background .2s;
+}
+.toggle-slider::after {
+    content:''; position:absolute; top:2px; left:2px;
+    width:20px; height:20px; background:#fff; border-radius:50%;
+    transition:transform .2s;
+}
+.toggle-label input:checked + .toggle-slider { background:#7c5cfc; }
+.toggle-label input:checked + .toggle-slider::after { transform:translateX(20px); }
 </style>
 
 <script>
@@ -221,8 +260,36 @@ fetch('/api/config')
         if (cfg.todoDataDir) document.getElementById('todoDataDir').value = cfg.todoDataDir;
         if (cfg.chatSessionsDir) document.getElementById('chatSessionsDir').value = cfg.chatSessionsDir;
         if (cfg.comprehensiveReportDir) document.getElementById('comprehensiveReportDir').value = cfg.comprehensiveReportDir;
+        const enabledCheckbox = document.getElementById('mediaCollectEnabled');
+        const toggleText = document.getElementById('mediaCollectToggleText');
+        if (cfg.mediaCollectEnabled) {
+            enabledCheckbox.checked = true;
+            toggleText.textContent = '已开启';
+        }
+        if (cfg.mediaCollectTime) {
+            document.getElementById('mediaCollectTime').value = cfg.mediaCollectTime;
+        }
+        enabledCheckbox.addEventListener('change', function() {
+            toggleText.textContent = this.checked ? '已开启' : '已关闭';
+        });
     })
     .catch(() => {});
+
+async function saveMediaCollect(e) {
+    e.preventDefault();
+    const enabled = document.getElementById('mediaCollectEnabled').checked ? 'on' : 'off';
+    const time = document.getElementById('mediaCollectTime').value;
+    const res = await fetch('/api/config/media-collect?enabled=' + enabled + '&time=' + encodeURIComponent(time), { method: 'POST' });
+    const data = await res.json();
+    const status = document.getElementById('mediaCollectStatus');
+    if (data.ok) {
+        status.textContent = '✅ 已保存';
+        setTimeout(() => status.textContent = '', 3000);
+    } else {
+        status.textContent = '❌ ' + (data.error || '保存失败');
+    }
+    return false;
+}
 
 async function saveBaseDir(e) {
     e.preventDefault();

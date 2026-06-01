@@ -1,10 +1,13 @@
 package com.laoqi.assistant.service;
 
+import com.laoqi.assistant.model.Config;
 import com.laoqi.assistant.util.TimeUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+
+import java.time.LocalTime;
 
 @Service
 public class SchedulerService {
@@ -14,18 +17,42 @@ public class SchedulerService {
     private final ReportService reportService;
     private final FeishuService feishuService;
     private final LogService logService;
+    private final MediaDataCollectorService mediaDataCollectorService;
+    private final ConfigService configService;
 
     public SchedulerService(ReportService reportService, FeishuService feishuService,
-                            LogService logService) {
+                            LogService logService,
+                            MediaDataCollectorService mediaDataCollectorService,
+                            ConfigService configService) {
         this.reportService = reportService;
         this.feishuService = feishuService;
         this.logService = logService;
+        this.mediaDataCollectorService = mediaDataCollectorService;
+        this.configService = configService;
     }
 
     @Scheduled(cron = "0 30 9 * * ?", zone = "Asia/Shanghai")
     public void morningReport() {
         log.info("[{}] ⏰ 定时任务：生成综合日报", TimeUtil.nowStr());
         reportService.generateAndPush();
+    }
+
+    @Scheduled(cron = "0 * * * * ?", zone = "Asia/Shanghai")
+    public void collectPlatformData() {
+        Config config = configService.load();
+        if (!config.isMediaCollectEnabled()) return;
+        String expected = config.getMediaCollectTime();
+        if (expected == null || expected.isBlank()) return;
+        String now = LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"));
+        if (!expected.equals(now)) return;
+        log.info("[{}] ⏰ 定时任务：CSDN数据采集", TimeUtil.nowStr());
+        mediaDataCollectorService.collect();
+    }
+
+    @Scheduled(cron = "0 0 9 * * ?", zone = "Asia/Shanghai")
+    public void wechatDataRequest() {
+        log.info("[{}] ⏰ 定时任务：公众号数据采集请求", TimeUtil.nowStr());
+        mediaDataCollectorService.sendWechatDataRequest();
     }
 
     @Scheduled(cron = "0 0 18 * * ?", zone = "Asia/Shanghai")

@@ -30,6 +30,8 @@ public class Config {
     private String weeklyDir;
     private String comprehensiveReportDir;
     private String remindFile;
+    private boolean mediaCollectEnabled;
+    private String mediaCollectTime;
     private Map<String, Map<String, List<String>>> columnSettings = new HashMap<>();
 
     public Config() {}
@@ -47,6 +49,8 @@ public class Config {
         c.weeklyDir = "工作/周报";
         c.comprehensiveReportDir = "工作/综合日报";
         c.remindFile = "提醒.md";
+        c.mediaCollectEnabled = false;
+        c.mediaCollectTime = "08:00";
         return c;
     }
 
@@ -92,6 +96,10 @@ public class Config {
     public void setComprehensiveReportDir(String comprehensiveReportDir) { this.comprehensiveReportDir = comprehensiveReportDir; }
     public String getRemindFile() { return remindFile; }
     public void setRemindFile(String remindFile) { this.remindFile = remindFile; }
+    public boolean isMediaCollectEnabled() { return mediaCollectEnabled; }
+    public void setMediaCollectEnabled(boolean mediaCollectEnabled) { this.mediaCollectEnabled = mediaCollectEnabled; }
+    public String getMediaCollectTime() { return mediaCollectTime; }
+    public void setMediaCollectTime(String mediaCollectTime) { this.mediaCollectTime = mediaCollectTime; }
     public Map<String, Map<String, List<String>>> getColumnSettings() { return columnSettings; }
     public void setColumnSettings(Map<String, Map<String, List<String>>> columnSettings) { this.columnSettings = columnSettings; }
 }
