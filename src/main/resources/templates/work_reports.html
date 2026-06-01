@@ -11,6 +11,13 @@
     <h2>📋 工作看板</h2>
 </div>
 
+<div class="card" style="background:#f8f9fa;border:1px solid #e1e3e6;">
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+        <button class="btn btn-primary" onclick="showAddDailyModal()" style="font-size:14px;">📝 添加日报</button>
+        <button class="btn btn-primary" onclick="showAddWeeklyModal()" style="font-size:14px;">📊 添加周报</button>
+    </div>
+</div>
+
 <div class="card" style="background:linear-gradient(135deg,#f0edff,#fafafe);border:1px solid #d9d0ff;">
     <h2 style="margin-bottom:4px;">🤖 AI 工作分析报告</h2>
     <div class="text-muted mb-2" style="font-size:12px;">
@@ -31,11 +38,6 @@
         📁 原始工作记录详情
     </summary>
     <div style="margin-top:12px;">
-
-<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
-    <button class="btn btn-primary" onclick="showAddDailyModal()" style="font-size:12px;">+ 添加日报</button>
-    <button class="btn btn-primary" onclick="showAddWeeklyModal()" style="font-size:12px;">+ 添加周报</button>
-</div>
 
 <div class="work-reminders">
     <div class="reminder-item" style="border-left: 4px solid #e03131;">
@@ -70,15 +72,15 @@
 </div>
 
 <div id="daily-tab" class="tab-content active">
-    <div style="margin-bottom:16px;">
-        <button class="btn btn-primary" onclick="showAddDailyModal()">+ 添加日报</button>
-    </div>
     <th:block th:if="${daily_reports != null and #lists.size(daily_reports) > 0}">
         <div class="card" style="padding:0;overflow:hidden;" th:each="report : ${daily_reports}">
             <details>
                 <summary class="report-summary" style="cursor:pointer;font-size:14px;font-weight:600;list-style:none;display:flex;align-items:center;padding:14px 20px;background:#fafafe;border-bottom:1px solid #e1e3e6;">
                     <span style="color:#5c3dcf;" th:text="'📄 ' + ${report.name}">日报名</span>
                     <span class="text-muted" style="font-size:12px;margin-left:auto;" th:text="${report.modified}">时间</span>
+                    <button class="btn btn-secondary" style="margin-left:12px;padding:4px 12px;font-size:12px;" 
+                            th:attr="onclick='showEditDailyModal(\'' + ${report.name} + '\')'" 
+                            onclick="event.stopPropagation();">✏️ 编辑</button>
                 </summary>
                 <div class="report" style="padding:16px 20px;" th:utext="${report.content}">内容</div>
             </details>
@@ -92,9 +94,6 @@
 </div>
 
 <div id="weekly-tab" class="tab-content">
-    <div style="margin-bottom:16px;">
-        <button class="btn btn-primary" onclick="showAddWeeklyModal()">+ 添加周报</button>
-    </div>
     <th:block th:if="${weekly_reports != null and #lists.size(weekly_reports) > 0}">
         <div class="card" th:each="report : ${weekly_reports}">
             <details>
@@ -116,19 +115,65 @@
 </details>
 
 <div class="modal-overlay" id="add-daily-modal">
-    <div class="modal">
+    <div class="modal" style="max-width:600px;">
         <h3>📝 添加日报</h3>
         <div class="form-group" style="margin-bottom:12px;">
             <label>日期</label>
             <input type="date" id="daily-date" style="width:100%;">
         </div>
+        <div class="form-group" style="margin-bottom:12px;">
+            <label>工作任务</label>
+            <div id="task-list" style="margin-bottom:8px;"></div>
+            <div style="display:flex;gap:8px;">
+                <input type="text" id="new-task" placeholder="输入工作任务，按回车添加" style="flex:1;" onkeypress="if(event.key==='Enter'){event.preventDefault();addTask();}">
+                <button class="btn btn-secondary" onclick="addTask()" style="white-space:nowrap;">+ 添加</button>
+            </div>
+        </div>
+        <div class="form-group" style="margin-bottom:12px;">
+            <label>明日计划</label>
+            <div id="plan-list" style="margin-bottom:8px;"></div>
+            <div style="display:flex;gap:8px;">
+                <input type="text" id="new-plan" placeholder="输入计划事项，按回车添加" style="flex:1;" onkeypress="if(event.key==='Enter'){event.preventDefault();addPlan();}">
+                <button class="btn btn-secondary" onclick="addPlan()" style="white-space:nowrap;">+ 添加</button>
+            </div>
+        </div>
         <div class="form-group" style="margin-bottom:16px;">
-            <label>内容（Markdown 格式）</label>
-            <textarea id="daily-content" rows="12" placeholder="## 工作&#10;1. **任务名称** — 任务描述&#10;&#10;## 明日计划&#10;- [ ] 待办事项"></textarea>
+            <label>备注</label>
+            <textarea id="daily-note" rows="3" placeholder="其他备注（可选）"></textarea>
         </div>
         <div class="modal-actions">
             <button class="btn btn-secondary" onclick="closeModal('add-daily-modal')">取消</button>
             <button class="btn btn-primary" onclick="submitDailyReport()">保存</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="edit-daily-modal">
+    <div class="modal" style="max-width:600px;">
+        <h3>✏️ 编辑日报 <span id="edit-daily-date" style="font-weight:normal;font-size:14px;color:#666;"></span></h3>
+        <div class="form-group" style="margin-bottom:12px;">
+            <label>工作任务</label>
+            <div id="edit-task-list" style="margin-bottom:8px;"></div>
+            <div style="display:flex;gap:8px;">
+                <input type="text" id="edit-new-task" placeholder="输入工作任务，按回车添加" style="flex:1;" onkeypress="if(event.key==='Enter'){event.preventDefault();editAddTask();}">
+                <button class="btn btn-secondary" onclick="editAddTask()" style="white-space:nowrap;">+ 添加</button>
+            </div>
+        </div>
+        <div class="form-group" style="margin-bottom:12px;">
+            <label>明日计划</label>
+            <div id="edit-plan-list" style="margin-bottom:8px;"></div>
+            <div style="display:flex;gap:8px;">
+                <input type="text" id="edit-new-plan" placeholder="输入计划事项，按回车添加" style="flex:1;" onkeypress="if(event.key==='Enter'){event.preventDefault();editAddPlan();}">
+                <button class="btn btn-secondary" onclick="editAddPlan()" style="white-space:nowrap;">+ 添加</button>
+            </div>
+        </div>
+        <div class="form-group" style="margin-bottom:16px;">
+            <label>备注</label>
+            <textarea id="edit-daily-note" rows="3" placeholder="其他备注（可选）"></textarea>
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-secondary" onclick="closeModal('edit-daily-modal')">取消</button>
+            <button class="btn btn-primary" onclick="submitEditDailyReport()">保存</button>
         </div>
     </div>
 </div>
@@ -245,7 +290,213 @@ function setDefaultDate() {
 
 function showAddDailyModal() {
     setDefaultDate();
+    document.getElementById('task-list').innerHTML = '';
+    document.getElementById('plan-list').innerHTML = '';
+    document.getElementById('new-task').value = '';
+    document.getElementById('new-plan').value = '';
+    document.getElementById('daily-note').value = '';
     document.getElementById('add-daily-modal').classList.add('active');
+}
+
+var editTaskCount = 0;
+var editPlanCount = 0;
+var editCurrentDate = '';
+
+async function showEditDailyModal(date) {
+    editCurrentDate = date;
+    document.getElementById('edit-daily-date').textContent = date;
+    document.getElementById('edit-task-list').innerHTML = '';
+    document.getElementById('edit-plan-list').innerHTML = '';
+    document.getElementById('edit-new-task').value = '';
+    document.getElementById('edit-new-plan').value = '';
+    document.getElementById('edit-daily-note').value = '';
+    editTaskCount = 0;
+    editPlanCount = 0;
+
+    try {
+        const res = await fetch('/api/daily-reports/content?date=' + encodeURIComponent(date));
+        const result = await res.json();
+        if (result.ok && result.content) {
+            parseContentToForm(result.content);
+        }
+    } catch (e) {
+        toast('加载内容失败', 'error');
+    }
+
+    document.getElementById('edit-daily-modal').classList.add('active');
+}
+
+function parseContentToForm(content) {
+    var lines = content.split('\n');
+    var currentSection = '';
+    var inWork = false;
+    var inPlan = false;
+    var noteLines = [];
+
+    for (var i = 0; i < lines.length; i++) {
+        var line = lines[i].trim();
+        if (line === '## 工作' || line === '## 工作内容' || line === '## 今日工作') {
+            currentSection = 'work';
+            inWork = true;
+            inPlan = false;
+        } else if (line === '## 明日计划' || line === '## 明日工作计划' || line === '## 计划') {
+            currentSection = 'plan';
+            inWork = false;
+            inPlan = true;
+        } else if (line === '## 备注' || line === '## 备注说明') {
+            currentSection = 'note';
+            inWork = false;
+            inPlan = false;
+        } else if (line === '##' || line === '') {
+            currentSection = '';
+            inWork = false;
+            inPlan = false;
+        } else if (inWork && line) {
+            var task = line.replace(/^\d+[\.\)]\s*/, '').replace(/\*\*/g, '').trim();
+            if (task && task !== '暂无' && task !== '无') {
+                addEditTaskDirect(task);
+            }
+        } else if (inPlan && line) {
+            var plan = line.replace(/^-\s*\[\s*[xX]?\s*\]\s*/, '').replace(/\*\*/g, '').trim();
+            if (plan && plan !== '暂无' && plan !== '无') {
+                addEditPlanDirect(plan);
+            }
+        } else if (currentSection === 'note' && line) {
+            noteLines.push(line);
+        }
+    }
+
+    if (noteLines.length > 0) {
+        document.getElementById('edit-daily-note').value = noteLines.join('\n');
+    }
+}
+
+function addEditTaskDirect(text) {
+    var id = 'edit-task-' + (++editTaskCount);
+    var div = document.createElement('div');
+    div.id = id;
+    div.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 12px;background:#fff;border:1px solid #e1e3e6;border-radius:8px;margin-bottom:6px;';
+    div.innerHTML = '<span style="flex:1;font-size:13px;">' + text.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</span><button onclick="removeEditTask(\'' + id + '\')" style="background:none;border:none;cursor:pointer;color:#e03131;font-size:16px;">×</button>';
+    document.getElementById('edit-task-list').appendChild(div);
+}
+
+function addEditPlanDirect(text) {
+    var id = 'edit-plan-' + (++editPlanCount);
+    var div = document.createElement('div');
+    div.id = id;
+    div.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 12px;background:#fff;border:1px solid #e1e3e6;border-radius:8px;margin-bottom:6px;';
+    div.innerHTML = '<span style="flex:1;font-size:13px;">' + text.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</span><button onclick="removeEditPlan(\'' + id + '\')" style="background:none;border:none;cursor:pointer;color:#e03131;font-size:16px;">×</button>';
+    document.getElementById('edit-plan-list').appendChild(div);
+}
+
+function editAddTask() {
+    var input = document.getElementById('edit-new-task');
+    var task = input.value.trim();
+    if (!task) return;
+    addEditTaskDirect(task);
+    input.value = '';
+}
+
+function removeEditTask(id) {
+    document.getElementById(id).remove();
+}
+
+function editAddPlan() {
+    var input = document.getElementById('edit-new-plan');
+    var plan = input.value.trim();
+    if (!plan) return;
+    addEditPlanDirect(plan);
+    input.value = '';
+}
+
+function removeEditPlan(id) {
+    document.getElementById(id).remove();
+}
+
+async function submitEditDailyReport() {
+    var tasks = [];
+    document.querySelectorAll('#edit-task-list > div').forEach(function(div) {
+        var text = div.querySelector('span').textContent;
+        if (text) tasks.push(text);
+    });
+
+    var plans = [];
+    document.querySelectorAll('#edit-plan-list > div').forEach(function(div) {
+        var text = div.querySelector('span').textContent;
+        if (text) plans.push(text);
+    });
+
+    var note = document.getElementById('edit-daily-note').value.trim();
+
+    var content = '## 工作\n';
+    if (tasks.length > 0) {
+        tasks.forEach(function(task, i) {
+            content += (i + 1) + '. ' + task + '\n';
+        });
+    } else {
+        content += '暂无\n';
+    }
+
+    content += '\n## 明日计划\n';
+    if (plans.length > 0) {
+        plans.forEach(function(plan) {
+            content += '- [ ] ' + plan + '\n';
+        });
+    } else {
+        content += '暂无\n';
+    }
+
+    if (note) {
+        content += '\n## 备注\n' + note + '\n';
+    }
+
+    try {
+        const res = await fetch('/api/daily-reports/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'date=' + encodeURIComponent(editCurrentDate) + '&content=' + encodeURIComponent(content)
+        });
+        const result = await res.json();
+        if (result.ok) { toast('✅ 日报已更新'); closeModal('edit-daily-modal'); setTimeout(() => { window.location.reload(); }, 300); }
+        else { toast(result.error || '更新失败', 'error'); }
+    } catch (e) { toast('请求失败: ' + e.message, 'error'); }
+}
+
+var taskCount = 0;
+var planCount = 0;
+
+function addTask() {
+    var input = document.getElementById('new-task');
+    var task = input.value.trim();
+    if (!task) return;
+    var id = 'task-' + (++taskCount);
+    var div = document.createElement('div');
+    div.id = id;
+    div.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 12px;background:#fff;border:1px solid #e1e3e6;border-radius:8px;margin-bottom:6px;';
+    div.innerHTML = '<span style="flex:1;font-size:13px;">' + task.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</span><button onclick="removeTask(\'' + id + '\')" style="background:none;border:none;cursor:pointer;color:#e03131;font-size:16px;">×</button>';
+    document.getElementById('task-list').appendChild(div);
+    input.value = '';
+}
+
+function removeTask(id) {
+    document.getElementById(id).remove();
+}
+
+function addPlan() {
+    var input = document.getElementById('new-plan');
+    var plan = input.value.trim();
+    if (!plan) return;
+    var id = 'plan-' + (++planCount);
+    var div = document.createElement('div');
+    div.id = id;
+    div.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 12px;background:#fff;border:1px solid #e1e3e6;border-radius:8px;margin-bottom:6px;';
+    div.innerHTML = '<span style="flex:1;font-size:13px;">' + plan.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</span><button onclick="removePlan(\'' + id + '\')" style="background:none;border:none;cursor:pointer;color:#e03131;font-size:16px;">×</button>';
+    document.getElementById('plan-list').appendChild(div);
+    input.value = '';
+}
+
+function removePlan(id) {
+    document.getElementById(id).remove();
 }
 
 function showAddWeeklyModal() {
@@ -271,13 +522,57 @@ async function aiSend(msg) {
 
 async function submitDailyReport() {
     const date = document.getElementById('daily-date').value;
-    const content = document.getElementById('daily-content').value;
     if (!date) { toast('请选择日期', 'error'); return; }
-    if (!content.trim()) { toast('请输入日报内容', 'error'); return; }
+    
+    var tasks = [];
+    document.querySelectorAll('#task-list > div').forEach(function(div) {
+        var text = div.querySelector('span').textContent;
+        if (text) tasks.push(text);
+    });
+    
+    var plans = [];
+    document.querySelectorAll('#plan-list > div').forEach(function(div) {
+        var text = div.querySelector('span').textContent;
+        if (text) plans.push(text);
+    });
+    
+    var note = document.getElementById('daily-note').value.trim();
+    
+    if (tasks.length === 0 && plans.length === 0 && !note) {
+        toast('请至少添加工作任务或明日计划', 'error'); return;
+    }
+    
+    var content = '## 工作\n';
+    if (tasks.length > 0) {
+        tasks.forEach(function(task, i) {
+            content += (i + 1) + '. ' + task + '\n';
+        });
+    } else {
+        content += '暂无\n';
+    }
+    
+    content += '\n## 明日计划\n';
+    if (plans.length > 0) {
+        plans.forEach(function(plan) {
+            content += '- [ ] ' + plan + '\n';
+        });
+    } else {
+        content += '暂无\n';
+    }
+    
+    if (note) {
+        content += '\n## 备注\n' + note + '\n';
+    }
+    
     try {
-        const res = await aiSend('记录日报：日期=' + date + '，内容=' + content);
-        if (res.ok) { toast('✅ ' + res.reply); closeModal('add-daily-modal'); setTimeout(() => { window.location.href = '/work-reports?tab=daily'; }, 500); }
-        else { toast(res.error || '添加失败', 'error'); }
+        const res = await fetch('/api/daily-reports/add', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'date=' + encodeURIComponent(date) + '&content=' + encodeURIComponent(content)
+        });
+        const result = await res.json();
+        if (result.ok) { toast('✅ 日报已保存'); closeModal('add-daily-modal'); setTimeout(() => { window.location.href = '/work-reports?tab=daily'; }, 300); }
+        else { toast(result.error || '添加失败', 'error'); }
     } catch (e) { toast('请求失败: ' + e.message, 'error'); }
 }
 
@@ -340,10 +635,14 @@ async function submitWeeklyReport() {
     if (!yearWeek) { toast('请输入年-周', 'error'); return; }
     if (!content.trim()) { toast('请输入周报内容', 'error'); return; }
     try {
-        const msg = '记录周报：年周=' + yearWeek + (dateRange ? '，日期范围=' + dateRange : '') + '，内容=' + content;
-        const res = await aiSend(msg);
-        if (res.ok) { toast('✅ ' + res.reply); closeModal('add-weekly-modal'); setTimeout(() => { window.location.href = '/work-reports?tab=weekly'; }, 500); }
-        else { toast(res.error || '添加失败', 'error'); }
+        const res = await fetch('/api/weekly-reports/add', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'yearWeek=' + encodeURIComponent(yearWeek) + '&dateRange=' + encodeURIComponent(dateRange) + '&content=' + encodeURIComponent(content)
+        });
+        const result = await res.json();
+        if (result.ok) { toast('✅ 周报已保存'); closeModal('add-weekly-modal'); setTimeout(() => { window.location.href = '/work-reports?tab=weekly'; }, 300); }
+        else { toast(result.error || '添加失败', 'error'); }
     } catch (e) { toast('请求失败: ' + e.message, 'error'); }
 }
 </script>

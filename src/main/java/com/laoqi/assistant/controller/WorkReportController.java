@@ -222,6 +222,62 @@ modified: %s
         return Map.of("ok", true, "date", dateStr);
     }
 
+    @PostMapping("/api/daily-reports/update")
+    @ResponseBody
+    public Map<String, Object> updateDailyReport(
+            @RequestParam String date,
+            @RequestParam String content) {
+        if (!date.matches("\\d{4}-\\d{2}-\\d{2}"))
+            return Map.of("ok", false, "error", "日期格式错误，应为 YYYY-MM-DD");
+
+        Path file = getDailyDir().resolve(date + ".md");
+        if (!Files.exists(file))
+            return Map.of("ok", false, "error", "日报文件不存在: " + date + ".md");
+
+        String raw = FileUtil.readText(file);
+        String created = com.laoqi.assistant.util.TimeUtil.todayStr();
+        if (raw.contains("created:")) {
+            int start = raw.indexOf("created:") + 9;
+            int end = raw.indexOf("\n", start);
+            if (end > start) {
+                String orig = raw.substring(start, end).trim();
+                if (orig.matches("\\d{4}-\\d{2}-\\d{2}")) created = orig;
+            }
+        }
+
+        String md = """
+---
+tags:
+  - 日报
+created: %s
+modified: %s
+---
+
+# %s 日报
+
+%s
+""".formatted(created, com.laoqi.assistant.util.TimeUtil.todayStr(), date, content);
+
+        FileUtil.writeText(file, md);
+        logService.add("编辑日报", "成功", date);
+        return Map.of("ok", true, "date", date);
+    }
+
+    @GetMapping("/api/daily-reports/content")
+    @ResponseBody
+    public Map<String, Object> getDailyReportContent(@RequestParam String date) {
+        if (!date.matches("\\d{4}-\\d{2}-\\d{2}"))
+            return Map.of("ok", false, "error", "日期格式错误");
+
+        Path file = getDailyDir().resolve(date + ".md");
+        if (!Files.exists(file))
+            return Map.of("ok", false, "error", "日报文件不存在");
+
+        String raw = FileUtil.readText(file);
+        String content = com.laoqi.assistant.util.MarkdownUtil.stripFrontmatter(raw);
+        return Map.of("ok", true, "content", content);
+    }
+
     @PostMapping("/api/weekly-reports/add")
     @ResponseBody
     public Map<String, Object> addWeeklyReport(
