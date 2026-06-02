@@ -271,9 +271,6 @@ public class MediaDataCollectorService {
         var existingArticles = readJsonFile("自媒体文章.json");
 
         List<List<Map<String, String>>> paragraphs = new ArrayList<>();
-        paragraphs.add(List.of(Map.of("tag", "text", "text", "老齐，最新的公众号数据来一下？")));
-        paragraphs.add(List.of(Map.of("tag", "text", "text", "━━━━━━━━━━━━━━━━━━")));
-        paragraphs.add(List.of(Map.of("tag", "text", "text", "回复格式：")));
         paragraphs.add(List.of(Map.of("tag", "text", "text", "码农老齐 粉丝- 阅读- 分享收藏- 主页- 消息- 搜一搜- 聊天会话- 其他- 朋友圈- 推荐-")));
         paragraphs.add(List.of(Map.of("tag", "text", "text", "启航电商ERP 粉丝- 阅读- 分享收藏- 主页- 消息- 搜一搜- 聊天会话- 其他- 朋友圈- 推荐-")));
         paragraphs.add(List.of(Map.of("tag", "text", "text", "老齐二三事 粉丝- 阅读- 分享收藏- 主页- 消息- 搜一搜- 聊天会话- 其他- 朋友圈- 推荐-")));
@@ -294,9 +291,6 @@ public class MediaDataCollectorService {
             }
         }
 
-        paragraphs.add(List.of(Map.of("tag", "text", "text", "━━━━━━━━━━━━━━━━━━")));
-        paragraphs.add(List.of(Map.of("tag", "text", "text", "直接回复我，我会自动存入运营数据 📝")));
-
         feishuService.sendPost("📊 公众号数据 · " + today + " · " + wd, paragraphs);
         log.info("[数据采集] 已发送公众号数据请求到飞书");
         logService.add("数据采集", "已请求", "已发送飞书数据请求");
@@ -312,11 +306,12 @@ public class MediaDataCollectorService {
             if (title != null && !title.isBlank()) {
                 String reads = article.get("reads") != null ? article.get("reads").toString() : "-";
                 String likes = article.get("likes") != null ? article.get("likes").toString() : "-";
-                String shares = article.get("shares") != null ? article.get("shares").toString() : "-";
-                String favorites = article.get("favorites") != null ? article.get("favorites").toString() : "-";
+                int shareNum = article.get("shares") != null ? Integer.parseInt(article.get("shares").toString()) : 0;
+                int favoriteNum = article.get("favorites") != null ? Integer.parseInt(article.get("favorites").toString()) : 0;
+                int shareFavorite = shareNum + favoriteNum;
+                String recommend = article.get("recommend") != null ? article.get("recommend").toString() : "-";
                 String comments = article.get("comments") != null ? article.get("comments").toString() : "-";
-                paragraphs.add(List.of(Map.of("tag", "text", "text", "  [" + id + "] " + title)));
-                paragraphs.add(List.of(Map.of("tag", "text", "text", "    阅读:" + reads + " 点赞:" + likes + " 转发:" + shares + " 收藏:" + favorites + " 评论:" + comments)));
+                paragraphs.add(List.of(Map.of("tag", "text", "text", "  [" + id + "] " + title + " 阅读:" + reads + " 点赞:" + likes + " 转发收藏:" + shareFavorite + " 推荐:" + recommend + " 评论:" + comments)));
                 count++;
             }
         }
