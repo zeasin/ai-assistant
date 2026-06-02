@@ -177,6 +177,71 @@
             color: #7c5cfc;
             background: #f0edff;
         }
+        /* Modal styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 10000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-overlay.active {
+            display: flex;
+        }
+        .modal-overlay .modal {
+            background: #fff;
+            border-radius: 12px;
+            padding: 24px;
+            max-width: 800px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+        }
+        .modal-overlay .modal h3 {
+            margin: 0 0 16px 0;
+            font-size: 18px;
+        }
+        .modal-actions {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+            margin-top: 20px;
+            padding-top: 16px;
+            border-top: 1px solid #e1e3e6;
+        }
+        .modal-actions .btn {
+            padding: 8px 16px;
+            font-size: 13px;
+        }
+        /* Toast styles */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 10001;
+        }
+        .toast {
+            background: #333;
+            color: #fff;
+            padding: 12px 20px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            font-size: 13px;
+            animation: toast-in 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .toast.error {
+            background: #e74c3c;
+        }
+        .toast.success {
+            background: #27ae60;
+        }
+        @keyframes toast-in {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
     </style>
 </head>
 <body>
@@ -531,20 +596,44 @@ function renderAllTables() {
 }
 
 function findIdField(records) {
+    if (!records || records.length === 0) return 'id';
     var idCandidates = ['id', 'ID', 'Id', '_id', 'key', 'name'];
+    var firstRow = records[0];
     for (var i = 0; i < idCandidates.length; i++) {
         var field = idCandidates[i];
-        if (tableColumns.includes(field)) {
+        if (firstRow.hasOwnProperty(field)) {
             return field;
         }
     }
-    return tableColumns[0];
+    // Fall back to first available key
+    for (var k in firstRow) {
+        return k;
+    }
+    return 'id';
 }
 
 function escapeHtml(str) {
     var div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
+}
+
+function toast(message, type) {
+    var container = document.getElementById('toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toast-container';
+        container.className = 'toast-container';
+        document.body.appendChild(container);
+    }
+    var toast = document.createElement('div');
+    toast.className = 'toast' + (type === 'error' ? ' error' : (type === 'success' ? ' success' : ''));
+    toast.textContent = message;
+    container.appendChild(toast);
+    setTimeout(function() {
+        toast.style.animation = 'toast-in 0.3s ease reverse';
+        setTimeout(function() { toast.remove(); }, 300);
+    }, 3000);
 }
 
 function showDetailModal(groupName, index) {
@@ -643,7 +732,9 @@ async function submitEdit(event) {
         return String(r[document.getElementById('edit-idField').value]) === document.getElementById('edit-idValue').value;
     });
     
+    var hiddenFields = ['edit-fileName', 'edit-group', 'edit-idField', 'edit-idValue'];
     formData.forEach(function(value, key) {
+        if (hiddenFields.indexOf(key) !== -1) return;
         if (originalRow && typeof originalRow[key] === 'object' && originalRow[key] !== null) {
             try {
                 updates[key] = JSON.parse(value);

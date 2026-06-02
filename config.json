@@ -24,7 +24,7 @@
     "customer" : {
       "客户数据_customers" : [ "id", "name", "stage", "source", "product", "company", "createdAt", "notes" ],
       "线索数据_leads" : [ "id", "name", "status", "source", "contacts", "createdAt", "lastContactedAt", "notes" ],
-      "客户数据_客户列表" : [ "编号", "名称", "阶段", "产品", "公司", "地区", "联系人", "备注" ],
+      "客户数据_客户列表" : [ "编号", "名称", "阶段", "产品", "公司", "联系人", "备注" ],
       "线索数据_线索列表" : [ "编号", "名称", "状态", "来源", "联系电话", "最后联系时间", "备注", "下次跟进" ]
     },
     "operations" : {
