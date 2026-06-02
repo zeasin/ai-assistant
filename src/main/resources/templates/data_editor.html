@@ -794,7 +794,7 @@ async function confirmDelete() {
         if (result.ok) {
             toast('✅ 删除成功');
             closeModal('modal-delete');
-            loadGroupData();
+            loadData();
         } else {
             toast(result.error || '删除失败', 'error');
         }

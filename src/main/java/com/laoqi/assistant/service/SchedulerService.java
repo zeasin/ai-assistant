@@ -71,7 +71,7 @@ public class SchedulerService {
         mediaDataCollectorService.collect();
     }
 
-    @Scheduled(cron = "0 0 10 * * ?", zone = "Asia/Shanghai")
+    @Scheduled(cron = "0 55 10 * * ?", zone = "Asia/Shanghai")
     public void wechatDataRequest() {
         log.info("[{}] ⏰ 定时任务：公众号数据采集请求", TimeUtil.nowStr());
         mediaDataCollectorService.sendWechatDataRequest();

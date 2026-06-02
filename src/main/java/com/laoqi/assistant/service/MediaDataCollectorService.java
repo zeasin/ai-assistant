@@ -274,19 +274,24 @@ public class MediaDataCollectorService {
         paragraphs.add(List.of(Map.of("tag", "text", "text", "老齐，最新的公众号数据来一下？")));
         paragraphs.add(List.of(Map.of("tag", "text", "text", "━━━━━━━━━━━━━━━━━━")));
         paragraphs.add(List.of(Map.of("tag", "text", "text", "回复格式：")));
-        paragraphs.add(List.of(Map.of("tag", "text", "text", "码农老齐 粉丝143 阅读128 新增粉丝5")));
-        paragraphs.add(List.of(Map.of("tag", "text", "text", "启航电商ERP 粉丝3738 阅读90")));
-        paragraphs.add(List.of(Map.of("tag", "text", "text", "老齐二三事 粉丝0 阅读128")));
+        paragraphs.add(List.of(Map.of("tag", "text", "text", "码农老齐 粉丝- 阅读- 分享收藏- 主页- 消息- 搜一搜- 聊天会话- 其他- 朋友圈- 推荐-")));
+        paragraphs.add(List.of(Map.of("tag", "text", "text", "启航电商ERP 粉丝- 阅读- 分享收藏- 主页- 消息- 搜一搜- 聊天会话- 其他- 朋友圈- 推荐-")));
+        paragraphs.add(List.of(Map.of("tag", "text", "text", "老齐二三事 粉丝- 阅读- 分享收藏- 主页- 消息- 搜一搜- 聊天会话- 其他- 朋友圈- 推荐-")));
         paragraphs.add(List.of(Map.of("tag", "text", "text", "━━━━━━━━━━━━━━━━━━")));
 
-        for (var entry : existingArticles.entrySet()) {
-            List<Map<String, Object>> list = entry.getValue();
-            if (list == null || list.isEmpty()) continue;
-            Map<String, Object> last = list.get(list.size() - 1);
-            String topic = (String) last.getOrDefault("title", "");
-            String date = (String) last.getOrDefault("publishDate", "");
-            paragraphs.add(List.of(Map.of("tag", "text", "text",
-                    "· " + entry.getKey() + " 最新: " + topic + " (" + date + ")")));
+        List<String> targetAccounts = List.of("码农老齐", "启航电商ERP", "老齐二三事");
+        for (String account : targetAccounts) {
+            paragraphs.add(List.of(Map.of("tag", "text", "text", "📝 " + account + " 文章数据：")));
+            boolean found = false;
+            String wechatKey = account + "-微信";
+            if (existingArticles.containsKey(account)) {
+                found = addArticles(paragraphs, existingArticles.get(account));
+            } else if (existingArticles.containsKey(wechatKey)) {
+                found = addArticles(paragraphs, existingArticles.get(wechatKey));
+            }
+            if (!found) {
+                paragraphs.add(List.of(Map.of("tag", "text", "text", "  暂无文章数据")));
+            }
         }
 
         paragraphs.add(List.of(Map.of("tag", "text", "text", "━━━━━━━━━━━━━━━━━━")));
@@ -295,6 +300,27 @@ public class MediaDataCollectorService {
         feishuService.sendPost("📊 公众号数据 · " + today + " · " + wd, paragraphs);
         log.info("[数据采集] 已发送公众号数据请求到飞书");
         logService.add("数据采集", "已请求", "已发送飞书数据请求");
+    }
+
+    private boolean addArticles(List<List<Map<String, String>>> paragraphs, List<Map<String, Object>> list) {
+        if (list == null || list.isEmpty()) return false;
+        int count = 0;
+        for (int i = list.size() - 1; i >= 0 && count < 5; i--) {
+            Map<String, Object> article = list.get(i);
+            String id = (String) article.getOrDefault("id", "");
+            String title = (String) article.getOrDefault("title", "");
+            if (title != null && !title.isBlank()) {
+                String reads = article.get("reads") != null ? article.get("reads").toString() : "-";
+                String likes = article.get("likes") != null ? article.get("likes").toString() : "-";
+                String shares = article.get("shares") != null ? article.get("shares").toString() : "-";
+                String favorites = article.get("favorites") != null ? article.get("favorites").toString() : "-";
+                String comments = article.get("comments") != null ? article.get("comments").toString() : "-";
+                paragraphs.add(List.of(Map.of("tag", "text", "text", "  [" + id + "] " + title)));
+                paragraphs.add(List.of(Map.of("tag", "text", "text", "    阅读:" + reads + " 点赞:" + likes + " 转发:" + shares + " 收藏:" + favorites + " 评论:" + comments)));
+                count++;
+            }
+        }
+        return count > 0;
     }
 
     public Map<String, Object> requestSync() {

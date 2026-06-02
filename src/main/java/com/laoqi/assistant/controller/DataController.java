@@ -312,24 +312,42 @@ public class DataController {
             Map<String, Object> fileData = FileUtil.readJson(filePath, mapType, new HashMap<>());
             Object groupData = fileData.get(group);
             
-            if (!(groupData instanceof List)) {
+            boolean found = false;
+            
+            if (groupData instanceof List) {
+                List<Map<String, Object>> records = (List<Map<String, Object>>) groupData;
+                for (int i = 0; i < records.size(); i++) {
+                    Map<String, Object> record = records.get(i);
+                    if (idValue.equals(String.valueOf(record.get(idField)))) {
+                        for (Map.Entry<String, Object> entry : updates.entrySet()) {
+                            record.put(entry.getKey(), entry.getValue());
+                        }
+                        found = true;
+                        break;
+                    }
+                }
+            } else if (groupData instanceof Map) {
+                Map<?, ?> mapData = (Map<?, ?>) groupData;
+                for (Object val : mapData.values()) {
+                    if (val instanceof List) {
+                        List<Map<String, Object>> records = (List<Map<String, Object>>) val;
+                        for (int i = 0; i < records.size(); i++) {
+                            Map<String, Object> record = records.get(i);
+                            if (idValue.equals(String.valueOf(record.get(idField)))) {
+                                for (Map.Entry<String, Object> entry : updates.entrySet()) {
+                                    record.put(entry.getKey(), entry.getValue());
+                                }
+                                found = true;
+                                break;
+                            }
+                        }
+                        if (found) break;
+                    }
+                }
+            } else {
                 result.put("ok", false);
                 result.put("error", "分组不存在或不是数组类型");
                 return ResponseEntity.ok(result);
-            }
-            
-            List<Map<String, Object>> records = (List<Map<String, Object>>) groupData;
-            boolean found = false;
-            
-            for (int i = 0; i < records.size(); i++) {
-                Map<String, Object> record = records.get(i);
-                if (idValue.equals(String.valueOf(record.get(idField)))) {
-                    for (Map.Entry<String, Object> entry : updates.entrySet()) {
-                        record.put(entry.getKey(), entry.getValue());
-                    }
-                    found = true;
-                    break;
-                }
             }
             
             if (!found) {
@@ -356,7 +374,8 @@ public class DataController {
             @RequestParam String fileName,
             @RequestParam String group,
             @RequestBody Map<String, Object> record,
-            @RequestParam(required = false) String type) {
+            @RequestParam(required = false) String type,
+            @RequestParam(required = false) String subGroup) {
         
         Map<String, Object> result = new LinkedHashMap<>();
         
@@ -389,14 +408,43 @@ public class DataController {
             Map<String, Object> fileData = FileUtil.readJson(filePath, mapType, new HashMap<>());
             Object groupData = fileData.get(group);
             
-            if (!(groupData instanceof List)) {
+            boolean added = false;
+            
+            if (groupData instanceof List) {
+                List<Map<String, Object>> records = (List<Map<String, Object>>) groupData;
+                records.add(record);
+                added = true;
+            } else if (groupData instanceof Map) {
+                Map<String, Object> mapData = (Map<String, Object>) groupData;
+                
+                if (subGroup != null && !subGroup.isEmpty()) {
+                    Object subGroupData = mapData.get(subGroup);
+                    if (subGroupData instanceof List) {
+                        List<Map<String, Object>> records = (List<Map<String, Object>>) subGroupData;
+                        records.add(record);
+                        added = true;
+                    }
+                } else {
+                    for (Map.Entry<String, Object> entry : mapData.entrySet()) {
+                        if (entry.getValue() instanceof List) {
+                            List<Map<String, Object>> records = (List<Map<String, Object>>) entry.getValue();
+                            records.add(record);
+                            added = true;
+                            break;
+                        }
+                    }
+                }
+            } else {
                 result.put("ok", false);
                 result.put("error", "分组不存在或不是数组类型");
                 return ResponseEntity.ok(result);
             }
             
-            List<Map<String, Object>> records = (List<Map<String, Object>>) groupData;
-            records.add(record);
+            if (!added) {
+                result.put("ok", false);
+                result.put("error", "未能添加记录，请检查数据结构");
+                return ResponseEntity.ok(result);
+            }
             
             FileUtil.writeJson(filePath, fileData);
             result.put("ok", true);
@@ -450,14 +498,25 @@ public class DataController {
             Map<String, Object> fileData = FileUtil.readJson(filePath, mapType, new HashMap<>());
             Object groupData = fileData.get(group);
             
-            if (!(groupData instanceof List)) {
+            boolean removed = false;
+            
+            if (groupData instanceof List) {
+                List<Map<String, Object>> records = (List<Map<String, Object>>) groupData;
+                removed = records.removeIf(r -> idValue.equals(String.valueOf(r.get(idField))));
+            } else if (groupData instanceof Map) {
+                Map<?, ?> mapData = (Map<?, ?>) groupData;
+                for (Object val : mapData.values()) {
+                    if (val instanceof List) {
+                        List<Map<String, Object>> records = (List<Map<String, Object>>) val;
+                        removed = records.removeIf(r -> idValue.equals(String.valueOf(r.get(idField))));
+                        if (removed) break;
+                    }
+                }
+            } else {
                 result.put("ok", false);
                 result.put("error", "分组不存在或不是数组类型");
                 return ResponseEntity.ok(result);
             }
-            
-            List<Map<String, Object>> records = (List<Map<String, Object>>) groupData;
-            boolean removed = records.removeIf(r -> idValue.equals(String.valueOf(r.get(idField))));
             
             if (!removed) {
                 result.put("ok", false);
