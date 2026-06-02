@@ -20,7 +20,7 @@
   "weeklyDir" : "周报",
   "remindFile" : null,
   "mediaCollectEnabled" : true,
-  "mediaCollectTime" : "22:00",
+  "mediaCollectTime" : "08:00",
   "columnSettings" : {
     "customer" : {
       "客户数据_customers" : [ "id", "name", "stage", "source", "product", "company", "createdAt", "notes" ],

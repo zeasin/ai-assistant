@@ -45,14 +45,13 @@ public class SchedulerService {
     @Scheduled(cron = "0 * * * * ?", zone = "Asia/Shanghai")
     public void collectPlatformData() {
         String now = LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"));
-        log.debug("[{}] ⏰ 每分钟检查：是否需要执行CSDN数据采集", TimeUtil.nowStr());
+//        log.debug("[{}] ⏰ 每分钟检查：是否需要执行CSDN数据采集", TimeUtil.nowStr());
         
         Config config = configService.load();
         Boolean enabled = config.isMediaCollectEnabled();
         String expected = config.getMediaCollectTime();
         
-        log.debug("[{}]  配置检查：enabled={}, 期望时间={}, 当前时间={}", 
-                TimeUtil.nowStr(), enabled, expected, now);
+//        log.debug("[{}]  配置检查：enabled={}, 期望时间={}, 当前时间={}", TimeUtil.nowStr(), enabled, expected, now);
         
         if (!Boolean.TRUE.equals(enabled)) {
             log.debug("[{}]  跳过：采集开关未开启", TimeUtil.nowStr());
@@ -63,7 +62,7 @@ public class SchedulerService {
             return;
         }
         if (!expected.equals(now)) {
-            log.debug("[{}]  跳过：当前时间 {} != 配置时间 {}", TimeUtil.nowStr(), now, expected);
+//            log.debug("[{}]  跳过：当前时间 {} != 配置时间 {}", TimeUtil.nowStr(), now, expected);
             return;
         }
         
@@ -72,7 +71,7 @@ public class SchedulerService {
         mediaDataCollectorService.collect();
     }
 
-    @Scheduled(cron = "0 0 9 * * ?", zone = "Asia/Shanghai")
+    @Scheduled(cron = "0 0 10 * * ?", zone = "Asia/Shanghai")
     public void wechatDataRequest() {
         log.info("[{}] ⏰ 定时任务：公众号数据采集请求", TimeUtil.nowStr());
         mediaDataCollectorService.sendWechatDataRequest();

@@ -203,15 +203,119 @@ java -jar target/assistant-v2-2.0.0.jar
 <div class="card">
     <h2>📩 飞书集成</h2>
     <p class="text-muted" style="line-height:1.7;">
-        支持两种飞书集成方式：
+        支持三种飞书集成方式，可根据需要组合使用。所有配置均在 <a href="/config">配置页</a> 中设置。
+    </p>
+
+    <h3 style="margin-top:20px;">🔗 方式一：Webhook 推送（接收通知）</h3>
+    <p class="text-muted" style="line-height:1.7;">
+        配置 Webhook URL 后，AI 综合日报、发文提醒、下班提醒等自动推送到飞书群。<br>
+        仅需群机器人权限，配置最简单。
+    </p>
+    <ol class="text-muted" style="line-height:1.7;padding-left:20px;">
+        <li>打开飞书，进入目标群聊的「设置」→「群机器人」→「添加机器人」
+            <br><span class="text-muted" style="font-size:12px;">权限：无需申请，群管理员可直接添加</span>
+        </li>
+        <li>搜索并添加「自定义机器人（Webhook）」</li>
+        <li>复制机器人 Webhook 地址，格式：<code>https://open.feishu.cn/open-apis/bot/v2/hook/xxxxxxxx</code></li>
+        <li>进入本系统 <a href="/config">配置页</a>，在「飞书 Webhook 配置」中粘贴地址并保存</li>
+        <li>点击「手动触发」区域的按钮（如🌅生成综合日报）测试推送是否正常</li>
+    </ol>
+
+    <h3 style="margin-top:24px;">📡 方式二：消息轮询（API 方式接收消息）</h3>
+    <p class="text-muted" style="line-height:1.7;">
+        通过飞书 API 定时轮询指定群的未读消息，AI 自动回复。<br>
+        需创建飞书自建应用，配置复杂但功能完整。
+    </p>
+
+    <h4 style="margin-top:16px;margin-bottom:8px;font-size:14px;">第一步：创建飞书自建应用</h4>
+    <ol class="text-muted" style="line-height:1.7;padding-left:20px;">
+        <li>打开 <a href="https://open.feishu.cn/app" target="_blank">飞书开发者后台</a>，点击「创建企业自建应用」
+            <br><span class="text-muted" style="font-size:12px;">权限：需要飞书管理员账号或拥有创建应用权限</span>
+        </li>
+        <li>填写应用名称（如：AI助理）、描述，创建完成后进入应用详情</li>
+    </ol>
+
+    <h4 style="margin-top:16px;margin-bottom:8px;font-size:14px;">第二步：获取 App ID 和 App Secret</h4>
+    <ol class="text-muted" style="line-height:1.7;padding-left:20px;" start="3">
+        <li>在应用详情页左侧菜单点击「凭证与基础信息」
+            <br><span class="text-muted" style="font-size:12px;">权限：应用创建者或管理员可查看</span>
+        </li>
+        <li>复制 <strong>App ID</strong> 和 <strong>App Secret</strong>（App Secret 首次需点击「显示」或重置）</li>
+    </ol>
+
+    <h4 style="margin-top:16px;margin-bottom:8px;font-size:14px;">第三步：配置权限</h4>
+    <ol class="text-muted" style="line-height:1.7;padding-left:20px;" start="5">
+        <li>在左侧菜单点击「权限管理」</li>
+        <li>开启以下权限（必选）：
+            <ul style="margin-top:4px;">
+                <li><code>im:message</code> — 获取单聊、群组消息（read_message 和 send_message 子权限）</li>
+                <li><code>im:chat</code> — 获取群列表信息（read_chat 子权限）</li>
+            </ul>
+        </li>
+        <li>点击「批量开通」并确认</li>
+    </ol>
+
+    <h4 style="margin-top:16px;margin-bottom:8px;font-size:14px;">第四步：发布应用</h4>
+    <ol class="text-muted" style="line-height:1.7;padding-left:20px;" start="8">
+        <li>在左侧菜单点击「版本管理与发布」</li>
+        <li>创建版本，填写版本号（如 1.0.0）、更新说明，点击「保存」</li>
+        <li>点击「申请发布」，选择审核方式（推荐「普通发布」，需管理员审批）</li>
+        <li>联系飞书管理员审批通过</li>
+    </ol>
+
+    <h4 style="margin-top:16px;margin-bottom:8px;font-size:14px;">第五步：将应用添加到群聊</h4>
+    <ol class="text-muted" style="line-height:1.7;padding-left:20px;" start="12">
+        <li>打开要监听的飞书群，进入「设置」→「群机器人」→「添加机器人」
+            <br><span class="text-muted" style="font-size:12px;">权限：群管理员可操作</span>
+        </li>
+        <li>搜索并添加刚才创建的自建应用</li>
+    </ol>
+
+    <h4 style="margin-top:16px;margin-bottom:8px;font-size:14px;">第六步：在系统中配置</h4>
+    <ol class="text-muted" style="line-height:1.7;padding-left:20px;" start="14">
+        <li>进入本系统 <a href="/config">配置页</a>，在「飞书消息接收（API 轮询）」区域</li>
+        <li>填入 <strong>App ID</strong> 和 <strong>App Secret</strong></li>
+        <li>点击「获取群列表」按钮，选择要监听的群（自动填入 Chat ID）</li>
+        <li>勾选「启用消息轮询（每15秒检查一次）」</li>
+        <li>点击「保存飞书配置」</li>
+        <li>点击「发送测试消息」验证配置是否正确</li>
+    </ol>
+
+    <h3 style="margin-top:24px;">🔌 方式三：长连接 WebSocket（推荐，替代轮询）</h3>
+    <p class="text-muted" style="line-height:1.7;">
+        通过飞书 WebSocket 长连接实时接收消息，比轮询延迟更低、资源消耗更小。
+        配置步骤与方式二完全相同（共用 App ID/App Secret），区别在于：
     </p>
     <ul class="text-muted" style="line-height:1.7;padding-left:20px;">
-        <li><strong>Webhook 推送</strong> — 配置 Webhook URL 后，AI 综合日报、发文提醒、下班提醒等自动推送到飞书群</li>
-        <li><strong>消息轮询（API）</strong> — 配置自建应用凭据后，AI 助理可轮询指定群的未读消息并自动回复</li>
+        <li>在「权限管理」中额外开启 <code>im:resource</code> 权限（接收消息资源）</li>
+        <li>启用「消息轮询」后，系统自动使用长连接代替轮询</li>
+        <li>无需额外配置，应用启动后自动连接飞书 WebSocket 网关</li>
     </ul>
     <p class="text-muted" style="line-height:1.7;">
-        均在 <a href="/config">配置页</a> 中设置。
+        <strong>注意：</strong>长连接模式下，应用需保持运行。如果网络断开，系统会自动重连。
     </p>
+
+    <h3 style="margin-top:24px;">📋 权限汇总表</h3>
+    <table class="log-table" style="margin-top:8px;">
+        <thead><tr><th>场景</th><th>所需权限</th><th>说明</th></tr></thead>
+        <tbody>
+            <tr>
+                <td>Webhook 推送</td>
+                <td>无</td>
+                <td>仅需群管理员添加自定义机器人</td>
+            </tr>
+            <tr>
+                <td>API 轮询接收消息</td>
+                <td><code>im:message</code>（读+写）<br><code>im:chat.readonly</code></td>
+                <td>读取未读消息、发送回复、获取群列表</td>
+            </tr>
+            <tr>
+                <td>长连接 WebSocket</td>
+                <td>上述权限 + <code>im:resource</code></td>
+                <td>实时接收消息推送</td>
+            </tr>
+        </tbody>
+    </table>
 </div>
 
 <div class="card">

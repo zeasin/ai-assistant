@@ -161,7 +161,15 @@ public class ChatController {
     public SseEmitter chat(@RequestParam String message,
                             @RequestParam(name = "session_id") String sessionId) {
         log.info("收到对话请求: message={}, sessionId={}", message, sessionId);
-        SseEmitter emitter = new SseEmitter(300_000L);
+        SseEmitter emitter = new SseEmitter(1_800_000L); // 30分钟超时，支持大型笔记库
+
+        // 注册完成和超时回调
+        emitter.onCompletion(() -> log.info("[chat] SSE 连接完成"));
+        emitter.onTimeout(() -> {
+            log.warn("[chat] SSE 连接超时");
+            emitter.complete();
+        });
+        emitter.onError((ex) -> log.error("[chat] SSE 连接错误", ex));
 
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
@@ -208,6 +216,11 @@ public class ChatController {
                     sendError(emitter, "AI 服务调用失败: " + e.getMessage());
                 } catch (Exception ex) {
                     log.error("发送错误信息失败", ex);
+                    try {
+                        emitter.completeWithError(ex);
+                    } catch (Exception e2) {
+                        log.error("无法完成错误发送", e2);
+                    }
                 }
             }
         });
@@ -259,25 +272,56 @@ public class ChatController {
         return openCodeService.createSession("chat-" + chatSessionId);
     }
 
-    private void sendStatus(SseEmitter emitter, String mode, String text) throws Exception {
-        Map<String, Object> data = Map.of("type", "status", "content", text, "mode", mode);
-        emitter.send(SseEmitter.event().data(mapper.writeValueAsString(data)));
+    private void sendStatus(SseEmitter emitter, String mode, String text) {
+        try {
+            Map<String, Object> data = Map.of("type", "status", "content", text, "mode", mode);
+            emitter.send(SseEmitter.event().data(mapper.writeValueAsString(data)));
+        } catch (Exception e) {
+            log.warn("发送状态消息失败", e);
+        }
     }
 
-    private void sendText(SseEmitter emitter, String mode, String text) throws Exception {
-        Map<String, Object> data = Map.of("type", "text", "content", text, "mode", mode);
-        emitter.send(SseEmitter.event().data(mapper.writeValueAsString(data)));
+    private void sendText(SseEmitter emitter, String mode, String text) {
+        try {
+            Map<String, Object> data = Map.of("type", "text", "content", text, "mode", mode);
+            emitter.send(SseEmitter.event().data(mapper.writeValueAsString(data)));
+        } catch (Exception e) {
+            log.error("发送文本消息失败", e);
+            try {
+                emitter.completeWithError(e);
+            } catch (Exception ex) {
+                log.error("无法完成发射器", ex);
+            }
+        }
     }
 
-    private void sendError(SseEmitter emitter, String message) throws Exception {
-        Map<String, Object> data = Map.of("type", "error", "content", message);
-        emitter.send(SseEmitter.event().data(mapper.writeValueAsString(data)));
-        emitter.complete();
+    private void sendDone(SseEmitter emitter, String mode) {
+        try {
+            Map<String, Object> data = Map.of("type", "done", "mode", mode);
+            emitter.send(SseEmitter.event().data(mapper.writeValueAsString(data)));
+            emitter.complete();
+        } catch (Exception e) {
+            log.error("发送完成消息失败", e);
+            try {
+                emitter.completeWithError(e);
+            } catch (Exception ex) {
+                log.error("无法完成发射器", ex);
+            }
+        }
     }
 
-    private void sendDone(SseEmitter emitter, String mode) throws Exception {
-        Map<String, Object> data = Map.of("type", "done", "mode", mode);
-        emitter.send(SseEmitter.event().data(mapper.writeValueAsString(data)));
-        emitter.complete();
+    private void sendError(SseEmitter emitter, String message) {
+        try {
+            Map<String, Object> data = Map.of("type", "error", "content", message);
+            emitter.send(SseEmitter.event().data(mapper.writeValueAsString(data)));
+            emitter.complete();
+        } catch (Exception e) {
+            log.error("发送错误信息失败", e);
+            try {
+                emitter.completeWithError(e);
+            } catch (Exception ex) {
+                log.error("无法完成发射器", ex);
+            }
+        }
     }
 }

@@ -4,6 +4,8 @@ import com.laoqi.assistant.config.AppConfig;
 import com.laoqi.assistant.model.ChatSession;
 import com.laoqi.assistant.model.ChatSession.ChatMessage;
 import com.laoqi.assistant.util.TimeUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.io.*;
@@ -14,6 +16,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class FeishuService {
+
+    private static final Logger log = LoggerFactory.getLogger(FeishuService.class);
 
     private final AppConfig appConfig;
     private final ConfigService configService;
@@ -87,14 +91,20 @@ public class FeishuService {
         var config = configService.load();
         String webhookUrl = config.getFeishuWebhookUrl();
         if (webhookUrl == null || webhookUrl.isEmpty()) {
-            logService.add("飞书推送", "跳过", "未配置 Webhook URL");
+            String msg = "未配置 Webhook URL";
+            log.warn("[飞书推送] {}", msg);
+            logService.add("飞书推送", "跳过", msg);
             return;
         }
         try {
             String body = "{\"msg_type\":\"post\",\"content\":{\"post\":{\"zh_cn\":{\"title\":\"" +
                     escapeJson(title) + "\",\"content\":" + toJson(paragraphs) + "}}}}";
-            httpPost(webhookUrl, body, "application/json; charset=utf-8");
+            log.info("[飞书推送] 发送消息: title={}", title);
+            String response = httpPost(webhookUrl, body, "application/json; charset=utf-8");
+            log.info("[飞书推送] 发送成功, 响应: {}", response);
+            logService.add("飞书推送", "成功", title);
         } catch (IOException e) {
+            log.error("[飞书推送] 发送失败: {}", e.getMessage(), e);
             logService.add("飞书推送", "失败", e.getMessage());
         }
     }

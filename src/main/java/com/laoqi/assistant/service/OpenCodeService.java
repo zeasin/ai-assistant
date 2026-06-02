@@ -28,6 +28,7 @@ public class OpenCodeService {
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(30))
                 .version(HttpClient.Version.HTTP_1_1)
+                .followRedirects(HttpClient.Redirect.NORMAL)
                 .build();
     }
 
@@ -91,7 +92,7 @@ public class OpenCodeService {
                 .uri(URI.create(url))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(requestBody))
-                .timeout(Duration.ofSeconds(600))
+                .timeout(Duration.ofSeconds(900)) // 15分钟超时，支持大型笔记库
                 .build();
 
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
@@ -235,7 +236,7 @@ public class OpenCodeService {
                     .uri(URI.create(url))
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(requestBody))
-                    .timeout(Duration.ofSeconds(300))
+                    .timeout(Duration.ofSeconds(900)) // 15分钟超时，支持大型项目分析
                     .build();
 
             log.debug("[opencode-code] 请求已构建，准备发送...");

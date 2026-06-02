@@ -18,12 +18,12 @@ public class ConfigService {
     }
 
     public Config load() {
-        log.info("Loading config from {}", appConfig.getConfigFile());
+//        log.info("Loading config from {}", appConfig.getConfigFile());
         Config config = FileUtil.readJson(appConfig.getConfigFile(), Config.class,
                 Config.defaultConfig("", ""));
         mergeDefaultValues(config);
-        log.info("Config loaded - mediaCollectEnabled={}, mediaCollectTime={}", 
-                config.isMediaCollectEnabled(), config.getMediaCollectTime());
+//        log.info("Config loaded - mediaCollectEnabled={}, mediaCollectTime={}",
+//                config.isMediaCollectEnabled(), config.getMediaCollectTime());
         return config;
     }
 
@@ -31,12 +31,12 @@ public class ConfigService {
         Config defaultConfig = Config.defaultConfig("", "");
         
         if (config.getMediaCollectTime() == null || config.getMediaCollectTime().isEmpty()) {
-            log.info("Setting default mediaCollectTime: {}", defaultConfig.getMediaCollectTime());
+//            log.info("Setting default mediaCollectTime: {}", defaultConfig.getMediaCollectTime());
             config.setMediaCollectTime(defaultConfig.getMediaCollectTime());
         }
         
         if (config.isMediaCollectEnabled() == null) {
-            log.info("Setting default mediaCollectEnabled: {}", defaultConfig.isMediaCollectEnabled());
+//            log.info("Setting default mediaCollectEnabled: {}", defaultConfig.isMediaCollectEnabled());
             config.setMediaCollectEnabled(defaultConfig.isMediaCollectEnabled());
         }
         

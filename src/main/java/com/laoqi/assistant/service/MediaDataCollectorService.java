@@ -91,6 +91,19 @@ public class MediaDataCollectorService {
             logService.add("数据采集", "成功",
                     String.format("文章更新%d条, 账号更新%d条", articleUpdates, accountUpdates));
 
+            // 发送数据采集完成的飞书通知
+            String today = TimeUtil.todayStr();
+            String wd = TimeUtil.weekdayCn(TimeUtil.now());
+            List<List<Map<String, String>>> paragraphs = new ArrayList<>();
+            paragraphs.add(List.of(Map.of("tag", "text", "text", "✅ CSDN/知乎数据采集完成！")));
+            paragraphs.add(List.of(Map.of("tag", "text", "text", "━━━━━━━━━━━━━━━━━━")));
+            paragraphs.add(List.of(Map.of("tag", "text", "text", "文章更新：" + articleUpdates + " 条")));
+            paragraphs.add(List.of(Map.of("tag", "text", "text", "账号更新：" + accountUpdates + " 条")));
+            paragraphs.add(List.of(Map.of("tag", "text", "text", "━━━━━━━━━━━━━━━━━━")));
+            paragraphs.add(List.of(Map.of("tag", "text", "text", "采集时间：" + TimeUtil.nowStr())));
+            feishuService.sendPost("📊 数据采集完成 · " + today + " · " + wd, paragraphs);
+            log.info("[数据采集] 已发送采集完成通知到飞书");
+
         } catch (Exception e) {
             log.error("[数据采集] 失败: {}", e.getMessage(), e);
             logService.add("数据采集", "失败", e.getMessage());
