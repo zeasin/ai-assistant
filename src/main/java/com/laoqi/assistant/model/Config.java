@@ -21,7 +21,7 @@ public class Config {
     private String leadDataPath;
     private String recordDataPath;
     private String customerDataDir;
-    private String operationsDataPath;
+
     private String operationsDataDir;
     
     private String workDir;
@@ -42,7 +42,7 @@ public class Config {
         c.baseDir = baseDir;
         c.feishuWebhookUrl = webhookUrl;
         c.customerDataDir = "";
-        c.operationsDataPath = "自媒体/运营数据.json";
+
         c.chatSessionsDir = "chat";
         c.chatSessionsFile = "chat_sessions.json";
         c.logFile = "assistant_log.json";
@@ -77,8 +77,7 @@ public class Config {
     public void setRecordDataPath(String recordDataPath) { this.recordDataPath = recordDataPath; }
     public String getCustomerDataDir() { return customerDataDir; }
     public void setCustomerDataDir(String customerDataDir) { this.customerDataDir = customerDataDir; }
-    public String getOperationsDataPath() { return operationsDataPath; }
-    public void setOperationsDataPath(String operationsDataPath) { this.operationsDataPath = operationsDataPath; }
+
     public String getOperationsDataDir() { return operationsDataDir; }
     public void setOperationsDataDir(String operationsDataDir) { this.operationsDataDir = operationsDataDir; }
     public String getWorkDir() { return workDir; }

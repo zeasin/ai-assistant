@@ -54,7 +54,7 @@ public class OperationsService {
     public String buildDataSummary() {
         var accounts = readJsonFile("自媒体账号.json");
         var articles = readJsonFile("自媒体文章.json");
-        var dailyStats = readJsonFile("自媒体数据.json");
+        var dailyStats = readJsonFile("自媒体日数据.json");
 
         StringBuilder sb = new StringBuilder();
 

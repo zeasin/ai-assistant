@@ -10,7 +10,6 @@
   "leadDataPath" : null,
   "recordDataPath" : null,
   "customerDataDir" : "客户管理",
-  "operationsDataPath" : "",
   "operationsDataDir" : "自媒体",
   "workDir" : "工作",
   "chatSessionsDir" : null,
@@ -24,11 +23,14 @@
   "columnSettings" : {
     "customer" : {
       "客户数据_customers" : [ "id", "name", "stage", "source", "product", "company", "createdAt", "notes" ],
-      "线索数据_leads" : [ "id", "name", "status", "source", "contacts", "createdAt", "lastContactedAt", "notes" ]
+      "线索数据_leads" : [ "id", "name", "status", "source", "contacts", "createdAt", "lastContactedAt", "notes" ],
+      "客户数据_客户列表" : [ "编号", "名称", "阶段", "产品", "公司", "地区", "联系人", "备注" ],
+      "线索数据_线索列表" : [ "编号", "名称", "状态", "来源", "联系电话", "最后联系时间", "备注", "下次跟进" ]
     },
     "operations" : {
       "自媒体文章_码农老齐" : [ "id", "topic", "series", "publishDate", "fansAtPublish", "fansGained" ],
-      "自媒体数据_启航电商ERP" : [ "date", "fans", "reads", "shares", "sourceMessage", "sourceAccount", "sourceSearch", "sourceChat" ]
+      "自媒体数据_启航电商ERP" : [ "date", "fans", "reads", "shares", "sourceMessage", "sourceAccount", "sourceSearch", "sourceChat" ],
+      "自媒体账号_码农老齐" : [ "账号ID", "平台", "名称", "粉丝", "总访问", "文章数", "更新日期", "粉丝更新日期" ]
     }
   }
 }
