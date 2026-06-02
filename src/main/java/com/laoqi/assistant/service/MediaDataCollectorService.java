@@ -271,7 +271,7 @@ public class MediaDataCollectorService {
         var existingArticles = readJsonFile("自媒体文章.json");
 
         List<List<Map<String, String>>> paragraphs = new ArrayList<>();
-        paragraphs.add(List.of(Map.of("tag", "text", "text", "📊 老齐，今天的公众号数据来一下？")));
+        paragraphs.add(List.of(Map.of("tag", "text", "text", "老齐，最新的公众号数据来一下？")));
         paragraphs.add(List.of(Map.of("tag", "text", "text", "━━━━━━━━━━━━━━━━━━")));
         paragraphs.add(List.of(Map.of("tag", "text", "text", "回复格式：")));
         paragraphs.add(List.of(Map.of("tag", "text", "text", "码农老齐 粉丝143 阅读128 新增粉丝5")));
