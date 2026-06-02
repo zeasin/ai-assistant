@@ -1,4 +1,4 @@
-# 老齐AI个人助理 V2
+# AI 助理 (ai-assistant)
 
 ## Quick start
 
@@ -11,7 +11,7 @@ opencode serve --port 14099  # 代码分析服务
 mvn package -q
 
 # 3. 启动应用
-java -jar target/assistant-v2-2.0.0.jar
+java -jar target/ai-assistant-2.0.0.jar
 
 # 访问地址
 # - Web UI: http://localhost:6790

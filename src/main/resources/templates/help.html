@@ -8,10 +8,11 @@
 <th:block layout:fragment="content">
 
 <div class="card">
-    <h2>📖 老齐AI个人助理</h2>
+    <h2>📖 AI 助理 (ai-assistant)</h2>
     <p class="text-muted" style="line-height:1.7;">
         一站式个人工作台，集成 AI 综合日报、对话问答、笔记管理、公众号运营分析、客户管理等功能。
         所有 AI 能力基于本地笔记库和 <strong>opencode serve</strong>，不依赖任何第三方云服务。
+        开源版免费，商业版即将推出。
     </p>
 </div>
 
@@ -27,14 +28,14 @@
     </table>
     <h3 style="font-size:15px;margin:16px 0 8px;">启动步骤</h3>
     <pre style="background:#1e1e2e;color:#cdd6f4;padding:16px;border-radius:8px;font-size:13px;line-height:1.6;overflow-x:auto;"># 1. 先启动两个 opencode serve 服务（必须）
-opencode serve --port 14096  # AI聊天/笔记库服务
+opencode serve --port 14096  # AI 聊天/笔记库服务
 opencode serve --port 14099  # 代码分析服务
 
 # 2. 编译项目
 mvn package -q
 
 # 3. 启动应用
-java -jar target/assistant-v2-2.0.0.jar
+java -jar target/ai-assistant-2.0.0.jar
 
 # 访问地址
 # - Web UI: http://localhost:6790
@@ -49,7 +50,7 @@ java -jar target/assistant-v2-2.0.0.jar
     <table class="log-table">
         <thead><tr><th>服务</th><th>端口</th><th>用途</th></tr></thead>
         <tbody>
-            <tr><td><strong>AI聊天/笔记库</strong></td><td>14096</td><td>综合日报、智能问答、数据采集、客户跟进分析</td></tr>
+            <tr><td><strong>AI 聊天/笔记库</strong></td><td>14096</td><td>综合日报、智能问答、数据采集、客户跟进分析</td></tr>
             <tr><td><strong>代码分析</strong></td><td>14099</td><td>Java 项目分析、代码知识库</td></tr>
         </tbody>
     </table>
@@ -63,7 +64,7 @@ java -jar target/assistant-v2-2.0.0.jar
     <table class="log-table">
         <thead><tr><th>功能</th><th>路由</th><th>说明</th></tr></thead>
         <tbody>
-            <tr><td><strong>综合日报</strong></td><td><code>/</code></td><td>AI 每日综合报告，含项目进展、客户动态、TODO、学习、生活、AI建议</td></tr>
+            <tr><td><strong>综合日报</strong></td><td><code>/</code></td><td>AI 每日综合报告，含项目进展、客户动态、TODO、学习、生活、AI 建议</td></tr>
             <tr><td><strong>工作看板</strong></td><td><code>/work-reports</code></td><td>日报/周报管理，支持添加、编辑，AI 分析工作趋势</td></tr>
             <tr><td><strong>AI 对话</strong></td><td><code>/chat</code></td><td>与 AI 对话，AI 读取笔记库回答问题，支持流式响应和会话管理</td></tr>
             <tr><td><strong>笔记浏览</strong></td><td><code>/browse</code></td><td>文件浏览器，支持查看/新建/删除 Markdown 文件</td></tr>
@@ -110,7 +111,7 @@ java -jar target/assistant-v2-2.0.0.jar
             <tr><td><strong>综合日报生成</strong></td><td>工作日 09:00</td><td>AI 读取笔记库生成日报，推送飞书并保存到 <code>工作/综合日报/</code></td></tr>
             <tr><td><strong>下班提醒</strong></td><td>工作日 18:00</td><td>提醒写工作记录</td></tr>
             <tr><td><strong>周二发文提醒</strong></td><td>每周二 09:00</td><td>提醒发布「码农老齐」公众号</td></tr>
-            <tr><td><strong>周四发文提醒</strong></td><td>每周四 09:00</td><td>提醒发布「启航电商ERP」公众号</td></tr>
+            <tr><td><strong>周四发文提醒</strong></td><td>每周四 09:00</td><td>提醒发布「启航电商 ERP」公众号</td></tr>
             <tr><td><strong>CSDN 数据采集</strong></td><td>每天 08:00（可配置）</td><td>自动抓取 CSDN 阅读/点赞等数据</td></tr>
         </tbody>
     </table>
@@ -138,7 +139,7 @@ java -jar target/assistant-v2-2.0.0.jar
         <li><strong>AI 分析</strong> — 基于近期日报和周报，AI 自动生成工作趋势分析和改进建议</li>
     </ul>
     <p class="text-muted" style="line-height:1.7;margin-top:8px;">
-        数据存储：<code>工作/日报/{日期}.md</code> 和 <code>工作/周报/{年-周}.md</code>
+        数据存储：<code>工作/日报/{日期}.md</code> 和 <code>工作/周报/{年 - 周}.md</code>
     </p>
 </div>
 
@@ -171,15 +172,15 @@ java -jar target/assistant-v2-2.0.0.jar
             <tr><td><strong>页面表单</strong></td><td>运营/客户页面点按钮弹窗填写</td><td>字段拼成文本发给 AI，AI 按规则保存</td></tr>
             <tr><td><strong>工作看板</strong></td><td>日报/周报页面直接填写</td><td>直接保存到文件，无需 AI 处理</td></tr>
             <tr><td><strong>飞书消息</strong></td><td>以"记录/新增/添加/创建/录入"开头发消息</td><td>原样转发 AI，AI 按规则保存并回复</td></tr>
-            <tr><td><strong>AI对话</strong></td><td>聊天框以"记录/新增/添加/创建/录入"开头输入</td><td>原样转发 AI，AI 按规则保存并回复</td></tr>
+            <tr><td><strong>AI 对话</strong></td><td>聊天框以"记录/新增/添加/创建/录入"开头输入</td><td>原样转发 AI，AI 按规则保存并回复</td></tr>
         </tbody>
     </table>
     <h3 style="font-size:14px;margin:16px 0 8px;">示例消息（AI 按 AGENTS.md 规则解析）</h3>
-    <pre style="background:#1e1e2e;color:#cdd6f4;padding:16px;border-radius:8px;font-size:13px;line-height:1.6;overflow-x:auto;">记录文章：《实战指南》微信阅读3200点赞85，增粉12
-新增客户：王五，公司启航科技，阶段意向，产品ERP
+    <pre style="background:#1e1e2e;color:#cdd6f4;padding:16px;border-radius:8px;font-size:13px;line-height:1.6;overflow-x:auto;">记录文章：《实战指南》微信阅读 3200 点赞 85，增粉 12
+新增客户：王五，公司启航科技，阶段意向，产品 ERP
 新增线索：赵六，来源转介绍，备注朋友推荐
 记录跟进：张三 谈了合同细节，下周二再约
-记录日统计：码农老齐 粉丝28500 阅读4200</pre>
+记录日统计：码农老齐 粉丝 28500 阅读 4200</pre>
 </div>
 
 <div class="card">
@@ -232,7 +233,7 @@ java -jar target/assistant-v2-2.0.0.jar
         <li>打开 <a href="https://open.feishu.cn/app" target="_blank">飞书开发者后台</a>，点击「创建企业自建应用」
             <br><span class="text-muted" style="font-size:12px;">权限：需要飞书管理员账号或拥有创建应用权限</span>
         </li>
-        <li>填写应用名称（如：AI助理）、描述，创建完成后进入应用详情</li>
+        <li>填写应用名称（如：AI 助理）、描述，创建完成后进入应用详情</li>
     </ol>
 
     <h4 style="margin-top:16px;margin-bottom:8px;font-size:14px;">第二步：获取 App ID 和 App Secret</h4>
@@ -276,7 +277,7 @@ java -jar target/assistant-v2-2.0.0.jar
         <li>进入本系统 <a href="/config">配置页</a>，在「飞书消息接收（API 轮询）」区域</li>
         <li>填入 <strong>App ID</strong> 和 <strong>App Secret</strong></li>
         <li>点击「获取群列表」按钮，选择要监听的群（自动填入 Chat ID）</li>
-        <li>勾选「启用消息轮询（每15秒检查一次）」</li>
+        <li>勾选「启用消息轮询（每 15 秒检查一次）」</li>
         <li>点击「保存飞书配置」</li>
         <li>点击「发送测试消息」验证配置是否正确</li>
     </ol>
@@ -306,7 +307,7 @@ java -jar target/assistant-v2-2.0.0.jar
             </tr>
             <tr>
                 <td>API 轮询接收消息</td>
-                <td><code>im:message</code>（读+写）<br><code>im:chat.readonly</code></td>
+                <td><code>im:message</code>（读 + 写）<br><code>im:chat.readonly</code></td>
                 <td>读取未读消息、发送回复、获取群列表</td>
             </tr>
             <tr>
@@ -385,13 +386,13 @@ java -jar target/assistant-v2-2.0.0.jar
             <tr><td><code>chat/chat_sessions.json</code></td><td>读写</td><td>对话历史记录</td></tr>
             <tr><td><code>工作/综合日报/</code></td><td>读写</td><td>AI 生成的综合日报文件（按日期命名）</td></tr>
             <tr><td><code>工作/日报/</code></td><td>读写</td><td>手动记录的日报文件（按日期命名）</td></tr>
-            <tr><td><code>工作/周报/</code></td><td>读写</td><td>手动记录的周报文件（按年-周命名）</td></tr>
+            <tr><td><code>工作/周报/</code></td><td>读写</td><td>手动记录的周报文件（按年 - 周命名）</td></tr>
             <tr><td><code>自媒体/data/*.json</code></td><td>读写</td><td>公众号运营数据（文章、账号、日统计三个文件）</td></tr>
             <tr><td><code>企业/客户管理/*.json</code></td><td>读写</td><td>客户、线索、跟进记录数据</td></tr>
             <tr><td><code>reminders.json</code></td><td>读写</td><td>定时提醒数据（在笔记库根目录下）</td></tr>
             <tr><td><code>记忆/当前重点.md</code></td><td>只读</td><td>TODO、近期动态、关键数据</td></tr>
             <tr><td><code>记忆/项目状态.md</code></td><td>只读</td><td>各项目进展</td></tr>
-            <tr><td><code>AI记忆.md</code></td><td>只读</td><td>全局背景、产品矩阵、客户规模、战略决策</td></tr>
+            <tr><td><code>AI 记忆.md</code></td><td>只读</td><td>全局背景、产品矩阵、客户规模、战略决策</td></tr>
             <tr><td><code>提醒.md</code></td><td>读写</td><td>每日循环和临时提醒（日报生成后自动清空临时提醒）</td></tr>
         </tbody>
     </table>

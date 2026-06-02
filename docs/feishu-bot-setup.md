@@ -70,7 +70,7 @@
 
 ```bash
 mvn package -q
-java -jar target/assistant-v2-2.0.0.jar
+java -jar target/ai-assistant-2.0.0.jar
 ```
 
 ### 2. 检查日志

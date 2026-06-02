@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>老齐AI个人助理</title>
+    <title>AI 助理</title>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -297,16 +297,16 @@
 </head>
 <body>
     <div th:if="${!notesRunning}" class="port-banner">
-        <span>⚠️ 笔记库服务(端口 <span th:text="${notesPort}">14096</span>) 未启动</span>
+        <span>⚠️ 笔记库服务 (端口 <span th:text="${notesPort}">14096</span>) 未启动</span>
         <button class="port-close" onclick="this.parentElement.remove()">✕</button>
     </div>
     <div th:if="${!codeRunning}" class="port-banner" style="background:#fff3e0;border-bottom-color:#ff9800;">
-        <span>⚠️ Java项目服务(端口 <span th:text="${codePort}">14099</span>) 未启动</span>
+        <span>⚠️ Java 项目服务 (端口 <span th:text="${codePort}">14099</span>) 未启动</span>
         <button class="port-close" onclick="this.parentElement.remove()">✕</button>
     </div>
 
     <nav class="nav">
-        <span class="title">老齐AI助理</span>
+        <span class="title">AI 助理</span>
         <a th:classappend="${requestURI == '/' ? 'active' : ''}" href="/">综合</a>
         <a th:classappend="${requestURI == '/chat' ? 'active' : ''}" href="/chat">对话</a>
         <a th:classappend="${requestURI == '/browse' or requestURI == '/view' ? 'active' : ''}" href="/browse">笔记</a>

@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 mvn package -q
 
 # run (opencode serve must be running on port 14096 first)
-java -jar target/assistant-v2-2.0.0.jar
+java -jar target/ai-assistant-2.0.0.jar
 
 # web UI at http://localhost:6790
 # health check at http://localhost:6790/health

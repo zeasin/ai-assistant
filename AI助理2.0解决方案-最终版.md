@@ -146,7 +146,7 @@ modified: 2026-05-31
 ### 4.1 文件组织
 
 ```
-assistant-v2/
+ai-assistant/
 ├── src/main/java/com/laoqi/assistant/
 │   ├── AssistantApplication.java        # 启动入口
 │   ├── config/
@@ -369,7 +369,7 @@ opencode serve --port 14096
 mvn package -q
 
 # 3. 启动
-java -jar target/assistant-v2-2.0.0.jar
+java -jar target/ai-assistant-2.0.0.jar
 
 # 4. 访问
 open http://localhost:6790
