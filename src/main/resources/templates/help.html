@@ -148,7 +148,22 @@ java -jar target/ai-assistant-2.0.0.jar
     <p class="text-muted" style="line-height:1.7;">
         与 AI 助理对话，它会读取整个笔记库来回答问题。支持流式响应、实时状态显示、历史会话管理。
     </p>
+    <h3 style="margin-top:16px;margin-bottom:8px;font-size:14px;">路由规则</h3>
+    <table class="log-table">
+        <thead><tr><th>输入</th><th>路由</th><th>AI 引擎</th></tr></thead>
+        <tbody>
+            <tr><td>普通文字（默认）</td><td>📚 知识库AI</td><td>14096 端口 opencode（笔记库）</td></tr>
+            <tr><td><code>/code 你的问题</code></td><td>🔧 编程AI</td><td>14099 端口 opencode（代码分析）</td></tr>
+        </tbody>
+    </table>
+    <p class="text-muted" style="line-height:1.7;margin-top:8px;">
+        <strong>注意：</strong>路由规则基于消息前缀，而非关键词匹配。不以 <code>/code </code> 开头的消息一律走知识库AI。
+        前缀在发送给 AI 前会自动剥离，AI 不会看到 <code>/code </code> 前缀。
+    </p>
+    <h3 style="margin-top:20px;font-size:14px;">核心特性</h3>
     <ul class="text-muted" style="line-height:1.7;padding-left:20px;margin-top:8px;">
+        <li><strong>路由规则</strong> — 默认知识库，<code>/code </code> 前缀触发编程AI，互不干扰</li>
+        <li><strong>无限等待</strong> — 不设超时，AI 思考多久等多久，无需重试</li>
         <li><strong>流式响应</strong> — 回答逐字显示，无需等待全部生成完毕</li>
         <li><strong>实时状态</strong> — AI 读取笔记时显示 📖 文件名，知道它在做什么</li>
         <li><strong>历史会话</strong> — 左侧边栏保存所有对话记录，可切换、可删除</li>
@@ -294,6 +309,24 @@ java -jar target/ai-assistant-2.0.0.jar
     </ul>
     <p class="text-muted" style="line-height:1.7;">
         <strong>注意：</strong>长连接模式下，应用需保持运行。如果网络断开，系统会自动重连。
+    </p>
+
+    <h3 style="margin-top:24px;">🎯 消息路由规则（长连接模式）</h3>
+    <p class="text-muted" style="line-height:1.7;">
+        与 Web 聊天页面规则一致，所有消息默认走知识库，仅以 <code>/code </code> 开头的消息触发编程 AI。
+        前缀在发送给 AI 前自动剥离。
+    </p>
+    <table class="log-table" style="margin-top:8px;">
+        <thead><tr><th>飞书消息</th><th>路由</th><th>说明</th></tr></thead>
+        <tbody>
+            <tr><td>今天对接了1个新客户...</td><td>📚 知识库AI</td><td>默认走笔记库，读取笔记库数据回答</td></tr>
+            <tr><td>/code 帮我写个用户管理...</td><td>🔧 编程AI</td><td>走代码分析引擎，访问项目代码</td></tr>
+        </tbody>
+    </table>
+    <h4 style="margin-top:16px;margin-bottom:8px;font-size:14px;">聊天上下文隔离</h4>
+    <p class="text-muted" style="line-height:1.7;">
+        知识库对话和编程对话的聊天记录按模式分开保存。知识库历史不会混入编程上下文，反之亦然。
+        当 opencode session 过期重建时，自动注入对应模式的最近历史记录，保持对话连贯性。
     </p>
 
     <h3 style="margin-top:24px;">📋 权限汇总表</h3>

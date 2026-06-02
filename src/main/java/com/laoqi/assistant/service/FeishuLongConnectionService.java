@@ -12,6 +12,7 @@ import com.lark.oapi.service.im.v1.model.CreateMessageReqBody;
 import com.lark.oapi.service.im.v1.model.CreateMessageResp;
 import com.lark.oapi.service.im.v1.model.P2MessageReceiveV1;
 import com.lark.oapi.service.im.v1.model.ext.MessageText;
+import com.laoqi.assistant.config.AppConfig;
 import com.laoqi.assistant.model.Config;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,19 +32,23 @@ public class FeishuLongConnectionService {
     private final ConfigService configService;
     private final OpenCodeService openCodeService;
     private final LogService logService;
-    
+    private final FeishuChatSessionService feishuChatSessionService;
+    private final AppConfig appConfig;
+
     private com.lark.oapi.ws.Client wsClient;
     private Client client;
-    private String feishuSessionId;
-    private String feishuCodeSessionId;
     private final Set<String> processedMessages = ConcurrentHashMap.newKeySet();
 
     public FeishuLongConnectionService(ConfigService configService,
                                         OpenCodeService openCodeService,
-                                        LogService logService) {
+                                        LogService logService,
+                                        FeishuChatSessionService feishuChatSessionService,
+                                        AppConfig appConfig) {
         this.configService = configService;
         this.openCodeService = openCodeService;
         this.logService = logService;
+        this.feishuChatSessionService = feishuChatSessionService;
+        this.appConfig = appConfig;
     }
 
     @PostConstruct
@@ -89,7 +94,6 @@ public class FeishuLongConnectionService {
                     .eventHandler(dispatcher)
                     .build();
 
-            // 在后台线程启动，避免阻塞应用启动
             new Thread(() -> {
                 try {
                     wsClient.start();
@@ -114,7 +118,16 @@ public class FeishuLongConnectionService {
             String content = event.getEvent().getMessage().getContent();
             String chatType = event.getEvent().getMessage().getChatType();
 
-            log.info("[飞书长连接] 收到消息: msgType={}, chatType={}", msgType, chatType);
+            // 获取发送者信息
+            String senderOpenId = null;
+            try {
+                senderOpenId = event.getEvent().getSender().getSenderId().getOpenId();
+            } catch (Exception e) {
+                log.warn("[飞书长连接] 获取发送者信息失败", e);
+            }
+            if (senderOpenId == null) senderOpenId = "unknown";
+
+            log.info("[飞书长连接] 收到消息: msgType={}, chatType={}, sender={}", msgType, chatType, senderOpenId);
             log.info("[飞书长连接] 消息内容: {}", content);
 
             if (!"text".equals(msgType)) {
@@ -151,16 +164,25 @@ public class FeishuLongConnectionService {
                 processedMessages.clear();
             }
 
+            // 构造用户标识: p2p/openId 或 group/chatId/openId
+            String userKey = "p2p".equals(chatType)
+                    ? "p2p:" + senderOpenId
+                    : "group:" + chatId + ":" + senderOpenId;
+
+            // 获取或创建持久化会话
+            feishuChatSessionService.getOrCreate(userKey, chatId, chatType);
+
             String finalChatId = chatId;
             String finalChatType = chatType;
             String finalMessageId = messageId;
             String finalText = text;
+            String finalUserKey = userKey;
             new Thread(() -> {
                 try {
                     log.info("[飞书长连接] 开始处理消息: {}", finalText);
-                    boolean isCodeRelated = isCodeRelatedMessage(finalText);
+                    boolean isCodeRelated = isCodeRequest(finalText);
                     sendImmediateReply(finalChatId, finalChatType, finalMessageId, isCodeRelated);
-                    String reply = processMessage(finalText);
+                    String reply = processMessage(finalText, finalUserKey);
                     log.info("[飞书长连接] 消息处理完成，回复长度: {}", reply != null ? reply.length() : 0);
                     if (reply != null && !reply.isEmpty()) {
                         sendReply(finalChatId, reply, finalChatType, finalMessageId);
@@ -183,44 +205,26 @@ public class FeishuLongConnectionService {
         }
     }
 
-    private boolean isCodeRelatedMessage(String text) {
-        String lowerText = text.toLowerCase();
-        return lowerText.contains("项目") ||
-               lowerText.contains("代码") ||
-               lowerText.contains("bug") ||
-               lowerText.contains("启动") ||
-               lowerText.contains("java") ||
-               lowerText.contains("程序") ||
-               lowerText.contains("开发") ||
-               lowerText.contains("功能") ||
-               lowerText.contains("流程") ||
-               lowerText.contains("优化") ||
-               lowerText.contains("重构") ||
-               lowerText.contains("部署") ||
-               lowerText.contains("微服务") ||
-               lowerText.contains("service") ||
-               lowerText.contains("controller") ||
-               lowerText.contains("repository") ||
-               lowerText.contains("dao") ||
-               lowerText.contains("entity") ||
-               lowerText.contains("model") ||
-               lowerText.contains("class") ||
-               lowerText.contains("接口") ||
-               lowerText.contains("api") ||
-               lowerText.contains("文件") ||
-               lowerText.contains("目录") ||
-               lowerText.contains("包");
+    private boolean isCodeRequest(String text) {
+        return text.startsWith("/code ");
     }
 
-    private String processMessage(String text) {
+    private String stripCodePrefix(String text) {
+        return text.substring(6);
+    }
+
+    private String processMessage(String text, String userKey) {
         try {
-            if (isCodeRelatedMessage(text)) {
-                log.info("[飞书长连接] 检测到代码相关消息");
+            boolean isCode = isCodeRequest(text);
+            String actualText = isCode ? stripCodePrefix(text) : text;
+
+            if (isCode) {
+                log.info("[飞书长连接] 检测到代码请求，已剥离前缀");
                 if (!openCodeService.isCodeHealthy()) {
                     log.warn("[飞书长连接] 代码 AI 服务(14099)未启动");
                     return "⚠️ 代码 AI 服务未启动，请先启动 14099 端口的 opencode 服务";
                 }
-                String reply = processCodeMessage(text);
+                String reply = processCodeMessage(actualText, userKey);
                 return reply != null && !reply.isEmpty() ? "🔧 【编程AI】\n" + reply : reply;
             } else {
                 log.info("[飞书长连接] 检测到普通消息");
@@ -228,7 +232,7 @@ public class FeishuLongConnectionService {
                     log.warn("[飞书长连接] 笔记库 AI 服务(14096)未启动");
                     return "⚠️ 笔记库 AI 服务未启动，请先启动 14096 端口的 opencode 服务";
                 }
-                String reply = processNormalMessage(text);
+                String reply = processNormalMessage(text, userKey);
                 return reply != null && !reply.isEmpty() ? "📚 【知识库AI】\n" + reply : reply;
             }
 
@@ -239,54 +243,77 @@ public class FeishuLongConnectionService {
         }
     }
 
-    private String processCodeMessage(String text) {
-        try {
-            if (feishuCodeSessionId == null) {
-                feishuCodeSessionId = openCodeService.findIdleCodeSession();
-                if (feishuCodeSessionId == null) {
-                    feishuCodeSessionId = openCodeService.createCodeSession("飞书代码对话");
+    private String processCodeMessage(String text, String userKey) {
+        Exception lastError = null;
+        // 保存用户消息，标注为 coding 模式
+        feishuChatSessionService.saveMessage(userKey, "user", text, "coding");
+        for (int attempt = 0; attempt < 2; attempt++) {
+            try {
+                // 每次新建 session，从 feishu_sessions.json 恢复历史上下文
+                String sessionId = openCodeService.createCodeSession("飞书代码-" + userKey);
+                String context = feishuChatSessionService.buildHistoryContext(userKey, "coding");
+                String fullText = text;
+                if (context != null) {
+                    log.info("[飞书长连接] 恢复代码历史上下文");
+                    fullText = context + "\n\n---\n\n用户最新消息:\n" + text;
                 }
+
+                log.info("[飞书长连接] 发送给代码 AI: {}", fullText);
+                String reply = openCodeService.sendCodeMessage(sessionId, fullText);
+                log.info("[飞书长连接] 代码 AI 回复长度: {}", reply != null ? reply.length() : 0);
+
+                feishuChatSessionService.saveMessage(userKey, "assistant", reply, "coding");
+
+                return reply;
+
+            } catch (Exception e) {
+                log.warn("[飞书长连接] 处理代码消息失败(第{}次): {}", attempt + 1, e.getMessage());
+                lastError = e;
             }
-
-            log.info("[飞书长连接] 发送给代码 AI: {}", text);
-            String reply = openCodeService.sendCodeMessage(feishuCodeSessionId, text);
-            log.info("[飞书长连接] 代码 AI 回复长度: {}", reply != null ? reply.length() : 0);
-
-            return reply;
-
-        } catch (Exception e) {
-            log.error("[飞书长连接] 处理代码消息失败: {}", e.getMessage(), e);
-            logService.add("飞书消息", "处理失败", e.getMessage());
-            return "❌ 处理失败: " + e.getMessage();
         }
+        log.error("[飞书长连接] 处理代码消息失败", lastError);
+        logService.add("飞书消息", "处理失败", lastError.getMessage());
+        return "❌ 处理失败: " + lastError.getMessage();
     }
 
-    private String processNormalMessage(String text) {
-        try {
-            if (feishuSessionId == null) {
-                feishuSessionId = openCodeService.findIdleSession();
-                if (feishuSessionId == null) {
-                    feishuSessionId = openCodeService.createSession("飞书对话");
+    private String processNormalMessage(String text, String userKey) {
+        Exception lastError = null;
+        // 保存用户消息，标注为 knowledge 模式
+        feishuChatSessionService.saveMessage(userKey, "user", text, "knowledge");
+        for (int attempt = 0; attempt < 2; attempt++) {
+            try {
+                // 每次新建 session，从 feishu_sessions.json 恢复历史上下文
+                String sessionId = openCodeService.createSession("飞书-" + userKey);
+                String context = feishuChatSessionService.buildHistoryContext(userKey, "knowledge");
+                String fullText = text;
+                if (context != null) {
+                    log.info("[飞书长连接] 恢复知识库历史上下文");
+                    fullText = context + "\n\n---\n\n用户最新消息:\n" + text;
                 }
+
+                log.info("[飞书长连接] 发送给 AI: {}", fullText);
+                String reply = openCodeService.sendMessage(sessionId, fullText);
+                log.info("[飞书长连接] AI 回复长度: {}", reply != null ? reply.length() : 0);
+
+                feishuChatSessionService.saveMessage(userKey, "assistant", reply, "knowledge");
+
+                return reply;
+
+            } catch (Exception e) {
+                log.warn("[飞书长连接] 处理普通消息失败(第{}次): {}", attempt + 1, e.getMessage());
+                lastError = e;
             }
-
-            log.info("[飞书长连接] 发送给 AI: {}", text);
-            String reply = openCodeService.sendMessage(feishuSessionId, text);
-            log.info("[飞书长连接] AI 回复长度: {}", reply != null ? reply.length() : 0);
-
-            return reply;
-
-        } catch (Exception e) {
-            log.error("[飞书长连接] 处理普通消息失败: {}", e.getMessage(), e);
-            logService.add("飞书消息", "处理失败", e.getMessage());
-            return "❌ 处理失败: " + e.getMessage();
         }
+        log.error("[飞书长连接] 处理普通消息失败", lastError);
+        logService.add("飞书消息", "处理失败", lastError.getMessage());
+        return "❌ 处理失败: " + lastError.getMessage();
     }
 
     private void sendImmediateReply(String chatId, String chatType, String messageId, boolean isCodeRelated) {
         try {
             String waitingMsg = isCodeRelated ? "🔧 收到消息，编程AI正在思考中，请稍候..." : "📚 收到消息，知识库AI正在思考中，请稍候...";
-            String replyContent = "{\"text\":\"" + escapeJson(waitingMsg) + "\"}";
+            Map<String, String> contentMap = Map.of("text", waitingMsg);
+            String replyContent = new Gson().toJson(contentMap);
 
             if ("p2p".equals(chatType)) {
                 CreateMessageReq req = CreateMessageReq.newBuilder()
@@ -319,7 +346,8 @@ public class FeishuLongConnectionService {
 
     private void sendReply(String chatId, String reply, String chatType, String messageId) {
         try {
-            String replyContent = "{\"text\":\"" + escapeJson(reply) + "\"}";
+            Map<String, String> contentMap = Map.of("text", reply);
+            String replyContent = new Gson().toJson(contentMap);
 
             if ("p2p".equals(chatType)) {
                 CreateMessageReq req = CreateMessageReq.newBuilder()

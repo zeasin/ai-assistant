@@ -160,33 +160,8 @@ function escapeHtml(text) {
     return d.innerHTML;
 }
 
-function isCodeRelatedMessage(text) {
-    const lowerText = text.toLowerCase();
-    return lowerText.includes("项目") ||
-           lowerText.includes("代码") ||
-           lowerText.includes("bug") ||
-           lowerText.includes("启动") ||
-           lowerText.includes("java") ||
-           lowerText.includes("程序") ||
-           lowerText.includes("开发") ||
-           lowerText.includes("功能") ||
-           lowerText.includes("流程") ||
-           lowerText.includes("优化") ||
-           lowerText.includes("重构") ||
-           lowerText.includes("部署") ||
-           lowerText.includes("微服务") ||
-           lowerText.includes("service") ||
-           lowerText.includes("controller") ||
-           lowerText.includes("repository") ||
-           lowerText.includes("dao") ||
-           lowerText.includes("entity") ||
-           lowerText.includes("model") ||
-           lowerText.includes("class") ||
-           lowerText.includes("接口") ||
-           lowerText.includes("api") ||
-           lowerText.includes("文件") ||
-           lowerText.includes("目录") ||
-           lowerText.includes("包");
+function isCodeRequest(text) {
+    return text.startsWith("/code ");
 }
 
 function getAIModeName(mode) {

@@ -1,5 +1,8 @@
 package com.laoqi.assistant.service;
 
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.laoqi.assistant.config.AppConfig;
@@ -7,6 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -18,7 +22,8 @@ import java.util.*;
 public class OpenCodeService {
 
     private static final Logger log = LoggerFactory.getLogger(OpenCodeService.class);
-    private static final ObjectMapper mapper = new ObjectMapper();
+    private static final ObjectMapper mapper = new ObjectMapper()
+            .configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     private final AppConfig appConfig;
     private final HttpClient httpClient;
@@ -56,17 +61,17 @@ public class OpenCodeService {
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                .header("Content-Type", "application/json; charset=UTF-8")
+                .POST(HttpRequest.BodyPublishers.ofString(requestBody, java.nio.charset.StandardCharsets.UTF_8))
                 .timeout(Duration.ofSeconds(30))
                 .build();
 
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(java.nio.charset.StandardCharsets.UTF_8));
 
         log.info("[opencode] 创建会话响应 status={} body={}", response.statusCode(), response.body());
 
         if (response.statusCode() != 200) {
-            throw new RuntimeException("opencode createSession error: " + response.statusCode());
+            throw new RuntimeException("opencode createSession error: " + response.statusCode() + " body=" + response.body());
         }
 
         JsonNode json = mapper.readTree(response.body());
@@ -74,64 +79,123 @@ public class OpenCodeService {
     }
 
     /**
-     * Send a message synchronously via POST /session/:id/message.
-     * This blocks until the AI finishes generating the reply.
+     * Send a message via POST /session/:id/message.
+     * Streams the response and logs each part in real-time to the console,
+     * then returns the complete text reply.
      */
     public String sendMessage(String sessionId, String message) throws Exception {
+        return sendMessageStreamed(getBaseUrl(), sessionId, message, false);
+    }
+
+    public String sendCodeMessage(String sessionId, String message) throws Exception {
+        return sendMessageStreamed(getCodeBaseUrl(), sessionId, message, true);
+    }
+
+    /**
+     * Streamed version: reads the HTTP response body as a stream,
+     * uses Jackson streaming parser to extract parts as they arrive,
+     * logs each part in real-time to the backend console.
+     */
+    private String sendMessageStreamed(String baseUrl, String sessionId, String message, boolean isCode) throws Exception {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("parts", List.of(Map.of("type", "text", "text", message)));
 
-        String url = getBaseUrl() + "/session/" + sessionId + "/message";
+        String url = baseUrl + "/session/" + sessionId + "/message";
         String requestBody = mapper.writeValueAsString(body);
+        String label = isCode ? "[opencode-code]" : "[opencode]";
 
-        log.info("[opencode] 发送消息 POST {} sessionId={} message={}", url, sessionId, message);
+        log.info("{} 发送消息 POST {} sessionId={}", label, url, sessionId);
 
         long start = System.currentTimeMillis();
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
-                .timeout(Duration.ofSeconds(900)) // 15分钟超时，支持大型笔记库
+                .header("Content-Type", "application/json; charset=UTF-8")
+                .POST(HttpRequest.BodyPublishers.ofString(requestBody, java.nio.charset.StandardCharsets.UTF_8))
+                .timeout(Duration.ofMinutes(10))
                 .build();
 
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<InputStream> response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
 
         long elapsed = System.currentTimeMillis() - start;
-
-        log.info("[opencode] 消息响应 status={} 耗时={}ms", response.statusCode(), elapsed);
-        log.info("[opencode] 响应体: {}", truncate(response.body(), 2000));
+        log.info("{} 消息响应 status={} 耗时={}ms", label, response.statusCode(), elapsed);
 
         if (response.statusCode() != 200) {
-            throw new RuntimeException("opencode sendMessage error: " + response.statusCode() + " body=" + response.body());
+            String errorBody = new String(response.body().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+            throw new RuntimeException(label + " error: " + response.statusCode() + " body=" + errorBody);
         }
 
-        return extractReplyText(response.body());
-    }
+        // 流式读取响应体，逐 part 实时打印到控制台
+        StringBuilder textReply = new StringBuilder();
+        try (InputStream is = response.body()) {
+            // 先用额外线程读取网络流到字节缓冲区，当前线程逐块解析
+            // 这样一旦有数据到达就处理，而非等全部读完
+            java.util.concurrent.LinkedBlockingQueue<byte[]> chunks = new java.util.concurrent.LinkedBlockingQueue<>();
+            java.util.concurrent.atomic.AtomicBoolean done = new java.util.concurrent.atomic.AtomicBoolean(false);
+            java.util.concurrent.atomic.AtomicReference<Exception> readError = new java.util.concurrent.atomic.AtomicReference<>();
 
-    /**
-     * Extract the assistant's text reply from the response JSON
-     */
-    private String extractReplyText(String responseBody) throws Exception {
-        JsonNode root = mapper.readTree(responseBody);
-        JsonNode parts = root.get("parts");
-        if (parts == null || !parts.isArray()) {
-            log.warn("[opencode] 响应中未找到 parts 字段, keys={}", root.fieldNames());
-            return "";
-        }
+            // 后台线程持续读取网络流
+            Thread reader = new Thread(() -> {
+                try {
+                    byte[] buf = new byte[8192];
+                    int len;
+                    while ((len = is.read(buf, 0, buf.length)) != -1) {
+                        byte[] chunk = new byte[len];
+                        System.arraycopy(buf, 0, chunk, 0, len);
+                        chunks.put(chunk);
+                    }
+                } catch (Exception e) {
+                    readError.set(e);
+                } finally {
+                    done.set(true);
+                }
+            }, label + "-stream-reader");
+            reader.setDaemon(true);
+            reader.start();
 
-        StringBuilder sb = new StringBuilder();
-        for (JsonNode part : parts) {
-            String type = part.get("type").asText();
-            if ("text".equals(type)) {
-                sb.append(part.get("text").asText());
+            // 主线程从队列取数据，追加到缓冲区，当检测到完整 parts 时打印
+            StringBuilder jsonBuf = new StringBuilder();
+            int partsLogged = 0;
+
+            while (!done.get() || !chunks.isEmpty()) {
+                byte[] chunk = chunks.poll(200, java.util.concurrent.TimeUnit.MILLISECONDS);
+                if (chunk != null) {
+                    jsonBuf.append(new String(chunk, java.nio.charset.StandardCharsets.UTF_8));
+                }
+                // 尝试从当前缓冲区提取所有可解析的 parts
+                partsLogged = tryExtractParts(jsonBuf, partsLogged, textReply, label);
+            }
+            // 最后再尝试解析一次（可能还有剩余数据）
+            tryExtractParts(jsonBuf, partsLogged, textReply, label);
+
+            Exception err = readError.get();
+            if (err != null) {
+                log.warn("{} 流读取异常: {}", label, err.getMessage());
+            }
+
+            if (textReply.length() == 0) {
+                // 如果没解析出 text，尝试从完整 JSON 中提取
+                String fullJson = jsonBuf.toString();
+                if (!fullJson.isEmpty()) {
+                    log.info("{} 尝试从完整响应提取文本, 长度={}", label, fullJson.length());
+                    JsonNode root = mapper.readTree(fullJson);
+                    if (root.has("text")) {
+                        textReply.append(root.get("text").asText());
+                    } else if (root.has("parts")) {
+                        // 重新解析一次确保不漏
+                    }
+                    // 诊断日志
+                    Set<String> fields = new LinkedHashSet<>();
+                    root.fieldNames().forEachRemaining(fields::add);
+                    log.info("{} 响应根字段: {}", label, fields);
+                }
             }
         }
 
-        String reply = sb.toString();
-        log.info("[opencode] 提取回复文本 长度={}", reply.length());
-
-        return reply;
+        long totalElapsed = System.currentTimeMillis() - start;
+        String result = textReply.toString();
+        log.info("{} 处理完成, 文本长度={}, 总耗时={}ms", label, result.length(), totalElapsed);
+        return result;
     }
 
     /**
@@ -166,27 +230,68 @@ public class OpenCodeService {
     }
 
     /**
-     * Check if the opencode serve is healthy
+     * Check if the opencode serve is healthy via TCP port check
      */
     public boolean isHealthy() {
+        return checkPort(appConfig.getNotesPort());
+    }
+
+    /**
+     * Try to extract and log parts from the JSON buffer incrementally.
+     * Looks for the parts array and logs any new parts found.
+     * Returns the number of parts logged so far.
+     */
+    private int tryExtractParts(StringBuilder jsonBuf, int alreadyLogged, StringBuilder textReply, String label) {
+        String json = jsonBuf.toString();
+        if (!json.contains("\"parts\"")) {
+            return alreadyLogged;
+        }
         try {
-            String url = getBaseUrl() + "/global/health";
+            JsonNode root = mapper.readTree(json);
+            JsonNode parts = root.get("parts");
+            if (parts == null || !parts.isArray() || parts.size() <= alreadyLogged) {
+                return alreadyLogged;
+            }
 
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .GET()
-                    .timeout(Duration.ofSeconds(5))
-                    .build();
+            for (int i = alreadyLogged; i < parts.size(); i++) {
+                JsonNode part = parts.get(i);
+                String type = part.has("type") ? part.get("type").asText() : "unknown";
 
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-
-            log.debug("[opencode] 健康检查响应 status={} body={}", response.statusCode(), response.body());
-
-            JsonNode json = mapper.readTree(response.body());
-            return json.get("healthy").asBoolean();
+                switch (type) {
+                    case "text":
+                        String text = part.get("text").asText();
+                        log.info("{} [{}][part={}] {}", label, type, i, truncate(text, 500));
+                        textReply.append(text);
+                        break;
+                    case "reasoning":
+                    case "thinking":
+                        String reasoning = part.has("reasoning") ? part.get("reasoning").asText()
+                                                : part.has("thinking") ? part.get("thinking").asText() : "";
+                        if (!reasoning.isEmpty()) {
+                            log.info("{} [{}][part={}] {}", label, type, i, truncate(reasoning, 500));
+                        }
+                        break;
+                    case "tool_use":
+                        String toolName = part.has("name") ? part.get("name").asText() : "?";
+                        String toolInput = part.has("input") ? part.get("input").toString() : "";
+                        log.info("{} [{}][part={}] name={} input={}",
+                                label, type, i, toolName, truncate(toolInput, 300));
+                        break;
+                    case "tool_result":
+                        String result = part.has("content") ? part.get("content").toString()
+                                                : part.has("result") ? part.get("result").toString() : "";
+                        log.info("{} [{}][part={}] result={}",
+                                label, type, i, truncate(result, 300));
+                        break;
+                    default:
+                        log.info("{} [{}][part={}] {}", label, type, i, truncate(part.toString(), 300));
+                        break;
+                }
+            }
+            return parts.size();
         } catch (Exception e) {
-            log.warn("[opencode] 健康检查失败: {}", e.getMessage());
-            return false;
+            // JSON 还没完整，或者 parts 还没解析完，忽略
+            return alreadyLogged;
         }
     }
 
@@ -203,63 +308,21 @@ public class OpenCodeService {
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                .header("Content-Type", "application/json; charset=UTF-8")
+                .POST(HttpRequest.BodyPublishers.ofString(requestBody, java.nio.charset.StandardCharsets.UTF_8))
                 .timeout(Duration.ofSeconds(30))
                 .build();
 
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(java.nio.charset.StandardCharsets.UTF_8));
 
         log.info("[opencode-code] 创建会话响应 status={} body={}", response.statusCode(), response.body());
 
         if (response.statusCode() != 200) {
-            throw new RuntimeException("opencode createCodeSession error: " + response.statusCode());
+            throw new RuntimeException("opencode createCodeSession error: " + response.statusCode() + " body=" + response.body());
         }
 
         JsonNode json = mapper.readTree(response.body());
         return json.get("id").asText();
-    }
-
-    public String sendCodeMessage(String sessionId, String message) throws Exception {
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("parts", List.of(Map.of("type", "text", "text", message)));
-
-        String url = getCodeBaseUrl() + "/session/" + sessionId + "/message";
-        String requestBody = mapper.writeValueAsString(body);
-
-        log.info("[opencode-code] 发送消息 POST {} sessionId={} message={}", url, sessionId, message);
-
-        long start = System.currentTimeMillis();
-
-        try {
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(requestBody))
-                    .timeout(Duration.ofSeconds(900)) // 15分钟超时，支持大型项目分析
-                    .build();
-
-            log.debug("[opencode-code] 请求已构建，准备发送...");
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            log.debug("[opencode-code] 请求已发送，等待响应...");
-
-            long elapsed = System.currentTimeMillis() - start;
-
-            log.info("[opencode-code] 消息响应 status={} 耗时={}ms", response.statusCode(), elapsed);
-            log.info("[opencode-code] 响应体: {}", truncate(response.body(), 2000));
-
-            if (response.statusCode() != 200) {
-                throw new RuntimeException("opencode sendCodeMessage error: " + response.statusCode() + " body=" + response.body());
-            }
-
-            String reply = extractReplyText(response.body());
-            log.info("[opencode-code] 提取回复文本 长度={}", reply.length());
-            return reply;
-        } catch (Exception e) {
-            long elapsed = System.currentTimeMillis() - start;
-            log.error("[opencode-code] 发送消息失败，耗时={}ms: {}", elapsed, e.getMessage(), e);
-            throw e;
-        }
     }
 
     public String findIdleCodeSession() {
@@ -291,23 +354,43 @@ public class OpenCodeService {
     }
 
     public boolean isCodeHealthy() {
-        try {
-            String url = getCodeBaseUrl() + "/global/health";
+        return checkPort(appConfig.getCodePort());
+    }
 
+    /**
+     * Check if an opencode session is still valid by querying the session list.
+     */
+    public boolean isSessionValid(int port, String sessionId) {
+        String baseUrl = "http://127.0.0.1:" + port;
+        try {
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
+                    .uri(URI.create(baseUrl + "/session"))
                     .GET()
                     .timeout(Duration.ofSeconds(5))
                     .build();
-
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-
-            log.debug("[opencode-code] 健康检查响应 status={} body={}", response.statusCode(), response.body());
-
-            JsonNode json = mapper.readTree(response.body());
-            return json.get("healthy").asBoolean();
+            if (response.statusCode() != 200) return false;
+            JsonNode sessions = mapper.readTree(response.body());
+            if (sessions.isArray()) {
+                for (JsonNode s : sessions) {
+                    if (s.has("id") && sessionId.equals(s.get("id").asText())) {
+                        return true;
+                    }
+                }
+            }
+            return false;
         } catch (Exception e) {
-            log.warn("[opencode-code] 健康检查失败: {}", e.getMessage());
+            log.warn("[opencode] 验证 session {} 有效性失败: {}", sessionId, e.getMessage());
+            return false;
+        }
+    }
+
+    private boolean checkPort(int port) {
+        try (java.net.Socket s = new java.net.Socket()) {
+            s.connect(new java.net.InetSocketAddress("127.0.0.1", port), 2000);
+            return true;
+        } catch (Exception e) {
+            log.warn("[opencode] 端口 {} 检查失败: {}", port, e.getMessage());
             return false;
         }
     }

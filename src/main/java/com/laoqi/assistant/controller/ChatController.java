@@ -39,34 +39,8 @@ public class ChatController {
         this.appConfig = appConfig;
     }
 
-    private boolean isCodeRelatedMessage(String text) {
-        String lowerText = text.toLowerCase();
-        return lowerText.contains("项目") ||
-               lowerText.contains("代码") ||
-               lowerText.contains("bug") ||
-               lowerText.contains("启动") ||
-               lowerText.contains("java") ||
-               lowerText.contains("程序") ||
-               lowerText.contains("开发") ||
-               lowerText.contains("功能") ||
-               lowerText.contains("流程") ||
-               lowerText.contains("优化") ||
-               lowerText.contains("重构") ||
-               lowerText.contains("部署") ||
-               lowerText.contains("微服务") ||
-               lowerText.contains("service") ||
-               lowerText.contains("controller") ||
-               lowerText.contains("repository") ||
-               lowerText.contains("dao") ||
-               lowerText.contains("entity") ||
-               lowerText.contains("model") ||
-               lowerText.contains("class") ||
-               lowerText.contains("接口") ||
-               lowerText.contains("api") ||
-               lowerText.contains("文件") ||
-               lowerText.contains("目录") ||
-               lowerText.contains("包");
-    }
+
+    private static final String CODE_PREFIX = "/code ";
 
     @GetMapping
     public String chatPage(@RequestParam(required = false, defaultValue = "") String id,
@@ -157,26 +131,34 @@ public class ChatController {
         return "chat";
     }
 
+    /**
+     * 判断是否为编程AI请求：以 /code 开头
+     */
+    private boolean isCodeRequest(String text) {
+        return text.startsWith(CODE_PREFIX);
+    }
+
+    private String stripCodePrefix(String text) {
+        return text.substring(CODE_PREFIX.length());
+    }
+
     @PostMapping
     public SseEmitter chat(@RequestParam String message,
                             @RequestParam(name = "session_id") String sessionId) {
         log.info("收到对话请求: message={}, sessionId={}", message, sessionId);
-        SseEmitter emitter = new SseEmitter(1_800_000L); // 30分钟超时，支持大型笔记库
+        SseEmitter emitter = new SseEmitter(0L); // 不设超时，等待AI回复
 
         // 注册完成和超时回调
         emitter.onCompletion(() -> log.info("[chat] SSE 连接完成"));
-        emitter.onTimeout(() -> {
-            log.warn("[chat] SSE 连接超时");
-            emitter.complete();
-        });
         emitter.onError((ex) -> log.error("[chat] SSE 连接错误", ex));
 
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
-                // 自动判断使用哪个AI服务
-                boolean isCodeRelated = isCodeRelatedMessage(message);
+                // 以 /code 前缀判断是否走编程AI，否则默认走知识库
+                boolean isCodeRelated = isCodeRequest(message);
                 String mode = isCodeRelated ? "coding" : "knowledge";
-                
+                String actualMessage = isCodeRelated ? stripCodePrefix(message) : message;
+
                 if (isCodeRelated) {
                     if (!openCodeService.isCodeHealthy()) {
                         sendError(emitter, "编程AI服务未启动，请确保 opencode serve 已在端口 " + appConfig.getCodePort() + " 运行");
@@ -193,12 +175,12 @@ public class ChatController {
                 
                 String opencodeSessionId = isCodeRelated ? ensureCodeSession(sessionId) : ensureOpenCodeSession(sessionId);
                 
-                log.info("[chat] 开始发送消息到 opencode, sessionId={}, mode={}", opencodeSessionId, mode);
+                log.info("[chat] 开始发送消息到 opencode, sessionId={}, mode={}, strippedPrefix={}", opencodeSessionId, mode, isCodeRelated);
                 String reply;
                 if (isCodeRelated) {
-                    reply = openCodeService.sendCodeMessage(opencodeSessionId, message);
+                    reply = openCodeService.sendCodeMessage(opencodeSessionId, actualMessage);
                 } else {
-                    reply = openCodeService.sendMessage(opencodeSessionId, message);
+                    reply = openCodeService.sendMessage(opencodeSessionId, actualMessage);
                 }
                 log.info("[chat] 收到 opencode 回复, 长度={}", reply != null ? reply.length() : 0);
 
