@@ -1,4 +1,4 @@
-# AI 助理 (AIMate)
+# AI 助理 (AI Assistant)
 
 > **用你的数据，做你的 AI 助理。**
 
