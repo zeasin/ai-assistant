@@ -189,12 +189,13 @@ async function sendMessage() {
     btn.disabled = true; btn.textContent = '⏳ 思考中...';
     replyText = '';
 
-    // 保存用户消息到当前会话
-    await saveMessage('user', msg, 'knowledge');
+    // 保存用户消息到当前会话（根据 /code 前缀区分模式）
+    const userMode = isCodeRequest(msg) ? 'coding' : 'knowledge';
+    await saveMessage('user', msg, userMode);
     box.innerHTML += `<div class="chat-msg user"><div class="label">你</div><div class="text">${escapeHtml(msg)}</div></div>`;
     box.scrollTop = box.scrollHeight;
 
-    let aiMode = 'knowledge';  // 默认值，会从后端更新
+    let aiMode = userMode;  // 根据消息前缀决定初始模式，后端 SSE 会进一步确认
     const aiMsgId = 'ai-' + Date.now();
     box.innerHTML += `<div class="chat-msg ai" id="${aiMsgId}">
         <div class="label" id="ai-label-${aiMsgId}">🤖 AI 助理</div>

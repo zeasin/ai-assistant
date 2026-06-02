@@ -172,15 +172,26 @@ public class ChatController {
                 }
 
                 sendStatus(emitter, mode, "⏳ 正在思考...");
-                
-                String opencodeSessionId = isCodeRelated ? ensureCodeSession(sessionId) : ensureOpenCodeSession(sessionId);
-                
-                log.info("[chat] 开始发送消息到 opencode, sessionId={}, mode={}, strippedPrefix={}", opencodeSessionId, mode, isCodeRelated);
+
+                // Build conversation history context (same approach as Feishu)
+                String context = sessionService.buildHistoryContext(sessionId, mode);
+                String fullMessage = actualMessage;
+                if (context != null) {
+                    log.info("[chat] 恢复对话历史上下文, sessionId={}, mode={}", sessionId, mode);
+                    fullMessage = context + "\n\n---\n\n用户最新消息:\n" + actualMessage;
+                }
+
+                // Always create a new opencode session for each request (same as Feishu)
+                String opencodeSessionId = isCodeRelated
+                        ? openCodeService.createCodeSession("chat-" + sessionId)
+                        : openCodeService.createSession("chat-" + sessionId);
+
+                log.info("[chat] 开始发送消息到 opencode, opencodeSessionId={}, mode={}", opencodeSessionId, mode);
                 String reply;
                 if (isCodeRelated) {
-                    reply = openCodeService.sendCodeMessage(opencodeSessionId, actualMessage);
+                    reply = openCodeService.sendCodeMessage(opencodeSessionId, fullMessage);
                 } else {
-                    reply = openCodeService.sendMessage(opencodeSessionId, actualMessage);
+                    reply = openCodeService.sendMessage(opencodeSessionId, fullMessage);
                 }
                 log.info("[chat] 收到 opencode 回复, 长度={}", reply != null ? reply.length() : 0);
 
@@ -210,17 +221,6 @@ public class ChatController {
         return emitter;
     }
 
-    private String ensureCodeSession(String chatSessionId) throws Exception {
-        String idleSessionId = openCodeService.findIdleCodeSession();
-        if (idleSessionId != null) {
-            log.info("[chat-code] 复用已有 session: {}", idleSessionId);
-            return idleSessionId;
-        }
-
-        log.info("[chat-code] 没有空闲 session，创建新 session");
-        return openCodeService.createCodeSession("chat-" + chatSessionId);
-    }
-
     @PostMapping("/session/save")
     @ResponseBody
     public Map<String, Object> saveSession(@RequestParam(name = "session_id") String sessionId,
@@ -239,19 +239,6 @@ public class ChatController {
     public Map<String, Object> deleteSession(@RequestParam(name = "session_id") String sessionId) {
         sessionService.deleteSession(sessionId);
         return Map.of("ok", true);
-    }
-
-    private String ensureOpenCodeSession(String chatSessionId) throws Exception {
-        // Try to find an idle session to reuse
-        String idleSessionId = openCodeService.findIdleSession();
-        if (idleSessionId != null) {
-            log.info("[chat] 复用已有 session: {}", idleSessionId);
-            return idleSessionId;
-        }
-
-        // No idle session, create a new one
-        log.info("[chat] 没有空闲 session，创建新 session");
-        return openCodeService.createSession("chat-" + chatSessionId);
     }
 
     private void sendStatus(SseEmitter emitter, String mode, String text) {

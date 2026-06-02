@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.laoqi.assistant.config.AppConfig;
 import com.laoqi.assistant.model.ChatSession;
+import com.laoqi.assistant.model.ChatSession.ChatMessage;
 import com.laoqi.assistant.model.Config;
 import com.laoqi.assistant.util.FileUtil;
 import com.laoqi.assistant.util.TimeUtil;
@@ -13,6 +14,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class ChatSessionService {
@@ -103,5 +105,40 @@ public class ChatSessionService {
         return data.sessions.stream()
                 .filter(s -> s.getId().equals(sessionId))
                 .findFirst().orElse(null);
+    }
+
+    /**
+     * Build a context prompt from message history of a chat session,
+     * for prepending to the current AI request (same approach as Feishu).
+     */
+    public String buildHistoryContext(String sessionId, String mode) {
+        ChatSession session = getSession(sessionId);
+        if (session == null) return null;
+
+        List<ChatMessage> messages = session.getMessages();
+        if (messages == null || messages.isEmpty()) return null;
+
+        // Filter by mode if specified
+        List<ChatMessage> filtered;
+        if (mode != null && !mode.isEmpty()) {
+            filtered = messages.stream()
+                    .filter(m -> mode.equals(m.getMode()))
+                    .collect(Collectors.toList());
+        } else {
+            filtered = new ArrayList<>(messages);
+        }
+
+        if (filtered.isEmpty()) return null;
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("以下是之前的对话历史，供参考：\n\n");
+
+        for (ChatMessage msg : filtered) {
+            String label = "user".equals(msg.getRole()) ? "用户" : "AI";
+            sb.append(label).append(": ").append(msg.getContent()).append("\n\n");
+        }
+
+        sb.append("---\n\n请基于以上历史对话，继续回复用户的最新消息。");
+        return sb.toString();
     }
 }
