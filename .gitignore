@@ -67,3 +67,6 @@ cert/
 assistant_log.json
 
 *.jar
+.claude
+AGENTS.md
+CLAUDE.md
