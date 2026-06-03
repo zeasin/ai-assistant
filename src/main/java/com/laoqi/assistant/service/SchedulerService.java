@@ -137,35 +137,41 @@ public class SchedulerService {
     @Scheduled(cron = "0 0 18 * * ?", zone = "Asia/Shanghai")
     public void dailyReportReminder() {
         log.info("[{}] ⏰ 定时任务：下班日报提醒", TimeUtil.nowStr());
-        feishuService.dailyReportReminder();
-        logService.add("下班提醒", "成功");
+        boolean ok = feishuService.dailyReportReminder();
+        logService.add("下班提醒", ok ? "成功" : "失败");
     }
 
     @Scheduled(cron = "0 0 9 ? * TUE", zone = "Asia/Shanghai")
     public void articleTuesday() {
         log.info("[{}] ⏰ 定时任务：周二发文提醒", TimeUtil.nowStr());
-        feishuService.articleReminder("码农老齐", "周二");
-        logService.add("周二发文提醒", "成功");
+        boolean ok = feishuService.articleReminder("码农老齐", "周二");
+        logService.add("周二发文提醒", ok ? "成功" : "失败");
     }
 
     @Scheduled(cron = "0 0 9 ? * THU", zone = "Asia/Shanghai")
     public void articleThursday() {
         log.info("[{}] ⏰ 定时任务：周四发文提醒", TimeUtil.nowStr());
-        feishuService.articleReminder("启航电商ERP", "周四");
-        logService.add("周四发文提醒", "成功");
+        boolean ok = feishuService.articleReminder("启航电商ERP", "周四");
+        logService.add("周四发文提醒", ok ? "成功" : "失败");
     }
 
     @Scheduled(cron = "0 * * * * ?", zone = "Asia/Shanghai")
     public void checkDynamicReminders() {
         try {
+            log.info("[{}] ⏰ 检查动态提醒...", TimeUtil.nowStr());
             List<Reminder> dueReminders = reminderService.getDueReminders();
-            for (Reminder r : dueReminders) {
-                log.info("[{}] ⏰ 触发动态提醒：{}", TimeUtil.nowStr(), r.name);
-                reminderService.triggerReminder(r);
-                logService.add("定时提醒", "成功", r.name);
+            if (dueReminders.isEmpty()) {
+                log.info("[{}] ⏰ 没有到期的提醒", TimeUtil.nowStr());
+            } else {
+                log.info("[{}] ⏰ 找到 {} 个到期的提醒", TimeUtil.nowStr(), dueReminders.size());
+                for (Reminder r : dueReminders) {
+                    log.info("[{}] ⏰ 触发动态提醒：{}", TimeUtil.nowStr(), r.name);
+                    reminderService.triggerReminder(r);
+                    logService.add("定时提醒", "成功", r.name);
+                }
             }
         } catch (Exception e) {
-            log.error("[提醒] 检查动态提醒失败: {}", e.getMessage());
+            log.error("[提醒] 检查动态提醒失败: {}", e.getMessage(), e);
         }
     }
 }

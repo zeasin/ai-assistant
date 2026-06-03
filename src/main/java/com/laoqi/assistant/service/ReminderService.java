@@ -92,10 +92,33 @@ public class ReminderService {
         r.message = message;
         r.type = type;
         r.time = normalizeTime(time);
-        r.date = date;
-        r.dayOfWeek = dayOfWeek;
-        r.dayOfMonth = dayOfMonth;
-        r.monthDay = monthDay;
+        // 根据提醒类型只设置相关的字段，其他字段置空
+        if ("once".equals(type)) {
+            r.date = date;
+            r.dayOfWeek = null;
+            r.dayOfMonth = null;
+            r.monthDay = null;
+        } else if ("weekly".equals(type)) {
+            r.date = null;
+            r.dayOfWeek = dayOfWeek;
+            r.dayOfMonth = null;
+            r.monthDay = null;
+        } else if ("monthly".equals(type)) {
+            r.date = null;
+            r.dayOfWeek = null;
+            r.dayOfMonth = dayOfMonth;
+            r.monthDay = null;
+        } else if ("yearly".equals(type)) {
+            r.date = null;
+            r.dayOfWeek = null;
+            r.dayOfMonth = null;
+            r.monthDay = monthDay;
+        } else { // daily
+            r.date = null;
+            r.dayOfWeek = null;
+            r.dayOfMonth = null;
+            r.monthDay = null;
+        }
         r.enabled = true;
         r.createdAt = LocalDateTime.now(TZ).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
 
@@ -122,13 +145,39 @@ public class ReminderService {
                     r.time = normalizeTime(time);
                     r.lastTriggered = null; // 改时间后重置触发状态
                 }
-                if (date != null) {
-                    r.date = date;
-                    r.lastTriggered = null; // 改日期后重置触发状态
+                
+                // 根据提醒类型只设置相关的字段，其他字段置空
+                String reminderType = (type != null) ? type : r.type;
+                if ("once".equals(reminderType)) {
+                    if (date != null) {
+                        r.date = date;
+                        r.lastTriggered = null;
+                    }
+                    r.dayOfWeek = null;
+                    r.dayOfMonth = null;
+                    r.monthDay = null;
+                } else if ("weekly".equals(reminderType)) {
+                    r.date = null;
+                    if (dayOfWeek != null) r.dayOfWeek = dayOfWeek;
+                    r.dayOfMonth = null;
+                    r.monthDay = null;
+                } else if ("monthly".equals(reminderType)) {
+                    r.date = null;
+                    r.dayOfWeek = null;
+                    if (dayOfMonth != null) r.dayOfMonth = dayOfMonth;
+                    r.monthDay = null;
+                } else if ("yearly".equals(reminderType)) {
+                    r.date = null;
+                    r.dayOfWeek = null;
+                    r.dayOfMonth = null;
+                    if (monthDay != null) r.monthDay = monthDay;
+                } else { // daily
+                    r.date = null;
+                    r.dayOfWeek = null;
+                    r.dayOfMonth = null;
+                    r.monthDay = null;
                 }
-                if (dayOfWeek != null) r.dayOfWeek = dayOfWeek;
-                if (dayOfMonth != null) r.dayOfMonth = dayOfMonth;
-                if (monthDay != null) r.monthDay = monthDay;
+                
                 if (enabled != null) r.enabled = enabled;
                 root.meta.put("lastUpdated", LocalDate.now(TZ).toString());
                 save(root);
@@ -190,7 +239,11 @@ public class ReminderService {
                     List.of(Map.of("tag", "text", "text", "━━━━━━━━━━━━━━━━━━")),
                     List.of(Map.of("tag", "text", "text", r.message != null ? r.message : "该提醒了！"))
             );
-            feishuService.sendPost("🔔 " + r.name, content);
+            boolean success = feishuService.sendPost("🔔 " + r.name, content);
+            if (!success) {
+                log.warn("[提醒] 触发失败(飞书发送未成功): {}", r.name);
+                return;
+            }
 
             Root root = load();
             if (root.reminders != null) {

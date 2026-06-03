@@ -87,25 +87,37 @@ public class FeishuService {
     }
 
     // Webhook-based message push
-    public void sendPost(String title, List<List<Map<String, String>>> paragraphs) {
+    // Returns true on success, false on failure
+    public boolean sendPost(String title, List<List<Map<String, String>>> paragraphs) {
         var config = configService.load();
         String webhookUrl = config.getFeishuWebhookUrl();
         if (webhookUrl == null || webhookUrl.isEmpty()) {
             String msg = "未配置 Webhook URL";
             log.warn("[飞书推送] {}", msg);
             logService.add("飞书推送", "跳过", msg);
-            return;
+            return false;
         }
         try {
             String body = "{\"msg_type\":\"post\",\"content\":{\"post\":{\"zh_cn\":{\"title\":\"" +
                     escapeJson(title) + "\",\"content\":" + toJson(paragraphs) + "}}}}";
             log.info("[飞书推送] 发送消息: title={}", title);
             String response = httpPost(webhookUrl, body, "application/json; charset=utf-8");
+            // 验证webhook响应是否成功
+            Map<String, Object> json = parseJson(response);
+            Object code = json.get("code");
+            if (code != null && !"0".equals(String.valueOf(code))) {
+                String errMsg = "Webhook响应异常: " + json.get("msg");
+                log.error("[飞书推送] {}", errMsg);
+                logService.add("飞书推送", "失败", title + " - " + errMsg);
+                return false;
+            }
             log.info("[飞书推送] 发送成功, 响应: {}", response);
             logService.add("飞书推送", "成功", title);
+            return true;
         } catch (IOException e) {
             log.error("[飞书推送] 发送失败: {}", e.getMessage(), e);
             logService.add("飞书推送", "失败", e.getMessage());
+            return false;
         }
     }
 
@@ -135,15 +147,15 @@ public class FeishuService {
         return paras;
     }
 
-    public void articleReminder(String name, String day) {
-        sendPost("📝 " + name + " 发文提醒", List.of(
+    public boolean articleReminder(String name, String day) {
+        return sendPost("📝 " + name + " 发文提醒", List.of(
                 List.of(Map.of("tag", "text", "text", "今天是" + day + "，该发「" + name + "」公众号了！")),
                 List.of(Map.of("tag", "text", "text", "写完记得多平台分发：知乎 / CSDN / 开源中国"))
         ));
     }
 
-    public void dailyReportReminder() {
-        sendPost("📝 下班日报提醒", List.of(
+    public boolean dailyReportReminder() {
+        return sendPost("📝 下班日报提醒", List.of(
                 List.of(Map.of("tag", "text", "text", "到6点了老齐，写一下今天的工作记录！")),
                 List.of(Map.of("tag", "text", "text", "━━━━━━━━━━━━━━━━━━")),
                 List.of(Map.of("tag", "text", "text", "写完后我来帮你更新记忆文件，明天综合日报就会包含这些内容。")),

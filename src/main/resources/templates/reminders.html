@@ -410,10 +410,17 @@ async function saveReminder() {
     formData.append('message', message);
     formData.append('type', type);
     formData.append('time', time);
-    formData.append('date', date);
-    formData.append('dayOfWeek', dayOfWeek);
-    formData.append('dayOfMonth', dayOfMonth);
-    formData.append('monthDay', monthDay);
+    
+    // 根据提醒类型只发送相关的字段
+    if (type === 'once') {
+        formData.append('date', date);
+    } else if (type === 'weekly') {
+        formData.append('dayOfWeek', dayOfWeek);
+    } else if (type === 'monthly') {
+        formData.append('dayOfMonth', dayOfMonth);
+    } else if (type === 'yearly') {
+        formData.append('monthDay', monthDay);
+    }
 
     try {
         var resp = await fetch(url, {

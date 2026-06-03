@@ -47,9 +47,9 @@ public class FileUtil {
             String json = mapper.writeValueAsString(obj);
             log.info("Serialized JSON length={}, contains mediaCollectEnabled={}", 
                     json.length(), json.contains("mediaCollectEnabled"));
-            if (json.length() < 2000) {
-                log.info("JSON content: {}", json);
-            }
+//            if (json.length() < 2000) {
+//                log.info("JSON content: {}", json);
+//            }
             
             mapper.writeValue(path.toFile(), obj);
             log.info("Successfully wrote JSON to {}", path);
