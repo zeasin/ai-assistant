@@ -51,7 +51,7 @@ public class SchedulerService {
         reportService.generateAndPush();
     }
 
-    @Scheduled(cron = "0 0 8 * * ?", zone = "Asia/Shanghai")
+    @Scheduled(cron = "0 30 11 * * ?", zone = "Asia/Shanghai")
     public void morningOperationsAnalysis() {
         log.info("[{}] ⏰ 定时任务：生成运营AI分析", TimeUtil.nowStr());
         try {
