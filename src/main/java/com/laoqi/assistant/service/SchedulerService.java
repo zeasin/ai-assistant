@@ -22,24 +22,81 @@ public class SchedulerService {
     private final MediaDataCollectorService mediaDataCollectorService;
     private final ConfigService configService;
     private final ReminderService reminderService;
+    private final OperationsService operationsService;
+    private final CustomerService customerService;
+    private final com.laoqi.assistant.controller.WorkReportController workReportController;
 
     public SchedulerService(ReportService reportService, FeishuService feishuService,
                             LogService logService,
                             MediaDataCollectorService mediaDataCollectorService,
                             ConfigService configService,
-                            ReminderService reminderService) {
+                            ReminderService reminderService,
+                            OperationsService operationsService,
+                            CustomerService customerService,
+                            com.laoqi.assistant.controller.WorkReportController workReportController) {
         this.reportService = reportService;
         this.feishuService = feishuService;
         this.logService = logService;
         this.mediaDataCollectorService = mediaDataCollectorService;
         this.configService = configService;
         this.reminderService = reminderService;
+        this.operationsService = operationsService;
+        this.customerService = customerService;
+        this.workReportController = workReportController;
     }
 
     @Scheduled(cron = "0 30 9 * * ?", zone = "Asia/Shanghai")
     public void morningReport() {
         log.info("[{}] ⏰ 定时任务：生成综合日报", TimeUtil.nowStr());
         reportService.generateAndPush();
+    }
+
+    @Scheduled(cron = "0 0 8 * * ?", zone = "Asia/Shanghai")
+    public void morningOperationsAnalysis() {
+        log.info("[{}] ⏰ 定时任务：生成运营AI分析", TimeUtil.nowStr());
+        try {
+            String result = operationsService.aiAnalyze(true);
+            if (result != null && !result.isEmpty()) {
+                logService.add("运营AI分析", "成功", "定时任务自动生成");
+            } else {
+                logService.add("运营AI分析", "失败", "AI返回为空");
+            }
+        } catch (Exception e) {
+            log.error("运营AI分析定时任务失败", e);
+            logService.add("运营AI分析", "失败", e.getMessage());
+        }
+    }
+
+    @Scheduled(cron = "0 5 8 * * ?", zone = "Asia/Shanghai")
+    public void morningCustomerAnalysis() {
+        log.info("[{}] ⏰ 定时任务：生成客户AI分析", TimeUtil.nowStr());
+        try {
+            String result = customerService.aiAnalyze(true);
+            if (result != null && !result.isEmpty()) {
+                logService.add("客户AI分析", "成功", "定时任务自动生成");
+            } else {
+                logService.add("客户AI分析", "失败", "AI返回为空");
+            }
+        } catch (Exception e) {
+            log.error("客户AI分析定时任务失败", e);
+            logService.add("客户AI分析", "失败", e.getMessage());
+        }
+    }
+
+    @Scheduled(cron = "0 10 8 * * ?", zone = "Asia/Shanghai")
+    public void morningWorkReportAnalysis() {
+        log.info("[{}] ⏰ 定时任务：生成工作AI分析", TimeUtil.nowStr());
+        try {
+            String result = workReportController.generateAndSaveAnalysis();
+            if (result != null && !result.isEmpty()) {
+                logService.add("工作AI分析", "成功", "定时任务自动生成");
+            } else {
+                logService.add("工作AI分析", "失败", "AI返回为空");
+            }
+        } catch (Exception e) {
+            log.error("工作AI分析定时任务失败", e);
+            logService.add("工作AI分析", "失败", e.getMessage());
+        }
     }
 
     @Scheduled(cron = "0 * * * * ?", zone = "Asia/Shanghai")

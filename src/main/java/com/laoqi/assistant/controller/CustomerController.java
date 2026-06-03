@@ -87,6 +87,16 @@ public class CustomerController {
         return "leads_all";
     }
 
+    @GetMapping("/api/customers/ai-report")
+    @ResponseBody
+    public Map<String, Object> getAiReport() {
+        String report = customerService.readTodayAnalysis();
+        if (report != null && !report.isEmpty()) {
+            return Map.of("ok", true, "report", report);
+        }
+        return Map.of("ok", false, "report", "");
+    }
+
     @GetMapping("/api/customers/ai-analysis")
     public SseEmitter aiAnalysis(@RequestParam(required = false, defaultValue = "false") boolean force) {
         SseEmitter emitter = new SseEmitter(300_000L);

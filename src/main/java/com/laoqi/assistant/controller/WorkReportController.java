@@ -32,10 +32,6 @@ public class WorkReportController {
     private final OpenCodeService openCodeService;
     private static final ObjectMapper mapper = new ObjectMapper();
 
-    // AI analysis cache
-    private String cachedAnalysis = "";
-    private String cachedDate = "";
-
     public WorkReportController(AppConfig appConfig, LogService logService, ConfigService configService, OpenCodeService openCodeService) {
         this.appConfig = appConfig;
         this.logService = logService;
@@ -63,6 +59,30 @@ public class WorkReportController {
 
     record ReportItem(String name, String modified, String content) {}
 
+    private Path getAnalysisDir() {
+        Config config = configService.load();
+        String workDir = config.getWorkDir();
+        if (workDir == null || workDir.isEmpty()) workDir = "工作";
+        return Paths.get(configService.getBaseDir()).resolve(workDir).resolve("AI分析");
+    }
+
+    private String readTodayAnalysis() {
+        Path dir = getAnalysisDir();
+        String date = com.laoqi.assistant.util.TimeUtil.todayStr();
+        Path file = dir.resolve(date + ".md");
+        if (FileUtil.exists(file)) {
+            return FileUtil.readText(file);
+        }
+        return null;
+    }
+
+    private void saveAnalysis(String result) {
+        Path dir = getAnalysisDir();
+        String date = com.laoqi.assistant.util.TimeUtil.todayStr();
+        Path file = dir.resolve(date + ".md");
+        FileUtil.writeText(file, result);
+    }
+
     private List<ReportItem> loadReports(Path dir) {
         List<ReportItem> items = new ArrayList<>();
         if (!Files.isDirectory(dir)) return items;
@@ -88,16 +108,37 @@ public class WorkReportController {
         return items;
     }
 
+    @GetMapping("/api/work-reports/ai-report")
+    @ResponseBody
+    public Map<String, Object> getAiReport() {
+        String report = readTodayAnalysis();
+        if (report != null && !report.isEmpty()) {
+            return Map.of("ok", true, "report", report);
+        }
+        return Map.of("ok", false, "report", "");
+    }
+
+    /**
+     * Generate and save work report analysis (for scheduled task use)
+     */
+    public String generateAndSaveAnalysis() {
+        String result = buildAiReportSummary();
+        if (result != null && !result.isEmpty()) {
+            saveAnalysis(result);
+        }
+        return result;
+    }
+
     @GetMapping("/api/work-reports/ai-analysis")
     public SseEmitter aiAnalysis(@RequestParam(required = false, defaultValue = "false") boolean force) {
         SseEmitter emitter = new SseEmitter(300_000L);
 
         if (!force) {
-            String today = com.laoqi.assistant.util.TimeUtil.todayStr();
-            if (today.equals(cachedDate) && !cachedAnalysis.isEmpty()) {
+            String cached = readTodayAnalysis();
+            if (cached != null && !cached.isEmpty()) {
                 try {
                     emitter.send(SseEmitter.event().data(mapper.writeValueAsString(
-                            Map.of("type", "text", "content", cachedAnalysis))));
+                            Map.of("type", "text", "content", cached))));
                     emitter.send(SseEmitter.event().data(mapper.writeValueAsString(Map.of("type", "done"))));
                     emitter.complete();
                 } catch (Exception ignored) {}
@@ -111,8 +152,9 @@ public class WorkReportController {
                         Map.of("type", "status", "content", "⏳ AI 正在分析工作日报..."))));
 
                 String result = buildAiReportSummary();
-                cachedAnalysis = result;
-                cachedDate = com.laoqi.assistant.util.TimeUtil.todayStr();
+                if (result != null && !result.isEmpty()) {
+                    saveAnalysis(result);
+                }
                 emitter.send(SseEmitter.event().data(mapper.writeValueAsString(
                         Map.of("type", "text", "content", result))));
                 emitter.send(SseEmitter.event().data(mapper.writeValueAsString(

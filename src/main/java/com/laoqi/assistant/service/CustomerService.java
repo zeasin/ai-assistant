@@ -13,6 +13,8 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import com.laoqi.assistant.util.TimeUtil;
+
 @Service
 public class CustomerService {
 
@@ -69,6 +71,41 @@ public class CustomerService {
         String dir = configService.load().getCustomerDataDir();
         if (dir == null || dir.isEmpty()) return null;
         return getBaseDir().resolve(dir).resolve("data");
+    }
+
+    /**
+     * Get the analysis report directory. If customer data dir is configured, use that parent.
+     * Otherwise fall back to {baseDir}/客户/AI分析
+     */
+    private Path getAnalysisDir() {
+        String dir = configService.load().getCustomerDataDir();
+        if (dir != null && !dir.isEmpty()) {
+            return getBaseDir().resolve(dir).resolve("AI分析");
+        }
+        return getBaseDir().resolve("客户").resolve("AI分析");
+    }
+
+    /**
+     * Read today's saved AI analysis report from file
+     */
+    public String readTodayAnalysis() {
+        Path dir = getAnalysisDir();
+        String date = TimeUtil.todayStr();
+        Path file = dir.resolve(date + ".md");
+        if (FileUtil.exists(file)) {
+            return FileUtil.readText(file);
+        }
+        return null;
+    }
+
+    /**
+     * Save AI analysis result to file
+     */
+    public void saveAnalysis(String result) {
+        Path dir = getAnalysisDir();
+        String date = TimeUtil.todayStr();
+        Path file = dir.resolve(date + ".md");
+        FileUtil.writeText(file, result);
     }
 
     public boolean isCustomerDataDirConfigured() {
@@ -261,6 +298,7 @@ public class CustomerService {
             String result = openCodeService.sendMessage(sessionId, prompt);
             cachedAnalysis = result;
             cachedDate = com.laoqi.assistant.util.TimeUtil.todayStr();
+            saveAnalysis(result);
             return result;
         } catch (Exception e) {
             log.error("AI 客户分析失败", e);

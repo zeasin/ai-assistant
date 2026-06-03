@@ -39,6 +39,16 @@ public class OperationsController {
         return "operations";
     }
 
+    @GetMapping("/api/operations/ai-report")
+    @ResponseBody
+    public Map<String, Object> getAiReport() {
+        String report = operationsService.readTodayAnalysis();
+        if (report != null && !report.isEmpty()) {
+            return Map.of("ok", true, "report", report);
+        }
+        return Map.of("ok", false, "report", "");
+    }
+
     @GetMapping("/api/operations/ai-analysis")
     public SseEmitter aiAnalysis(@RequestParam(required = false, defaultValue = "false") boolean force) {
         SseEmitter emitter = new SseEmitter(300_000L);

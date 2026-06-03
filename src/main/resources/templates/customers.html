@@ -143,7 +143,33 @@ let columnSettings = {};
 
 document.addEventListener('DOMContentLoaded', function() {
     loadCustomerData();
+    loadAiReport();
 });
+
+async function loadAiReport() {
+    var status = document.getElementById('customer-ai-status');
+    var result = document.getElementById('customer-ai-result');
+    var elapsed = document.getElementById('customer-ai-elapsed');
+    var btn = document.getElementById('customer-ai-btn');
+
+    try {
+        const res = await fetch('/api/customers/ai-report');
+        const data = await res.json();
+        if (data.ok && data.report) {
+            status.style.display = 'none';
+            result.innerHTML = marked.parse(data.report);
+            elapsed.style.display = 'inline';
+            elapsed.textContent = '📄 今日已生成';
+            btn.textContent = '🔄 重新分析';
+            return;
+        }
+    } catch (e) {}
+
+    // No report yet — show placeholder
+    status.style.display = 'block';
+    status.innerHTML = '暂无AI分析报告。点击「生成分析」手动生成，或等待每天早上 8:05 自动生成。';
+    btn.textContent = '🚀 生成分析';
+}
 
 async function loadCustomerData() {
     try {
@@ -227,8 +253,7 @@ async function loadCustomerData() {
         }
 
         renderData();
-        setTimeout(function() { startCustomerAnalysis(false); }, 300);
-    } catch (e) {
+            } catch (e) {
         console.error('加载数据失败:', e);
         document.getElementById('data-source-info').innerHTML = '数据加载失败: ' + e.message;
     }

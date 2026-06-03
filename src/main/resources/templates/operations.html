@@ -463,11 +463,36 @@ function startAiAnalysis(force) {
     };
 }
 
-// Auto-load on page load — backend returns cached result if already done today
+// Auto-load on page load — read saved report
 window.addEventListener('DOMContentLoaded', function() {
     loadOperationsData();
-    setTimeout(function() { startAiAnalysis(false); }, 300);
+    loadAiReport();
 });
+
+async function loadAiReport() {
+    var status = document.getElementById('ai-analysis-status');
+    var result = document.getElementById('ai-analysis-result');
+    var elapsed = document.getElementById('ai-analysis-elapsed');
+    var btn = document.getElementById('ai-analyze-btn');
+
+    try {
+        const res = await fetch('/api/operations/ai-report');
+        const data = await res.json();
+        if (data.ok && data.report) {
+            status.style.display = 'none';
+            result.innerHTML = marked.parse(data.report);
+            elapsed.style.display = 'inline';
+            elapsed.textContent = '📄 今日已生成';
+            btn.textContent = '🔄 重新分析';
+            return;
+        }
+    } catch (e) {}
+
+    // No report yet — show placeholder
+    status.style.display = 'block';
+    status.innerHTML = '暂无AI分析报告。点击「生成分析」手动生成，或等待每天早上 8:00 自动生成。';
+    btn.textContent = '🚀 生成分析';
+}
 
 /* ===== 数据录入弹窗 ===== */
 function showAddArticleModal() {
