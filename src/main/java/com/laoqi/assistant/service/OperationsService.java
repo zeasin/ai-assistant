@@ -11,6 +11,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 
+import com.laoqi.assistant.util.TimeUtil;
+
 @Service
 public class OperationsService {
 
@@ -41,6 +43,38 @@ public class OperationsService {
             throw new IllegalStateException("运营数据目录未配置");
         }
         return getBaseDir().resolve(dir).resolve("data");
+    }
+
+    private Path getAnalysisDir() {
+        var config = configService.load();
+        String dir = config.getOperationsDataDir();
+        if (dir == null || dir.isEmpty()) {
+            throw new IllegalStateException("运营数据目录未配置");
+        }
+        return getBaseDir().resolve(dir).resolve("AI分析");
+    }
+
+    /**
+     * Read today's saved AI analysis report from file
+     */
+    public String readTodayAnalysis() {
+        Path dir = getAnalysisDir();
+        String date = TimeUtil.todayStr();
+        Path file = dir.resolve(date + ".md");
+        if (FileUtil.exists(file)) {
+            return FileUtil.readText(file);
+        }
+        return null;
+    }
+
+    /**
+     * Save AI analysis result to file
+     */
+    public void saveAnalysis(String result) {
+        Path dir = getAnalysisDir();
+        String date = TimeUtil.todayStr();
+        Path file = dir.resolve(date + ".md");
+        FileUtil.writeText(file, result);
     }
 
     private Map<String, List<Map<String, Object>>> readJsonFile(String fileName) {
@@ -174,9 +208,10 @@ public class OperationsService {
             String sessionId = openCodeService.createSession("运营分析");
 
             String result = openCodeService.sendMessage(sessionId, prompt);
-            // Cache successful result with today's date
+            // Cache successful result with today's date and save to file
             cachedAnalysis = result;
             cachedDate = com.laoqi.assistant.util.TimeUtil.todayStr();
+            saveAnalysis(result);
             return result;
         } catch (Exception e) {
             log.error("AI 运营分析失败", e);
