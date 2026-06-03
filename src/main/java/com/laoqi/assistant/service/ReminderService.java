@@ -81,7 +81,7 @@ public class ReminderService {
     }
 
     public Reminder addReminder(String name, String message, String type, String time,
-                                 String dayOfWeek, String dayOfMonth, String monthDay) {
+                                 String date, String dayOfWeek, String dayOfMonth, String monthDay) {
         Root root = load();
         if (root.reminders == null) root.reminders = new ArrayList<>();
         if (root.meta == null) root.meta = new LinkedHashMap<>();
@@ -92,6 +92,7 @@ public class ReminderService {
         r.message = message;
         r.type = type;
         r.time = normalizeTime(time);
+        r.date = date;
         r.dayOfWeek = dayOfWeek;
         r.dayOfMonth = dayOfMonth;
         r.monthDay = monthDay;
@@ -107,7 +108,7 @@ public class ReminderService {
     }
 
     public boolean updateReminder(String id, String name, String message, String type,
-                                    String time, String dayOfWeek, String dayOfMonth,
+                                    String time, String date, String dayOfWeek, String dayOfMonth,
                                     String monthDay, Boolean enabled) {
         Root root = load();
         if (root.reminders == null) return false;
@@ -117,7 +118,14 @@ public class ReminderService {
                 if (name != null) r.name = name;
                 if (message != null) r.message = message;
                 if (type != null) r.type = type;
-                if (time != null) r.time = normalizeTime(time);
+                if (time != null) {
+                    r.time = normalizeTime(time);
+                    r.lastTriggered = null; // 改时间后重置触发状态
+                }
+                if (date != null) {
+                    r.date = date;
+                    r.lastTriggered = null; // 改日期后重置触发状态
+                }
                 if (dayOfWeek != null) r.dayOfWeek = dayOfWeek;
                 if (dayOfMonth != null) r.dayOfMonth = dayOfMonth;
                 if (monthDay != null) r.monthDay = monthDay;
@@ -184,8 +192,15 @@ public class ReminderService {
             );
             feishuService.sendPost("🔔 " + r.name, content);
 
-            r.lastTriggered = LocalDateTime.now(TZ).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
             Root root = load();
+            if (root.reminders != null) {
+                for (Reminder rem : root.reminders) {
+                    if (rem.id.equals(r.id)) {
+                        rem.lastTriggered = LocalDateTime.now(TZ).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+                        break;
+                    }
+                }
+            }
             save(root);
 
             log.info("[提醒] 触发提醒: {}", r.name);
@@ -239,6 +254,7 @@ public class ReminderService {
 
         return switch (r.type) {
             case "daily" -> true;
+            case "once" -> r.date != null && r.date.equals(now.toLocalDate().toString());
             case "weekly" -> r.dayOfWeek != null && r.dayOfWeek.equals(currentWeekday);
             case "monthly" -> r.dayOfMonth != null && r.dayOfMonth.equals(currentDayOfMonth);
             case "yearly" -> {
@@ -260,6 +276,7 @@ public class ReminderService {
     public String getTypeLabel(String type) {
         return switch (type) {
             case "daily" -> "每天";
+            case "once" -> "一次";
             case "weekly" -> "每周";
             case "monthly" -> "每月";
             case "yearly" -> "每年";
@@ -287,7 +304,9 @@ public class ReminderService {
         if (r.time != null) {
             sb.append(" ").append(r.time);
         }
-        if ("weekly".equals(r.type) && r.dayOfWeek != null) {
+        if ("once".equals(r.type) && r.date != null) {
+            sb.append(" (").append(r.date).append(")");
+        } else if ("weekly".equals(r.type) && r.dayOfWeek != null) {
             sb.append(" (").append(getWeekdayLabel(r.dayOfWeek)).append(")");
         }
         if ("monthly".equals(r.type) && r.dayOfMonth != null) {

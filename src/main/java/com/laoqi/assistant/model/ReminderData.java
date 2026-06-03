@@ -15,6 +15,7 @@ public class ReminderData {
         public String message;
         public String type;
         public String time;
+        public String date;
         public String dayOfWeek;
         public String dayOfMonth;
         public String monthDay;

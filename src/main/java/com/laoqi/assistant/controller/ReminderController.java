@@ -33,6 +33,7 @@ public class ReminderController {
                         m.put("message", r.message);
                         m.put("type", r.type);
                         m.put("time", r.time);
+                        m.put("date", r.date);
                         m.put("dayOfWeek", r.dayOfWeek);
                         m.put("dayOfMonth", r.dayOfMonth);
                         m.put("monthDay", r.monthDay);
@@ -64,6 +65,7 @@ public class ReminderController {
                     m.put("message", r.message);
                     m.put("type", r.type);
                     m.put("time", r.time);
+                    m.put("date", r.date);
                     m.put("dayOfWeek", r.dayOfWeek);
                     m.put("dayOfMonth", r.dayOfMonth);
                     m.put("monthDay", r.monthDay);
@@ -83,12 +85,13 @@ public class ReminderController {
             @RequestParam(required = false, defaultValue = "") String message,
             @RequestParam String type,
             @RequestParam(required = false, defaultValue = "09:00") String time,
+            @RequestParam(required = false, defaultValue = "") String date,
             @RequestParam(required = false, defaultValue = "") String dayOfWeek,
             @RequestParam(required = false, defaultValue = "") String dayOfMonth,
             @RequestParam(required = false, defaultValue = "") String monthDay) {
         try {
             Reminder r = reminderService.addReminder(name, message, type, time,
-                    dayOfWeek, dayOfMonth, monthDay);
+                    date, dayOfWeek, dayOfMonth, monthDay);
             logService.add("提醒管理", "成功", "添加提醒: " + name);
             return Map.of("ok", true, "reminder", r);
         } catch (Exception e) {
@@ -104,13 +107,14 @@ public class ReminderController {
             @RequestParam(required = false) String message,
             @RequestParam(required = false) String type,
             @RequestParam(required = false) String time,
+            @RequestParam(required = false) String date,
             @RequestParam(required = false) String dayOfWeek,
             @RequestParam(required = false) String dayOfMonth,
             @RequestParam(required = false) String monthDay,
             @RequestParam(required = false) Boolean enabled) {
         try {
             boolean ok = reminderService.updateReminder(id, name, message, type, time,
-                    dayOfWeek, dayOfMonth, monthDay, enabled);
+                    date, dayOfWeek, dayOfMonth, monthDay, enabled);
             if (!ok) {
                 return Map.of("ok", false, "error", "提醒不存在");
             }

@@ -55,6 +55,7 @@
             <label>提醒类型 *</label>
             <select id="reminder-type" onchange="onTypeChange()" style="width:100%;">
                 <option value="daily">📅 每天 - 每天定时提醒</option>
+                <option value="once">🔔 一次 - 指定日期提醒</option>
                 <option value="weekly">📆 每周 - 每周特定星期几提醒</option>
                 <option value="monthly">📅 每月 - 每月特定几号提醒</option>
                 <option value="yearly">🎂 每年 - 每年特定日期提醒</option>
@@ -78,6 +79,11 @@
                     <option value="6">周六</option>
                     <option value="7">周日</option>
                 </select>
+            </div>
+
+            <div class="form-group" id="once-group" style="flex:1;display:none;">
+                <label>日期</label>
+                <input type="date" id="reminder-date" style="width:100%;">
             </div>
 
             <div class="form-group" id="monthly-group" style="flex:1;display:none;">
@@ -269,6 +275,7 @@ function renderReminders() {
 
         var typeLabels = {
             'daily': '每天',
+            'once': '一次',
             'weekly': '每周',
             'monthly': '每月',
             'yearly': '每年'
@@ -320,6 +327,7 @@ function renderReminders() {
 
 function onTypeChange() {
     var type = document.getElementById('reminder-type').value;
+    document.getElementById('once-group').style.display = type === 'once' ? 'flex' : 'none';
     document.getElementById('weekday-group').style.display = type === 'weekly' ? 'flex' : 'none';
     document.getElementById('monthly-group').style.display = type === 'monthly' ? 'flex' : 'none';
     document.getElementById('yearly-group').style.display = type === 'yearly' ? 'flex' : 'none';
@@ -332,6 +340,7 @@ function showAddModal() {
     document.getElementById('reminder-message').value = '';
     document.getElementById('reminder-type').value = 'daily';
     document.getElementById('reminder-time').value = '09:00';
+    document.getElementById('reminder-date').value = new Date().toISOString().split('T')[0];
     document.getElementById('reminder-dayOfWeek').value = '1';
     document.getElementById('reminder-dayOfMonth').value = '';
     document.getElementById('reminder-yearMonth').value = '';
@@ -351,6 +360,7 @@ function editReminder(id) {
     document.getElementById('reminder-message').value = r.message || '';
     document.getElementById('reminder-type').value = r.type || 'daily';
     document.getElementById('reminder-time').value = r.time || '09:00';
+    document.getElementById('reminder-date').value = r.date || new Date().toISOString().split('T')[0];
     document.getElementById('reminder-dayOfWeek').value = r.dayOfWeek || '1';
     document.getElementById('reminder-dayOfMonth').value = r.dayOfMonth || '';
     if (r.monthDay) {
@@ -386,6 +396,7 @@ async function saveReminder() {
     var message = document.getElementById('reminder-message').value.trim();
     var type = document.getElementById('reminder-type').value;
     var time = document.getElementById('reminder-time').value;
+    var date = document.getElementById('reminder-date').value;
     var dayOfWeek = document.getElementById('reminder-dayOfWeek').value;
     var dayOfMonth = document.getElementById('reminder-dayOfMonth').value;
     var yearMonth = document.getElementById('reminder-yearMonth').value;
@@ -399,6 +410,7 @@ async function saveReminder() {
     formData.append('message', message);
     formData.append('type', type);
     formData.append('time', time);
+    formData.append('date', date);
     formData.append('dayOfWeek', dayOfWeek);
     formData.append('dayOfMonth', dayOfMonth);
     formData.append('monthDay', monthDay);
