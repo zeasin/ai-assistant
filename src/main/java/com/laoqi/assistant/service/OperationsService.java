@@ -100,11 +100,11 @@ public class OperationsService {
                 List<Map<String, Object>> platforms = accEntry.getValue();
                 if (platforms != null) {
                     for (Map<String, Object> info : platforms) {
-                        sb.append("  - 平台：").append(info.get("platform"));
-                        if (info.get("name") != null) sb.append("，名称：").append(info.get("name"));
-                        if (info.get("fans") != null) sb.append("，粉丝：").append(info.get("fans"));
-                        if (info.get("totalViews") != null) sb.append("，总访问：").append(info.get("totalViews"));
-                        if (info.get("totalArticles") != null) sb.append("，总文章：").append(info.get("totalArticles"));
+                        sb.append("  - 平台：").append(info.get("平台"));
+                        if (info.get("名称") != null) sb.append("，名称：").append(info.get("名称"));
+                        if (info.get("粉丝") != null) sb.append("，粉丝：").append(info.get("粉丝"));
+                        if (info.get("总访问") != null) sb.append("，总访问：").append(info.get("总访问"));
+                        if (info.get("文章数") != null) sb.append("，总文章：").append(info.get("文章数"));
                         sb.append("\n");
                     }
                 }
@@ -120,17 +120,14 @@ public class OperationsService {
                 List<Map<String, Object>> articleList = artEntry.getValue();
                 if (articleList != null) {
                     for (Map<String, Object> a : articleList) {
-                        sb.append("  - [").append(a.get("id")).append("] ").append(a.get("title"));
-                        if (a.get("series") != null) sb.append(" (系列：").append(a.get("series")).append(")");
-                        if (a.get("publishDate") != null) sb.append(" 发布于：").append(a.get("publishDate"));
+                        sb.append("  - [").append(a.get("文章id")).append("] ").append(a.get("文章名"));
+                        if (a.get("日期") != null) sb.append(" 发布于：").append(a.get("日期"));
                         sb.append("\n");
-                        if (a.get("fansGained") != null) sb.append("    增粉：").append(a.get("fansGained"));
-                        if (a.get("notes") != null) sb.append(" 备注：").append(a.get("notes"));
-                        sb.append("\n");
-                        if (a.get("reads") != null) sb.append("    阅读：").append(a.get("reads")).append(" ");
-                        if (a.get("likes") != null) sb.append("点赞：").append(a.get("likes")).append(" ");
-                        if (a.get("shares") != null) sb.append("分享：").append(a.get("shares")).append(" ");
-                        if (a.get("favorites") != null) sb.append("收藏：").append(a.get("favorites"));
+                        if (a.get("阅读") != null) sb.append("    阅读：").append(a.get("阅读")).append(" ");
+                        if (a.get("点赞") != null) sb.append("点赞：").append(a.get("点赞")).append(" ");
+                        if (a.get("转发收藏") != null) sb.append("转发收藏：").append(a.get("转发收藏"));
+                        if (a.get("推荐") != null) sb.append(" 推荐：").append(a.get("推荐"));
+                        if (a.get("评论") != null) sb.append(" 评论：").append(a.get("评论"));
                         sb.append("\n");
                     }
                 }
@@ -149,10 +146,11 @@ public class OperationsService {
                     for (int i = stats.size() - count; i < stats.size(); i++) {
                         Map<String, Object> d = stats.get(i);
                         if (d != null) {
-                            sb.append("  - ").append(d.get("date"));
-                            if (d.get("fans") != null) sb.append(" 粉丝：").append(d.get("fans"));
-                            if (d.get("reads") != null) sb.append(" 阅读：").append(d.get("reads"));
-                            if (d.get("readArticles") != null) sb.append(" 文章：").append(d.get("readArticles"));
+                            sb.append("  - ").append(d.get("日期"));
+                            if (d.get("粉丝") != null) sb.append(" 粉丝：").append(d.get("粉丝"));
+                            if (d.get("阅读") != null) sb.append(" 阅读：").append(d.get("阅读"));
+                            if (d.get("推荐") != null) sb.append(" 推荐：").append(d.get("推荐"));
+                            if (d.get("搜一搜") != null) sb.append(" 搜一搜：").append(d.get("搜一搜"));
                             sb.append("\n");
                         }
                     }

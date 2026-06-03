@@ -179,30 +179,32 @@ public class MediaDataCollectorService {
 
                 if (existing == null) {
                     existing = new LinkedHashMap<>();
-                    existing.put("id", "A" + ((System.currentTimeMillis() + nextId++) % 100000));
-                    existing.put("title", aiTopic);
-                    existing.put("publishDate", aiArt.getOrDefault("publishDate", TimeUtil.todayStr()));
-                    existing.put("series", null);
-                    existing.put("link", null);
-                    existing.put("fansAtPublish", null);
-                    existing.put("fansGained", null);
-                    existing.put("notes", null);
+                    existing.put("文章id", "A" + ((System.currentTimeMillis() + nextId++) % 100000));
+                    existing.put("文章名", aiTopic);
+                    existing.put("日期", aiArt.getOrDefault("publishDate", TimeUtil.todayStr()));
                     list.add(existing);
                     updates++;
                 }
 
                 boolean changed = false;
-                String[] fields = {"reads", "likes", "favorites", "shares", "comments"};
-                for (String f : fields) {
-                    Object val = aiArt.get(f);
-                    if (val != null) {
-                        existing.put(f, val);
-                        changed = true;
-                    }
-                }
+                Object reads = aiArt.get("reads");
+                Object likes = aiArt.get("likes");
+                Object favorites = aiArt.get("favorites");
+                Object shares = aiArt.get("shares");
+                Object comments = aiArt.get("comments");
+
+                if (reads != null) { existing.put("阅读", reads); changed = true; }
+                if (likes != null) { existing.put("点赞", likes); changed = true; }
+                if (comments != null) { existing.put("评论", comments); changed = true; }
+                // Combine shares + favorites into 转发收藏
+                int shareFav = 0;
+                if (shares != null) shareFav += ((Number) shares).intValue();
+                if (favorites != null) shareFav += ((Number) favorites).intValue();
+                if (shareFav > 0) { existing.put("转发收藏", shareFav); changed = true; }
+
                 Object publishDate = aiArt.get("publishDate");
-                if (publishDate != null && existing.get("publishDate") == null) {
-                    existing.put("publishDate", publishDate);
+                if (publishDate != null && existing.get("日期") == null) {
+                    existing.put("日期", publishDate);
                 }
                 if (changed) updates++;
             }
@@ -215,7 +217,7 @@ public class MediaDataCollectorService {
         Map<String, Object> bestMatch = null;
         int bestScore = 0;
         for (Map<String, Object> art : list) {
-            String t = (String) art.get("title");
+            String t = (String) art.get("文章名");
             if (t == null) continue;
             String tNorm = t.replaceAll("[\\s　,，、：:。.；;！!？?（）()\\[\\]【】「」『》》]|^【.*?】", "").toLowerCase();
             if (tNorm.isEmpty()) continue;
@@ -246,18 +248,13 @@ public class MediaDataCollectorService {
             Map<String, Object> aiAcc = (Map<String, Object>) rawAccount;
 
             for (Map<String, Object> existing : existingList) {
-                if (!platform.equals(existing.get("platform"))) continue;
-                boolean changed = false;
-                for (var field : aiAcc.entrySet()) {
-                    if (field.getValue() != null) {
-                        existing.put(field.getKey(), field.getValue());
-                        changed = true;
-                    }
-                }
-                if (changed) {
-                    existing.put("updated", TimeUtil.todayStr());
-                    updates++;
-                }
+                if (!platform.equals(existing.get("平台"))) continue;
+                // Map AI response fields to Chinese keys
+                if (aiAcc.get("fans") != null) existing.put("粉丝", aiAcc.get("fans"));
+                if (aiAcc.get("totalViews") != null) existing.put("总访问", aiAcc.get("totalViews"));
+                if (aiAcc.get("totalArticles") != null) existing.put("文章数", aiAcc.get("totalArticles"));
+                existing.put("更新日期", TimeUtil.todayStr());
+                updates++;
                 break;
             }
         }
@@ -301,17 +298,15 @@ public class MediaDataCollectorService {
         int count = 0;
         for (int i = list.size() - 1; i >= 0 && count < 5; i--) {
             Map<String, Object> article = list.get(i);
-            String id = (String) article.getOrDefault("id", "");
-            String title = (String) article.getOrDefault("title", "");
+            String id = (String) article.getOrDefault("文章id", "");
+            String title = (String) article.getOrDefault("文章名", "");
             if (title != null && !title.isBlank()) {
-                String reads = article.get("reads") != null ? article.get("reads").toString() : "-";
-                String likes = article.get("likes") != null ? article.get("likes").toString() : "-";
-                int shareNum = article.get("shares") != null ? Integer.parseInt(article.get("shares").toString()) : 0;
-                int favoriteNum = article.get("favorites") != null ? Integer.parseInt(article.get("favorites").toString()) : 0;
-                int shareFavorite = shareNum + favoriteNum;
-                String recommend = article.get("recommend") != null ? article.get("recommend").toString() : "-";
-                String comments = article.get("comments") != null ? article.get("comments").toString() : "-";
-                paragraphs.add(List.of(Map.of("tag", "text", "text", "  [" + id + "] " + title + " 阅读:" + reads + " 点赞:" + likes + " 转发收藏:" + shareFavorite + " 推荐:" + recommend + " 评论:" + comments)));
+                String reads = article.get("阅读") != null ? article.get("阅读").toString() : "-";
+                String likes = article.get("点赞") != null ? article.get("点赞").toString() : "-";
+                String shareFav = article.get("转发收藏") != null ? article.get("转发收藏").toString() : "0";
+                String recommend = article.get("推荐") != null ? article.get("推荐").toString() : "-";
+                String comments = article.get("评论") != null ? article.get("评论").toString() : "-";
+                paragraphs.add(List.of(Map.of("tag", "text", "text", "  [" + id + "] " + title + " 阅读:" + reads + " 点赞:" + likes + " 转发收藏:" + shareFav + " 推荐:" + recommend + " 评论:" + comments)));
                 count++;
             }
         }
