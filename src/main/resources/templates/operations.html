@@ -85,6 +85,11 @@
         <span id="last-collect-time" class="text-muted">CSDN采集：加载中...</span>
         <button class="btn btn-secondary" style="margin-left:12px;padding:4px 12px;font-size:12px;" onclick="manualCollect()">🔄 手动采集</button>
     </div>
+    <div class="flex" style="gap:8px;margin-top:12px;flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="showAddDailyStatsModal()">📊 公众号日统计</button>
+        <button class="btn btn-primary" onclick="showAddArticleModal()">📝 添加文章</button>
+        <button class="btn btn-primary" onclick="showSaveAccountModal()">📋 添加账号</button>
+    </div>
 </div>
 
 <div class="card" id="config-card" style="display:none;text-align:center;padding:30px 20px;border:2px dashed #d9d0ff;background:#fafafe;">
@@ -499,6 +504,12 @@ function showAddArticleModal() {
     document.getElementById('modal-article').classList.add('active');
 }
 function showAddDailyStatsModal() {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    document.querySelector('#modal-daily-stats input[name="date"]').value = y + '-' + m + '-' + day;
     document.getElementById('modal-daily-stats').classList.add('active');
 }
 function showSaveAccountModal() {
@@ -541,9 +552,15 @@ async function submitDailyStats(e) {
         + '，日期=' + fd.get('date')
         + '，粉丝=' + fd.get('fans')
         + '，阅读=' + fd.get('reads')
+        + '，分享收藏=' + fd.get('shareFav')
         + '，文章数=' + fd.get('readArticles')
         + '，推荐来源=' + fd.get('sourceRecommend')
-        + '，搜一搜=' + fd.get('sourceSearch');
+        + '，搜一搜=' + fd.get('sourceSearch')
+        + '，主页=' + fd.get('sourceHome')
+        + '，消息=' + fd.get('sourceMessage')
+        + '，聊天会话=' + fd.get('sourceChat')
+        + '，朋友圈=' + fd.get('sourceMoments')
+        + '，其他=' + fd.get('sourceOther');
     try {
         const res = await aiSend(msg);
         if (res.ok) { toast('✅ ' + res.reply); closeModal('modal-daily-stats'); location.reload(); }
@@ -627,7 +644,7 @@ async function submitAccount(e) {
 
 <!-- 添加日统计弹窗 -->
 <div class="modal-overlay" id="modal-daily-stats">
-    <div class="modal">
+    <div class="modal" style="max-width: 960px;">
         <h3>📊 添加每日统计</h3>
         <form onsubmit="return submitDailyStats(event)">
             <div class="form-row">
@@ -647,11 +664,27 @@ async function submitAccount(e) {
             <div class="form-row">
                 <div class="form-group"><label>粉丝数</label><input type="number" name="fans" value="0"></div>
                 <div class="form-group"><label>阅读量</label><input type="number" name="reads" value="0"></div>
-                <div class="form-group"><label>文章数</label><input type="number" name="readArticles" value="0"></div>
+                <div class="form-group"><label>分享收藏</label><input type="number" name="shareFav" value="0"></div>
             </div>
             <div class="form-row">
-                <div class="form-group"><label>推荐来源</label><input type="number" name="sourceRecommend" value="0"></div>
-                <div class="form-group"><label>搜一搜来源</label><input type="number" name="sourceSearch" value="0"></div>
+
+                <div class="form-group"><label>被阅读文章数</label><input type="number" name="readArticles" value="0"></div>
+            </div>
+            <div style="background:#f8f7ff;border-radius:8px;padding:12px;margin-bottom:12px;">
+                <div style="font-size:12px;font-weight:600;margin-bottom:8px;">流量来源</div>
+                <div class="form-row">
+                    <div class="form-group"><label>推荐</label><input type="number" step="0.1" name="sourceRecommend" value="0"></div>
+                    <div class="form-group"><label>搜一搜</label><input type="number" step="0.1" name="sourceSearch" value="0"></div>
+                    <div class="form-group"><label>主页</label><input type="number" step="0.1" name="sourceHome" value="0"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>聊天会话</label><input type="number" step="0.1" name="sourceChat" value="0"></div>
+                    <div class="form-group"><label>朋友圈</label><input type="number" step="0.1" name="sourceMoments" value="0"></div>
+                    <div class="form-group"><label>消息</label><input type="number" step="0.1" name="sourceMessage" value="0"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>其他</label><input type="number" step="0.1" name="sourceOther" value="0"></div>
+                </div>
             </div>
             <div class="modal-actions">
                 <button type="button" class="btn btn-secondary" onclick="closeModal('modal-daily-stats')">取消</button>
