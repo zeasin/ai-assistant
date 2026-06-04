@@ -538,11 +538,12 @@ async function submitArticle(e) {
         + '，CSDN阅读=' + fd.get('csdnReads') + ' CSDN点赞=' + fd.get('csdnLikes')
         + '，知乎阅读=' + fd.get('zhihuReads') + ' 知乎点赞=' + fd.get('zhihuLikes');
     try {
-        const res = await aiSend(msg);
-        if (res.ok) { toast('✅ ' + res.reply); closeModal('modal-article'); location.reload(); }
-        else { toast(res.error || '添加失败', 'error'); }
+        const resp = await fetch('/api/ai/send-async?message=' + encodeURIComponent(msg), { method: 'POST' });
+        const res = await resp.json();
+        if (res.ok) { toast('✅ 已提交，AI 后台处理中'); } else { toast(res.error || '添加失败', 'error'); }
     } catch(e) { toast('网络错误', 'error'); }
-    return false;
+    closeModal('modal-article');
+    location.reload();
 }
 
 async function submitDailyStats(e) {
@@ -561,12 +562,20 @@ async function submitDailyStats(e) {
         + '，聊天会话=' + fd.get('sourceChat')
         + '，朋友圈=' + fd.get('sourceMoments')
         + '，其他=' + fd.get('sourceOther');
+    // 异步提交，不等待 AI 处理完成
     try {
-        const res = await aiSend(msg);
-        if (res.ok) { toast('✅ ' + res.reply); closeModal('modal-daily-stats'); location.reload(); }
-        else { toast(res.error || '添加失败', 'error'); }
-    } catch(e) { toast('网络错误', 'error'); }
-    return false;
+        const resp = await fetch('/api/ai/send-async?message=' + encodeURIComponent(msg), { method: 'POST' });
+        const res = await resp.json();
+        if (res.ok) {
+            toast('✅ 已提交，AI 后台处理中');
+        } else {
+            toast(res.error || '提交失败', 'error');
+        }
+    } catch(e) {
+        toast('网络错误', 'error');
+    }
+    closeModal('modal-daily-stats');
+    location.reload();
 }
 
 async function submitAccount(e) {
@@ -579,11 +588,12 @@ async function submitAccount(e) {
         + '，总访问=' + fd.get('totalViews')
         + '，总文章=' + fd.get('totalArticles');
     try {
-        const res = await aiSend(msg);
-        if (res.ok) { toast('✅ ' + res.reply); closeModal('modal-account'); location.reload(); }
-        else { toast(res.error || '添加失败', 'error'); }
+        const resp = await fetch('/api/ai/send-async?message=' + encodeURIComponent(msg), { method: 'POST' });
+        const res = await resp.json();
+        if (res.ok) { toast('✅ 已提交，AI 后台处理中'); } else { toast(res.error || '添加失败', 'error'); }
     } catch(e) { toast('网络错误', 'error'); }
-    return false;
+    closeModal('modal-account');
+    location.reload();
 }
 </script>
 
