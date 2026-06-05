@@ -532,11 +532,10 @@ async function submitArticle(e) {
         + '，标题=' + fd.get('topic')
         + '，日期=' + fd.get('publishDate')
         + (fd.get('series') ? '，系列=' + fd.get('series') : '')
-        + (fd.get('fansGained') ? '，增粉=' + fd.get('fansGained') : '')
+        + (fd.get('fansGained') && fd.get('fansGained') !== '0' ? '，增粉=' + fd.get('fansGained') : '')
         + (fd.get('notes') ? '，备注=' + fd.get('notes') : '')
-        + '，微信阅读=' + fd.get('wechatReads') + ' 微信点赞=' + fd.get('wechatLikes') + ' 微信分享=' + fd.get('wechatShares')
-        + '，CSDN阅读=' + fd.get('csdnReads') + ' CSDN点赞=' + fd.get('csdnLikes')
-        + '，知乎阅读=' + fd.get('zhihuReads') + ' 知乎点赞=' + fd.get('zhihuLikes');
+        + '，阅读=' + fd.get('reads') + ' 点赞=' + fd.get('likes') + ' 分享=' + fd.get('shares') + ' 收藏=' + fd.get('favorites')
+        + ' 评论=' + fd.get('comments') + ' 推荐=' + fd.get('recommend');
     try {
         const resp = await fetch('/api/ai/send-async?message=' + encodeURIComponent(msg), { method: 'POST' });
         const res = await resp.json();
@@ -604,11 +603,19 @@ async function submitAccount(e) {
         <form onsubmit="return submitArticle(event)">
             <div class="form-row">
                 <div class="form-group">
-                    <label>账号 *</label>
+                    <label>账号-平台 *</label>
                     <select name="accountName" required>
-                        <option value="码农老齐">码农老齐</option>
-                        <option value="启航电商ERP">启航电商ERP</option>
-                        <option value="老齐二三事">老齐二三事</option>
+                        <optgroup label="码农老齐">
+                            <option value="码农老齐-公众号">码农老齐-公众号</option>
+                            <option value="码农老齐-CSDN">码农老齐-CSDN</option>
+                            <option value="码农老齐-知乎">码农老齐-知乎</option>
+                        </optgroup>
+                        <optgroup label="启航电商ERP">
+                            <option value="启航电商ERP-公众号">启航电商ERP-公众号</option>
+                        </optgroup>
+                        <optgroup label="老齐二三事">
+                            <option value="老齐二三事-公众号">老齐二三事-公众号</option>
+                        </optgroup>
                     </select>
                 </div>
                 <div class="form-group">
@@ -622,26 +629,23 @@ async function submitAccount(e) {
             </div>
             <div class="form-row">
                 <div class="form-group"><label>系列</label><input type="text" name="series" placeholder="如 OpenCode系列"></div>
-                <div class="form-group"><label>增粉</label><input type="text" name="fansGained" placeholder="可选"></div>
+                <div class="form-group"><label>增粉</label><input type="number" name="fansGained" value="0"></div>
             </div>
             <div class="form-group" style="margin-bottom:12px;">
                 <label>备注</label>
                 <input type="text" name="notes" placeholder="可选">
             </div>
             <div style="background:#f8f7ff;border-radius:8px;padding:12px;margin-bottom:12px;">
-                <div style="font-size:12px;font-weight:600;margin-bottom:8px;">各平台数据</div>
+                <div style="font-size:12px;font-weight:600;margin-bottom:8px;">文章数据（所有平台统一）</div>
                 <div class="form-row">
-                    <div class="form-group"><label>微信阅读</label><input type="number" name="wechatReads" value="0"></div>
-                    <div class="form-group"><label>微信点赞</label><input type="number" name="wechatLikes" value="0"></div>
-                    <div class="form-group"><label>微信分享</label><input type="number" name="wechatShares" value="0"></div>
+                    <div class="form-group"><label>阅读</label><input type="number" name="reads" value="0"></div>
+                    <div class="form-group"><label>点赞</label><input type="number" name="likes" value="0"></div>
+                    <div class="form-group"><label>分享</label><input type="number" name="shares" value="0"></div>
+                    <div class="form-group"><label>收藏</label><input type="number" name="favorites" value="0"></div>
                 </div>
                 <div class="form-row">
-                    <div class="form-group"><label>CSDN阅读</label><input type="number" name="csdnReads" value="0"></div>
-                    <div class="form-group"><label>CSDN点赞</label><input type="number" name="csdnLikes" value="0"></div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group"><label>知乎阅读</label><input type="number" name="zhihuReads" value="0"></div>
-                    <div class="form-group"><label>知乎点赞</label><input type="number" name="zhihuLikes" value="0"></div>
+                    <div class="form-group"><label>评论</label><input type="number" name="comments" value="0"></div>
+                    <div class="form-group"><label>推荐</label><input type="number" name="recommend" value="0"></div>
                 </div>
             </div>
             <div class="modal-actions">
