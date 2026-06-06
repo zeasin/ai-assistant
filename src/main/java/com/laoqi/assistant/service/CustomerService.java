@@ -24,15 +24,17 @@ public class CustomerService {
     private final AppConfig appConfig;
     private final ConfigService configService;
     private final OpenCodeService openCodeService;
+    private final PromptService promptService;
 
     // AI analysis cache
     private String cachedAnalysis = "";
     private String cachedDate = "";
 
-    public CustomerService(AppConfig appConfig, ConfigService configService, OpenCodeService openCodeService) {
+    public CustomerService(AppConfig appConfig, ConfigService configService, OpenCodeService openCodeService, PromptService promptService) {
         this.appConfig = appConfig;
         this.configService = configService;
         this.openCodeService = openCodeService;
+        this.promptService = promptService;
     }
 
     private Path getBaseDir() {
@@ -280,21 +282,13 @@ public class CustomerService {
 
         String dataSummary = buildDataSummary();
 
-        String prompt = "你是一个客户管理分析专家。以下是我的客户管理数据：\n\n"
-                + dataSummary
-                + "\n请根据以上数据，生成一份客户分析报告，包含：\n"
-                + "1. 【整体概况】当前客户和线索的整体状况\n"
-                + "2. 【客户阶段分析】各阶段客户数量、转化情况\n"
-                + "3. 【重点客户】需要重点关注的大客户或高风险客户\n"
-                + "4. 【跟进建议】哪些客户需要优先跟进、下一步行动建议\n"
-                + "5. 【风险提示】可能流失的客户或需要关注的线索\n\n"
-                + "请使用简洁的中文，适当使用小标题和列表。";
+        String prompt = promptService.format("customer-analysis", Map.of("data", dataSummary));
 
         try {
             if (!openCodeService.isHealthy()) {
                 return "⚠️ opencode serve 未启动（端口 " + appConfig.getNotesPort() + "），无法进行 AI 分析。";
             }
-            String sessionId = openCodeService.createSession("客户分析");
+            String sessionId = openCodeService.createSession(promptService.getSessionTitle("customer-analysis"));
             String result = openCodeService.sendMessage(sessionId, prompt);
             cachedAnalysis = result;
             cachedDate = com.laoqi.assistant.util.TimeUtil.todayStr();

@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Map;
 
 @Service
 public class ReportService {
@@ -23,6 +24,7 @@ public class ReportService {
     private final LogService logService;
     private final OpenCodeService openCodeService;
     private final ConfigService configService;
+    private final PromptService promptService;
 
     private String latestReport = "";
     private String latestReportTime = "";
@@ -31,13 +33,14 @@ public class ReportService {
     public ReportService(AppConfig appConfig,
                           FeishuService feishuService, TodoService todoService,
                           LogService logService, OpenCodeService openCodeService,
-                          ConfigService configService) {
+                          ConfigService configService, PromptService promptService) {
         this.appConfig = appConfig;
         this.feishuService = feishuService;
         this.todoService = todoService;
         this.logService = logService;
         this.openCodeService = openCodeService;
         this.configService = configService;
+        this.promptService = promptService;
     }
 
     private Path getComprehensiveReportDir() {
@@ -64,21 +67,13 @@ public class ReportService {
 
             String sessionId = openCodeService.findIdleSession();
             if (sessionId == null) {
-                sessionId = openCodeService.createSession("日报生成");
+                sessionId = openCodeService.createSession(promptService.getSessionTitle("daily-report"));
             }
 
             String today = TimeUtil.todayStr();
             String wd = TimeUtil.weekdayCn(TimeUtil.now());
 
-            String prompt = "现在是" + today + " " + wd + "。请根据我的工作笔记生成今天的综合日报。" +
-                    "内容需要涵盖：今日重点工作、客户沟通情况、开发进展、文章发布情况、明日计划。" +
-                    "请按以下格式输出：\n\n" +
-                    "【今日重点】\n...\n\n" +
-                    "【客户沟通】\n...\n\n" +
-                    "【开发进展】\n...\n\n" +
-                    "【文章发布】\n...\n\n" +
-                    "【明日计划】\n...\n\n" +
-                    "注意：如果某个板块没有相关信息，请写\"暂无\"。请使用中文回复。";
+            String prompt = promptService.format("daily-report", Map.of("date", today, "weekday", wd));
 
             String report = openCodeService.sendMessage(sessionId, prompt);
             if (report != null && !report.isEmpty()) {

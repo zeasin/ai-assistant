@@ -5,6 +5,7 @@ import com.laoqi.assistant.model.Config;
 import com.laoqi.assistant.service.ConfigService;
 import com.laoqi.assistant.service.LogService;
 import com.laoqi.assistant.service.OpenCodeService;
+import com.laoqi.assistant.service.PromptService;
 import com.laoqi.assistant.util.FileUtil;
 import com.laoqi.assistant.util.MarkdownUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -30,13 +31,15 @@ public class WorkReportController {
     private final LogService logService;
     private final ConfigService configService;
     private final OpenCodeService openCodeService;
+    private final PromptService promptService;
     private static final ObjectMapper mapper = new ObjectMapper();
 
-    public WorkReportController(AppConfig appConfig, LogService logService, ConfigService configService, OpenCodeService openCodeService) {
+    public WorkReportController(AppConfig appConfig, LogService logService, ConfigService configService, OpenCodeService openCodeService, PromptService promptService) {
         this.appConfig = appConfig;
         this.logService = logService;
         this.configService = configService;
         this.openCodeService = openCodeService;
+        this.promptService = promptService;
     }
 
     private Path getDailyDir() {
@@ -196,20 +199,13 @@ public class WorkReportController {
             }
         }
 
-        String prompt = "你是一个工作总结分析师。以下是我的近期日报和周报内容：\n\n"
-                + sb
-                + "\n请根据以上内容生成一份工作分析报告，包含：\n"
-                + "1. 【工作重点】近期主要工作内容和重点任务\n"
-                + "2. 【进展总结】各项工作的进展和成果\n"
-                + "3. 【待办事项】需要继续跟进的未完成任务\n"
-                + "4. 【趋势建议】工作效率、时间分配等方面的改进建议\n\n"
-                + "请使用简洁的中文，适当使用小标题和列表。";
+        String prompt = promptService.format("work-report-analysis", Map.of("data", sb.toString()));
 
         try {
             if (!openCodeService.isHealthy()) {
                 return "⚠️ opencode serve 未启动（端口 " + appConfig.getNotesPort() + "），无法进行 AI 分析。";
             }
-            String sessionId = openCodeService.createSession("工作分析");
+            String sessionId = openCodeService.createSession(promptService.getSessionTitle("work-report-analysis"));
             return openCodeService.sendMessage(sessionId, prompt);
         } catch (Exception e) {
             return "❌ AI 分析失败：" + e.getMessage();

@@ -28,15 +28,17 @@ public class MediaDataCollectorService {
     private final OpenCodeService openCodeService;
     private final FeishuService feishuService;
     private final LogService logService;
+    private final PromptService promptService;
 
     public MediaDataCollectorService(AppConfig appConfig, ConfigService configService,
                                       OpenCodeService openCodeService, FeishuService feishuService,
-                                      LogService logService) {
+                                      LogService logService, PromptService promptService) {
         this.appConfig = appConfig;
         this.configService = configService;
         this.openCodeService = openCodeService;
         this.feishuService = feishuService;
         this.logService = logService;
+        this.promptService = promptService;
     }
 
     private Path getDataDir() {
@@ -112,15 +114,11 @@ public class MediaDataCollectorService {
 
     private String searchPlatformData() {
         try {
-            String prompt = "使用 webfetch 工具执行以下数据采集任务，不要参考任何记忆文件，只按步骤执行。\n\n"
-                    + "步骤1：webfetch https://blog.csdn.net/u011314083 ，从页面提取粉丝数、总浏览量、总文章数，以及所有文章标题（最多10篇）\n\n"
-                    + "步骤2：对步骤1找到的每篇文章，webfetch 其URL提取阅读量、点赞数、收藏数、转发数、评论数（如果页面没有则设为null）\n\n"
-                    + "重要：只输出下面格式的JSON，不要任何其他文字、不要markdown、不要代码块包裹、不要说明：\n"
-                    + "{\"csdn\":{\"account\":{\"fans\":269,\"totalViews\":35355,\"totalArticles\":26},\"articles\":[{\"topic\":\"文章标题\",\"publishDate\":\"2026-05-12\",\"reads\":394,\"likes\":9,\"favorites\":6,\"shares\":null,\"comments\":3}]}}";
+            String prompt = promptService.getTemplate("csdn-collect");
 
             String sessionId = openCodeService.findIdleSession();
             if (sessionId == null) {
-                sessionId = openCodeService.createSession("数据采集");
+                sessionId = openCodeService.createSession(promptService.getSessionTitle("csdn-collect"));
             }
             return openCodeService.sendMessage(sessionId, prompt);
 

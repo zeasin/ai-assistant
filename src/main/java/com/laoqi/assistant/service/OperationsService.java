@@ -22,14 +22,16 @@ public class OperationsService {
     private final AppConfig appConfig;
     private final ConfigService configService;
     private final OpenCodeService openCodeService;
+    private final PromptService promptService;
 
     private String cachedAnalysis = "";
     private String cachedDate = "";
 
-    public OperationsService(AppConfig appConfig, ConfigService configService, OpenCodeService openCodeService) {
+    public OperationsService(AppConfig appConfig, ConfigService configService, OpenCodeService openCodeService, PromptService promptService) {
         this.appConfig = appConfig;
         this.configService = configService;
         this.openCodeService = openCodeService;
+        this.promptService = promptService;
     }
 
     private Path getBaseDir() {
@@ -188,22 +190,14 @@ public class OperationsService {
 
         String dataSummary = buildDataSummary();
 
-        String prompt = "你是一个自媒体运营分析专家。以下是我的自媒体运营数据：\n\n"
-                + dataSummary
-                + "\n请根据以上数据，生成一份运营分析报告，包含：\n"
-                + "1. 【数据概览】整体运营状况一句话总结\n"
-                + "2. 【各平台表现】每个平台的关键指标和变化趋势\n"
-                + "3. 【文章表现】表现最好和最差的文章分析\n"
-                + "4. 【发现问题】数据中反映出的问题\n"
-                + "5. 【改进建议】具体的改进措施建议\n\n"
-                + "请使用简洁的中文，适当使用小标题和列表，便于阅读。";
+        String prompt = promptService.format("operations-analysis", Map.of("data", dataSummary));
 
         try {
             if (!openCodeService.isHealthy()) {
                 return "⚠️ opencode serve 未启动，无法进行 AI 分析。请确保 opencode serve --port " + appConfig.getNotesPort() + " 已运行。";
             }
 
-            String sessionId = openCodeService.createSession("运营分析");
+            String sessionId = openCodeService.createSession(promptService.getSessionTitle("operations-analysis"));
 
             String result = openCodeService.sendMessage(sessionId, prompt);
             // Cache successful result with today's date and save to file
