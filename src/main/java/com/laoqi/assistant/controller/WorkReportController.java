@@ -175,31 +175,7 @@ public class WorkReportController {
     }
 
     private String buildAiReportSummary() {
-        List<ReportItem> dailyReports = loadReports(getDailyDir());
-        List<ReportItem> weeklyReports = loadReports(getWeeklyDir());
-
-        StringBuilder sb = new StringBuilder();
-        sb.append("## 近期日报\n\n");
-        if (!dailyReports.isEmpty()) {
-            for (int i = 0; i < Math.min(dailyReports.size(), 5); i++) {
-                ReportItem r = dailyReports.get(i);
-                sb.append("### ").append(r.name).append("\n\n");
-                String plain = r.content.replaceAll("<[^>]+>", "");
-                sb.append(plain, 0, Math.min(plain.length(), 500)).append("\n\n");
-            }
-        }
-
-        sb.append("## 近期周报\n\n");
-        if (!weeklyReports.isEmpty()) {
-            for (int i = 0; i < Math.min(weeklyReports.size(), 3); i++) {
-                ReportItem r = weeklyReports.get(i);
-                sb.append("### ").append(r.name).append("\n\n");
-                String plain = r.content.replaceAll("<[^>]+>", "");
-                sb.append(plain, 0, Math.min(plain.length(), 800)).append("\n\n");
-            }
-        }
-
-        String prompt = promptService.format("work-report-analysis", Map.of("data", sb.toString()));
+        String prompt = promptService.getTemplate("work-report-analysis");
 
         try {
             if (!openCodeService.isHealthy()) {

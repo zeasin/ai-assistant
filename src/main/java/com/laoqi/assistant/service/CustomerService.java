@@ -191,71 +191,7 @@ public class CustomerService {
         return new ArrayList<>();
     }
 
-    /**
-     * Build a text summary of customer data for AI analysis
-     */
-    public String buildDataSummary() {
-        StringBuilder sb = new StringBuilder();
-        List<Map<String, Object>> customers = getCustomers();
-        List<Map<String, Object>> leads = getLeads();
-        List<Map<String, Object>> records = getRecords();
 
-        sb.append("## 客户概况\n\n");
-        sb.append("客户总数：").append(customers.size()).append("\n");
-        long activeCount = customers.stream().filter(c -> !"已流失".equals(c.get("stage"))).count();
-        long churnedCount = customers.stream().filter(c -> "已流失".equals(c.get("stage"))).count();
-        sb.append("活跃客户：").append(activeCount).append("\n");
-        sb.append("已流失：").append(churnedCount).append("\n\n");
-
-        sb.append("### 客户列表\n\n");
-        if (!customers.isEmpty()) {
-            for (Map<String, Object> c : customers) {
-                sb.append("- ").append(c.get("name"));
-                if (c.get("company") != null) sb.append(" (").append(c.get("company")).append(")");
-                sb.append(" 阶段：").append(c.get("stage"));
-                if (c.get("contractAmount") != null && ((Number)c.get("contractAmount")).doubleValue() > 0) {
-                    sb.append(" 合同：").append(c.get("contractAmount"));
-                }
-                if (c.get("notes") != null) sb.append(" 备注：").append(c.get("notes"));
-                sb.append("\n");
-            }
-        }
-        sb.append("\n");
-
-        sb.append("## 线索概况\n\n");
-        sb.append("线索总数：").append(leads.size()).append("\n\n");
-        if (!leads.isEmpty()) {
-            for (Map<String, Object> l : leads) {
-                sb.append("- ").append(l.get("name"));
-                if (l.get("company") != null) sb.append(" (").append(l.get("company")).append(")");
-                sb.append(" 状态：").append(l.get("status"));
-                sb.append(" 来源：").append(l.get("source"));
-                if (l.get("notes") != null) sb.append(" 备注：").append(l.get("notes"));
-                sb.append("\n");
-            }
-        }
-        sb.append("\n");
-
-        sb.append("## 最近跟进记录\n\n");
-        if (!records.isEmpty()) {
-            records.stream()
-                    .sorted((a, b) -> {
-                        String da = (String) a.getOrDefault("date", "");
-                        String db = (String) b.getOrDefault("date", "");
-                        return db.compareTo(da);
-                    })
-                    .limit(15)
-                    .forEach(r -> {
-                        sb.append("- ").append(r.getOrDefault("date", "")).append(" ")
-                          .append(r.getOrDefault("customerName", "")).append(" ")
-                          .append(r.getOrDefault("actType", "")).append("：")
-                          .append(r.getOrDefault("content", "")).append("\n");
-                    });
-        }
-        sb.append("\n");
-
-        return sb.toString();
-    }
 
     /**
      * Get cached AI analysis if already generated today, or null if not cached
@@ -280,9 +216,7 @@ public class CustomerService {
             }
         }
 
-        String dataSummary = buildDataSummary();
-
-        String prompt = promptService.format("customer-analysis", Map.of("data", dataSummary));
+        String prompt = promptService.getTemplate("customer-analysis");
 
         try {
             if (!openCodeService.isHealthy()) {
