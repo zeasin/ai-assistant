@@ -68,15 +68,15 @@
 | 数据类型 | 存储位置 | 说明 |
 |---------|---------|------|
 | **业务数据** | 笔记库（用户指定目录） | 客户数据、运营数据、项目数据等，全部来自用户自己的笔记库 |
-| **聊天历史** | 笔记库（`chat/chat_sessions.json`） | AI 对话记录保存在用户自己的笔记库中 |
+| **聊天历史** | SQLite（`memory.db`） | Web + 飞书对话记录存储在 SQLite，首次启动自动从 JSON 迁移 |
 | **配置信息** | 配置目录（`config.json`） | 飞书凭据、路径配置等，仅包含连接信息，不含业务数据 |
 | **操作日志** | 配置目录（`assistant_log.json`） | 仅记录操作时间、类型，不含业务数据 |
 
 **这意味着：**
 - ✅ 你的业务数据**永远留在你的笔记库**，程序不会复制、上传或迁移
-- ✅ 程序只是**读取和写入**你指定的文件，不做任何数据处理
-- ✅ 即使删除程序，你的数据**毫发无损**，仍在笔记库中
-- ✅ 换一台机器，只需重新配置笔记库路径，数据**无需迁移**
+- ✅ 聊天记录迁移到 SQLite，查询更快、按 mode/session 过滤更灵活
+- ✅ 即使删除程序，你的笔记库数据**毫发无损**，仍在笔记库中
+- ✅ 换一台机器，只需重新配置笔记库路径和拷贝 `memory.db`，数据**无需重新迁移**
 
 ---
 
@@ -127,10 +127,12 @@ java -jar target/ai-assistant-2.0.0.jar
 | **AI 对话** | Web 聊天界面 + 飞书消息，SSE 流式输出，无限等待 |
 | **双模式 AI** | 默认走知识库（笔记库），`/code ` 前缀触发编程 AI，互不干扰 |
 | **飞书集成** | WebSocket 长连接实时接收消息，私聊/群聊均支持，自动按模式保存聊天上下文 |
+| **聊天记录持久化** | SQLite 存储，MyBatis-Plus 操作，自动从旧 JSON 迁移 |
 | **数据看板** | 客户看板、运营看板，JSON 文件驱动，动态表格 |
 | **数据编辑器** | 通用 JSON 数据在线编辑（增删改查） |
 | **定时任务** | 日报、周报、提醒（可自定义） |
 | **配置管理** | Web UI 配置所有参数，无需改代码 |
+| **提示词管理** | 独立页面动态编辑 AI 提示词，支持重置默认 |
 | **笔记库浏览** | 文件/目录树浏览 |
 
 ---
@@ -152,16 +154,34 @@ java -jar target/ai-assistant-2.0.0.jar
                         │                                         │
   ┌──────────────┐     │  ┌──────────┐  ┌──────────┐  ┌────────┐ │
   │  数据源      │────►│  │ Controller│◄─►│ Service  │◄─►│ Model  │ │
-  │  (笔记库)    │     │  │  13个    │  │  10个    │  │        │ │
+  │  (笔记库)    │     │  │  15个    │  │  15个    │  │        │ │
   ├──────────────┤     │  └────┬─────┘  └────┬─────┘  └────────┘ │
   │  飞书（当前） │────►│       │             │                   │
-  ├──────────────┤     │       ▼             ▼                   │
-  │  邮件/日历   │────►│  ┌────────────────────────┐              │
-  │  (未来扩展)  │     │  │   统一数据接口层        │              │
-  │              │     │  │   /api/data/*          │              │
-  │              │     │  └───────────┬────────────┘              │
-  │              │     │              │                           │
-  └──────────────┘     │              ▼                           │
+  ├──────────────┤     │       │             ▼                   │
+  │  邮件/日历   │────►│       │   ┌──────────────────────┐      │
+  │  (未来扩展)  │     │       │   │  数据库 Service 层    │      │
+  │              │     │       │   │  (service.db)        │      │
+  │              │     │       │   │  仿 IService 模式    │      │
+  │              │     │       │   └──────────┬───────────┘      │
+  │              │     │       │              │                  │
+  └──────────────┘     │       │     ┌────────▼────────┐         │
+                        │       │     │  MyBatis-Plus   │         │
+                        │       │     │  Mapper 接口    │         │
+                        │       │     └────────┬────────┘         │
+                        │       │              │                  │
+                        │       │     ┌────────▼────────┐         │
+                        │       │     │  SQLite          │         │
+                        │       │     │  (memory.db)     │         │
+                        │       │     │  聊天记录        │         │
+                        │       │     └─────────────────┘         │
+                        │       │                                  │
+                        │  ┌────▼────────────────────────────┐    │
+                        │  │   统一数据接口层                  │    │
+                        │  │   /api/data/*                   │    │
+                        │  │   JSON 文件 CRUD                │    │
+                        │  └───────────┬─────────────────────┘    │
+                        │              │                           │
+                        │              ▼                           │
                         │  ┌────────────────────────┐              │
                         │  │   规则组装层            │              │
                         │  │   Prompt 模板 + 上下文   │              │
@@ -182,7 +202,7 @@ java -jar target/ai-assistant-2.0.0.jar
 
 ### 核心设计原则
 
-1. **数据不动** — 所有数据存在用户自己的笔记库，程序只读不写（除编辑操作）
+1. **数据分层** — 聊天记录存 SQLite（结构化，灵活查询），业务数据存笔记库 JSON（可读可编辑）
 2. **规则可配** — 所有业务逻辑通过配置文件定义，无硬编码
 3. **接口统一** — `/api/data/*` 提供通用的 JSON 数据 CRUD
 4. **AI 可换** — AI 大脑通过接口层接入，可替换为任何 LLM
@@ -248,19 +268,24 @@ public void dailyMeetingSummary() {
 ai-assistant/
 ├── src/main/java/com/laoqi/assistant/
 │   ├── AssistantApplication.java        # 启动入口
-│   ├── controller/                      # 13 个控制器
-│   │   ├── ChatController.java          # AI 对话 SSE
-│   │   ├── DataController.java          # 通用数据 API
-│   │   ├── CustomerController.java      # 客户看板
-│   │   ├── OperationsController.java    # 运营看板
-│   │   ├── ConfigController.java        # 配置页面
-│   │   └── ...
-│   ├── service/                         # 10 个服务
+│   ├── entity/                          # 4 个数据库实体
+│   │   ├── ChatSessionEntity.java
+│   │   ├── ChatMessageEntity.java
+│   │   ├── FeishuSessionEntity.java
+│   │   └── FeishuMessageEntity.java
+│   ├── mapper/                          # 4 个 MyBatis-Plus Mapper
+│   ├── service/
+│   │   ├── db/                          # 8 个数据库 Service
+│   │   │   ├── ChatSessionDbService.java
+│   │   │   ├── ChatMessageDbService.java
+│   │   │   ├── FeishuSessionDbService.java
+│   │   │   └── FeishuMessageDbService.java
 │   │   ├── OpenCodeService.java         # AI 服务客户端
 │   │   ├── FeishuService.java           # 飞书集成
 │   │   ├── SchedulerService.java        # 定时任务
 │   │   ├── ConfigService.java           # 配置管理
 │   │   └── ...
+│   ├── controller/                      # 15 个控制器
 │   ├── model/                           # 数据模型
 │   └── util/                            # 工具类
 ├── src/main/resources/
@@ -276,9 +301,10 @@ ai-assistant/
 
 | 类别 | 技术 |
 |------|------|
-| **后端** | Java 17 + Spring Boot 3.4.4 |
+| **后端** | Java 17 + Spring Boot 3.3.13 |
+| **ORM** | MyBatis-Plus 3.5.16 |
+| **数据库** | SQLite（聊天记录）+ JSON 文件（业务数据） |
 | **前端** | Thymeleaf + 原生 JS（无框架） |
-| **数据** | JSON 文件存储（无数据库） |
 | **AI 大脑** | OpenCode（当前）/ ClaudeCode（即将支持） |
 | **IM 集成** | 飞书 OpenAPI + WebSocket（当前）/ 钉钉、企业微信（即将支持） |
 
