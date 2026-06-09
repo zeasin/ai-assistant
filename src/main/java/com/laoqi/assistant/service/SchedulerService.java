@@ -128,11 +128,11 @@ public class SchedulerService {
         mediaDataCollectorService.collect();
     }
 
-    @Scheduled(cron = "0 57 8 * * ?", zone = "Asia/Shanghai")
-    public void wechatDataRequest() {
-        log.info("[{}] ⏰ 定时任务：公众号数据采集请求", TimeUtil.nowStr());
-        mediaDataCollectorService.sendWechatDataRequest();
-    }
+//    @Scheduled(cron = "0 57 8 * * ?", zone = "Asia/Shanghai")
+//    public void wechatDataRequest() {
+//        log.info("[{}] ⏰ 定时任务：公众号数据采集请求", TimeUtil.nowStr());
+//        mediaDataCollectorService.sendWechatDataRequest();
+//    }
 
     @Scheduled(cron = "0 0 18 * * ?", zone = "Asia/Shanghai")
     public void dailyReportReminder() {
