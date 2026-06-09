@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.Executors;
 
@@ -118,6 +119,15 @@ public class OperationsController {
     public Map<String, Object> requestData() {
         logService.add("运营数据", "手动请求数据", "");
         return mediaDataCollectorService.requestSync();
+    }
+
+    @PostMapping("/api/operations/import-excel")
+    @ResponseBody
+    public Map<String, Object> importExcel() {
+        String filePath = Paths.get(System.getProperty("user.dir"), "tendency_1778162497_1780668097.xls").toString();
+        var result = mediaDataCollectorService.importWechatExcel(filePath);
+        logService.add("运营数据", "Excel导入", result.getOrDefault("error", "成功").toString());
+        return result;
     }
 
     @GetMapping("/api/operations/last-collect")

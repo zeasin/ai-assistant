@@ -89,6 +89,7 @@
         <button class="btn btn-primary" onclick="showAddDailyStatsModal()">📊 公众号日统计</button>
         <button class="btn btn-primary" onclick="showAddArticleModal()">📝 添加文章</button>
         <button class="btn btn-primary" onclick="showSaveAccountModal()">📋 添加账号</button>
+        <button class="btn btn-secondary" onclick="importExcel()">📥 导入微信Excel数据</button>
     </div>
 </div>
 
@@ -575,6 +576,26 @@ async function submitDailyStats(e) {
     }
     closeModal('modal-daily-stats');
     location.reload();
+}
+
+async function importExcel() {
+    const btn = event.target;
+    btn.disabled = true;
+    btn.textContent = '⏳ 导入中...';
+    try {
+        const res = await fetch('/api/operations/import-excel', { method: 'POST' });
+        const data = await res.json();
+        if (data.ok) {
+            toast('✅ 导入完成：文章' + data.articleUpdates + '条，日统计' + data.statsUpdates + '条');
+            setTimeout(() => { window.location.reload(); }, 1500);
+        } else {
+            toast('❌ ' + (data.error || '导入失败'), 'error');
+        }
+    } catch (e) {
+        toast('❌ 请求失败: ' + e.message, 'error');
+    }
+    btn.disabled = false;
+    btn.textContent = '📥 导入微信Excel数据';
 }
 
 async function submitAccount(e) {
