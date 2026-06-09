@@ -32,6 +32,10 @@ public class PromptService {
 
     @PostConstruct
     public void init() {
+        reload();
+    }
+
+    public void reload() {
         prompts = loadDefaults();
         Map<String, Map<String, String>> external = loadExternal();
         if (external != null) {
@@ -39,6 +43,32 @@ public class PromptService {
             log.info("Loaded {} prompt overrides from external file", external.size());
         }
         log.info("PromptService initialized with {} prompt templates", prompts.size());
+    }
+
+    private Path getExternalPath() {
+        return appConfig.getConfigFile().resolveSibling("prompts.json");
+    }
+
+    public Map<String, Map<String, String>> getAllPrompts() {
+        return new LinkedHashMap<>(prompts);
+    }
+
+    public void savePrompts(Map<String, Map<String, String>> prompts) {
+        Path external = getExternalPath();
+        FileUtil.writeJson(external, prompts);
+        reload();
+        log.info("Saved {} prompts to {}", prompts.size(), external);
+    }
+
+    public void resetPrompts() {
+        Path external = getExternalPath();
+        try {
+            java.nio.file.Files.deleteIfExists(external);
+        } catch (Exception e) {
+            log.warn("Failed to delete external prompts file: {}", e.getMessage());
+        }
+        reload();
+        log.info("Reset prompts to defaults");
     }
 
     private Map<String, Map<String, String>> loadDefaults() {

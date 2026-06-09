@@ -4,6 +4,7 @@ import com.laoqi.assistant.model.Config;
 import com.laoqi.assistant.service.ConfigService;
 import com.laoqi.assistant.service.FeishuService;
 import com.laoqi.assistant.service.LogService;
+import com.laoqi.assistant.service.PromptService;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
@@ -15,12 +16,14 @@ public class ApiConfigController {
     private final ConfigService configService;
     private final FeishuService feishuService;
     private final LogService logService;
+    private final PromptService promptService;
 
     public ApiConfigController(ConfigService configService, FeishuService feishuService,
-                                LogService logService) {
+                                LogService logService, PromptService promptService) {
         this.configService = configService;
         this.feishuService = feishuService;
         this.logService = logService;
+        this.promptService = promptService;
     }
 
     @GetMapping("/api/config")
@@ -172,6 +175,34 @@ public class ApiConfigController {
             cfg.setMediaCollectTime(time);
             configService.save(cfg);
             logService.add("配置更新", "成功", "CSDN采集 " + (cfg.isMediaCollectEnabled() ? "已开启" : "已关闭") + " 时间=" + time);
+            return Map.of("ok", true);
+        } catch (Exception e) {
+            return Map.of("ok", false, "error", e.getMessage());
+        }
+    }
+
+    @GetMapping("/api/config/prompts")
+    public Map<String, Object> getPrompts() {
+        return Map.of("ok", true, "prompts", promptService.getAllPrompts());
+    }
+
+    @PostMapping("/api/config/prompts")
+    public Map<String, Object> savePrompts(@RequestBody Map<String, Map<String, String>> prompts) {
+        try {
+            promptService.savePrompts(prompts);
+            logService.add("提示词配置", "成功", "已保存 " + prompts.size() + " 个提示词");
+            return Map.of("ok", true);
+        } catch (Exception e) {
+            logService.add("提示词配置", "失败", e.getMessage());
+            return Map.of("ok", false, "error", e.getMessage());
+        }
+    }
+
+    @PostMapping("/api/config/prompts/reset")
+    public Map<String, Object> resetPrompts() {
+        try {
+            promptService.resetPrompts();
+            logService.add("提示词配置", "重置", "已重置为默认值");
             return Map.of("ok", true);
         } catch (Exception e) {
             return Map.of("ok", false, "error", e.getMessage());

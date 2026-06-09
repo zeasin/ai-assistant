@@ -1,0 +1,154 @@
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title layout:fragment="title">提示词配置</title>
+</head>
+<body>
+<th:block layout:fragment="content">
+
+<div class="card">
+    <h2>🤖 提示词配置</h2>
+    <div class="text-muted mb-2">自定义 AI 使用的提示词模板。默认值来自 <code>prompts-defaults.json</code>，修改后将保存到 <code>prompts.json</code>。</div>
+    <div id="prompts-container" style="margin-bottom:12px;"></div>
+    <div class="flex" style="gap:8px;">
+        <button class="btn btn-primary" onclick="savePrompts()">保存提示词</button>
+        <button class="btn btn-secondary" onclick="resetPrompts()">重置为默认</button>
+        <span id="promptsStatus" class="text-muted" style="margin-left:4px;"></span>
+    </div>
+</div>
+
+<style>
+.form-group { margin-bottom: 12px; }
+.form-group label {
+    display: block; font-size: 13px; font-weight: 500; color: #5c5f66; margin-bottom: 4px;
+}
+.form-group input[type="text"],
+.form-group textarea {
+    width: 100%; padding: 8px 10px; border: 1px solid #e1e3e6; border-radius: 6px;
+    font-size: 13px; outline: none; font-family: inherit; box-sizing: border-box;
+}
+.form-group input:focus,
+.form-group textarea:focus { border-color: #7c5cfc; }
+</style>
+
+<script>
+var promptsData = {};
+
+function loadPrompts() {
+    fetch('/api/config/prompts')
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) {
+                promptsData = data.prompts || {};
+                renderPrompts();
+            }
+        })
+        .catch(() => {});
+}
+
+function renderPrompts() {
+    var container = document.getElementById('prompts-container');
+    var keys = Object.keys(promptsData);
+    if (keys.length === 0) {
+        container.innerHTML = '<div class="text-muted" style="font-size:13px;padding:12px 0;">暂无提示词配置。</div>';
+        return;
+    }
+    var html = '';
+    keys.forEach(function(k) {
+        var p = promptsData[k] || {};
+        var title = p.session_title || '';
+        var template = p.template || '';
+        var escapedKey = escapeHtml(k);
+        html += '<details style="margin-bottom:8px;border:1px solid #e1e3e6;border-radius:8px;padding:0;">';
+        html += '<summary style="padding:10px 14px;cursor:pointer;font-size:13px;font-weight:500;display:flex;align-items:center;gap:8px;">';
+        html += '<code style="font-size:12px;color:#7c5cfc;">' + escapedKey + '</code>';
+        html += '<span style="color:#5c5f66;">' + escapeHtml(title) + '</span>';
+        html += '</summary>';
+        html += '<div style="padding:0 14px 14px;">';
+        html += '<div class="form-group">';
+        html += '<label>会话标题</label>';
+        html += '<input type="text" class="prompt-title-input" data-key="' + escapedKey + '" value="' + escapeHtml(title) + '" style="width:100%;padding:8px 10px;border:1px solid #e1e3e6;border-radius:6px;font-size:13px;outline:none;">';
+        html += '</div>';
+        html += '<div class="form-group">';
+        html += '<label>提示词模板</label>';
+        html += '<textarea class="prompt-template-input" data-key="' + escapedKey + '" rows="8" style="width:100%;padding:8px 10px;border:1px solid #e1e3e6;border-radius:6px;font-size:13px;font-family:monospace;outline:none;resize:vertical;">' + escapeHtml(template) + '</textarea>';
+        html += '</div>';
+        html += '</div>';
+        html += '</details>';
+    });
+    container.innerHTML = html;
+}
+
+function collectPrompts() {
+    var result = {};
+    document.querySelectorAll('.prompt-title-input').forEach(function(input) {
+        var key = input.dataset.key;
+        if (!result[key]) result[key] = {};
+        result[key].session_title = input.value.trim();
+    });
+    document.querySelectorAll('.prompt-template-input').forEach(function(input) {
+        var key = input.dataset.key;
+        if (!result[key]) result[key] = {};
+        result[key].template = input.value;
+    });
+    return result;
+}
+
+function savePrompts() {
+    var data = collectPrompts();
+    fetch('/api/config/prompts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(function(resp) {
+        var status = document.getElementById('promptsStatus');
+        if (resp.ok) {
+            status.textContent = '✅ 已保存';
+            toast('✅ 提示词已保存', 'success');
+            setTimeout(function() { status.textContent = ''; }, 3000);
+        } else {
+            status.textContent = '❌ ' + (resp.error || '保存失败');
+            toast('❌ 保存失败', 'error');
+        }
+    })
+    .catch(function() {
+        document.getElementById('promptsStatus').textContent = '❌ 请求失败';
+    });
+}
+
+function resetPrompts() {
+    if (!confirm('确定重置所有提示词为默认值？自定义修改将丢失。')) return;
+    fetch('/api/config/prompts/reset', { method: 'POST' })
+        .then(r => r.json())
+        .then(function(resp) {
+            var status = document.getElementById('promptsStatus');
+            if (resp.ok) {
+                status.textContent = '✅ 已重置';
+                toast('✅ 提示词已重置为默认值', 'success');
+                setTimeout(function() { status.textContent = ''; }, 3000);
+                loadPrompts();
+            } else {
+                status.textContent = '❌ ' + (resp.error || '重置失败');
+                toast('❌ 重置失败', 'error');
+            }
+        })
+        .catch(function() {
+            document.getElementById('promptsStatus').textContent = '❌ 请求失败';
+        });
+}
+
+function escapeHtml(str) {
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadPrompts();
+});
+</script>
+
+</th:block>
+</body>
+</html>
