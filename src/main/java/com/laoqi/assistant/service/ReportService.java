@@ -11,7 +11,6 @@ import org.springframework.stereotype.Service;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Map;
 
 @Service
 public class ReportService {
@@ -70,10 +69,7 @@ public class ReportService {
                 sessionId = openCodeService.createSession(promptService.getSessionTitle("daily-report"));
             }
 
-            String today = TimeUtil.todayStr();
-            String wd = TimeUtil.weekdayCn(TimeUtil.now());
-
-            String prompt = promptService.format("daily-report", Map.of("date", today, "weekday", wd));
+            String prompt = promptService.getTemplate("daily-report");
 
             String report = openCodeService.sendMessage(sessionId, prompt);
             if (report != null && !report.isEmpty()) {
