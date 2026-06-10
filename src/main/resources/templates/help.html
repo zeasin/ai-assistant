@@ -166,44 +166,8 @@ java -jar target/ai-assistant-2.0.0.jar
         <li><strong>流式响应</strong> — 回答逐字显示，无需等待全部生成完毕</li>
         <li><strong>实时状态</strong> — AI 读取笔记时显示 📖 文件名，知道它在做什么</li>
         <li><strong>历史会话</strong> — 左侧边栏保存所有对话记录，可切换、可删除</li>
-        <li><strong>自动保存</strong> — 每次对话自动保存到 SQLite <code>memory.db</code></li>
+        <li><strong>历史会话</strong> — 左侧边栏保存所有对话记录，可切换、可删除</li>
     </ul>
-</div>
-
-<div class="card">
-    <h2>🧠 长期记忆</h2>
-    <p class="text-muted" style="line-height:1.7;">
-        长期记忆让 AI 能记住关键信息跨会话使用。记忆存储在 SQLite <code>memory.db</code> 中，
-        每次对话时自动检索相关记忆注入给 AI 作为上下文，无需手动重复告知。
-    </p>
-
-    <h3 style="margin-top:16px;margin-bottom:8px;font-size:14px;">保存记忆</h3>
-    <p class="text-muted" style="line-height:1.7;">
-        在 Web 聊天或飞书中，直接输入以下格式即可保存记忆：
-    </p>
-    <table class="log-table" style="margin-top:8px;">
-        <thead><tr><th>输入</th><th>效果</th></tr></thead>
-        <tbody>
-            <tr><td><code>记住 张三的电话是13812345678</code></td><td>保存一条记忆"张三的电话是13812345678"</td></tr>
-            <tr><td><code>记一下 项目deadline是6月30日</code></td><td>保存一条记忆"项目deadline是6月30日"</td></tr>
-            <tr><td><code>帮我记住 客户李四的公司叫启航科技</code></td><td>保存一条记忆"客户李四的公司叫启航科技"</td></tr>
-        </tbody>
-    </table>
-    <p class="text-muted" style="line-height:1.7;margin-top:8px;">
-        也支持 <code>请记住</code> 前缀。AI 看到"记住"开头的消息会同时保存记忆并正常回复。
-    </p>
-
-    <h3 style="margin-top:16px;margin-bottom:8px;font-size:14px;">检索使用</h3>
-    <p class="text-muted" style="line-height:1.7;">
-        每次对话时，系统会自动将当前问题与已有记忆做匹配，找到最相关的 5 条记忆
-        注入到 AI 的上下文中。例如你之前记住了"张三的电话是13812345678"，
-        之后问"张三的电话是多少"时，AI 会自动看到这条记忆并回答，无需你再次告知。
-    </p>
-
-    <h3 style="margin-top:16px;margin-bottom:8px;font-size:14px;">遗忘管理</h3>
-    <p class="text-muted" style="line-height:1.7;">
-        前往 <a href="/memory">记忆管理页面</a> 可查看所有记忆、按关键词搜索、手动添加新记忆，或点击"遗忘"删除不需要的记忆。
-    </p>
 </div>
 
 <div class="card">
@@ -451,7 +415,7 @@ java -jar target/ai-assistant-2.0.0.jar
         <tbody>
             <tr><td><code>{config-dir}/config.json</code></td><td>读写</td><td>应用配置（飞书、笔记库路径、数据目录等）</td></tr>
             <tr><td><code>{config-dir}/assistant_log.json</code></td><td>读写</td><td>操作日志（最多保留 100 条）</td></tr>
-            <tr><td><code>{config-dir}/memory.db</code></td><td>读写</td><td>SQLite 数据库（对话记录 + 长期记忆）</td></tr>
+            <tr><td><code>{config-dir}/memory.db</code></td><td>读写</td><td>SQLite 数据库（对话记录）</td></tr>
             <tr><td><code>工作/综合日报/</code></td><td>读写</td><td>AI 生成的综合日报文件（按日期命名）</td></tr>
             <tr><td><code>工作/日报/</code></td><td>读写</td><td>手动记录的日报文件（按日期命名）</td></tr>
             <tr><td><code>工作/周报/</code></td><td>读写</td><td>手动记录的周报文件（按年 - 周命名）</td></tr>
