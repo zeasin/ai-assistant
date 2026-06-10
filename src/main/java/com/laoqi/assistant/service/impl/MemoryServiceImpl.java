@@ -41,7 +41,12 @@ public class MemoryServiceImpl implements IMemoryService {
         if (query == null || query.isBlank()) return List.of();
         try {
             String ftsQuery = String.join(" AND ", query.trim().split("\\s+"));
-            return memoryMapper.searchFts(ftsQuery, topK);
+            List<Memory> results = memoryMapper.searchFts(ftsQuery, topK);
+            // FTS5 unicode61 对中文按单字索引，可能返回空；降级到 LIKE
+            if (results == null || results.isEmpty()) {
+                return memoryMapper.searchLike(query.trim(), topK);
+            }
+            return results;
         } catch (DataAccessException e) {
             log.warn("FTS5 search failed, falling back to LIKE: {}", e.getMessage());
             return memoryMapper.searchLike(query.trim(), topK);

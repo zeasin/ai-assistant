@@ -1,11 +1,13 @@
 package com.laoqi.assistant.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.laoqi.assistant.entity.Memory;
 import com.laoqi.assistant.model.ChatSession;
 import com.laoqi.assistant.model.ChatSession.ChatMessage;
 import com.laoqi.assistant.service.ChatSessionService;
 import com.laoqi.assistant.service.ChatSessionService.SessionsData;
 import com.laoqi.assistant.config.AppConfig;
+import com.laoqi.assistant.service.IMemoryService;
 import com.laoqi.assistant.service.LogService;
 import com.laoqi.assistant.service.OpenCodeService;
 import com.laoqi.assistant.util.TimeUtil;
@@ -30,13 +32,16 @@ public class ChatController {
     private final OpenCodeService openCodeService;
     private final LogService logService;
     private final AppConfig appConfig;
+    private final IMemoryService memoryService;
 
     public ChatController(ChatSessionService sessionService, OpenCodeService openCodeService,
-                           LogService logService, AppConfig appConfig) {
+                           LogService logService, AppConfig appConfig,
+                           IMemoryService memoryService) {
         this.sessionService = sessionService;
         this.openCodeService = openCodeService;
         this.logService = logService;
         this.appConfig = appConfig;
+        this.memoryService = memoryService;
     }
 
 
@@ -171,15 +176,27 @@ public class ChatController {
                     }
                 }
 
+                // Handle "记住..." intent (save to memory silently)
+                handleRememberIntent(actualMessage, sessionId);
+
                 sendStatus(emitter, mode, "⏳ 正在思考...");
 
                 // Build conversation history context (same approach as Feishu)
                 String context = sessionService.buildHistoryContext(sessionId, mode);
-                String fullMessage = actualMessage;
+
+                // Search relevant memories and inject as context
+                String memoryContext = buildMemoryContext(actualMessage);
+
+                StringBuilder fullText = new StringBuilder();
                 if (context != null) {
                     log.info("[chat] 恢复对话历史上下文, sessionId={}, mode={}", sessionId, mode);
-                    fullMessage = context + "\n\n---\n\n用户最新消息:\n" + actualMessage;
+                    fullText.append(context).append("\n\n---\n\n");
                 }
+                if (memoryContext != null) {
+                    fullText.append(memoryContext).append("\n\n");
+                }
+                fullText.append("用户最新消息:\n").append(actualMessage);
+                String fullMessage = fullText.toString();
 
                 // Always create a new opencode session for each request (same as Feishu)
                 String opencodeSessionId = isCodeRelated
@@ -239,6 +256,36 @@ public class ChatController {
     public Map<String, Object> deleteSession(@RequestParam(name = "session_id") String sessionId) {
         sessionService.deleteSession(sessionId);
         return Map.of("ok", true);
+    }
+
+    /** 检测并处理"记住"意图 */
+    private void handleRememberIntent(String text, String sessionId) {
+        String content = null;
+        String lower = text.trim().toLowerCase();
+        if (lower.startsWith("记住") || lower.startsWith("记一下") || lower.startsWith("帮我记住") || lower.startsWith("请记住")) {
+            content = text.trim().replaceAll("^(记住|记一下|帮我记住|请记住)[：:、\\s]*", "");
+        }
+        if (content != null && !content.isEmpty()) {
+            memoryService.remember(content, "web", List.of(sessionId));
+            log.info("[chat] 已保存记忆: {}", content);
+        }
+    }
+
+    /** 搜索相关记忆，构建上下文块 */
+    private String buildMemoryContext(String text) {
+        try {
+            List<Memory> memories = memoryService.search(text, 5);
+            if (memories == null || memories.isEmpty()) return null;
+            StringBuilder sb = new StringBuilder("## 长期记忆\n以下是可能与当前问题相关的长期记忆：\n");
+            for (Memory m : memories) {
+                sb.append("- ").append(m.getContent()).append("\n");
+            }
+            log.info("[chat] 注入 {} 条相关记忆", memories.size());
+            return sb.toString();
+        } catch (Exception e) {
+            log.warn("[chat] 检索记忆失败: {}", e.getMessage());
+            return null;
+        }
     }
 
     private void sendStatus(SseEmitter emitter, String mode, String text) {
