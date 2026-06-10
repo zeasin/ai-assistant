@@ -345,10 +345,7 @@ public class ChatSessionService {
 
     private Path getChatSessionsFile() {
         Config config = configService.load();
-        String chatDir = config.getChatSessionsDir();
-        if (chatDir == null || chatDir.isEmpty()) chatDir = "chat";
-        String chatSessionsFile = config.getChatSessionsFile();
-        if (chatSessionsFile == null || chatSessionsFile.isEmpty()) chatSessionsFile = "chat_sessions.json";
-        return Paths.get(configService.getBaseDir()).resolve(chatDir).resolve(chatSessionsFile);
+        String chatDir = "chat";
+        return Paths.get(configService.getBaseDir()).resolve(chatDir).resolve("chat_sessions.json");
     }
 }

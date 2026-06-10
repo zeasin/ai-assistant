@@ -60,26 +60,6 @@
 </div>
 
 <div class="card">
-    <h2>💬 聊天记录保存位置</h2>
-    <div class="text-muted mb-2">聊天记录将保存在笔记库根目录下的指定文件夹中。</div>
-    <form id="chatDirForm" onsubmit="return saveChatDir(event)">
-        <div class="form-group">
-            <label>聊天记录文件夹</label>
-            <input type="text" id="chatSessionsDir" placeholder="chat" style="font-family:monospace;">
-            <div class="text-muted" style="font-size:12px;margin-top:4px;">
-                相对于笔记库根目录的文件夹路径，完整路径为 <code>{笔记库根目录}/chat/chat_sessions.json</code><br>
-                例如：<code>chat</code> → <code>{笔记库根目录}/chat/chat_sessions.json</code><br>
-                例如：<code>AI/对话</code> → <code>{笔记库根目录}/AI/对话/chat_sessions.json</code>
-            </div>
-        </div>
-        <div class="flex" style="gap:8px;">
-            <button type="submit" class="btn btn-primary">保存目录</button>
-            <span id="chatDirStatus" class="text-muted" style="margin-left:4px;"></span>
-        </div>
-    </form>
-</div>
-
-<div class="card">
     <h2>📁 工作目录配置</h2>
     <div class="text-muted mb-2">工作相关数据（日报、周报、任务、提醒）将保存在此目录下。</div>
     <form id="workDirForm" onsubmit="return saveWorkDir(event)">
@@ -254,7 +234,6 @@ fetch('/api/config')
         if (cfg.baseDir) document.getElementById('baseDirPath').value = cfg.baseDir;
         if (cfg.customerDataDir) document.getElementById('customerDataDir').value = cfg.customerDataDir;
         if (cfg.operationsDataDir) document.getElementById('operationsDataDir').value = cfg.operationsDataDir;
-        if (cfg.chatSessionsDir) document.getElementById('chatSessionsDir').value = cfg.chatSessionsDir;
         if (cfg.workDir) document.getElementById('workDir').value = cfg.workDir;
         const enabledCheckbox = document.getElementById('mediaCollectEnabled');
         const toggleText = document.getElementById('mediaCollectToggleText');
@@ -294,22 +273,6 @@ async function saveBaseDir(e) {
     const res = await fetch('/api/config/baseDir', { method: 'POST', body: form });
     const data = await res.json();
     const status = document.getElementById('baseDirStatus');
-    if (data.ok) {
-        status.textContent = '✅ 已保存';
-        setTimeout(() => status.textContent = '', 3000);
-    } else {
-        status.textContent = '❌ ' + (data.error || '保存失败');
-    }
-    return false;
-}
-
-async function saveChatDir(e) {
-    e.preventDefault();
-    const form = new FormData();
-    form.append('chatSessionsDir', document.getElementById('chatSessionsDir').value.trim());
-    const res = await fetch('/api/config/chatDir', { method: 'POST', body: form });
-    const data = await res.json();
-    const status = document.getElementById('chatDirStatus');
     if (data.ok) {
         status.textContent = '✅ 已保存';
         setTimeout(() => status.textContent = '', 3000);

@@ -88,7 +88,6 @@ java -jar target/ai-assistant-2.0.0.jar
     </p>
     <ol class="text-muted" style="line-height:1.7;padding-left:20px;">
         <li><strong>笔记库根目录</strong> — 设置笔记库的绝对路径（如 <code>D:\projects\richie_learning_notes</code>），所有数据文件的相对路径都基于此目录</li>
-        <li><strong>聊天记录目录</strong> — 默认 <code>chat</code>，对话记录保存在 <code>{根目录}/chat/chat_sessions.json</code></li>
         <li><strong>工作目录</strong> — 默认 <code>工作</code>，日报/周报保存在 <code>{根目录}/工作/日报/</code> 和 <code>{根目录}/工作/周报/</code></li>
         <li><strong>客户数据目录</strong> — 默认 <code>企业/客户管理</code>，客户、线索、跟进记录数据</li>
         <li><strong>运营数据目录</strong> — 默认 <code>自媒体</code>，公众号运营数据</li>
@@ -167,7 +166,7 @@ java -jar target/ai-assistant-2.0.0.jar
         <li><strong>流式响应</strong> — 回答逐字显示，无需等待全部生成完毕</li>
         <li><strong>实时状态</strong> — AI 读取笔记时显示 📖 文件名，知道它在做什么</li>
         <li><strong>历史会话</strong> — 左侧边栏保存所有对话记录，可切换、可删除</li>
-        <li><strong>自动保存</strong> — 每次对话自动保存到 <code>chat_sessions.json</code></li>
+        <li><strong>自动保存</strong> — 每次对话自动保存到 SQLite <code>memory.db</code></li>
     </ul>
 </div>
 
@@ -416,7 +415,7 @@ java -jar target/ai-assistant-2.0.0.jar
         <tbody>
             <tr><td><code>{config-dir}/config.json</code></td><td>读写</td><td>应用配置（飞书、笔记库路径、数据目录等）</td></tr>
             <tr><td><code>{config-dir}/assistant_log.json</code></td><td>读写</td><td>操作日志（最多保留 100 条）</td></tr>
-            <tr><td><code>chat/chat_sessions.json</code></td><td>读写</td><td>对话历史记录</td></tr>
+            <tr><td><code>{config-dir}/memory.db</code></td><td>读写</td><td>SQLite 数据库（对话记录 + 长期记忆）</td></tr>
             <tr><td><code>工作/综合日报/</code></td><td>读写</td><td>AI 生成的综合日报文件（按日期命名）</td></tr>
             <tr><td><code>工作/日报/</code></td><td>读写</td><td>手动记录的日报文件（按日期命名）</td></tr>
             <tr><td><code>工作/周报/</code></td><td>读写</td><td>手动记录的周报文件（按年 - 周命名）</td></tr>
@@ -441,7 +440,7 @@ java -jar target/ai-assistant-2.0.0.jar
             <tr><td>定时任务</td><td>Spring @Scheduled</td></tr>
             <tr><td>AI 引擎</td><td>opencode serve（外部进程）</td></tr>
             <tr><td>消息推送</td><td>飞书 Webhook / Bot API</td></tr>
-            <tr><td>数据持久化</td><td>JSON 文件（无数据库）</td></tr>
+            <tr><td>数据持久化</td><td>SQLite（聊天记录）+ JSON 文件（业务数据）</td></tr>
             <tr><td>运行环境</td><td>Java ≥17 + Maven</td></tr>
         </tbody>
     </table>

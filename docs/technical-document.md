@@ -213,8 +213,7 @@ D:/projects/assistant-v2/
 │                                                            │
 │  ┌──────────────────────────────────────────────────┐     │
 │  │          文件系统 (笔记库)                          │     │
-│  │  D:\projects\richie_learning_notes\               │     │
-│  │  ├── chat/chat_sessions.json.bak (已迁移)         │     │
+│  │  D:\projects\richie_learning_notes\               │     │    │     │
 │  │  ├── 工作/日报/                   (日报文件)       │     │
 │  │  ├── 工作/周报/                   (周报文件)       │     │
 │  │  ├── 工作/综合日报/               (AI 综合日报)    │     │
@@ -311,6 +310,8 @@ POST /session/{id}/message  → 发送消息 → 流式 JSON 响应
 - `columnSettings`：客户/运营数据表格列配置
 - `workDir` / `dailyDir` / `weeklyDir`：工作目录路径
 
+> 注：`chatSessionsDir` / `chatSessionsFile` 旧配置项已移除。聊天记录不再保存为 JSON 文件，始终写入 SQLite `memory.db`。旧 `config.json` 中残留的这两个字段会被 `@JsonIgnoreProperties(ignoreUnknown = true)` 静默忽略。
+
 **AppConfig.java**：`@ConfigurationProperties(prefix = "app")`，映射 application.yml 中的 app.* 属性。
 
 **MybatisPlusConfig.java**：`@MapperScan("com.laoqi.assistant.mapper")`，扫描 Mapper 接口。
@@ -352,7 +353,7 @@ POST /session/{id}/message  → 发送消息 → 流式 JSON 响应
 
 #### 数据迁移
 
-应用启动时自动检测旧的 `chat_sessions.json` 和 `feishu_sessions.json`，将其数据逐条插入 SQLite 后将旧文件重命名为 `.bak`。
+应用启动时自动检测旧的 `chat_sessions.json` 和 `feishu_sessions.json`，将其数据逐条插入 SQLite 后将旧文件重命名为 `.bak`。迁移完成后，聊天记录完全由 SQLite 管理，旧配置文件 `config.json` 中的 `chatSessionsDir` / `chatSessionsFile` 字段不再使用（已从代码中移除）。配置页中对应的"聊天记录保存位置"设置项也已删除。
 
 ### 5.3 AI 服务模块 — OpenCodeService
 

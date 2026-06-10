@@ -25,8 +25,6 @@ public class Config {
     private String operationsDataDir;
     
     private String workDir;
-    private String chatSessionsDir;
-    private String chatSessionsFile;
     private String logFile;
     private String dailyDir;
     private String weeklyDir;
@@ -43,8 +41,6 @@ public class Config {
         c.feishuWebhookUrl = webhookUrl;
         c.customerDataDir = "";
 
-        c.chatSessionsDir = "chat";
-        c.chatSessionsFile = "chat_sessions.json";
         c.logFile = "assistant_log.json";
         c.dailyDir = "日报";
         c.weeklyDir = "周报";
@@ -82,10 +78,6 @@ public class Config {
     public void setOperationsDataDir(String operationsDataDir) { this.operationsDataDir = operationsDataDir; }
     public String getWorkDir() { return workDir; }
     public void setWorkDir(String workDir) { this.workDir = workDir; }
-    public String getChatSessionsDir() { return chatSessionsDir; }
-    public void setChatSessionsDir(String chatSessionsDir) { this.chatSessionsDir = chatSessionsDir; }
-    public String getChatSessionsFile() { return chatSessionsFile; }
-    public void setChatSessionsFile(String chatSessionsFile) { this.chatSessionsFile = chatSessionsFile; }
     public String getLogFile() { return logFile; }
     public void setLogFile(String logFile) { this.logFile = logFile; }
     public String getDailyDir() { return dailyDir; }
