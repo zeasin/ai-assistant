@@ -272,7 +272,8 @@ public class MediaDataCollectorService {
         }
         try (HSSFWorkbook wb = new HSSFWorkbook(inputStream)) {
             Sheet sheet = wb.getSheetAt(0);
-            Map<String, Double> dailyReaders = new LinkedHashMap<>();
+            // date → { channel → value }
+            Map<String, Map<String, Double>> dailyChannelData = new LinkedHashMap<>();
             Map<String, Double> dailyShares = new LinkedHashMap<>();
             Map<String, Double> dailyFavorites = new LinkedHashMap<>();
             Map<String, Map<String, Object>> articleMap = new LinkedHashMap<>();
@@ -281,11 +282,14 @@ public class MediaDataCollectorService {
                 Row row = sheet.getRow(r);
                 if (row == null) continue;
 
+                String date = cellStr(row, 1);
                 String channel = cellStr(row, 2);
                 String readersStr = cellStr(row, 3);
 
-                if ("全部".equals(channel) && !readersStr.isEmpty()) {
-                    dailyReaders.put(cellStr(row, 1), parseDouble(readersStr));
+                if (channel != null && !channel.isEmpty() && !readersStr.isEmpty()) {
+                    dailyChannelData
+                        .computeIfAbsent(date, k -> new LinkedHashMap<>())
+                        .put(channel, parseDouble(readersStr));
                 }
 
                 String shareDate = cellStr(row, 5);
@@ -339,19 +343,36 @@ public class MediaDataCollectorService {
                 articleUpdates++;
             }
 
+            // Excel channel names → JSON field names
+            Map<String, String> channelFieldMap = Map.of(
+                "全部", "阅读",
+                "推荐", "推荐",
+                "搜一搜", "搜一搜",
+                "主页", "主页",
+                "消息", "消息",
+                "聊天会话", "聊天会话",
+                "朋友圈", "朋友圈",
+                "其他", "其他"
+            );
+
             var dailyStats = readJsonFile("自媒体日数据.json");
             List<Map<String, Object>> statsList = dailyStats.computeIfAbsent(account, k -> new ArrayList<>());
             int statsUpdates = 0;
-            for (Map.Entry<String, Double> e : dailyReaders.entrySet()) {
+            for (Map.Entry<String, Map<String, Double>> e : dailyChannelData.entrySet()) {
                 String date = e.getKey();
-                double reads = e.getValue();
+                Map<String, Double> channelValues = e.getValue();
                 Map<String, Object> existing = findDailyStat(statsList, date);
                 if (existing == null) {
                     existing = new LinkedHashMap<>();
                     existing.put("日期", date);
                     statsList.add(existing);
                 }
-                existing.put("阅读", reads);
+                for (Map.Entry<String, String> mapping : channelFieldMap.entrySet()) {
+                    Double val = channelValues.get(mapping.getKey());
+                    if (val != null) {
+                        existing.put(mapping.getValue(), val);
+                    }
+                }
                 Double shares = dailyShares.get(date);
                 Double favs = dailyFavorites.get(date);
                 if (shares != null || favs != null) {
