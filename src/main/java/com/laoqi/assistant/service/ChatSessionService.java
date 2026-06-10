@@ -104,6 +104,48 @@ public class ChatSessionService {
                 """);
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_feishu_messages_user ON feishu_messages(user_key, created_at)");
 
+            // ==== Memory 长期记忆 ====
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS memories (
+                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                    content     TEXT NOT NULL,
+                    source      TEXT NOT NULL DEFAULT 'user',
+                    tags        TEXT DEFAULT '[]',
+                    created_at  TEXT NOT NULL
+                )
+                """);
+
+            // FTS5 full-text search (optional — may not be available in all SQLite builds)
+            try {
+                stmt.execute("""
+                    CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts USING fts5(
+                        content,
+                        tokenize='unicode61',
+                        content='memories',
+                        content_rowid='id'
+                    )
+                    """);
+                stmt.execute("""
+                    CREATE TRIGGER IF NOT EXISTS memories_ai AFTER INSERT ON memories BEGIN
+                        INSERT INTO memories_fts(rowid, content) VALUES (new.id, new.content);
+                    END
+                    """);
+                stmt.execute("""
+                    CREATE TRIGGER IF NOT EXISTS memories_ad AFTER DELETE ON memories BEGIN
+                        INSERT INTO memories_fts(memories_fts, rowid, content) VALUES('delete', old.id, old.content);
+                    END
+                    """);
+                stmt.execute("""
+                    CREATE TRIGGER IF NOT EXISTS memories_au AFTER UPDATE ON memories BEGIN
+                        INSERT INTO memories_fts(memories_fts, rowid, content) VALUES('delete', old.id, old.content);
+                        INSERT INTO memories_fts(rowid, content) VALUES (new.id, new.content);
+                    END
+                    """);
+                log.info("FTS5 full-text search index created for memories");
+            } catch (SQLException e) {
+                log.warn("FTS5 not available (full-text search disabled): {}", e.getMessage());
+            }
+
             log.info("Database tables initialized");
         } catch (SQLException e) {
             throw new RuntimeException("Failed to create tables", e);

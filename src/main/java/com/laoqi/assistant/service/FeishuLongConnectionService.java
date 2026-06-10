@@ -13,13 +13,16 @@ import com.lark.oapi.service.im.v1.model.CreateMessageResp;
 import com.lark.oapi.service.im.v1.model.P2MessageReceiveV1;
 import com.lark.oapi.service.im.v1.model.ext.MessageText;
 import com.laoqi.assistant.config.AppConfig;
+import com.laoqi.assistant.entity.Memory;
 import com.laoqi.assistant.model.Config;
+import com.laoqi.assistant.service.IMemoryService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -34,6 +37,7 @@ public class FeishuLongConnectionService {
     private final LogService logService;
     private final FeishuChatSessionService feishuChatSessionService;
     private final AppConfig appConfig;
+    private final IMemoryService memoryService;
 
     private com.lark.oapi.ws.Client wsClient;
     private Client client;
@@ -43,12 +47,14 @@ public class FeishuLongConnectionService {
                                         OpenCodeService openCodeService,
                                         LogService logService,
                                         FeishuChatSessionService feishuChatSessionService,
-                                        AppConfig appConfig) {
+                                        AppConfig appConfig,
+                                        IMemoryService memoryService) {
         this.configService = configService;
         this.openCodeService = openCodeService;
         this.logService = logService;
         this.feishuChatSessionService = feishuChatSessionService;
         this.appConfig = appConfig;
+        this.memoryService = memoryService;
     }
 
     @PostConstruct
@@ -277,22 +283,32 @@ public class FeishuLongConnectionService {
     }
 
     private String processNormalMessage(String text, String userKey) {
-        Exception lastError = null;
+        // 1. 检测"记住"意图，保存到长期记忆
+        handleRememberIntent(text, userKey);
+
+        // 2. 搜索相关记忆作为上下文
+        String memoryContext = buildMemoryContext(text);
+
         // 保存用户消息，标注为 knowledge 模式
         feishuChatSessionService.saveMessage(userKey, "user", text, "knowledge");
+        Exception lastError = null;
         for (int attempt = 0; attempt < 2; attempt++) {
             try {
-                // 每次新建 session，从 feishu_sessions.json 恢复历史上下文
+                // 每次新建 session，恢复历史上下文
                 String sessionId = openCodeService.createSession("飞书-" + userKey);
                 String context = feishuChatSessionService.buildHistoryContext(userKey, "knowledge");
-                String fullText = text;
+                StringBuilder fullText = new StringBuilder();
                 if (context != null) {
                     log.info("[飞书长连接] 恢复知识库历史上下文");
-                    fullText = context + "\n\n---\n\n用户最新消息:\n" + text;
+                    fullText.append(context).append("\n\n---\n\n");
                 }
+                if (memoryContext != null) {
+                    fullText.append(memoryContext).append("\n\n");
+                }
+                fullText.append("用户最新消息:\n").append(text);
 
                 log.info("[飞书长连接] 发送给 AI: {}", fullText);
-                String reply = openCodeService.sendMessage(sessionId, fullText);
+                String reply = openCodeService.sendMessage(sessionId, fullText.toString());
                 log.info("[飞书长连接] AI 回复长度: {}", reply != null ? reply.length() : 0);
 
                 feishuChatSessionService.saveMessage(userKey, "assistant", reply, "knowledge");
@@ -307,6 +323,37 @@ public class FeishuLongConnectionService {
         log.error("[飞书长连接] 处理普通消息失败", lastError);
         logService.add("飞书消息", "处理失败", lastError.getMessage());
         return "❌ 处理失败: " + lastError.getMessage();
+    }
+
+    /** 检测并处理"记住"意图 */
+    private void handleRememberIntent(String text, String userKey) {
+        String content = null;
+        // "记住..." / "记一下..." / "请记住..." / "帮我记住..."
+        String lower = text.trim().toLowerCase();
+        if (lower.startsWith("记住") || lower.startsWith("记一下") || lower.startsWith("帮我记住") || lower.startsWith("请记住")) {
+            content = text.trim().replaceAll("^(记住|记一下|帮我记住|请记住)[：:、\\s]*", "");
+        }
+        if (content != null && !content.isEmpty()) {
+            memoryService.remember(content, "feishu", List.of(userKey));
+            log.info("[飞书长连接] 已保存记忆: {}", content);
+        }
+    }
+
+    /** 搜索相关记忆，构建上下文块 */
+    private String buildMemoryContext(String text) {
+        try {
+            List<Memory> memories = memoryService.search(text, 5);
+            if (memories == null || memories.isEmpty()) return null;
+            StringBuilder sb = new StringBuilder("## 长期记忆\n以下是可能与当前问题相关的长期记忆：\n");
+            for (Memory m : memories) {
+                sb.append("- ").append(m.getContent()).append("\n");
+            }
+            log.info("[飞书长连接] 注入 {} 条相关记忆", memories.size());
+            return sb.toString();
+        } catch (Exception e) {
+            log.warn("[飞书长连接] 检索记忆失败: {}", e.getMessage());
+            return null;
+        }
     }
 
     private void sendImmediateReply(String chatId, String chatType, String messageId, boolean isCodeRelated) {
