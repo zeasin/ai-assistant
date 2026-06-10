@@ -13,7 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import java.nio.file.Files;
+import java.io.InputStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
@@ -263,15 +263,14 @@ public class MediaDataCollectorService {
         return updates;
     }
 
-    public Map<String, Object> importWechatExcel(String filePath) {
+    public Map<String, Object> importWechatExcel(InputStream inputStream, String account) {
         Map<String, Object> result = new LinkedHashMap<>();
-        Path path = Paths.get(filePath);
-        if (!FileUtil.exists(path)) {
+        if (account == null || account.isBlank()) {
             result.put("ok", false);
-            result.put("error", "文件不存在: " + filePath);
+            result.put("error", "请选择账号");
             return result;
         }
-        try (HSSFWorkbook wb = new HSSFWorkbook(Files.newInputStream(path))) {
+        try (HSSFWorkbook wb = new HSSFWorkbook(inputStream)) {
             Sheet sheet = wb.getSheetAt(0);
             Map<String, Double> dailyReaders = new LinkedHashMap<>();
             Map<String, Double> dailyShares = new LinkedHashMap<>();
@@ -319,7 +318,7 @@ public class MediaDataCollectorService {
 
             int nextId = 1;
             var articles = readJsonFile("自媒体文章.json");
-            String groupKey = "码农老齐-微信";
+            String groupKey = account + "-微信";
             List<Map<String, Object>> list = articles.computeIfAbsent(groupKey, k -> new ArrayList<>());
             int articleUpdates = 0;
             for (Map<String, Object> art : articleMap.values()) {
@@ -341,7 +340,7 @@ public class MediaDataCollectorService {
             }
 
             var dailyStats = readJsonFile("自媒体日数据.json");
-            List<Map<String, Object>> statsList = dailyStats.computeIfAbsent("码农老齐", k -> new ArrayList<>());
+            List<Map<String, Object>> statsList = dailyStats.computeIfAbsent(account, k -> new ArrayList<>());
             int statsUpdates = 0;
             for (Map.Entry<String, Double> e : dailyReaders.entrySet()) {
                 String date = e.getKey();
@@ -362,11 +361,11 @@ public class MediaDataCollectorService {
             }
 
             var accounts = readJsonFile("自媒体账号.json");
-            List<Map<String, Object>> accountList = accounts.computeIfAbsent("码农老齐", k -> new ArrayList<>());
+            List<Map<String, Object>> accountList = accounts.computeIfAbsent(account, k -> new ArrayList<>());
             boolean wechatAccountFound = false;
             for (Map<String, Object> acc : accountList) {
-                if ("微信".equals(acc.get("平台"))) {
-                    acc.put("名称", "码农老齐");
+                if ("wechat".equals(acc.get("平台"))) {
+                    acc.put("名称", account);
                     acc.put("更新日期", TimeUtil.todayStr());
                     wechatAccountFound = true;
                     break;
@@ -374,8 +373,8 @@ public class MediaDataCollectorService {
             }
             if (!wechatAccountFound) {
                 Map<String, Object> wechatAcc = new LinkedHashMap<>();
-                wechatAcc.put("平台", "微信");
-                wechatAcc.put("名称", "码农老齐");
+                wechatAcc.put("平台", "wechat");
+                wechatAcc.put("名称", account);
                 wechatAcc.put("更新日期", TimeUtil.todayStr());
                 accountList.add(wechatAcc);
             }

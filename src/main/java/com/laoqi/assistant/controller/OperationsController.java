@@ -12,6 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.nio.file.Path;
@@ -127,11 +128,19 @@ public class OperationsController {
 
     @PostMapping("/api/operations/import-excel")
     @ResponseBody
-    public Map<String, Object> importExcel() {
-        String filePath = Paths.get(System.getProperty("user.dir"), "tendency_1778162497_1780668097.xls").toString();
-        var result = mediaDataCollectorService.importWechatExcel(filePath);
-        logService.add("运营数据", "Excel导入", result.getOrDefault("error", "成功").toString());
-        return result;
+    public Map<String, Object> importExcel(@RequestParam("file") MultipartFile file,
+                                           @RequestParam("account") String account) {
+        if (file.isEmpty()) {
+            return Map.of("ok", false, "error", "请选择文件");
+        }
+        try {
+            var result = mediaDataCollectorService.importWechatExcel(file.getInputStream(), account);
+            logService.add("运营数据", "Excel导入", result.getOrDefault("error", "成功").toString());
+            return result;
+        } catch (Exception e) {
+            log.error("Excel导入失败", e);
+            return Map.of("ok", false, "error", "文件读取失败: " + e.getMessage());
+        }
     }
 
     @GetMapping("/api/operations/last-collect")

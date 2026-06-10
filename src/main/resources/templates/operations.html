@@ -89,7 +89,7 @@
         <button class="btn btn-primary" onclick="showAddDailyStatsModal()">📊 公众号日统计</button>
         <button class="btn btn-primary" onclick="showAddArticleModal()">📝 添加文章</button>
         <button class="btn btn-primary" onclick="showSaveAccountModal()">📋 添加账号</button>
-        <button class="btn btn-secondary" onclick="importExcel()">📥 导入微信Excel数据</button>
+        <button class="btn btn-secondary" onclick="showImportExcelModal()">📥 导入微信Excel数据</button>
     </div>
 </div>
 
@@ -516,6 +516,9 @@ function showAddDailyStatsModal() {
 function showSaveAccountModal() {
     document.getElementById('modal-account').classList.add('active');
 }
+function showImportExcelModal() {
+    document.getElementById('modal-import-excel').classList.add('active');
+}
 function closeModal(id) { document.getElementById(id).classList.remove('active'); }
 document.querySelectorAll('.modal-overlay').forEach(m => {
     m.addEventListener('click', function(e) { if (e.target === this) this.classList.remove('active'); });
@@ -550,14 +553,22 @@ async function submitDailyStats(e) {
 }
 
 async function importExcel() {
-    const btn = event.target;
+    const account = document.getElementById('importExcelAccount').value;
+    const fileInput = document.getElementById('importExcelFile');
+    const file = fileInput.files[0];
+    if (!file) { toast('请选择 Excel 文件', 'error'); return; }
+    const btn = document.querySelector('#modal-import-excel .btn-primary');
     btn.disabled = true;
     btn.textContent = '⏳ 导入中...';
     try {
-        const res = await fetch('/api/operations/import-excel', { method: 'POST' });
+        const fd = new FormData();
+        fd.append('file', file);
+        fd.append('account', account);
+        const res = await fetch('/api/operations/import-excel', { method: 'POST', body: fd });
         const data = await res.json();
         if (data.ok) {
             toast('✅ 导入完成：文章' + data.articleUpdates + '条，日统计' + data.statsUpdates + '条');
+            closeModal('modal-import-excel');
             setTimeout(() => { window.location.reload(); }, 1500);
         } else {
             toast('❌ ' + (data.error || '导入失败'), 'error');
@@ -566,7 +577,8 @@ async function importExcel() {
         toast('❌ 请求失败: ' + e.message, 'error');
     }
     btn.disabled = false;
-    btn.textContent = '📥 导入微信Excel数据';
+    btn.textContent = '📥 导入';
+    fileInput.value = '';
 }
 
 async function submitAccount(e) {
@@ -724,6 +736,28 @@ async function submitAccount(e) {
                 <button type="submit" class="btn btn-primary">保存</button>
             </div>
         </form>
+    </div>
+</div>
+<!-- 导入微信Excel弹窗 -->
+<div class="modal-overlay" id="modal-import-excel">
+    <div class="modal">
+        <h3>📥 导入微信Excel数据</h3>
+        <div class="form-group" style="margin-bottom:12px;">
+            <label>账号 *</label>
+            <select id="importExcelAccount" required style="width:100%;padding:8px 10px;border:1px solid #e1e3e6;border-radius:6px;font-size:13px;">
+                <option value="码农老齐">码农老齐</option>
+                <option value="启航电商ERP">启航电商ERP</option>
+                <option value="老齐二三事">老齐二三事</option>
+            </select>
+        </div>
+        <div class="form-group" style="margin-bottom:12px;">
+            <label>Excel 文件 *</label>
+            <input type="file" id="importExcelFile" accept=".xls,.xlsx" style="width:100%;padding:6px 0;font-size:13px;">
+        </div>
+        <div class="modal-actions">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('modal-import-excel')">取消</button>
+            <button type="button" class="btn btn-primary" onclick="importExcel()">📥 导入</button>
+        </div>
     </div>
 </div>
 </body>
