@@ -6,13 +6,15 @@ import com.laoqi.assistant.service.ConfigService;
 import com.laoqi.assistant.service.LogService;
 import com.laoqi.assistant.service.MediaDataCollectorService;
 import com.laoqi.assistant.service.OperationsService;
+import com.laoqi.assistant.util.FileUtil;
+import com.laoqi.assistant.util.TimeUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.Executors;
@@ -20,11 +22,13 @@ import java.util.concurrent.Executors;
 @Controller
 public class OperationsController {
 
+    private static final Logger log = LoggerFactory.getLogger(OperationsController.class);
+    private static final ObjectMapper mapper = new ObjectMapper();
+
     private final OperationsService operationsService;
     private final LogService logService;
     private final MediaDataCollectorService mediaDataCollectorService;
     private final ConfigService configService;
-    private static final ObjectMapper mapper = new ObjectMapper();
 
     public OperationsController(OperationsService operationsService, LogService logService,
                                 MediaDataCollectorService mediaDataCollectorService,
@@ -135,6 +139,176 @@ public class OperationsController {
     public Map<String, Object> getLastCollectTime() {
         String time = mediaDataCollectorService.getLastCollectTime();
         return Map.of("ok", true, "lastCollectTime", time != null ? time : "从未采集");
+    }
+
+    @PostMapping("/api/operations/save-record")
+    @ResponseBody
+    public Map<String, Object> saveRecord(
+            @RequestParam String recordType,
+            @RequestParam Map<String, String> params) {
+        try {
+            Config config = configService.load();
+            String baseDir = config.getBaseDir();
+            String opsDir = config.getOperationsDataDir();
+            if (baseDir == null || baseDir.isEmpty() || opsDir == null || opsDir.isEmpty()) {
+                return Map.of("ok", false, "error", "运营数据目录未配置");
+            }
+            Path targetDir = Paths.get(baseDir).resolve(opsDir).resolve("data");
+
+            switch (recordType) {
+                case "article":
+                    return saveArticle(targetDir, params);
+                case "stats":
+                    return saveDailyStats(targetDir, params);
+                case "account":
+                    return saveAccount(targetDir, params);
+                default:
+                    return Map.of("ok", false, "error", "未知的记录类型: " + recordType);
+            }
+        } catch (Exception e) {
+            log.error("保存记录失败", e);
+            return Map.of("ok", false, "error", "保存失败: " + e.getMessage());
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> saveArticle(Path dataDir, Map<String, String> params) {
+        Path filePath = dataDir.resolve("自媒体文章.json");
+        Map<String, Object> fileData = FileUtil.readJson(filePath, Map.class, new LinkedHashMap<>());
+
+        String group = params.get("accountName");
+        if (group == null || group.isEmpty()) {
+            return Map.of("ok", false, "error", "账号不能为空");
+        }
+
+        List<Map<String, Object>> records = (List<Map<String, Object>>) fileData.computeIfAbsent(group, k -> new ArrayList<>());
+
+        // Generate next article ID
+        int maxId = 0;
+        for (Map<String, Object> r : records) {
+            Object idObj = r.get("文章id");
+            if (idObj != null) {
+                try {
+                    int id = Integer.parseInt(idObj.toString());
+                    if (id > maxId) maxId = id;
+                } catch (NumberFormatException ignored) {}
+            }
+        }
+        String newId = String.format("%02d", maxId + 1);
+
+        Map<String, Object> record = new LinkedHashMap<>();
+        record.put("文章id", newId);
+        record.put("文章名", params.getOrDefault("topic", ""));
+        record.put("日期", params.getOrDefault("publishDate", ""));
+        record.put("阅读", parseInt(params.get("reads"), 0));
+        record.put("点赞", parseInt(params.get("likes"), 0));
+        record.put("转发收藏", parseInt(params.get("shareFav"), 0));
+        record.put("推荐", parseInt(params.get("recommend"), 0));
+        record.put("评论", parseInt(params.get("comments"), 0));
+
+        records.add(record);
+        FileUtil.writeJson(filePath, fileData);
+        log.info("文章记录已保存: group={}, 文章名={}", group, record.get("文章名"));
+
+        return Map.of("ok", true, "message", "文章添加成功");
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> saveDailyStats(Path dataDir, Map<String, String> params) {
+        Path filePath = dataDir.resolve("自媒体日数据.json");
+        Map<String, Object> fileData = FileUtil.readJson(filePath, Map.class, new LinkedHashMap<>());
+
+        String group = params.get("accountName");
+        if (group == null || group.isEmpty()) {
+            return Map.of("ok", false, "error", "账号不能为空");
+        }
+
+        List<Map<String, Object>> records = (List<Map<String, Object>>) fileData.computeIfAbsent(group, k -> new ArrayList<>());
+
+        Map<String, Object> record = new LinkedHashMap<>();
+        record.put("日期", params.getOrDefault("date", ""));
+        record.put("粉丝", parseInt(params.get("fans"), 0));
+        record.put("阅读", parseInt(params.get("reads"), 0));
+        record.put("分享收藏", parseInt(params.get("shareFav"), 0));
+        record.put("推荐", parseDouble(params.get("sourceRecommend"), 0.0));
+        record.put("搜一搜", parseDouble(params.get("sourceSearch"), 0.0));
+        record.put("主页", parseDouble(params.get("sourceHome"), 0.0));
+        record.put("消息", parseDouble(params.get("sourceMessage"), 0.0));
+        record.put("聊天会话", parseDouble(params.get("sourceChat"), 0.0));
+        record.put("朋友圈", parseDouble(params.get("sourceMoments"), 0.0));
+        record.put("其他", parseDouble(params.get("sourceOther"), 0.0));
+
+        records.add(record);
+        FileUtil.writeJson(filePath, fileData);
+        log.info("日统计已保存: group={}, 日期={}", group, record.get("日期"));
+
+        return Map.of("ok", true, "message", "日统计添加成功");
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> saveAccount(Path dataDir, Map<String, String> params) {
+        Path filePath = dataDir.resolve("自媒体账号.json");
+        Map<String, Object> fileData = FileUtil.readJson(filePath, Map.class, new LinkedHashMap<>());
+
+        String group = params.get("accountName");
+        if (group == null || group.isEmpty()) {
+            return Map.of("ok", false, "error", "账号名不能为空");
+        }
+
+        List<Map<String, Object>> records = (List<Map<String, Object>>) fileData.computeIfAbsent(group, k -> new ArrayList<>());
+
+        // Generate next account ID (format: P01, P02...)
+        int maxId = 0;
+        for (Map<String, Object> r : records) {
+            Object idObj = r.get("账号ID");
+            if (idObj != null) {
+                String idStr = idObj.toString().replaceAll("[^0-9]", "");
+                if (!idStr.isEmpty()) {
+                    try {
+                        int id = Integer.parseInt(idStr);
+                        if (id > maxId) maxId = id;
+                    } catch (NumberFormatException ignored) {}
+                }
+            }
+        }
+        String newId = "P" + String.format("%02d", maxId + 1);
+
+        Map<String, Object> record = new LinkedHashMap<>();
+        record.put("账号ID", newId);
+        record.put("平台", params.getOrDefault("platformKey", ""));
+        record.put("名称", params.getOrDefault("name", group));
+        record.put("粉丝", parseInt(params.get("fans"), 0));
+        String link = params.get("link");
+        if (link != null && !link.isEmpty()) {
+            record.put("链接", link);
+        }
+        record.put("总访问", parseInt(params.get("totalViews"), 0));
+        record.put("文章数", parseInt(params.get("totalArticles"), 0));
+        record.put("更新日期", TimeUtil.todayStr());
+
+        records.add(record);
+        FileUtil.writeJson(filePath, fileData);
+        log.info("账号已保存: group={}, 平台={}", group, record.get("平台"));
+
+        return Map.of("ok", true, "message", "账号添加成功");
+    }
+
+    private int parseInt(String val, int defaultVal) {
+        if (val == null || val.isEmpty()) return defaultVal;
+        try {
+            return Integer.parseInt(val);
+        } catch (NumberFormatException e) {
+            return defaultVal;
+        }
+    }
+
+    private double parseDouble(String val, double defaultVal) {
+        if (val == null || val.isEmpty()) return defaultVal;
+        try {
+            return Double.parseDouble(val);
+        } catch (NumberFormatException e) {
+            return defaultVal;
+        }
     }
 
 }

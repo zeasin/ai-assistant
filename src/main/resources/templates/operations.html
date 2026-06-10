@@ -521,26 +521,15 @@ document.querySelectorAll('.modal-overlay').forEach(m => {
     m.addEventListener('click', function(e) { if (e.target === this) this.classList.remove('active'); });
 });
 
-async function aiSend(msg) {
-    const resp = await fetch('/api/ai/send?message=' + encodeURIComponent(msg), { method: 'POST' });
-    return resp.json();
-}
-
 async function submitArticle(e) {
     e.preventDefault();
     const fd = new FormData(e.target);
-    const msg = '记录文章：账号=' + fd.get('accountName')
-        + '，标题=' + fd.get('topic')
-        + '，日期=' + fd.get('publishDate')
-        + (fd.get('series') ? '，系列=' + fd.get('series') : '')
-        + (fd.get('fansGained') && fd.get('fansGained') !== '0' ? '，增粉=' + fd.get('fansGained') : '')
-        + (fd.get('notes') ? '，备注=' + fd.get('notes') : '')
-        + '，阅读=' + fd.get('reads') + ' 点赞=' + fd.get('likes') + ' 分享=' + fd.get('shares') + ' 收藏=' + fd.get('favorites')
-        + ' 评论=' + fd.get('comments') + ' 推荐=' + fd.get('recommend');
+    const params = new URLSearchParams(fd);
+    params.append('recordType', 'article');
     try {
-        const resp = await fetch('/api/ai/send-async?message=' + encodeURIComponent(msg), { method: 'POST' });
+        const resp = await fetch('/api/operations/save-record', { method: 'POST', body: params });
         const res = await resp.json();
-        if (res.ok) { toast('✅ 已提交，AI 后台处理中'); } else { toast(res.error || '添加失败', 'error'); }
+        if (res.ok) { toast('✅ 文章已保存'); } else { toast(res.error || '添加失败', 'error'); }
     } catch(e) { toast('网络错误', 'error'); }
     closeModal('modal-article');
     location.reload();
@@ -549,31 +538,13 @@ async function submitArticle(e) {
 async function submitDailyStats(e) {
     e.preventDefault();
     const fd = new FormData(e.target);
-    const msg = '记录日统计：账号=' + fd.get('accountName')
-        + '，日期=' + fd.get('date')
-        + '，粉丝=' + fd.get('fans')
-        + '，阅读=' + fd.get('reads')
-        + '，分享收藏=' + fd.get('shareFav')
-        + '，文章数=' + fd.get('readArticles')
-        + '，推荐来源=' + fd.get('sourceRecommend')
-        + '，搜一搜=' + fd.get('sourceSearch')
-        + '，主页=' + fd.get('sourceHome')
-        + '，消息=' + fd.get('sourceMessage')
-        + '，聊天会话=' + fd.get('sourceChat')
-        + '，朋友圈=' + fd.get('sourceMoments')
-        + '，其他=' + fd.get('sourceOther');
-    // 异步提交，不等待 AI 处理完成
+    const params = new URLSearchParams(fd);
+    params.append('recordType', 'stats');
     try {
-        const resp = await fetch('/api/ai/send-async?message=' + encodeURIComponent(msg), { method: 'POST' });
+        const resp = await fetch('/api/operations/save-record', { method: 'POST', body: params });
         const res = await resp.json();
-        if (res.ok) {
-            toast('✅ 已提交，AI 后台处理中');
-        } else {
-            toast(res.error || '提交失败', 'error');
-        }
-    } catch(e) {
-        toast('网络错误', 'error');
-    }
+        if (res.ok) { toast('✅ 日统计已保存'); } else { toast(res.error || '提交失败', 'error'); }
+    } catch(e) { toast('网络错误', 'error'); }
     closeModal('modal-daily-stats');
     location.reload();
 }
@@ -601,16 +572,12 @@ async function importExcel() {
 async function submitAccount(e) {
     e.preventDefault();
     const fd = new FormData(e.target);
-    const msg = '记录账号：账号名=' + fd.get('accountName')
-        + '，平台=' + fd.get('platformKey')
-        + (fd.get('name') ? '，名称=' + fd.get('name') : '')
-        + '，粉丝=' + fd.get('fans')
-        + '，总访问=' + fd.get('totalViews')
-        + '，总文章=' + fd.get('totalArticles');
+    const params = new URLSearchParams(fd);
+    params.append('recordType', 'account');
     try {
-        const resp = await fetch('/api/ai/send-async?message=' + encodeURIComponent(msg), { method: 'POST' });
+        const resp = await fetch('/api/operations/save-record', { method: 'POST', body: params });
         const res = await resp.json();
-        if (res.ok) { toast('✅ 已提交，AI 后台处理中'); } else { toast(res.error || '添加失败', 'error'); }
+        if (res.ok) { toast('✅ 账号已保存'); } else { toast(res.error || '添加失败', 'error'); }
     } catch(e) { toast('网络错误', 'error'); }
     closeModal('modal-account');
     location.reload();
@@ -627,15 +594,15 @@ async function submitAccount(e) {
                     <label>账号-平台 *</label>
                     <select name="accountName" required>
                         <optgroup label="码农老齐">
-                            <option value="码农老齐-公众号">码农老齐-公众号</option>
+                            <option value="码农老齐-微信">码农老齐-微信</option>
                             <option value="码农老齐-CSDN">码农老齐-CSDN</option>
                             <option value="码农老齐-知乎">码农老齐-知乎</option>
                         </optgroup>
                         <optgroup label="启航电商ERP">
-                            <option value="启航电商ERP-公众号">启航电商ERP-公众号</option>
+                            <option value="启航电商ERP-微信">启航电商ERP-微信</option>
                         </optgroup>
                         <optgroup label="老齐二三事">
-                            <option value="老齐二三事-公众号">老齐二三事-公众号</option>
+                            <option value="老齐二三事-微信">老齐二三事-微信</option>
                         </optgroup>
                     </select>
                 </div>
@@ -648,21 +615,12 @@ async function submitAccount(e) {
                 <label>文章标题 *</label>
                 <input type="text" name="topic" required placeholder="文章标题">
             </div>
-            <div class="form-row">
-                <div class="form-group"><label>系列</label><input type="text" name="series" placeholder="如 OpenCode系列"></div>
-                <div class="form-group"><label>增粉</label><input type="number" name="fansGained" value="0"></div>
-            </div>
-            <div class="form-group" style="margin-bottom:12px;">
-                <label>备注</label>
-                <input type="text" name="notes" placeholder="可选">
-            </div>
             <div style="background:#f8f7ff;border-radius:8px;padding:12px;margin-bottom:12px;">
                 <div style="font-size:12px;font-weight:600;margin-bottom:8px;">文章数据（所有平台统一）</div>
                 <div class="form-row">
                     <div class="form-group"><label>阅读</label><input type="number" name="reads" value="0"></div>
                     <div class="form-group"><label>点赞</label><input type="number" name="likes" value="0"></div>
-                    <div class="form-group"><label>分享</label><input type="number" name="shares" value="0"></div>
-                    <div class="form-group"><label>收藏</label><input type="number" name="favorites" value="0"></div>
+                    <div class="form-group"><label>分享收藏</label><input type="number" name="shareFav" value="0"></div>
                 </div>
                 <div class="form-row">
                     <div class="form-group"><label>评论</label><input type="number" name="comments" value="0"></div>
@@ -700,10 +658,6 @@ async function submitAccount(e) {
                 <div class="form-group"><label>粉丝数</label><input type="number" name="fans" value="0"></div>
                 <div class="form-group"><label>阅读量</label><input type="number" name="reads" value="0"></div>
                 <div class="form-group"><label>分享收藏</label><input type="number" name="shareFav" value="0"></div>
-            </div>
-            <div class="form-row">
-
-                <div class="form-group"><label>被阅读文章数</label><input type="number" name="readArticles" value="0"></div>
             </div>
             <div style="background:#f8f7ff;border-radius:8px;padding:12px;margin-bottom:12px;">
                 <div style="font-size:12px;font-weight:600;margin-bottom:8px;">流量来源</div>
@@ -755,6 +709,10 @@ async function submitAccount(e) {
             <div class="form-group" style="margin-bottom:12px;">
                 <label>平台显示名称</label>
                 <input type="text" name="name" placeholder="如 码农老齐">
+            </div>
+            <div class="form-group" style="margin-bottom:12px;">
+                <label>链接</label>
+                <input type="url" name="link" placeholder="如 https://blog.csdn.net/..." style="width:100%;">
             </div>
             <div class="form-row">
                 <div class="form-group"><label>粉丝数</label><input type="number" name="fans" value="0"></div>
