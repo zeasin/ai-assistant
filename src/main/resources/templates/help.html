@@ -171,6 +171,42 @@ java -jar target/ai-assistant-2.0.0.jar
 </div>
 
 <div class="card">
+    <h2>🧠 长期记忆</h2>
+    <p class="text-muted" style="line-height:1.7;">
+        长期记忆让 AI 能记住关键信息跨会话使用。记忆存储在 SQLite <code>memory.db</code> 中，
+        每次对话时自动检索相关记忆注入给 AI 作为上下文，无需手动重复告知。
+    </p>
+
+    <h3 style="margin-top:16px;margin-bottom:8px;font-size:14px;">保存记忆</h3>
+    <p class="text-muted" style="line-height:1.7;">
+        在 Web 聊天或飞书中，直接输入以下格式即可保存记忆：
+    </p>
+    <table class="log-table" style="margin-top:8px;">
+        <thead><tr><th>输入</th><th>效果</th></tr></thead>
+        <tbody>
+            <tr><td><code>记住 张三的电话是13812345678</code></td><td>保存一条记忆"张三的电话是13812345678"</td></tr>
+            <tr><td><code>记一下 项目deadline是6月30日</code></td><td>保存一条记忆"项目deadline是6月30日"</td></tr>
+            <tr><td><code>帮我记住 客户李四的公司叫启航科技</code></td><td>保存一条记忆"客户李四的公司叫启航科技"</td></tr>
+        </tbody>
+    </table>
+    <p class="text-muted" style="line-height:1.7;margin-top:8px;">
+        也支持 <code>请记住</code> 前缀。AI 看到"记住"开头的消息会同时保存记忆并正常回复。
+    </p>
+
+    <h3 style="margin-top:16px;margin-bottom:8px;font-size:14px;">检索使用</h3>
+    <p class="text-muted" style="line-height:1.7;">
+        每次对话时，系统会自动将当前问题与已有记忆做匹配，找到最相关的 5 条记忆
+        注入到 AI 的上下文中。例如你之前记住了"张三的电话是13812345678"，
+        之后问"张三的电话是多少"时，AI 会自动看到这条记忆并回答，无需你再次告知。
+    </p>
+
+    <h3 style="margin-top:16px;margin-bottom:8px;font-size:14px;">遗忘管理</h3>
+    <p class="text-muted" style="line-height:1.7;">
+        前往 <a href="/memory">记忆管理页面</a> 可查看所有记忆、按关键词搜索、手动添加新记忆，或点击"遗忘"删除不需要的记忆。
+    </p>
+</div>
+
+<div class="card">
     <h2>📝 快速数据录入</h2>
     <p class="text-muted" style="line-height:1.7;">
         <strong>核心原则：规则由你在 AI 的 AGENTS.md 中制定，AI 自己保存数据。</strong>
