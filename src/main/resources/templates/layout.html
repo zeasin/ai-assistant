@@ -345,6 +345,7 @@
             </div>
         </div>
         <a th:classappend="${requestURI == '/tasks' ? 'active' : ''}" href="/tasks">任务</a>
+        <a th:classappend="${requestURI == '/collector' ? 'active' : ''}" href="/collector">采集器</a>
         <a th:classappend="${requestURI == '/reminders' ? 'active' : ''}" href="/reminders">提醒</a>
         <a th:classappend="${requestURI == '/config' ? 'active' : ''}" href="/config">配置</a>
 <a th:classappend="${requestURI == '/ai-guide' ? 'active' : ''}" href="/ai-guide">AI指南</a>

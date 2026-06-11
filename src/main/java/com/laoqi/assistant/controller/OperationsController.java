@@ -101,22 +101,19 @@ public class OperationsController {
     @PostMapping("/api/operations/collect")
     @ResponseBody
     public Map<String, Object> triggerCollect() {
-        logService.add("运营数据", "手动触发采集", "");
-        return mediaDataCollectorService.collectSync();
+        return Map.of("ok", false, "error", "该功能已迁移至独立采集器模块，请使用 /api/collector/tasks API");
     }
     
     @PostMapping("/api/operations/test-scheduled-collect")
     @ResponseBody
     public Map<String, Object> testScheduledCollect() {
-        logService.add("运营数据", "测试定时采集", "");
-        Config config = configService.load();
-        return mediaDataCollectorService.collectSync();
+        return Map.of("ok", false, "error", "该功能已迁移至独立采集器模块，请使用 /api/collector/tasks API");
     }
 
     @GetMapping("/api/operations/collect/preview")
     @ResponseBody
     public Map<String, Object> previewCollect() {
-        return mediaDataCollectorService.dryRun();
+        return Map.of("ok", false, "error", "该功能已迁移至独立采集器模块，请使用 /api/collector/tasks API");
     }
 
     @PostMapping("/api/operations/request-data")
@@ -146,8 +143,7 @@ public class OperationsController {
     @GetMapping("/api/operations/last-collect")
     @ResponseBody
     public Map<String, Object> getLastCollectTime() {
-        String time = mediaDataCollectorService.getLastCollectTime();
-        return Map.of("ok", true, "lastCollectTime", time != null ? time : "从未采集");
+        return Map.of("ok", true, "lastCollectTime", "独立采集器模块未记录此信息");
     }
 
     @PostMapping("/api/operations/save-record")

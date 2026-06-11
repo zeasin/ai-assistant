@@ -82,8 +82,7 @@
     <h2>📊 自媒体运营看板</h2>
     <div class="text-muted mb-2">
         数据来源：<code>自媒体/data/</code> | 
-        <span id="last-collect-time" class="text-muted">CSDN采集：加载中...</span>
-        <button class="btn btn-secondary" style="margin-left:12px;padding:4px 12px;font-size:12px;" onclick="manualCollect()">🔄 手动采集</button>
+        <a href="/collector" style="color:#7c5cfc;">📡 数据采集器</a>
     </div>
     <div class="flex" style="gap:8px;margin-top:12px;flex-wrap:wrap;">
         <button class="btn btn-primary" onclick="showAddDailyStatsModal()">📊 公众号日统计</button>
@@ -124,39 +123,7 @@ const DATA_TYPE = 'operations';
 let appData = null;
 let columnSettings = {};
 
-async function loadLastCollectTime() {
-    try {
-        const res = await fetch('/api/operations/last-collect');
-        const data = await res.json();
-        document.getElementById('last-collect-time').textContent = 'CSDN采集：' + (data.lastCollectTime || '从未采集');
-    } catch (e) {
-        document.getElementById('last-collect-time').textContent = 'CSDN采集：加载失败';
-    }
-}
-
-async function manualCollect() {
-    const btn = event.target;
-    btn.disabled = true;
-    btn.textContent = '⏳ 采集中...';
-    try {
-        const res = await fetch('/api/operations/collect', { method: 'POST' });
-        const data = await res.json();
-        if (data.ok) {
-            toast('✅ 采集完成');
-            loadLastCollectTime();
-            setTimeout(() => { window.location.reload(); }, 1000);
-        } else {
-            toast('❌ ' + (data.error || '采集失败'), 'error');
-        }
-    } catch (e) {
-        toast('❌ 请求失败', 'error');
-    }
-    btn.disabled = false;
-    btn.textContent = '🔄 手动采集';
-}
-
 document.addEventListener('DOMContentLoaded', function() {
-    loadLastCollectTime();
 });
 
 // 检测并按照时间字段倒序排列

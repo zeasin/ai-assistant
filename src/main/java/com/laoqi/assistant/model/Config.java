@@ -29,8 +29,6 @@ public class Config {
     private String dailyDir;
     private String weeklyDir;
     private String remindFile;
-    private Boolean mediaCollectEnabled;
-    private String mediaCollectTime;
     private Map<String, Map<String, List<String>>> columnSettings = new HashMap<>();
 
     public Config() {}
@@ -46,8 +44,6 @@ public class Config {
         c.weeklyDir = "周报";
         c.workDir = "工作";
         c.remindFile = "提醒.md";
-        c.mediaCollectEnabled = false;
-        c.mediaCollectTime = "08:00";
         return c;
     }
 
@@ -86,10 +82,6 @@ public class Config {
     public void setWeeklyDir(String weeklyDir) { this.weeklyDir = weeklyDir; }
     public String getRemindFile() { return remindFile; }
     public void setRemindFile(String remindFile) { this.remindFile = remindFile; }
-    public Boolean isMediaCollectEnabled() { return mediaCollectEnabled; }
-    public void setMediaCollectEnabled(Boolean mediaCollectEnabled) { this.mediaCollectEnabled = mediaCollectEnabled; }
-    public String getMediaCollectTime() { return mediaCollectTime; }
-    public void setMediaCollectTime(String mediaCollectTime) { this.mediaCollectTime = mediaCollectTime; }
     public Map<String, Map<String, List<String>>> getColumnSettings() { return columnSettings; }
     public void setColumnSettings(Map<String, Map<String, List<String>>> columnSettings) { this.columnSettings = columnSettings; }
 }

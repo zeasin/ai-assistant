@@ -156,16 +156,7 @@ public class ApiConfigController {
     public Map<String, Object> updateMediaCollect(
             @RequestParam(name = "enabled", defaultValue = "off") String enabled,
             @RequestParam(name = "time", defaultValue = "08:00") String time) {
-        try {
-            Config cfg = configService.load();
-            cfg.setMediaCollectEnabled("on".equals(enabled));
-            cfg.setMediaCollectTime(time);
-            configService.save(cfg);
-            logService.add("配置更新", "成功", "CSDN采集 " + (cfg.isMediaCollectEnabled() ? "已开启" : "已关闭") + " 时间=" + time);
-            return Map.of("ok", true);
-        } catch (Exception e) {
-            return Map.of("ok", false, "error", e.getMessage());
-        }
+        return Map.of("ok", false, "error", "该功能已迁移至独立采集器模块，请使用 /api/collector/tasks API");
     }
 
     @GetMapping("/api/config/prompts")
