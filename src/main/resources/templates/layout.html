@@ -26,6 +26,30 @@
         .nav a.active { color: #7c5cfc; background: #f0edff; }
         .nav .title { color: #1a1b1e; font-size: 16px; font-weight: 600; margin-right: 20px; }
         .nav .subtitle { color: #909296; font-size: 12px; margin-left: auto; }
+        .dropdown { position: relative; display: inline-flex; }
+        .dropdown-toggle {
+            color: #5c5f66; text-decoration: none; padding: 8px 16px;
+            font-size: 14px; border-radius: 6px; transition: all .15s;
+            cursor: pointer; background: none; border: none;
+            align-items: center; gap: 4px;
+        }
+        .dropdown-toggle:hover { color: #1a1b1e; background: #e8e8ed; }
+        .dropdown-toggle.active { color: #7c5cfc; background: #f0edff; }
+        .dropdown-toggle .arrow { font-size: 10px; margin-left: 2px; }
+        .dropdown-content {
+            display: none; position: absolute; top: 100%; left: 0; min-width: 140px;
+            background: #fff; border: 1px solid #e1e3e6; border-radius: 8px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.1); padding: 4px; z-index: 100;
+        }
+        .dropdown-content a {
+            display: flex; align-items: center; gap: 6px;
+            padding: 8px 12px; font-size: 14px; border-radius: 6px;
+            color: #5c5f66; text-decoration: none;
+        }
+        .dropdown-content a:hover { color: #1a1b1e; background: #e8e8ed; }
+        .dropdown-content a.active { color: #7c5cfc; background: #f0edff; }
+        .dropdown:hover .dropdown-content { display: block; }
+        .dropdown:hover .dropdown-toggle { color: #1a1b1e; background: #e8e8ed; }
         .port-banner {
             background: #fff3cd; border-bottom: 1px solid #ffc107;
             padding: 8px 24px; display: flex; align-items: center; gap: 10px;
@@ -310,9 +334,16 @@
         <a th:classappend="${requestURI == '/' ? 'active' : ''}" href="/">综合</a>
         <a th:classappend="${requestURI == '/chat' ? 'active' : ''}" href="/chat">对话</a>
         <a th:classappend="${requestURI == '/browse' or requestURI == '/view' ? 'active' : ''}" href="/browse">笔记</a>
-        <a th:classappend="${requestURI == '/operations' ? 'active' : ''}" href="/operations">运营</a>
-        <a th:classappend="${requestURI == '/work-reports' or requestURI.startsWith('/work-reports') ? 'active' : ''}" href="/work-reports">工作</a>
-        <a th:classappend="${requestURI == '/customers' ? 'active' : ''}" href="/customers">客户</a>
+        <div class="dropdown">
+            <button class="dropdown-toggle" th:classappend="${#strings.startsWith(requestURI, '/module/')} ? 'active' : ''">
+                运营<span class="arrow">▾</span>
+            </button>
+            <div class="dropdown-content">
+                <a th:each="m : ${modules}" th:href="@{/module/{id}(id=${m.id})}"
+                   th:classappend="${requestURI == '/module/' + m.id} ? 'active' : ''"
+                   th:text="${m.icon + ' ' + m.name}">模块</a>
+            </div>
+        </div>
         <a th:classappend="${requestURI == '/tasks' ? 'active' : ''}" href="/tasks">任务</a>
         <a th:classappend="${requestURI == '/reminders' ? 'active' : ''}" href="/reminders">提醒</a>
         <a th:classappend="${requestURI == '/config' ? 'active' : ''}" href="/config">配置</a>
