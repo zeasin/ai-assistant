@@ -1,0 +1,570 @@
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title th:text="${module.name} + ' - AI 助理'">模块</title>
+    <style>
+        .tab-bar { display:flex; gap:4px; margin-bottom:20px; border-bottom:2px solid #e1e3e6; padding-bottom:0; }
+        .tab-btn {
+            padding:10px 20px; border:none; background:none; cursor:pointer;
+            font-size:14px; color:#5c5f66; border-bottom:2px solid transparent;
+            margin-bottom:-2px; transition:all .15s;
+        }
+        .tab-btn:hover { color:#1a1b1e; background:#f5f5f7; border-radius:8px 8px 0 0; }
+        .tab-btn.active { color:#7c5cfc; border-bottom-color:#7c5cfc; font-weight:600; }
+        .tab-content { display:none; }
+        .tab-content.active { display:block; }
+
+        .data-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+        .hidden-rows { display:none; }
+
+        .tree { list-style:none; padding-left:0; margin:0; }
+        .tree ul { list-style:none; padding-left:20px; margin:0; }
+        .tree li { margin:0; }
+        .tree-node {
+            display:flex; align-items:center; gap:6px; padding:6px 10px;
+            cursor:pointer; border-radius:6px; font-size:13px; user-select:none;
+        }
+        .tree-node:hover { background:#f0edff; }
+        .tree-node.active { background:#e8e3ff; color:#5c3dcf; font-weight:600; }
+        .tree-node .arrow {
+            display:inline-block; width:14px; text-align:center;
+            font-size:10px; color:#909296; transition:transform .15s;
+        }
+        .tree-node .arrow.expanded { transform:rotate(90deg); }
+        .tree-node .icon { font-size:14px; }
+
+        .doc-view { background:#fafafe; border:1px solid #eef0f4; border-radius:12px; padding:16px 20px; margin-top:12px; }
+        .doc-view .report { max-width:100%; }
+
+        .modal-overlay {
+            display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4);
+            z-index:100; justify-content:center; align-items:center;
+        }
+        .modal-overlay.active { display:flex; }
+        .modal {
+            background:#fff; border-radius:12px; padding:28px; width:640px;
+            max-width:92vw; max-height:88vh; overflow-y:auto;
+            box-shadow:0 8px 32px rgba(0,0,0,0.15);
+        }
+        .modal h3 { font-size:16px; margin-bottom:16px; }
+        .modal .form-row { display:flex; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
+        .modal .form-group { flex:1; display:flex; flex-direction:column; gap:4px; min-width:120px; }
+        .modal .form-group label { font-size:12px; color:#5c5f66; font-weight:500; }
+        .modal .form-group input, .modal .form-group select, .modal .form-group textarea {
+            padding:8px 10px; border:1px solid #e1e3e6; border-radius:6px;
+            font-size:13px; outline:none; background:#fff; color:#1a1b1e;
+        }
+        .modal .form-group input:focus, .modal .form-group select:focus, .modal .form-group textarea:focus {
+            border-color:#7c5cfc;
+        }
+        .modal .modal-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:16px; }
+
+        .prompt-editor { margin-top:16px; }
+        .prompt-editor textarea {
+            width:100%; min-height:120px; padding:10px 12px;
+            border:1px solid #e1e3e6; border-radius:8px;
+            font-size:13px; font-family:"SF Mono","Fira Code",monospace; outline:none; resize:vertical;
+            background:#fff; color:#1a1b1e; box-sizing:border-box;
+        }
+        .prompt-editor textarea:focus { border-color:#7c5cfc; }
+    </style>
+</head>
+<body>
+<th:block layout:fragment="content">
+
+<div th:if="${error}" class="card" style="text-align:center;padding:40px;">
+    <div style="font-size:18px;color:#e03131;margin-bottom:8px;">⚠️ [[${error}]]</div>
+    <a href="/" class="btn btn-primary">返回首页</a>
+</div>
+
+<div th:unless="${error}">
+<div class="card" style="padding:16px 20px;">
+    <div style="display:flex;align-items:center;gap:12px;">
+        <span style="font-size:28px;" th:text="${module.icon}">📁</span>
+        <div>
+            <h2 style="margin:0;font-size:20px;" th:text="${module.name}">模块名</h2>
+            <div class="text-muted" style="font-size:12px;">
+                目录：<code th:text="${module.dir}"></code>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('analysis')">🤖 AI分析</button>
+    <button class="tab-btn" onclick="switchTab('data')">📊 原始数据</button>
+    <button class="tab-btn" onclick="switchTab('docs')">📄 文档查看</button>
+    <button class="tab-btn" onclick="switchTab('schedules')">⏰ 定时任务</button>
+    <button class="tab-btn" onclick="switchTab('prompt')">✏️ 提示词</button>
+</div>
+
+<div id="tab-analysis" class="tab-content active">
+    <div class="card" style="background:linear-gradient(135deg,#f0edff,#fafafe);border:1px solid #d9d0ff;">
+        <h2 style="margin-bottom:4px;" th:text="'🤖 ' + ${module.name} + ' 分析报告'">分析报告</h2>
+        <div class="text-muted mb-2" style="font-size:12px;">
+            <span id="analysis-elapsed" style="display:none;"></span>
+        </div>
+        <div id="analysis-status" class="text-muted" style="padding:20px 0;text-align:center;">
+            ⏳ 正在加载分析报告...
+        </div>
+        <div id="analysis-result" class="report"></div>
+        <div style="margin-top:12px;text-align:right;">
+            <button class="btn btn-secondary" onclick="startAnalysis(true)" style="font-size:12px;">🔄 重新分析</button>
+        </div>
+    </div>
+</div>
+
+<div id="tab-data" class="tab-content">
+    <div id="data-loading" class="text-muted" style="padding:20px;text-align:center;">⏳ 加载数据...</div>
+    <div id="data-content"></div>
+</div>
+
+<div id="tab-docs" class="tab-content">
+    <div class="card" style="padding:0;display:flex;gap:0;">
+        <div id="docs-sidebar" style="flex:0 0 280px;border-right:1px solid #e1e3e6;overflow-y:auto;max-height:70vh;">
+            <div id="docs-breadcrumb" style="padding:8px 12px;border-bottom:1px solid #e1e3e6;font-size:12px;display:none;"></div>
+            <div id="docs-loading" class="text-muted" style="padding:20px;text-align:center;">⏳ 加载中...</div>
+            <div id="docs-tree" style="padding:4px 0;"></div>
+        </div>
+        <div id="docs-content" style="flex:1;padding:16px;overflow-y:auto;max-height:70vh;">
+            <div class="text-muted" style="padding:40px;text-align:center;">从左侧选择文档查看</div>
+        </div>
+    </div>
+</div>
+
+<div id="tab-schedules" class="tab-content">
+    <div class="card" style="text-align:center;padding:30px;">
+        <div class="text-muted">定时任务可在「配置」页面统一管理</div>
+        <a href="/config" class="btn btn-primary" style="margin-top:12px;">去配置</a>
+    </div>
+</div>
+
+<div id="tab-prompt" class="tab-content">
+    <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <h2 style="margin:0;font-size:16px;">✏️ AI 分析提示词</h2>
+            <span class="text-muted" style="font-size:11px;">保存在 <code>分析提示词.md</code></span>
+        </div>
+        <p class="text-muted" style="font-size:13px;margin-bottom:12px;">
+            修改提示词将影响 AI 分析报告的内容和风格。保存后，下次点击「重新分析」即生效。
+        </p>
+        <textarea id="prompt-textarea" placeholder="输入 AI 分析提示词..." style="width:100%;min-height:240px;padding:12px;border:1px solid #e1e3e6;border-radius:8px;font-size:13px;font-family:'SF Mono','Fira Code',monospace;outline:none;resize:vertical;background:#fff;color:#1a1b1e;box-sizing:border-box;"></textarea>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;align-items:center;">
+            <span id="prompt-save-status" class="text-muted" style="font-size:12px;"></span>
+            <button class="btn btn-primary" onclick="savePrompt()">💾 保存</button>
+        </div>
+    </div>
+</div>
+</div>
+
+<script>
+var MODULE_ID = '[[${module.id}]]';
+var MODULE_NAME = '[[${module.name}]]';
+var isAnalysisLoaded = false;
+
+function switchTab(name) {
+    document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+    document.querySelectorAll('.tab-content').forEach(function(c) { c.classList.remove('active'); });
+    document.querySelector('.tab-btn[onclick*="' + name + '"]').classList.add('active');
+    document.getElementById('tab-' + name).classList.add('active');
+
+    if (name === 'data' && !document.getElementById('data-content').dataset.loaded) {
+        loadData();
+    }
+    if (name === 'docs' && !document.getElementById('docs-tree').dataset.loaded) {
+        loadDocTree();
+    }
+}
+
+window.addEventListener('DOMContentLoaded', function() {
+    loadAnalysisReport();
+    loadPrompt();
+});
+
+/* ===== Prompt Editor ===== */
+var currentPrompt = '';
+
+async function loadPrompt() {
+    try {
+        var res = await fetch('/module/' + MODULE_ID + '/prompt');
+        var data = await res.json();
+        if (data.ok) {
+            currentPrompt = data.prompt;
+            document.getElementById('prompt-textarea').value = data.prompt;
+        }
+    } catch (e) {}
+}
+
+async function savePrompt() {
+    var content = document.getElementById('prompt-textarea').value;
+    var status = document.getElementById('prompt-save-status');
+    status.textContent = '⏳ 保存中...';
+    try {
+        var res = await fetch('/module/' + MODULE_ID + '/prompt', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt: content })
+        });
+        var data = await res.json();
+        status.textContent = data.ok ? '✅ 已保存' : '❌ ' + (data.error || '保存失败');
+        currentPrompt = content;
+    } catch (e) {
+        status.textContent = '❌ 保存失败';
+    }
+    setTimeout(function() { status.textContent = ''; }, 2000);
+}
+
+/* ===== AI Analysis ===== */
+async function loadAnalysisReport() {
+    var status = document.getElementById('analysis-status');
+    var result = document.getElementById('analysis-result');
+    var btn = document.querySelector('#tab-analysis .btn-secondary:last-child');
+
+    try {
+        var res = await fetch('/module/' + MODULE_ID + '/analysis/report');
+        var data = await res.json();
+        if (data.ok && data.report) {
+            status.style.display = 'none';
+            result.innerHTML = marked.parse(data.report);
+            isAnalysisLoaded = true;
+            btn.textContent = '🔄 重新分析';
+            return;
+        }
+    } catch (e) {}
+
+    status.style.display = 'block';
+    status.innerHTML = '暂无 AI 分析报告。点击「生成分析」手动生成。';
+    btn.textContent = '🚀 生成分析';
+}
+
+var analysisStartTime;
+function startAnalysis(force) {
+    var btn = document.querySelector('#tab-analysis .btn-secondary:last-child');
+    var status = document.getElementById('analysis-status');
+    var result = document.getElementById('analysis-result');
+    var elapsed = document.getElementById('analysis-elapsed');
+
+    btn.disabled = true;
+    btn.textContent = '⏳ 分析中...';
+    status.style.display = 'block';
+    status.textContent = '⏳ AI 正在分析 ' + MODULE_NAME + ' 数据...';
+    result.innerHTML = '';
+    elapsed.style.display = 'none';
+    analysisStartTime = Date.now();
+
+    var url = '/module/' + MODULE_ID + '/analysis?force=true';
+    var es = new EventSource(url);
+
+    es.onmessage = function(event) {
+        try {
+            var d = JSON.parse(event.data);
+            if (d.type === 'status') {
+                status.textContent = d.content;
+            } else if (d.type === 'text') {
+                status.style.display = 'none';
+                result.innerHTML = marked.parse(d.content);
+                elapsed.style.display = 'inline';
+                elapsed.textContent = '⏱️ ' + Math.round((Date.now() - analysisStartTime) / 1000) + 's';
+                isAnalysisLoaded = true;
+            } else if (d.type === 'error') {
+                status.style.display = 'none';
+                result.innerHTML = '<div style="color:#e03131;padding:20px;text-align:center;">❌ ' + d.content + '</div>';
+            } else if (d.type === 'done') {
+                es.close();
+                btn.disabled = false;
+                btn.textContent = '🔄 重新分析';
+            }
+        } catch (e) {
+            result.innerHTML += event.data + '<br>';
+        }
+    };
+    es.onerror = function() {
+        es.close();
+        btn.disabled = false;
+        btn.textContent = '🔄 重新分析';
+        if (result.innerHTML === '') {
+            status.style.display = 'none';
+            result.innerHTML = '<div style="color:#e03131;padding:20px;text-align:center;">❌ AI 分析连接中断，请重试</div>';
+        }
+    };
+}
+
+/* ===== Data CRUD ===== */
+var dataCache = {};
+var columnSettings = {};
+
+async function loadData() {
+    var loading = document.getElementById('data-loading');
+    var container = document.getElementById('data-content');
+
+    try {
+        var res = await fetch('/module/' + MODULE_ID + '/data/files');
+        var apiResult = await res.json();
+
+        if (!apiResult.ok) {
+            container.innerHTML = '<div class="text-muted" style="padding:20px;text-align:center;">' + (apiResult.error || '加载失败') + '</div>';
+            loading.style.display = 'none';
+            return;
+        }
+
+        var files = apiResult.files;
+        if (!files || files.length === 0) {
+            container.innerHTML = '<div class="text-muted" style="padding:20px;text-align:center;">暂无数据文件，请在 <code>' + apiResult.dir + '</code> 目录下创建 JSON 文件。</div>';
+            loading.style.display = 'none';
+            return;
+        }
+
+        dataCache = { rawDataGroups: {}, tableColumns: {} };
+
+        for (var fi = 0; fi < files.length; fi++) {
+            var f = files[fi];
+            var fileName = f.fileName;
+
+            var fileRes = await fetch('/module/' + MODULE_ID + '/data/file?file=' + encodeURIComponent(fileName));
+            var fileData = await fileRes.json();
+            if (!fileData.ok) continue;
+
+            dataCache.rawDataGroups[fileName] = {};
+
+            var groups = fileData.groups || {};
+            for (var groupKey in groups) {
+                var groupInfo = groups[groupKey];
+                if (groupInfo.type === 'array') {
+                    var grpRes = await fetch('/module/' + MODULE_ID + '/data/group?file=' + encodeURIComponent(fileName) + '&group=' + encodeURIComponent(groupKey));
+                    var grpData = await grpRes.json();
+                    if (grpData.ok && Array.isArray(grpData.data)) {
+                        var entries = [];
+                        for (var ii = 0; ii < grpData.data.length; ii++) {
+                            if (typeof grpData.data[ii] === 'object' && grpData.data[ii] !== null) entries.push(grpData.data[ii]);
+                        }
+                        entries.sort(compareByTime);
+                        dataCache.rawDataGroups[fileName][groupKey] = entries;
+
+                        var tableId = fileName + '_' + groupKey;
+                        var colSet = {};
+                        for (var ri = 0; ri < entries.length; ri++) {
+                            Object.keys(entries[ri]).forEach(function(k) { colSet[k] = true; });
+                        }
+                        dataCache.tableColumns[tableId] = Object.keys(colSet);
+                    }
+                }
+            }
+            if (Object.keys(dataCache.rawDataGroups[fileName]).length === 0) {
+                delete dataCache.rawDataGroups[fileName];
+            }
+        }
+
+        renderData();
+        loading.style.display = 'none';
+        container.dataset.loaded = 'true';
+    } catch (e) {
+        container.innerHTML = '<div class="text-muted" style="padding:20px;text-align:center;">加载失败: ' + e.message + '</div>';
+        loading.style.display = 'none';
+    }
+}
+
+function compareByTime(a, b) {
+    var timeField = null;
+    var timeKeywords = ['时间', '日期', '创建时间', '更新时间', '发布时间', 'date', 'created', 'updated', 'timestamp', 'publish', 'lastContact'];
+    for (var k = 0; k < timeKeywords.length; k++) {
+        for (var key in a) {
+            if (key.indexOf(timeKeywords[k]) !== -1) {
+                timeField = key;
+                break;
+            }
+        }
+        if (timeField) break;
+    }
+    if (!timeField) {
+        for (var key in a) {
+            if (typeof a[key] === 'string' && /^\d{4}[-\/]\d{1,2}[-\/]\d/.test(a[key])) {
+                timeField = key;
+                break;
+            }
+        }
+    }
+    if (!timeField) return 0;
+    var ta = a[timeField] || '';
+    var tb = b[timeField] || '';
+    return String(tb).localeCompare(String(ta));
+}
+
+function renderData() {
+    var container = document.getElementById('data-content');
+    var hasData = false;
+    for (var k in dataCache.rawDataGroups) { hasData = true; break; }
+    if (!hasData) {
+        container.innerHTML = '<div class="text-muted" style="padding:20px;text-align:center;">暂无数据</div>';
+        return;
+    }
+
+    var html = '<details style="background:#fff;border:1px solid #e1e3e6;border-radius:12px;padding:16px 20px;" open>' +
+        '<summary style="cursor:pointer;font-size:14px;font-weight:600;color:#5c5f66;outline:none;">📁 数据文件</summary>' +
+        '<div style="margin-top:12px;">';
+
+    for (var fileKey in dataCache.rawDataGroups) {
+        var fileGroups = dataCache.rawDataGroups[fileKey];
+        html += '<div style="margin-bottom:20px;">';
+        html += '<h3 style="margin:0 0 12px 0;">' + fileKey + '</h3>';
+
+        for (var groupKey in fileGroups) {
+            var rows = fileGroups[groupKey];
+            var tableId = fileKey + '_' + groupKey;
+            var allColumns = dataCache.tableColumns[tableId] || [];
+
+            html += '<div class="card" style="margin-bottom:12px;">';
+            html += '<div class="data-header"><h4>' + groupKey + '</h4></div>';
+            html += '<div style="overflow-x:auto;">';
+            html += '<table class="log-table" id="table_' + tableId + '">';
+            html += '<thead><tr>';
+            for (var ci = 0; ci < allColumns.length; ci++) {
+                html += '<th>' + allColumns[ci] + '</th>';
+            }
+            html += '</tr></thead><tbody>';
+
+            for (var ri = 0; ri < rows.length; ri++) {
+                var row = rows[ri];
+                var rowClass = ri >= 6 ? 'hidden-rows' : '';
+                html += '<tr class="' + rowClass + '">';
+                for (var ci = 0; ci < allColumns.length; ci++) {
+                    var val = row[allColumns[ci]];
+                    html += '<td>' + (val != null ? (typeof val === 'object' ? JSON.stringify(val) : val) : '—') + '</td>';
+                }
+                html += '</tr>';
+            }
+            if (rows.length === 0) {
+                html += '<tr><td colspan="' + allColumns.length + '" style="text-align:center;color:#909296;">暂无数据</td></tr>';
+            }
+            html += '</tbody></table>';
+
+            if (rows.length > 6) {
+                html += '<div style="text-align:center;padding:8px 0 4px;"><a href="#" onclick="toggleRows(\'table_' + tableId + '\', this);return false;" style="color:#7c5cfc;font-size:13px;text-decoration:none;">展开全部 ' + rows.length + ' 条 ▼</a></div>';
+            }
+            html += '</div></div>';
+        }
+        html += '</div>';
+    }
+    html += '</div></details>';
+    container.innerHTML = html;
+}
+
+function toggleRows(tableId, link) {
+    var table = document.getElementById(tableId);
+    if (!table) return;
+    var hidden = table.querySelectorAll('.hidden-rows');
+    if (hidden.length > 0) {
+        hidden.forEach(function(r) { r.classList.remove('hidden-rows'); });
+        link.textContent = '收起 ▲';
+    } else {
+        var rows = table.querySelectorAll('tbody tr');
+        for (var i = 6; i < rows.length; i++) {
+            rows[i].classList.add('hidden-rows');
+        }
+        link.textContent = '展开全部 ' + rows.length + ' 条 ▼';
+    }
+}
+
+/* ===== Docs Tree (navigate folders) ===== */
+var docsCurrentPath = '';
+
+async function loadDocTree() {
+    await navigateDocPath('');
+}
+
+async function navigateDocPath(path) {
+    docsCurrentPath = path;
+    var loading = document.getElementById('docs-loading');
+    var container = document.getElementById('docs-tree');
+    var breadcrumb = document.getElementById('docs-breadcrumb');
+
+    loading.style.display = 'block';
+    container.innerHTML = '';
+
+    try {
+        var res = await fetch('/module/' + MODULE_ID + '/docs/tree?path=' + encodeURIComponent(path));
+        var data = await res.json();
+        loading.style.display = 'none';
+
+        if (!data.ok || !data.tree) {
+            container.innerHTML = '<div class="text-muted" style="padding:20px;text-align:center;">暂无文档</div>';
+            container.dataset.loaded = 'true';
+            return;
+        }
+
+        // Breadcrumb
+        var crumbs = [];
+        if (path) {
+            var parts = path.split('/');
+            for (var i = 0; i < parts.length; i++) {
+                var p = parts.slice(0, i + 1).join('/');
+                crumbs.push({ name: parts[i], path: p });
+            }
+        }
+        var bcHtml = '<a href="#" onclick="navigateDocPath(\'\');return false;" style="color:#7c5cfc;text-decoration:none;">' + MODULE_NAME + '</a>';
+        for (var ci = 0; ci < crumbs.length; ci++) {
+            bcHtml += ' / <a href="#" onclick="navigateDocPath(\'' + crumbs[ci].path.replace(/'/g, "\\'") + '\');return false;" style="color:#7c5cfc;text-decoration:none;">' + crumbs[ci].name + '</a>';
+        }
+        breadcrumb.innerHTML = '📍 ' + bcHtml;
+        breadcrumb.style.display = 'block';
+
+        // Render current dir content
+        var tree = data.tree;
+        var children = tree.children || [];
+        var html = '<ul class="tree">';
+        var dirs = children.filter(function(c) { return c.type === 'dir'; });
+        var files = children.filter(function(c) { return c.type === 'file'; });
+
+        if (path) {
+            html += '<li><div class="tree-node" onclick="navigateDocPath(\'' + (data.parentPath || '').replace(/'/g, "\\'") + '\');return false;">';
+            html += '<span class="arrow" style="visibility:hidden;">▶</span>';
+            html += '<span class="icon">📂</span><span style="color:#909296;">.. / 上级目录</span>';
+            html += '</div></li>';
+        }
+
+        dirs.forEach(function(d) {
+            html += '<li><div class="tree-node" onclick="navigateDocPath(\'' + d.path.replace(/'/g, "\\'") + '\');return false;">';
+            html += '<span class="arrow" style="visibility:hidden;">▶</span>';
+            html += '<span class="icon">📁</span><span>' + d.name + '</span>';
+            html += '</div></li>';
+        });
+        files.forEach(function(f) {
+            html += '<li><div class="tree-node" onclick="showDocContent(\'' + f.path.replace(/'/g, "\\'") + '\');return false;">';
+            html += '<span class="arrow" style="visibility:hidden;">▶</span>';
+            html += '<span class="icon">📄</span><span>' + f.name + '</span>';
+            html += '</div></li>';
+        });
+        html += '</ul>';
+
+        if (dirs.length === 0 && files.length === 0) {
+            html = '<div class="text-muted" style="padding:20px;text-align:center;">空目录</div>';
+        }
+
+        container.innerHTML = html;
+        container.dataset.loaded = 'true';
+    } catch (e) {
+        loading.style.display = 'none';
+        container.innerHTML = '<div class="text-muted" style="padding:20px;text-align:center;">加载失败: ' + e.message + '</div>';
+    }
+}
+
+async function showDocContent(path) {
+    var contentDiv = document.getElementById('docs-content');
+    contentDiv.innerHTML = '<div class="text-muted" style="padding:20px;text-align:center;">⏳ 加载中...</div>';
+
+    try {
+        var res = await fetch('/module/' + MODULE_ID + '/docs/content?path=' + encodeURIComponent(path));
+        var data = await res.json();
+        if (data.ok) {
+            contentDiv.innerHTML = '<h3 style="margin:0 0 12px 0;">' + data.name + '</h3>' +
+                '<div class="report">' + data.html + '</div>';
+        } else {
+            contentDiv.innerHTML = '<div class="text-muted" style="padding:20px;text-align:center;">加载失败</div>';
+        }
+    } catch (e) {
+        contentDiv.innerHTML = '<div class="text-muted" style="padding:20px;text-align:center;">加载失败: ' + e.message + '</div>';
+    }
+}
+</script>
+</body>
+</html>
