@@ -1,6 +1,7 @@
 package com.laoqi.assistant.controller;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.laoqi.assistant.config.AppConfig;
 import com.laoqi.assistant.model.Config;
 import com.laoqi.assistant.service.ConfigService;
 import com.laoqi.assistant.util.FileUtil;
@@ -30,9 +31,11 @@ public class DataController {
     }
 
     private final ConfigService configService;
+    private final AppConfig appConfig;
 
-    public DataController(ConfigService configService) {
+    public DataController(ConfigService configService, AppConfig appConfig) {
         this.configService = configService;
+        this.appConfig = appConfig;
     }
 
     private Path getBaseDir() {
@@ -54,6 +57,17 @@ public class DataController {
             case "operations":
                 return config.getOperationsDataDir();
             default:
+                // Try module config
+                Map<String, Object> raw = FileUtil.readJson(appConfig.getConfigFile(), mapType, new HashMap<>());
+                Object modules = raw.get("modules");
+                if (modules instanceof List) {
+                    for (Object m : (List<?>) modules) {
+                        if (m instanceof Map && type.equals(((Map<?,?>) m).get("id"))) {
+                            Object dir = ((Map<?,?>) m).get("dir");
+                            return dir != null ? dir.toString() : null;
+                        }
+                    }
+                }
                 return null;
         }
     }

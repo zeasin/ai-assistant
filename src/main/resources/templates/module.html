@@ -355,6 +355,15 @@ async function loadData() {
             }
         }
 
+        // Load column settings
+        try {
+            var csRes = await fetch('/module/' + MODULE_ID + '/column-settings');
+            var csData = await csRes.json();
+            if (csData.ok && csData.settings) {
+                columnSettings = csData.settings;
+            }
+        } catch (e) {}
+
         renderData();
         loading.style.display = 'none';
         container.dataset.loaded = 'true';
@@ -406,20 +415,29 @@ function renderData() {
     for (var fileKey in dataCache.rawDataGroups) {
         var fileGroups = dataCache.rawDataGroups[fileKey];
         html += '<div style="margin-bottom:20px;">';
-        html += '<h3 style="margin:0 0 12px 0;">' + fileKey + '</h3>';
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">';
+        html += '<h3 style="margin:0;">' + fileKey + '</h3>';
+        html += '<a href="/data-editor?type=' + encodeURIComponent(MODULE_ID) + '&data=' + encodeURIComponent(fileKey) + '" class="btn btn-secondary" style="font-size:12px;padding:4px 12px;text-decoration:none;">查看更多数据</a>';
+        html += '</div>';
 
         for (var groupKey in fileGroups) {
             var rows = fileGroups[groupKey];
             var tableId = fileKey + '_' + groupKey;
             var allColumns = dataCache.tableColumns[tableId] || [];
+            var savedCols = columnSettings[tableId];
+            var columns = savedCols && savedCols.length > 0
+                ? allColumns.filter(function(c) { return savedCols.indexOf(c) !== -1; })
+                : allColumns;
 
             html += '<div class="card" style="margin-bottom:12px;">';
-            html += '<div class="data-header"><h4>' + groupKey + '</h4></div>';
+            html += '<div class="data-header"><h4>' + groupKey +
+                '<button class="col-settings-btn" onclick="showColumnSettings(\'' + tableId + '\')" title="列设置" style="cursor:pointer;font-size:14px;color:#909296;padding:2px 6px;border-radius:4px;background:none;border:none;margin-left:8px;">⚙️</button>' +
+                '</h4></div>';
             html += '<div style="overflow-x:auto;">';
             html += '<table class="log-table" id="table_' + tableId + '">';
             html += '<thead><tr>';
-            for (var ci = 0; ci < allColumns.length; ci++) {
-                html += '<th>' + allColumns[ci] + '</th>';
+            for (var ci = 0; ci < columns.length; ci++) {
+                html += '<th>' + columns[ci] + '</th>';
             }
             html += '</tr></thead><tbody>';
 
@@ -427,14 +445,14 @@ function renderData() {
                 var row = rows[ri];
                 var rowClass = ri >= 6 ? 'hidden-rows' : '';
                 html += '<tr class="' + rowClass + '">';
-                for (var ci = 0; ci < allColumns.length; ci++) {
-                    var val = row[allColumns[ci]];
+                for (var ci = 0; ci < columns.length; ci++) {
+                    var val = row[columns[ci]];
                     html += '<td>' + (val != null ? (typeof val === 'object' ? JSON.stringify(val) : val) : '—') + '</td>';
                 }
                 html += '</tr>';
             }
             if (rows.length === 0) {
-                html += '<tr><td colspan="' + allColumns.length + '" style="text-align:center;color:#909296;">暂无数据</td></tr>';
+                html += '<tr><td colspan="' + columns.length + '" style="text-align:center;color:#909296;">暂无数据</td></tr>';
             }
             html += '</tbody></table>';
 
@@ -463,6 +481,67 @@ function toggleRows(tableId, link) {
         }
         link.textContent = '展开全部 ' + rows.length + ' 条 ▼';
     }
+}
+
+/* ===== Column Settings ===== */
+function showColumnSettings(tableId) {
+    var allColumns = dataCache.tableColumns[tableId] || [];
+    if (allColumns.length === 0) return;
+
+    var savedCols = columnSettings[tableId];
+    var selected = savedCols && savedCols.length > 0
+        ? savedCols.slice()
+        : allColumns.slice();
+
+    var overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.style.display = 'flex';
+    overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+
+    var html = '<div class="modal" style="width:360px;" onclick="event.stopPropagation();">';
+    html += '<h3>选择要显示的列</h3>';
+    html += '<div style="max-height:50vh;overflow-y:auto;">';
+    for (var i = 0; i < allColumns.length; i++) {
+        var col = allColumns[i];
+        var checked = selected.indexOf(col) !== -1;
+        html += '<label class="column-settings-item" style="display:flex;align-items:center;padding:6px 0;font-size:13px;">';
+        html += '<input type="checkbox" value="' + col.replace(/"/g, '&quot;') + '" ' + (checked ? 'checked' : '') + ' style="margin-right:8px;">';
+        html += col;
+        html += '</label>';
+    }
+    html += '</div>';
+    html += '<div class="modal-actions">';
+    html += '<button class="btn btn-secondary" onclick="this.closest(\'.modal-overlay\').remove()">取消</button>';
+    html += '<button class="btn btn-primary" onclick="saveColumnSettings(\'' + tableId + '\', this)">确认</button>';
+    html += '</div></div>';
+
+    overlay.innerHTML = html;
+    document.body.appendChild(overlay);
+}
+
+async function saveColumnSettings(tableId, btn) {
+    var overlay = btn.closest('.modal-overlay');
+    var checkboxes = overlay.querySelectorAll('input[type="checkbox"]');
+    var selected = [];
+    for (var i = 0; i < checkboxes.length; i++) {
+        if (checkboxes[i].checked) selected.push(checkboxes[i].value);
+    }
+
+    columnSettings[tableId] = selected;
+
+    try {
+        var resp = await fetch('/module/' + MODULE_ID + '/column-settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(columnSettings)
+        });
+        var data = await resp.json();
+        if (data.ok) {
+            renderData();
+        }
+    } catch (e) {}
+
+    overlay.remove();
 }
 
 /* ===== Docs Tree (navigate folders) ===== */

@@ -3,6 +3,7 @@ package com.laoqi.assistant.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.laoqi.assistant.config.AppConfig;
 import com.laoqi.assistant.model.ModuleDefinition;
+import com.laoqi.assistant.service.ConfigService;
 import com.laoqi.assistant.service.ModuleDataService;
 import com.laoqi.assistant.service.ModuleService;
 import com.laoqi.assistant.service.OpenCodeService;
@@ -38,15 +39,17 @@ public class ModuleController {
     private final OpenCodeService openCodeService;
     private final AppConfig appConfig;
     private final PromptService promptService;
+    private final ConfigService configService;
 
     public ModuleController(ModuleService moduleService, ModuleDataService moduleDataService,
                             OpenCodeService openCodeService, AppConfig appConfig,
-                            PromptService promptService) {
+                            PromptService promptService, ConfigService configService) {
         this.moduleService = moduleService;
         this.moduleDataService = moduleDataService;
         this.openCodeService = openCodeService;
         this.appConfig = appConfig;
         this.promptService = promptService;
+        this.configService = configService;
     }
 
     @GetMapping("/{id}")
@@ -83,7 +86,9 @@ public class ModuleController {
         Path dataDir = moduleService.getModuleDataDir(mod);
         var result = moduleDataService.getFileData(dataDir, file);
         if (result == null) return Map.of("ok", false, "error", "文件不存在");
-        return new HashMap<>(result);
+        Map<String, Object> resp = new HashMap<>(result);
+        resp.put("ok", true);
+        return resp;
     }
 
     @GetMapping(value = "/{id}/data/group", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -97,7 +102,9 @@ public class ModuleController {
         Path dataDir = moduleService.getModuleDataDir(mod);
         var result = moduleDataService.getGroupData(dataDir, file, group);
         if (result == null) return Map.of("ok", false, "error", "数据不存在");
-        return new HashMap<>(result);
+        Map<String, Object> resp = new HashMap<>(result);
+        resp.put("ok", true);
+        return resp;
     }
 
     @PostMapping(value = "/{id}/data/add", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -323,6 +330,33 @@ public class ModuleController {
         } catch (Exception e) {
             log.error("AI analysis failed for module {}", mod.getId(), e);
             return "❌ AI 分析失败：" + e.getMessage();
+        }
+    }
+
+    @GetMapping(value = "/{id}/column-settings", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public Map<String, Object> getColumnSettings(@PathVariable String id) {
+        var config = configService.load();
+        var allSettings = config.getColumnSettings();
+        if (allSettings == null) allSettings = new HashMap<>();
+        var moduleSettings = allSettings.getOrDefault(id, new HashMap<>());
+        return Map.of("ok", true, "settings", moduleSettings);
+    }
+
+    @PostMapping(value = "/{id}/column-settings", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public Map<String, Object> saveColumnSettings(@PathVariable String id,
+                                                  @RequestBody Map<String, List<String>> settings) {
+        try {
+            var config = configService.load();
+            var allSettings = config.getColumnSettings();
+            if (allSettings == null) allSettings = new HashMap<>();
+            allSettings.put(id, settings);
+            config.setColumnSettings(allSettings);
+            configService.save(config);
+            return Map.of("ok", true);
+        } catch (Exception e) {
+            return Map.of("ok", false, "error", e.getMessage());
         }
     }
 
