@@ -3,6 +3,7 @@ package com.laoqi.assistant.controller;
 import com.laoqi.assistant.config.AppConfig;
 import com.laoqi.assistant.service.ConfigService;
 import com.laoqi.assistant.service.LogService;
+import com.laoqi.assistant.service.PromptService;
 import com.laoqi.assistant.util.FileUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,10 +23,12 @@ public class AiGuideController {
     private static final Logger log = LoggerFactory.getLogger(AiGuideController.class);
     private final ConfigService configService;
     private final LogService logService;
+    private final PromptService promptService;
 
-    public AiGuideController(ConfigService configService, LogService logService) {
+    public AiGuideController(ConfigService configService, LogService logService, PromptService promptService) {
         this.configService = configService;
         this.logService = logService;
+        this.promptService = promptService;
     }
 
     @GetMapping("/ai-guide")
@@ -159,6 +162,101 @@ public class AiGuideController {
         }
     }
 
+    // ---- 提示词 ----
+
+    @GetMapping("/api/ai-guide/prompts")
+    @ResponseBody
+    public Map<String, Object> listPrompts() {
+        Path dir = getPromptsDir();
+        if (dir == null || !Files.exists(dir)) {
+            return Map.of("ok", true, "files", List.of(), "path", dir != null ? dir.toString() : "");
+        }
+        try (Stream<Path> files = Files.list(dir)) {
+            List<Map<String, String>> fileList = files
+                    .filter(p -> p.getFileName().toString().endsWith(".md"))
+                    .sorted()
+                    .map(p -> {
+                        Map<String, String> info = new LinkedHashMap<>();
+                        info.put("name", p.getFileName().toString());
+                        info.put("path", p.toString());
+                        return info;
+                    })
+                    .collect(Collectors.toList());
+            return Map.of("ok", true, "files", fileList, "path", dir.toString());
+        } catch (Exception e) {
+            return Map.of("ok", false, "error", e.getMessage());
+        }
+    }
+
+    @GetMapping("/api/ai-guide/prompts/{name}")
+    @ResponseBody
+    public Map<String, Object> getPrompt(@PathVariable String name) {
+        Path dir = getPromptsDir();
+        if (dir == null) {
+            return Map.of("ok", false, "error", "未配置笔记库根目录");
+        }
+        Path file = dir.resolve(name).normalize();
+        if (!file.startsWith(dir)) {
+            return Map.of("ok", false, "error", "非法文件名");
+        }
+        if (!Files.exists(file)) {
+            return Map.of("ok", true, "content", "");
+        }
+        String content = FileUtil.readText(file);
+        return Map.of("ok", true, "content", content);
+    }
+
+    @PostMapping("/api/ai-guide/prompts")
+    @ResponseBody
+    public Map<String, Object> savePrompt(@RequestBody Map<String, String> body) {
+        String name = body.getOrDefault("name", "");
+        String content = body.getOrDefault("content", "");
+        if (name.isEmpty()) {
+            return Map.of("ok", false, "error", "文件名不能为空");
+        }
+        if (!name.endsWith(".md")) {
+            name = name + ".md";
+        }
+        Path dir = getPromptsDir();
+        if (dir == null) {
+            return Map.of("ok", false, "error", "未配置笔记库根目录");
+        }
+        try {
+            Files.createDirectories(dir);
+            Path file = dir.resolve(name).normalize();
+            if (!file.startsWith(dir)) {
+                return Map.of("ok", false, "error", "非法文件名");
+            }
+            FileUtil.writeText(file, content);
+            promptService.reload();
+            logService.add("AI指南", "保存提示词", name);
+            return Map.of("ok", true);
+        } catch (Exception e) {
+            return Map.of("ok", false, "error", e.getMessage());
+        }
+    }
+
+    @DeleteMapping("/api/ai-guide/prompts/{name}")
+    @ResponseBody
+    public Map<String, Object> deletePrompt(@PathVariable String name) {
+        Path dir = getPromptsDir();
+        if (dir == null) {
+            return Map.of("ok", false, "error", "未配置笔记库根目录");
+        }
+        Path file = dir.resolve(name).normalize();
+        if (!file.startsWith(dir)) {
+            return Map.of("ok", false, "error", "非法文件名");
+        }
+        try {
+            Files.deleteIfExists(file);
+            promptService.reload();
+            logService.add("AI指南", "删除提示词", name);
+            return Map.of("ok", true);
+        } catch (Exception e) {
+            return Map.of("ok", false, "error", e.getMessage());
+        }
+    }
+
     // ---- helpers ----
 
     private Path getAgentsFile() {
@@ -174,6 +272,15 @@ public class AiGuideController {
         try {
             String baseDir = configService.getBaseDir();
             return Paths.get(baseDir, "AI", "记忆");
+        } catch (IllegalStateException e) {
+            return null;
+        }
+    }
+
+    private Path getPromptsDir() {
+        try {
+            String baseDir = configService.getBaseDir();
+            return Paths.get(baseDir, "AI", "prompts");
         } catch (IllegalStateException e) {
             return null;
         }
