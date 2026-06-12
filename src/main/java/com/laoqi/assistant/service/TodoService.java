@@ -25,10 +25,7 @@ public class TodoService {
     }
 
     private Path getRemindFile() {
-        Config config = configService.load();
-        String remindFile = config.getRemindFile();
-        if (remindFile == null || remindFile.isEmpty()) remindFile = "提醒.md";
-        return getBaseDir().resolve(remindFile);
+        return getBaseDir().resolve("代办.md");
     }
 
     public static class Todos {

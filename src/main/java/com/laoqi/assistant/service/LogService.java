@@ -31,14 +31,7 @@ public class LogService {
     }
 
     private Path getLogFile() {
-        Config config = configService.load();
-        String logFile = config.getLogFile();
-        if (logFile == null || logFile.isEmpty()) {
-            return appConfig.getConfigDirPath().resolve("assistant_log.json");
-        }
-        return Paths.get(logFile).isAbsolute()
-                ? Paths.get(logFile)
-                : appConfig.getConfigDirPath().resolve(logFile);
+        return appConfig.getConfigDirPath().resolve("assistant_log.json");
     }
 
     public List<LogEntry> load() {

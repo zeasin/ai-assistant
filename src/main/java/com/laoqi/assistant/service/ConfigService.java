@@ -30,10 +30,6 @@ public class ConfigService {
         if (config.isFeishuPollingEnabled() == null) {
             config.setFeishuPollingEnabled(defaultConfig.isFeishuPollingEnabled());
         }
-        
-        if (config.getLogFile() == null || config.getLogFile().isEmpty()) {
-            config.setLogFile(defaultConfig.getLogFile());
-        }
     }
 
     public String getBaseDir() {
