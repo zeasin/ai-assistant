@@ -8,7 +8,6 @@ import com.laoqi.assistant.collector.model.CollectorTask;
 import com.laoqi.assistant.service.ConfigService;
 import com.laoqi.assistant.service.LogService;
 import com.laoqi.assistant.service.OpenCodeService;
-import com.laoqi.assistant.service.PromptService;
 import com.laoqi.assistant.util.FileUtil;
 import com.laoqi.assistant.util.TimeUtil;
 import org.slf4j.Logger;
@@ -33,7 +32,6 @@ public class CollectorService {
     private static final int MAX_RESULT_ENTRIES = 50;
 
     private final OpenCodeService openCodeService;
-    private final PromptService promptService;
     private final LogService logService;
     private final ConfigService configService;
     
@@ -41,10 +39,9 @@ public class CollectorService {
     private final Map<String, List<CollectorLog>> taskLogs = new ConcurrentHashMap<>();
     private final Map<String, List<CollectorResult>> taskResults = new ConcurrentHashMap<>();
 
-    public CollectorService(OpenCodeService openCodeService, PromptService promptService, 
+    public CollectorService(OpenCodeService openCodeService,
                            LogService logService, ConfigService configService) {
         this.openCodeService = openCodeService;
-        this.promptService = promptService;
         this.logService = logService;
         this.configService = configService;
     }
