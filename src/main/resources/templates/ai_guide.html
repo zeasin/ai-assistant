@@ -116,12 +116,11 @@
 
 <div class="card">
     <h2>AI 指南</h2>
-    <div class="text-muted mb-2">管理 AI 的行为指南——AGENTS.md、AI 记忆和提示词。</div>
+    <div class="text-muted mb-2">管理 AI 的行为指南——AGENTS.md 和 AI 记忆。</div>
 
     <div class="tab-bar">
         <button class="tab-btn active" onclick="switchTab('agents')">AGENTS.md</button>
         <button class="tab-btn" onclick="switchTab('memory')">AI 记忆</button>
-        <button class="tab-btn" onclick="switchTab('prompts')">提示词</button>
     </div>
 
     <!-- Tab: AGENTS.md -->
@@ -146,16 +145,6 @@
         </div>
         <div id="memoryList"></div>
     </div>
-
-    <!-- Tab: 提示词 -->
-    <div id="tab-prompts" class="tab-content">
-        <div class="toolbar">
-            <button class="btn btn-primary btn-sm" onclick="showPromptNew()">+ 新建提示词</button>
-            <span id="promptsStatus" class="status-text"></span>
-            <span id="promptsPath" class="path-hint"></span>
-        </div>
-        <div id="promptsList"></div>
-    </div>
 </div>
 
 <!-- Memory Edit Modal -->
@@ -176,35 +165,16 @@
     </div>
 </div>
 
-<!-- Prompt Edit Modal -->
-<div class="modal-overlay" id="promptModal">
-    <div class="modal" style="width: 800px;">
-        <h3 id="promptModalTitle">✏️ 编辑提示词</h3>
-        <input type="hidden" id="promptEditName">
-        <div class="form-group" style="margin-bottom:12px;">
-            <label style="font-size:12px;color:#5c5f66;font-weight:500;">文件名</label>
-            <input type="text" id="promptFileName" style="width:100%;padding:8px 10px;border:1px solid #e1e3e6;border-radius:6px;font-size:13px;outline:none;" placeholder="xxx.md">
-        </div>
-        <textarea id="promptEditor" class="modal-editor" placeholder="提示词内容 (Markdown + YAML frontmatter)..."></textarea>
-        <div class="modal-actions">
-            <button class="btn btn-secondary" onclick="closePromptModal()">取消</button>
-            <button class="btn btn-danger" id="promptDeleteBtn" style="display:none;" onclick="deletePrompt()">删除</button>
-            <button class="btn btn-primary" onclick="savePrompt()">保存</button>
-        </div>
-    </div>
-</div>
-
 <script>
 var showingPreview = false;
 
 function switchTab(tab) {
     document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
     document.querySelectorAll('.tab-content').forEach(function(c) { c.classList.remove('active'); });
-    var idx = tab === 'agents' ? 0 : (tab === 'memory' ? 1 : 2);
+    var idx = tab === 'agents' ? 0 : 1;
     document.querySelectorAll('.tab-btn')[idx].classList.add('active');
     document.getElementById('tab-' + tab).classList.add('active');
     if (tab === 'memory') loadMemoryList();
-    if (tab === 'prompts') loadPromptsList();
 }
 
 // ---- AGENTS.md ----
@@ -445,164 +415,6 @@ function deleteMemory() {
     var name = document.getElementById('memoryEditName').value;
     if (!name) return;
     deleteMemoryConfirm(name);
-}
-
-// ---- 提示词 ----
-
-function loadPromptsList() {
-    var container = document.getElementById('promptsList');
-    container.innerHTML = '<div style="text-align:center;padding:20px;color:#909296;">⏳ 加载中...</div>';
-
-    fetch('/api/ai-guide/prompts')
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-            if (!data.ok) {
-                container.innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><div>' + (data.error || '加载失败') + '</div></div>';
-                return;
-            }
-            if (data.path) {
-                document.getElementById('promptsPath').textContent = data.path;
-            }
-            renderPromptsList(data.files || []);
-        })
-        .catch(function() {
-            container.innerHTML = '<div class="empty-state"><div class="icon">❌</div><div>加载失败</div></div>';
-        });
-}
-
-function renderPromptsList(files) {
-    var container = document.getElementById('promptsList');
-    if (files.length === 0) {
-        container.innerHTML = '<div class="empty-state"><div class="icon">📋</div><div>暂无提示词文件</div><div style="margin-top:8px;font-size:13px;color:#909296;">点击「+ 新建提示词」创建第一条</div></div>';
-        return;
-    }
-
-    var html = '<ul class="memory-file-list">';
-    files.forEach(function(f) {
-        var name = f.name;
-        var displayName = name.replace(/\.md$/, '');
-        html += '<li class="memory-file-item">';
-        html += '<span class="memory-file-name" onclick="showPromptEditor(\'' + escapeJs(name) + '\')">';
-        html += '<span class="memory-type-badge badge-other">提示词</span>';
-        html += escapeHtml(displayName);
-        html += '</span>';
-        html += '<span style="display:flex;gap:4px;">';
-        html += '<button class="btn btn-secondary btn-sm" onclick="showPromptEditor(\'' + escapeJs(name) + '\')">编辑</button>';
-        html += '<button class="btn btn-danger btn-sm" onclick="deletePromptConfirm(\'' + escapeJs(name) + '\')">删除</button>';
-        html += '</span>';
-        html += '</li>';
-    });
-    html += '</ul>';
-    container.innerHTML = html;
-}
-
-function showPromptEditor(name) {
-    document.getElementById('promptModalTitle').textContent = '✏️ 编辑: ' + name;
-    document.getElementById('promptEditName').value = name;
-    document.getElementById('promptFileName').value = name;
-    document.getElementById('promptEditor').value = '⏳ 加载中...';
-    document.getElementById('promptDeleteBtn').style.display = 'inline-block';
-
-    fetch('/api/ai-guide/prompts/' + encodeURIComponent(name))
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-            if (data.ok) {
-                document.getElementById('promptEditor').value = data.content || '';
-            } else {
-                document.getElementById('promptEditor').value = '';
-                toast('加载失败: ' + (data.error || ''), 'error');
-            }
-        })
-        .catch(function() {
-            document.getElementById('promptEditor').value = '';
-            toast('加载失败', 'error');
-        });
-
-    document.getElementById('promptModal').classList.add('active');
-}
-
-function showPromptNew() {
-    document.getElementById('promptModalTitle').textContent = '➕ 新建提示词';
-    document.getElementById('promptEditName').value = '';
-    document.getElementById('promptFileName').value = '';
-    document.getElementById('promptEditor').value = '---\ntitle: \nsession_title: \n---\n\n# \n\n';
-    document.getElementById('promptDeleteBtn').style.display = 'none';
-    document.getElementById('promptModal').classList.add('active');
-}
-
-function closePromptModal() {
-    document.getElementById('promptModal').classList.remove('active');
-}
-
-function savePrompt() {
-    var btn = document.querySelector('#promptModal .btn-primary');
-    btn.disabled = true;
-    btn.textContent = '⏳ 保存...';
-
-    var name = document.getElementById('promptFileName').value.trim();
-    var content = document.getElementById('promptEditor').value;
-    var origName = document.getElementById('promptEditName').value;
-
-    if (!name) {
-        toast('文件名不能为空', 'error');
-        btn.disabled = false;
-        btn.textContent = '保存';
-        return;
-    }
-
-    var deleteFirst = (origName && origName !== name)
-        ? fetch('/api/ai-guide/prompts/' + encodeURIComponent(origName), { method: 'DELETE' })
-        : Promise.resolve();
-
-    deleteFirst
-        .then(function() {
-            return fetch('/api/ai-guide/prompts', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: name, content: content })
-            });
-        })
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-            if (data.ok) {
-                toast('✅ 已保存', 'success');
-                closePromptModal();
-                loadPromptsList();
-            } else {
-                toast('❌ ' + (data.error || '保存失败'), 'error');
-            }
-        })
-        .catch(function() {
-            toast('❌ 请求失败', 'error');
-        })
-        .finally(function() {
-            btn.disabled = false;
-            btn.textContent = '保存';
-        });
-}
-
-function deletePromptConfirm(name) {
-    if (!confirm('确定删除 ' + name + '？')) return;
-    fetch('/api/ai-guide/prompts/' + encodeURIComponent(name), { method: 'DELETE' })
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-            if (data.ok) {
-                toast('🗑️ 已删除', 'success');
-                loadPromptsList();
-                closePromptModal();
-            } else {
-                toast('❌ ' + (data.error || '删除失败'), 'error');
-            }
-        })
-        .catch(function() {
-            toast('❌ 请求失败', 'error');
-        });
-}
-
-function deletePrompt() {
-    var name = document.getElementById('promptEditName').value;
-    if (!name) return;
-    deletePromptConfirm(name);
 }
 
 // ---- utils ----

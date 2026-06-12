@@ -7,7 +7,6 @@ import com.laoqi.assistant.service.ConfigService;
 import com.laoqi.assistant.service.ModuleDataService;
 import com.laoqi.assistant.service.ModuleService;
 import com.laoqi.assistant.service.OpenCodeService;
-import com.laoqi.assistant.service.PromptService;
 import com.laoqi.assistant.util.FileUtil;
 import com.laoqi.assistant.util.MarkdownUtil;
 import com.laoqi.assistant.util.TimeUtil;
@@ -38,17 +37,15 @@ public class ModuleController {
     private final ModuleDataService moduleDataService;
     private final OpenCodeService openCodeService;
     private final AppConfig appConfig;
-    private final PromptService promptService;
     private final ConfigService configService;
 
     public ModuleController(ModuleService moduleService, ModuleDataService moduleDataService,
                             OpenCodeService openCodeService, AppConfig appConfig,
-                            PromptService promptService, ConfigService configService) {
+                            ConfigService configService) {
         this.moduleService = moduleService;
         this.moduleDataService = moduleDataService;
         this.openCodeService = openCodeService;
         this.appConfig = appConfig;
-        this.promptService = promptService;
         this.configService = configService;
     }
 
