@@ -334,6 +334,7 @@
         <a th:classappend="${requestURI == '/' ? 'active' : ''}" href="/">综合</a>
         <a th:classappend="${requestURI == '/chat' ? 'active' : ''}" href="/chat">对话</a>
         <a th:classappend="${requestURI == '/browse' or requestURI == '/view' ? 'active' : ''}" href="/browse">笔记</a>
+        <a th:classappend="${requestURI == '/image-recognition' ? 'active' : ''}" href="/image-recognition">识图</a>
         <div class="dropdown">
             <button class="dropdown-toggle" th:classappend="${#strings.startsWith(requestURI, '/module/')} ? 'active' : ''">
                 运营<span class="arrow">▾</span>

@@ -1,0 +1,465 @@
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title layout:fragment="title">识图</title>
+</head>
+<body>
+<th:block layout:fragment="content">
+
+<div class="ir-layout">
+    <!-- Left: Image Source Panel -->
+    <div class="ir-panel ir-source">
+        <div class="panel-header">
+            <h3>📂 图片来源</h3>
+        </div>
+
+        <div class="source-tabs">
+            <button class="tab-btn active" onclick="switchSource('browse')">笔记库</button>
+            <button class="tab-btn" onclick="switchSource('upload')">上传图片</button>
+        </div>
+
+        <!-- Browse from notes library -->
+        <div id="sourceBrowse" class="source-content active">
+            <div class="breadcrumb" id="breadcrumb">
+                <a href="/image-recognition" class="bc-link">根目录</a>
+                <th:block th:each="b,iter : ${breadcrumbs}">
+                    <span class="bc-sep">/</span>
+                    <a th:href="@{/image-recognition(dir=${breadcrumbPaths[iter.index]})}" class="bc-link" th:text="${b}">dir</a>
+                </th:block>
+            </div>
+
+            <div class="file-list" id="dirList">
+                <th:block th:if="${!parent.isEmpty()}">
+                    <a th:href="@{/image-recognition(dir=${parent})}" class="file-item dir-item">
+                        <span class="file-icon">📁</span>
+                        <span class="file-name">.. 返回上级</span>
+                    </a>
+                </th:block>
+                <th:block th:each="d : ${dirs}">
+                    <a th:href="@{/image-recognition(dir=${d.full_path})}" class="file-item dir-item">
+                        <span class="file-icon">📁</span>
+                        <span class="file-name" th:text="${d.name}">dir</span>
+                    </a>
+                </th:block>
+                <th:block th:each="img : ${images}">
+                    <div class="file-item img-item" th:data-path="${img.rel_path}" onclick="selectImage(this)">
+                        <img class="thumb" th:src="|/image-recognition/thumb?path=${img.rel_path}|" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2240%22 height=%2240%22><rect fill=%22%23f0f0f0%22 width=%2240%22 height=%2240%22/><text x=%2250%2250%22 dy=%22.3em%22 text-anchor=%22middle%22 fill=%22%23999%22 font-size=%2212%22>img</text></svg>'">
+                        <span class="file-name" th:text="${img.name}">image</span>
+                    </div>
+                </th:block>
+                <div th:if="${#lists.isEmpty(dirs) and #lists.isEmpty(images)}" class="empty-hint">
+                    此目录下没有图片文件
+                </div>
+            </div>
+        </div>
+
+        <!-- Upload image -->
+        <div id="sourceUpload" class="source-content" style="display:none;">
+            <div class="upload-area" id="uploadArea">
+                <input type="file" id="uploadInput" accept="image/*" style="display:none;" onchange="handleUpload(event)">
+                <div class="upload-placeholder" onclick="document.getElementById('uploadInput').click()">
+                    <div class="upload-icon">📤</div>
+                    <div class="upload-text">点击选择图片</div>
+                    <div class="upload-hint">支持 JPG、PNG、GIF、WebP 等格式</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Center: Preview + Analyze -->
+    <div class="ir-panel ir-main">
+        <div class="panel-header">
+            <h3>🔍 图片预览</h3>
+        </div>
+
+        <div class="preview-area" id="previewArea">
+            <div class="preview-empty">
+                <div class="preview-icon">🖼️</div>
+                <div>从左侧选择或上传图片</div>
+            </div>
+        </div>
+
+        <div class="prompt-area">
+            <textarea id="promptInput" rows="2" placeholder="自定义分析提示词（可选，默认会自动提取文字、分析内容、格式化数据）"></textarea>
+        </div>
+
+        <div class="action-bar">
+            <button class="btn btn-primary" id="analyzeBtn" onclick="analyzeImage()" disabled>
+                🤖 开始分析
+            </button>
+        </div>
+    </div>
+
+    <!-- Right: Result + Save -->
+    <div class="ir-panel ir-result">
+        <div class="panel-header">
+            <h3>📊 分析结果</h3>
+        </div>
+
+        <div class="result-area" id="resultArea">
+            <div class="result-empty">等待分析...</div>
+        </div>
+
+        <div class="save-area" id="saveArea" style="display:none;">
+            <div class="save-header">保存到笔记库</div>
+            <div class="save-form">
+                <div class="form-row">
+                    <label>文件名</label>
+                    <input type="text" id="saveFilename" placeholder="识图分析_20260612.md">
+                </div>
+                <div class="form-row">
+                    <label>保存路径</label>
+                    <div class="path-selector">
+                        <input type="text" id="savePath" readonly placeholder="点击选择路径">
+                        <button class="btn btn-secondary btn-sm" onclick="openPathSelector()">选择</button>
+                    </div>
+                </div>
+                <button class="btn btn-primary" onclick="saveResult()">💾 保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Path Selector Modal -->
+<div class="modal-overlay" id="pathModal">
+    <div class="modal">
+        <h3>选择保存路径</h3>
+        <div class="modal-body">
+            <div class="path-browse" id="pathBreadcrumb">
+                <span class="bc-link" onclick="browsePath('')">根目录</span>
+            </div>
+            <div class="path-list" id="pathList"></div>
+            <div class="form-row" style="margin-top:12px;">
+                <label>子目录（可选）</label>
+                <input type="text" id="pathSubdir" placeholder="输入子目录名称">
+            </div>
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-secondary" onclick="closePathSelector()">取消</button>
+            <button class="btn btn-primary" onclick="confirmPath()">确认</button>
+        </div>
+    </div>
+</div>
+
+<style>
+.ir-layout {
+    display: flex; gap: 0; margin: -24px; height: calc(100vh - 52px); overflow: hidden;
+}
+.ir-panel {
+    display: flex; flex-direction: column; overflow: hidden; background: #fff;
+}
+.ir-source {
+    width: 300px; flex-shrink: 0; border-right: 1px solid #e1e3e6;
+}
+.ir-main {
+    flex: 1; border-right: 1px solid #e1e3e6;
+}
+.ir-result {
+    width: 380px; flex-shrink: 0;
+}
+.panel-header {
+    padding: 14px 16px; border-bottom: 1px solid #e1e3e6;
+    display: flex; align-items: center; justify-content: space-between;
+}
+.panel-header h3 { margin: 0; font-size: 14px; }
+
+.source-tabs {
+    display: flex; border-bottom: 1px solid #e1e3e6;
+}
+.tab-btn {
+    flex: 1; padding: 10px; border: none; background: #fafafa;
+    font-size: 13px; cursor: pointer; color: #5c5f66;
+    border-bottom: 2px solid transparent; transition: all .15s;
+}
+.tab-btn:hover { background: #f0f0f0; }
+.tab-btn.active { background: #fff; color: #7c5cfc; border-bottom-color: #7c5cfc; }
+
+.source-content { flex: 1; overflow-y: auto; }
+.source-content.active { display: block; }
+
+.breadcrumb {
+    padding: 10px 16px; font-size: 12px; color: #5c5f66;
+    border-bottom: 1px solid #f0f0f0; background: #fafafe;
+}
+.bc-link { color: #7c5cfc; text-decoration: none; }
+.bc-link:hover { text-decoration: underline; }
+.bc-sep { color: #ccc; margin: 0 2px; }
+
+.file-list { padding: 8px; }
+.file-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px; border-radius: 6px; cursor: pointer;
+    transition: background .1s; text-decoration: none; color: inherit;
+}
+.file-item:hover { background: #f5f5f7; }
+.file-item.selected { background: #f0edff; border: 1px solid #d9d0ff; }
+.file-icon { font-size: 16px; flex-shrink: 0; }
+.file-name { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.thumb { width: 40px; height: 40px; object-fit: cover; border-radius: 4px; flex-shrink: 0; }
+.empty-hint { font-size: 13px; color: #909296; text-align: center; padding: 32px 16px; }
+
+.upload-area { padding: 20px; }
+.upload-placeholder {
+    border: 2px dashed #e1e3e6; border-radius: 12px; padding: 40px 20px;
+    text-align: center; cursor: pointer; transition: all .2s;
+}
+.upload-placeholder:hover { border-color: #7c5cfc; background: #f8f7ff; }
+.upload-icon { font-size: 36px; margin-bottom: 8px; }
+.upload-text { font-size: 14px; color: #1a1b1e; font-weight: 500; }
+.upload-hint { font-size: 12px; color: #909296; margin-top: 4px; }
+
+.preview-area {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    padding: 20px; min-height: 200px; overflow: auto; background: #fafafe;
+}
+.preview-empty { text-align: center; color: #909296; }
+.preview-icon { font-size: 48px; margin-bottom: 12px; }
+.preview-img { max-width: 100%; max-height: 100%; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
+
+.prompt-area { padding: 12px 16px; border-top: 1px solid #e1e3e6; }
+.prompt-area textarea {
+    width: 100%; border: 1px solid #e1e3e6; border-radius: 8px; padding: 10px 12px;
+    font-size: 13px; resize: none; outline: none; font-family: inherit;
+}
+.prompt-area textarea:focus { border-color: #7c5cfc; }
+
+.action-bar { padding: 0 16px 16px; }
+
+.result-area {
+    flex: 1; overflow-y: auto; padding: 16px; font-size: 14px; line-height: 1.8;
+}
+.result-empty { color: #909296; text-align: center; padding: 40px 20px; }
+.result-status {
+    font-size: 12px; color: #7c5cfc; padding: 8px 0; font-style: italic;
+}
+.result-text { white-space: pre-wrap; word-break: break-word; }
+
+.save-area { padding: 16px; border-top: 1px solid #e1e3e6; background: #fafafe; }
+.save-header { font-size: 13px; font-weight: 500; margin-bottom: 10px; color: #1a1b1e; }
+.save-form { display: flex; flex-direction: column; gap: 8px; }
+.save-form .form-row { display: flex; flex-direction: column; gap: 4px; }
+.save-form label { font-size: 12px; color: #5c5f66; font-weight: 500; }
+.save-form input {
+    padding: 8px 10px; border: 1px solid #e1e3e6; border-radius: 6px;
+    font-size: 13px; outline: none;
+}
+.save-form input:focus { border-color: #7c5cfc; }
+.path-selector { display: flex; gap: 6px; }
+.path-selector input { flex: 1; }
+.btn-sm { padding: 6px 12px; font-size: 12px; }
+
+.modal-body { max-height: 400px; overflow-y: auto; }
+.path-browse { padding: 8px 0; margin-bottom: 8px; border-bottom: 1px solid #e1e3e6; font-size: 13px; }
+.path-list { max-height: 250px; overflow-y: auto; }
+.path-item {
+    padding: 8px 12px; cursor: pointer; border-radius: 6px; font-size: 13px;
+    display: flex; align-items: center; gap: 6px;
+}
+.path-item:hover { background: #f5f5f7; }
+.path-item.selected { background: #f0edff; }
+</style>
+
+<script>
+let currentImageSource = null;
+let selectedImagePath = null;
+let analysisResult = '';
+let browseCurrentDir = '[[${current_dir}]]';
+
+function switchSource(type) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.source-content').forEach(c => c.style.display = 'none');
+
+    if (type === 'browse') {
+        document.querySelector('.tab-btn:first-child').classList.add('active');
+        document.getElementById('sourceBrowse').style.display = '';
+    } else {
+        document.querySelector('.tab-btn:last-child').classList.add('active');
+        document.getElementById('sourceUpload').style.display = '';
+    }
+}
+
+function selectImage(el) {
+    document.querySelectorAll('.img-item').forEach(i => i.classList.remove('selected'));
+    el.classList.add('selected');
+
+    const path = el.dataset.path;
+    selectedImagePath = path;
+    currentImageSource = { type: 'notes', path: path };
+
+    const preview = document.getElementById('previewArea');
+    preview.innerHTML = '<img class="preview-img" src="/image-recognition/thumb?path=' + encodeURIComponent(path) + '" onerror="this.style.display=\'none\'">';
+    document.getElementById('analyzeBtn').disabled = false;
+}
+
+function handleUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { toast('请选择图片文件', 'error'); return; }
+
+    currentImageSource = { type: 'upload', file: file };
+    selectedImagePath = null;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        document.getElementById('previewArea').innerHTML = '<img class="preview-img" src="' + e.target.result + '">';
+    };
+    reader.readAsDataURL(file);
+    document.getElementById('analyzeBtn').disabled = false;
+}
+
+async function analyzeImage() {
+    if (!currentImageSource) { toast('请先选择图片', 'error'); return; }
+
+    const btn = document.getElementById('analyzeBtn');
+    const resultArea = document.getElementById('resultArea');
+    const saveArea = document.getElementById('saveArea');
+    btn.disabled = true; btn.textContent = '⏳ 分析中...';
+    resultArea.innerHTML = '<div class="result-status">⏳ 正在发送图片到 AI 分析...</div>';
+    saveArea.style.display = 'none';
+    analysisResult = '';
+
+    const form = new FormData();
+    const prompt = document.getElementById('promptInput').value.trim();
+
+    if (currentImageSource.type === 'upload') {
+        form.append('image', currentImageSource.file);
+    } else {
+        form.append('image_path', currentImageSource.path);
+    }
+    if (prompt) form.append('prompt', prompt);
+
+    try {
+        const res = await fetch('/image-recognition/recognize', { method: 'POST', body: form });
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+
+            const parts = buffer.split('\n\n');
+            buffer = parts.pop() || '';
+
+            for (const part of parts) {
+                if (!part.startsWith('data:')) continue;
+                try {
+                    const data = JSON.parse(part.replace(/^data:\s*/, ''));
+                    if (data.type === 'status') {
+                        resultArea.innerHTML = '<div class="result-status">' + escapeHtml(data.content) + '</div>';
+                    } else if (data.type === 'text') {
+                        analysisResult += data.content;
+                        resultArea.innerHTML = '<div class="result-text">' + escapeHtml(analysisResult) + '</div>';
+                    } else if (data.type === 'error') {
+                        resultArea.innerHTML = '<div style="color:#ff6b6b;">❌ ' + escapeHtml(data.content) + '</div>';
+                    } else if (data.type === 'done') {
+                        resultArea.innerHTML = '<div class="result-text">' + escapeHtml(analysisResult) + '</div>';
+                    }
+                } catch (e) { /* skip */ }
+            }
+            resultArea.scrollTop = resultArea.scrollHeight;
+        }
+    } catch (e) {
+        resultArea.innerHTML = '<div style="color:#ff6b6b;">❌ 网络错误: ' + escapeHtml(e.message) + '</div>';
+    }
+
+    btn.disabled = false; btn.textContent = '🤖 开始分析';
+    if (analysisResult) {
+        saveArea.style.display = '';
+        const now = new Date();
+        const dateStr = now.getFullYear() + '' + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0');
+        document.getElementById('saveFilename').value = '识图分析_' + dateStr + '.md';
+    }
+}
+
+function escapeHtml(text) {
+    const d = document.createElement('div');
+    d.textContent = text;
+    return d.innerHTML;
+}
+
+async function saveResult() {
+    const filename = document.getElementById('saveFilename').value.trim();
+    const savePath = document.getElementById('savePath').value.trim();
+    if (!filename) { toast('请输入文件名', 'error'); return; }
+    if (!savePath && !savePath === '') { toast('请选择保存路径', 'error'); return; }
+
+    let fullPath = savePath ? savePath + '/' + filename : filename;
+
+    const form = new FormData();
+    form.append('path', fullPath);
+    form.append('content', analysisResult);
+
+    try {
+        const res = await fetch('/image-recognition/save', { method: 'POST', body: form });
+        const data = await res.json();
+        if (data.ok) {
+            toast('保存成功: ' + data.path, 'success');
+        } else {
+            toast('保存失败: ' + data.error, 'error');
+        }
+    } catch (e) {
+        toast('保存失败: ' + e.message, 'error');
+    }
+}
+
+function openPathSelector() {
+    document.getElementById('pathModal').classList.add('active');
+    browsePath('');
+}
+
+function closePathSelector() {
+    document.getElementById('pathModal').classList.remove('active');
+}
+
+let selectedSaveDir = '';
+
+async function browsePath(dir) {
+    try {
+        const res = await fetch('/image-recognition/subdirs?dir=' + encodeURIComponent(dir));
+        const data = await res.json();
+
+        const breadcrumb = document.getElementById('pathBreadcrumb');
+        let html = '<span class="bc-link" onclick="browsePath(\'\')">根目录</span>';
+        if (dir) {
+            const parts = dir.split('/');
+            let accum = '';
+            for (let i = 0; i < parts.length; i++) {
+                accum = accum ? accum + '/' + parts[i] : parts[i];
+                const d = accum;
+                html += ' / <span class="bc-link" onclick="browsePath(\'' + d.replace(/'/g, "\\'") + '\')">' + parts[i] + '</span>';
+            }
+        }
+        breadcrumb.innerHTML = html;
+
+        const list = document.getElementById('pathList');
+        if (data.ok && data.subdirs.length > 0) {
+            list.innerHTML = data.subdirs.map(d =>
+                '<div class="path-item" onclick="browsePath(\'' + d.path.replace(/'/g, "\\'") + '\')" data-path="' + d.path + '">📁 ' + d.name + '</div>'
+            ).join('');
+        } else {
+            list.innerHTML = '<div style="padding:12px;color:#909296;font-size:13px;">无子目录</div>';
+        }
+
+        selectedSaveDir = dir;
+    } catch (e) {
+        toast('加载目录失败', 'error');
+    }
+}
+
+function confirmPath() {
+    const subdir = document.getElementById('pathSubdir').value.trim();
+    let finalPath = selectedSaveDir;
+    if (subdir) {
+        finalPath = finalPath ? finalPath + '/' + subdir : subdir;
+    }
+    document.getElementById('savePath').value = finalPath;
+    closePathSelector();
+}
+</script>
+
+</th:block>
+</body>
+</html>

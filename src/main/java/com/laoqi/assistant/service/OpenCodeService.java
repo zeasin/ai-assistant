@@ -17,6 +17,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.*;
+import java.util.ArrayList;
 
 @Service
 public class OpenCodeService {
@@ -84,11 +85,15 @@ public class OpenCodeService {
      * then returns the complete text reply.
      */
     public String sendMessage(String sessionId, String message) throws Exception {
-        return sendMessageStreamed(getBaseUrl(), sessionId, message, false);
+        return sendMessageStreamed(getBaseUrl(), sessionId, message, false, null);
+    }
+
+    public String sendMessageWithImage(String sessionId, String message, String imageBase64, String imageType) throws Exception {
+        return sendMessageStreamed(getBaseUrl(), sessionId, message, false, imageBase64 != null ? Map.of("data", imageBase64, "type", imageType) : null);
     }
 
     public String sendCodeMessage(String sessionId, String message) throws Exception {
-        return sendMessageStreamed(getCodeBaseUrl(), sessionId, message, true);
+        return sendMessageStreamed(getCodeBaseUrl(), sessionId, message, true, null);
     }
 
     /**
@@ -96,9 +101,18 @@ public class OpenCodeService {
      * uses Jackson streaming parser to extract parts as they arrive,
      * logs each part in real-time to the backend console.
      */
-    private String sendMessageStreamed(String baseUrl, String sessionId, String message, boolean isCode) throws Exception {
+    private String sendMessageStreamed(String baseUrl, String sessionId, String message, boolean isCode, Map<String, String> imageData) throws Exception {
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("parts", List.of(Map.of("type", "text", "text", message)));
+        List<Map<String, Object>> parts = new ArrayList<>();
+        parts.add(Map.of("type", "text", "text", message));
+
+        if (imageData != null) {
+            String base64Data = imageData.get("data");
+            String imageType = imageData.getOrDefault("type", "image/jpeg");
+            parts.add(Map.of("type", "file", "mime", imageType, "url", "data:" + imageType + ";base64," + base64Data));
+        }
+
+        body.put("parts", parts);
 
         String url = baseUrl + "/session/" + sessionId + "/message";
         String requestBody = mapper.writeValueAsString(body);
