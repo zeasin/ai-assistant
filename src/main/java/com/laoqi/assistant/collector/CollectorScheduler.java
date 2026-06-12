@@ -8,6 +8,7 @@ import org.springframework.scheduling.support.CronTrigger;
 import org.springframework.stereotype.Component;
 
 import jakarta.annotation.PostConstruct;
+import java.time.ZoneId;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
@@ -28,6 +29,7 @@ public class CollectorScheduler {
 
     @PostConstruct
     public void init() {
+        log.info("CollectorScheduler initializing...");
         rescheduleAll();
     }
 
@@ -35,7 +37,10 @@ public class CollectorScheduler {
         scheduledTasks.values().forEach(future -> future.cancel(false));
         scheduledTasks.clear();
 
-        for (CollectorTask task : collectorService.getAllTasks()) {
+        var allTasks = collectorService.getAllTasks();
+        log.info("Found {} total collector tasks, checking enabled ones...", allTasks.size());
+        for (CollectorTask task : allTasks) {
+            log.info("Task: {} ({}), enabled={}, cron={}", task.getName(), task.getId(), task.getEnabled(), task.getCronExpression());
             if (Boolean.TRUE.equals(task.getEnabled())) {
                 scheduleTask(task);
             }
@@ -50,7 +55,7 @@ public class CollectorScheduler {
         }
 
         try {
-            CronTrigger trigger = new CronTrigger(task.getCronExpression());
+            CronTrigger trigger = new CronTrigger(task.getCronExpression(), ZoneId.of("Asia/Shanghai"));
             ScheduledFuture<?> future = taskScheduler.schedule(() -> {
                 log.info("Executing scheduled collector task: {}", task.getName());
                 try {

@@ -79,13 +79,6 @@
             <artifactId>oapi-sdk</artifactId>
             <version>2.3.2</version>
         </dependency>
-
-        <!-- SQLite JDBC（由 mybatis-plus-spring-boot3-starter 传递依赖 spring-boot-starter-jdbc 管理） -->
-        <dependency>
-            <groupId>org.xerial</groupId>
-            <artifactId>sqlite-jdbc</artifactId>
-            <version>3.47.0.0</version>
-        </dependency>
     </dependencies>
 
     <build>

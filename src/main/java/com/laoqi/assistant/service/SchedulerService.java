@@ -1,13 +1,14 @@
 package com.laoqi.assistant.service;
 
-import com.laoqi.assistant.model.ReminderData.Reminder;
-import com.laoqi.assistant.util.TimeUtil;
+import java.util.List;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
+import com.laoqi.assistant.model.ReminderData.Reminder;
+import com.laoqi.assistant.util.TimeUtil;
 
 @Service
 public class SchedulerService {
@@ -37,7 +38,7 @@ public class SchedulerService {
         this.workReportController = workReportController;
     }
 
-    @Scheduled(cron = "0 30 9 * * ?", zone = "Asia/Shanghai")
+    @Scheduled(cron = "0 30 10 * * ?", zone = "Asia/Shanghai")
     public void morningReport() {
         log.info("[{}] ⏰ 定时任务：生成综合日报", TimeUtil.nowStr());
         reportService.generateAndPush();

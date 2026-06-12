@@ -82,7 +82,6 @@
             <h2>采集结果</h2>
             <div id="taskResults"></div>
         </div>
-    </div>
 
     <div class="modal-overlay" id="taskModal">
         <div class="modal">
@@ -117,6 +116,12 @@
                 </div>
                 <div class="form-row">
                     <div class="form-group">
+                        <label>提示词内容 (MD格式，存储在 AI/collector/prompts/{promptKey}.md)</label>
+                        <textarea id="promptContent" rows="8" placeholder="在上方填写提示词Key后，此处编辑内容，保存时同步写入文件"></textarea>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
                         <label>启用</label>
                         <select id="enabled">
                             <option value="true">是</option>
@@ -138,11 +143,13 @@
                 const res = await fetch('/api/collector/tasks');
                 const data = await res.json();
                 if (data.ok && data.data && data.data.length > 0) {
-                    document.getElementById('emptyState').style.display = 'none';
                     renderTasks(data.data);
                 } else {
-                    document.getElementById('emptyState').style.display = 'block';
-                    document.getElementById('taskList').innerHTML = document.getElementById('emptyState').outerHTML;
+                    const emptyHtml = '<div class="empty-state" id="emptyState">' +
+                        '<div>暂无采集任务</div>' +
+                        '<button class="btn btn-primary mt-2" onclick="showAddTaskModal()">创建第一个任务</button>' +
+                        '</div>';
+                    document.getElementById('taskList').innerHTML = emptyHtml;
                 }
             } catch (e) {
                 toast('加载任务失败: ' + e.message, 'error');
@@ -185,9 +192,7 @@
             document.getElementById('taskModal').classList.add('active');
         }
 
-        function hideModal() {
-            document.getElementById('taskModal').classList.remove('active');
-        }
+        function hideModal() { closeModal('taskModal'); }
 
         async function editTask(id) {
             try {
@@ -203,6 +208,12 @@
                     document.getElementById('outputPath').value = task.outputPath || '';
                     document.getElementById('params').value = task.params ? JSON.stringify(task.params, null, 2) : '';
                     document.getElementById('enabled').value = String(task.enabled || false);
+                    document.getElementById('promptContent').value = '';
+                    if (task.promptKey) {
+                        fetch(`/api/collector/prompts/${encodeURIComponent(task.promptKey)}`)
+                            .then(r => r.json())
+                            .then(d => { if (d.ok) document.getElementById('promptContent').value = d.template || ''; });
+                    }
                     document.getElementById('taskModal').classList.add('active');
                 }
             } catch (e) {
@@ -220,6 +231,7 @@
                     cronExpression: document.getElementById('cronExpression').value || null,
                     outputPath: document.getElementById('outputPath').value || null,
                     params: document.getElementById('params').value ? JSON.parse(document.getElementById('params').value) : null,
+                    promptTemplate: document.getElementById('promptTemplate').value || null,
                     enabled: document.getElementById('enabled').value === 'true'
                 };
                 
@@ -233,6 +245,15 @@
                 const data = await res.json();
                 
                 if (data.ok) {
+                    const promptContent = document.getElementById('promptContent').value;
+                    const promptKey = document.getElementById('promptKey').value.trim();
+                    if (promptKey && promptContent) {
+                        await fetch(`/api/collector/prompts/${encodeURIComponent(promptKey)}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ template: promptContent })
+                        });
+                    }
                     toast(id ? '任务更新成功' : '任务创建成功', 'success');
                     hideModal();
                     loadTasks();
@@ -337,6 +358,12 @@
         }
 
         loadTasks();
+
+        function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+        document.querySelectorAll('.modal-overlay').forEach(function(m) {
+            m.addEventListener('click', function(e) { if (e.target === this) this.classList.remove('active'); });
+        });
     </script>
+    </div>
 </body>
 </html>

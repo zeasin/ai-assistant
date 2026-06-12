@@ -96,4 +96,17 @@ public class CollectorController {
         collectorScheduler.rescheduleAll();
         return ResponseEntity.ok(Map.of("ok", true, "message", "All tasks rescheduled"));
     }
+
+    @GetMapping("/prompts/{key}")
+    public ResponseEntity<Map<String, Object>> getPrompt(@PathVariable String key) {
+        String template = collectorService.getPromptTemplate(key);
+        return ResponseEntity.ok(Map.of("ok", true, "template", template != null ? template : ""));
+    }
+
+    @PostMapping("/prompts/{key}")
+    public ResponseEntity<Map<String, Object>> savePrompt(@PathVariable String key, @RequestBody Map<String, String> body) {
+        String template = body.getOrDefault("template", "");
+        collectorService.savePromptTemplate(key, template);
+        return ResponseEntity.ok(Map.of("ok", true));
+    }
 }

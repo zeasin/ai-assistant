@@ -323,9 +323,9 @@ public class CollectorService {
                 throw new RuntimeException("opencode serve is not running");
             }
 
-            String template = promptService.getTemplate(task.getPromptKey());
+            String template = getPromptTemplate(task.getPromptKey());
             if (template == null) {
-                throw new RuntimeException("Prompt template not found: " + task.getPromptKey());
+                throw new RuntimeException("Prompt template not found: " + task.getPromptKey() + " (check AI/collector/prompts/)");
             }
 
             String prompt = template;
@@ -438,5 +438,56 @@ public class CollectorService {
         taskLogs.values().forEach(allLogs::addAll);
         allLogs.sort((a, b) -> b.getStartTime().compareTo(a.getStartTime()));
         return allLogs;
+    }
+
+    private Path getPromptsDir() {
+        try {
+            Path dir = getCollectorDir().resolve("prompts");
+            if (!Files.exists(dir)) {
+                Files.createDirectories(dir);
+            }
+            return dir;
+        } catch (Exception e) {
+            return getCollectorDir();
+        }
+    }
+
+    private static final java.util.regex.Pattern FRONTMATTER_PATTERN = java.util.regex.Pattern.compile(
+            "^---\\s*\\n(.*?)\\n---\\s*\\n", java.util.regex.Pattern.DOTALL);
+
+    public Map<String, String> loadPrompts() {
+        Map<String, String> result = new LinkedHashMap<>();
+        Path dir = getPromptsDir();
+        if (!Files.exists(dir)) return result;
+        try (var files = Files.list(dir)) {
+            List<Path> mdFiles = files.filter(p -> p.toString().endsWith(".md"))
+                    .sorted(java.util.Comparator.comparing(p -> p.getFileName().toString()))
+                    .toList();
+            for (Path file : mdFiles) {
+                String key = file.getFileName().toString().replace(".md", "");
+                String raw = FileUtil.readText(file);
+                if (raw == null || raw.isBlank()) continue;
+                String template = raw.trim();
+                java.util.regex.Matcher m = FRONTMATTER_PATTERN.matcher(raw);
+                if (m.find()) {
+                    template = raw.substring(m.end()).trim();
+                }
+                result.put(key, template);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to load collector prompts: {}", e.getMessage());
+        }
+        return result;
+    }
+
+    public String getPromptTemplate(String key) {
+        return loadPrompts().get(key);
+    }
+
+    public void savePromptTemplate(String key, String template) {
+        Path dir = getPromptsDir();
+        String content = "---\ntitle: " + key + "\n---\n\n" + template.trim() + "\n";
+        FileUtil.writeText(dir.resolve(key + ".md"), content);
+        log.info("Saved collector prompt: {}", key);
     }
 }
