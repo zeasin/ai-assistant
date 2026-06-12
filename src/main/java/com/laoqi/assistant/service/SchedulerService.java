@@ -16,44 +16,21 @@ public class SchedulerService {
     private static final Logger log = LoggerFactory.getLogger(SchedulerService.class);
 
     private final ReportService reportService;
-    private final FeishuService feishuService;
     private final LogService logService;
     private final ReminderService reminderService;
 
-    public SchedulerService(ReportService reportService, FeishuService feishuService,
+    public SchedulerService(ReportService reportService,
                             LogService logService,
                             ReminderService reminderService) {
         this.reportService = reportService;
-        this.feishuService = feishuService;
         this.logService = logService;
         this.reminderService = reminderService;
     }
 
-    @Scheduled(cron = "0 30 10 * * ?", zone = "Asia/Shanghai")
+    @Scheduled(cron = "0 0 9 * * ?", zone = "Asia/Shanghai")
     public void morningReport() {
         log.info("[{}] ⏰ 定时任务：生成综合日报", TimeUtil.nowStr());
         reportService.generateAndPush();
-    }
-
-    @Scheduled(cron = "0 0 18 * * ?", zone = "Asia/Shanghai")
-    public void dailyReportReminder() {
-        log.info("[{}] ⏰ 定时任务：下班日报提醒", TimeUtil.nowStr());
-        boolean ok = feishuService.dailyReportReminder();
-        logService.add("下班提醒", ok ? "成功" : "失败");
-    }
-
-    @Scheduled(cron = "0 0 9 ? * TUE", zone = "Asia/Shanghai")
-    public void articleTuesday() {
-        log.info("[{}] ⏰ 定时任务：周二发文提醒", TimeUtil.nowStr());
-        boolean ok = feishuService.articleReminder("码农老齐", "周二");
-        logService.add("周二发文提醒", ok ? "成功" : "失败");
-    }
-
-    @Scheduled(cron = "0 0 9 ? * THU", zone = "Asia/Shanghai")
-    public void articleThursday() {
-        log.info("[{}] ⏰ 定时任务：周四发文提醒", TimeUtil.nowStr());
-        boolean ok = feishuService.articleReminder("启航电商ERP", "周四");
-        logService.add("周四发文提醒", ok ? "成功" : "失败");
     }
 
     @Scheduled(cron = "0 * * * * ?", zone = "Asia/Shanghai")

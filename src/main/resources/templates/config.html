@@ -8,8 +8,7 @@
 <th:block layout:fragment="content">
 
 <div class="card">
-    <h2>⚙️ 定时任务（Spring @Scheduled）</h2>
-    <div class="text-muted mb-2">由 Spring 注解驱动，替代了 crontab 和 LaunchAgent。</div>
+    <h2>⚙️ 定时任务</h2>
     <ul class="scheduler-list">
         <li th:each="job : ${scheduler_jobs}">
             <span th:text="${job.desc}">任务描述</span>
@@ -17,8 +16,6 @@
         </li>
     </ul>
 </div>
-
-
 
 <div class="card">
     <h2>📁 笔记库根目录配置</h2>
@@ -109,9 +106,6 @@
     <div class="text-muted mb-2">手动执行以下任务，立即推送飞书。</div>
     <div style="display:flex;flex-wrap:wrap;gap:8px;">
         <button class="btn btn-secondary" onclick="triggerJob('morning')">🌅 生成综合日报</button>
-        <button class="btn btn-secondary" onclick="triggerJob('daily-report')">📝 下班提醒</button>
-        <button class="btn btn-secondary" onclick="triggerJob('article-tue')">📢 周二发文提醒</button>
-        <button class="btn btn-secondary" onclick="triggerJob('article-thu')">📢 周四发文提醒</button>
     </div>
 </div>
 

@@ -5,6 +5,7 @@ import com.laoqi.assistant.model.ReminderData;
 import com.laoqi.assistant.model.ReminderData.Reminder;
 import com.laoqi.assistant.model.ReminderData.Root;
 import com.laoqi.assistant.util.FileUtil;
+import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -35,6 +36,31 @@ public class ReminderService {
         this.appConfig = appConfig;
         this.feishuService = feishuService;
         this.configService = configService;
+    }
+
+    @PostConstruct
+    public void init() {
+        try {
+            Root root = load();
+            if (root.reminders == null) root.reminders = new ArrayList<>();
+            boolean hasDailyReport = root.reminders.stream()
+                    .anyMatch(r -> "daily-report-reminder".equals(r.id));
+            if (!hasDailyReport) {
+                Reminder r = new Reminder();
+                r.id = "daily-report-reminder";
+                r.name = "下班日报提醒";
+                r.message = "到6点了老齐，写一下今天的工作记录！\n写完后我来帮你更新记忆文件，明天综合日报就会包含这些内容。\n内容包括：\n- 今天做了什么事\n- 客户沟通情况\n- 开发/文章进展\n- 明天计划";
+                r.type = "daily";
+                r.time = "18:00";
+                r.enabled = true;
+                r.createdAt = LocalDateTime.now(TZ).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+                root.reminders.add(r);
+                save(root);
+                log.info("[提醒] 已创建默认下班日报提醒");
+            }
+        } catch (Exception e) {
+            log.warn("[提醒] 初始化默认提醒失败: {}", e.getMessage());
+        }
     }
 
     private Path getRemindersDir() {

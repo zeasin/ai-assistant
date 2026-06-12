@@ -27,12 +27,8 @@ public class ConfigController {
     @GetMapping
     public String configPage(Model model) {
         model.addAttribute("scheduler_jobs", List.of(
-                Map.of("id", "daily_report", "time", "每天 18:00", "desc", "下班日报提醒"),
-                Map.of("id", "article_tue", "time", "每周二 09:00", "desc", "码农老齐发文提醒"),
-                Map.of("id", "article_thu", "time", "每周四 09:00", "desc", "启航电商ERP发文提醒")
+                Map.of("id", "morning_report", "time", "每天 09:00", "desc", "生成综合日报")
         ));
-        model.addAttribute("crontab", "（Java 版使用 Spring @Scheduled，无 crontab）");
-        model.addAttribute("launchagent", "（Java 版使用 Spring @Scheduled，无 LaunchAgent）");
         return "config";
     }
 
@@ -41,9 +37,6 @@ public class ConfigController {
     public Map<String, Object> triggerJob(@RequestParam String job) {
         try {
             switch (job) {
-                case "daily_report" -> feishuService.dailyReportReminder();
-                case "article_tue" -> feishuService.articleReminder("码农老齐", "周二");
-                case "article_thu" -> feishuService.articleReminder("启航电商ERP", "周四");
                 case "generate_report" -> reportService.generateAndPush();
                 default -> throw new IllegalArgumentException("未知任务: " + job);
             }
