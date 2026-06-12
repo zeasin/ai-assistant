@@ -122,13 +122,13 @@ public class CollectorService {
 
     private Path getLogsDir() {
         try {
-            Path dir = getCollectorDir().resolve("logs");
+            Path dir = Paths.get(System.getProperty("user.dir")).resolve("collector-logs");
             if (!Files.exists(dir)) {
                 Files.createDirectories(dir);
             }
             return dir;
         } catch (Exception e) {
-            return getCollectorDir();
+            return Paths.get(System.getProperty("user.dir"));
         }
     }
 
@@ -405,7 +405,13 @@ public class CollectorService {
 
     private void saveResultToFile(CollectorTask task, CollectorResult result) {
         try {
-            Path dir = Paths.get(task.getOutputPath());
+            String baseDir = configService.load().getBaseDir();
+            Path dir;
+            if (baseDir != null && !baseDir.isEmpty()) {
+                dir = Paths.get(baseDir).resolve(task.getOutputPath());
+            } else {
+                dir = Paths.get(task.getOutputPath());
+            }
             if (!dir.toFile().exists()) {
                 dir.toFile().mkdirs();
             }

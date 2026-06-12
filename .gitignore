@@ -65,7 +65,7 @@ ux/mini-wechat/dist/
 ux/cli/node_modules/
 cert/
 assistant_log.json
-
+collector-logs/
 *.jar
 .claude
 AGENTS.md
