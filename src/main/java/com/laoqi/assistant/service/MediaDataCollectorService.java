@@ -38,9 +38,11 @@ public class MediaDataCollectorService {
 
     private Path getDataDir() {
         Config config = configService.load();
-        String opDir = config.getOperationsDataDir();
-        if (opDir == null || opDir.isEmpty()) opDir = "自媒体";
-        return Paths.get(configService.getBaseDir()).resolve(opDir).resolve("data");
+        String baseDir = config.getBaseDir();
+        if (baseDir == null || baseDir.isEmpty()) {
+            throw new IllegalStateException("笔记库根目录未配置");
+        }
+        return Paths.get(baseDir).resolve("自媒体").resolve("data");
     }
 
     private Map<String, List<Map<String, Object>>> readJsonFile(String fileName) {

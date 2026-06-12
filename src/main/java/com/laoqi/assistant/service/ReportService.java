@@ -23,7 +23,6 @@ public class ReportService {
     private final LogService logService;
     private final OpenCodeService openCodeService;
     private final ConfigService configService;
-    private final PromptService promptService;
 
     private String latestReport = "";
     private String latestReportTime = "";
@@ -32,14 +31,13 @@ public class ReportService {
     public ReportService(AppConfig appConfig,
                           FeishuService feishuService, TodoService todoService,
                           LogService logService, OpenCodeService openCodeService,
-                          ConfigService configService, PromptService promptService) {
+                          ConfigService configService) {
         this.appConfig = appConfig;
         this.feishuService = feishuService;
         this.todoService = todoService;
         this.logService = logService;
         this.openCodeService = openCodeService;
         this.configService = configService;
-        this.promptService = promptService;
     }
 
     private Path getComprehensiveReportDir() {
@@ -56,38 +54,8 @@ public class ReportService {
 
     public ReportResult generate() {
         ReportResult result = new ReportResult();
-        try {
-            if (!openCodeService.isHealthy()) {
-                result.error = "opencode serve 未启动";
-                latestReport = "";
-                latestError = result.error;
-                return result;
-            }
-
-            String sessionId = openCodeService.findIdleSession();
-            if (sessionId == null) {
-                sessionId = openCodeService.createSession(promptService.getSessionTitle("daily-report"));
-            }
-
-            String prompt = promptService.getTemplate("daily-report");
-
-            String report = openCodeService.sendMessage(sessionId, prompt);
-            if (report != null && !report.isEmpty()) {
-                result.report = report;
-                latestReport = report;
-                latestReportTime = TimeUtil.nowStr();
-                latestError = "";
-            } else {
-                result.error = "AI 返回内容为空";
-                latestReport = "";
-                latestError = result.error;
-            }
-        } catch (Exception e) {
-            log.error("生成日报失败", e);
-            result.error = e.getMessage();
-            latestReport = "";
-            latestError = e.getMessage();
-        }
+        result.error = "日报生成功能已移除，请使用模块系统进行分析";
+        latestError = result.error;
         return result;
     }
 

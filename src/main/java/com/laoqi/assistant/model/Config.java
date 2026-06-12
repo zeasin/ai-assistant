@@ -17,13 +17,6 @@ public class Config {
     private String feishuChatId;
     private Boolean feishuPollingEnabled;
     
-    private String customerDataPath;
-    private String leadDataPath;
-    private String recordDataPath;
-    private String customerDataDir;
-
-    private String operationsDataDir;
-    
     private String workDir;
     private String logFile;
     private String dailyDir;
@@ -37,8 +30,6 @@ public class Config {
         Config c = new Config();
         c.baseDir = baseDir;
         c.feishuWebhookUrl = webhookUrl;
-        c.customerDataDir = "";
-
         c.logFile = "assistant_log.json";
         c.dailyDir = "日报";
         c.weeklyDir = "周报";
@@ -61,17 +52,6 @@ public class Config {
     public void setFeishuChatId(String feishuChatId) { this.feishuChatId = feishuChatId; }
     public Boolean isFeishuPollingEnabled() { return feishuPollingEnabled; }
     public void setFeishuPollingEnabled(Boolean feishuPollingEnabled) { this.feishuPollingEnabled = feishuPollingEnabled; }
-    public String getCustomerDataPath() { return customerDataPath; }
-    public void setCustomerDataPath(String customerDataPath) { this.customerDataPath = customerDataPath; }
-    public String getLeadDataPath() { return leadDataPath; }
-    public void setLeadDataPath(String leadDataPath) { this.leadDataPath = leadDataPath; }
-    public String getRecordDataPath() { return recordDataPath; }
-    public void setRecordDataPath(String recordDataPath) { this.recordDataPath = recordDataPath; }
-    public String getCustomerDataDir() { return customerDataDir; }
-    public void setCustomerDataDir(String customerDataDir) { this.customerDataDir = customerDataDir; }
-
-    public String getOperationsDataDir() { return operationsDataDir; }
-    public void setOperationsDataDir(String operationsDataDir) { this.operationsDataDir = operationsDataDir; }
     public String getWorkDir() { return workDir; }
     public void setWorkDir(String workDir) { this.workDir = workDir; }
     public String getLogFile() { return logFile; }

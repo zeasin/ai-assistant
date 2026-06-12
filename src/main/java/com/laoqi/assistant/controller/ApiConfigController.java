@@ -4,7 +4,6 @@ import com.laoqi.assistant.model.Config;
 import com.laoqi.assistant.service.ConfigService;
 import com.laoqi.assistant.service.FeishuService;
 import com.laoqi.assistant.service.LogService;
-import com.laoqi.assistant.service.PromptService;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
@@ -16,14 +15,12 @@ public class ApiConfigController {
     private final ConfigService configService;
     private final FeishuService feishuService;
     private final LogService logService;
-    private final PromptService promptService;
 
     public ApiConfigController(ConfigService configService, FeishuService feishuService,
-                                LogService logService, PromptService promptService) {
+                                LogService logService) {
         this.configService = configService;
         this.feishuService = feishuService;
         this.logService = logService;
-        this.promptService = promptService;
     }
 
     @GetMapping("/api/config")
@@ -51,23 +48,6 @@ public class ApiConfigController {
             logService.add("配置更新", "成功", "笔记库根目录已更新为: " + baseDir);
             return Map.of("ok", true);
         } catch (Exception e) {
-            return Map.of("ok", false, "error", e.getMessage());
-        }
-    }
-
-    @PostMapping("/api/config/dataDirs")
-    public Map<String, Object> updateDataDirs(
-            @RequestParam String customerDataDir,
-            @RequestParam(required = false, defaultValue = "") String operationsDataDir) {
-        try {
-            Config config = configService.load();
-            config.setCustomerDataDir(customerDataDir);
-            config.setOperationsDataDir(operationsDataDir);
-            configService.save(config);
-            logService.add("数据目录配置", "保存成功", "");
-            return Map.of("ok", true);
-        } catch (Exception e) {
-            logService.add("数据目录配置", "保存失败", e.getMessage());
             return Map.of("ok", false, "error", e.getMessage());
         }
     }
@@ -157,33 +137,5 @@ public class ApiConfigController {
             @RequestParam(name = "enabled", defaultValue = "off") String enabled,
             @RequestParam(name = "time", defaultValue = "08:00") String time) {
         return Map.of("ok", false, "error", "该功能已迁移至独立采集器模块，请使用 /api/collector/tasks API");
-    }
-
-    @GetMapping("/api/config/prompts")
-    public Map<String, Object> getPrompts() {
-        return Map.of("ok", true, "prompts", promptService.getAllPrompts());
-    }
-
-    @PostMapping("/api/config/prompts")
-    public Map<String, Object> savePrompts(@RequestBody Map<String, Map<String, String>> prompts) {
-        try {
-            promptService.savePrompts(prompts);
-            logService.add("提示词配置", "成功", "已保存 " + prompts.size() + " 个提示词");
-            return Map.of("ok", true);
-        } catch (Exception e) {
-            logService.add("提示词配置", "失败", e.getMessage());
-            return Map.of("ok", false, "error", e.getMessage());
-        }
-    }
-
-    @PostMapping("/api/config/prompts/reset")
-    public Map<String, Object> resetPrompts() {
-        try {
-            promptService.resetPrompts();
-            logService.add("提示词配置", "重置", "已重置为默认值");
-            return Map.of("ok", true);
-        } catch (Exception e) {
-            return Map.of("ok", false, "error", e.getMessage());
-        }
     }
 }

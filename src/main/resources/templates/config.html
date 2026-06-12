@@ -59,28 +59,6 @@
 </div>
 
 <div class="card">
-    <h2>📁 数据目录配置</h2>
-    <div class="text-muted mb-2">相对于笔记库根目录的路径。程序自动发现目录下所有 JSON 文件。</div>
-    <form id="dataDirsForm" onsubmit="return saveDataDirs(event)">
-        <div class="form-group">
-            <label>客户数据目录</label>
-            <input type="text" id="customerDataDir" placeholder="客户管理">
-            <div class="text-muted" style="font-size:12px;margin-top:4px;">程序将自动读取此目录下所有 .json 文件并显示为数据表</div>
-        </div>
-        <div class="form-group">
-            <label>运营数据目录</label>
-            <input type="text" id="operationsDataDir" placeholder="自媒体">
-            <div class="text-muted" style="font-size:12px;margin-top:4px;">程序将自动读取此目录下所有 .json 文件（目录/data/*.json）</div>
-        </div>
-        <div class="flex" style="gap:8px;">
-            <button type="submit" class="btn btn-primary">保存</button>
-            <button type="button" class="btn btn-secondary" onclick="resetDataDirs()">恢复默认</button>
-            <span id="dataDirsStatus" class="text-muted" style="margin-left:4px;"></span>
-        </div>
-    </form>
-</div>
-
-<div class="card">
     <h2>🏷️ 字段标签配置</h2>
     <div class="text-muted mb-2">自定义数据表格中英文 key 显示为中文标签。未配置的 key 保持原始英文显示。</div>
     <div id="labels-container" style="margin-bottom:12px;"></div>
@@ -211,8 +189,6 @@ fetch('/api/config')
         if (cfg.feishuChatId) document.getElementById('feishuChatId').value = cfg.feishuChatId;
         if (cfg.feishuPollingEnabled) document.getElementById('feishuPollingEnabled').checked = true;
         if (cfg.baseDir) document.getElementById('baseDirPath').value = cfg.baseDir;
-        if (cfg.customerDataDir) document.getElementById('customerDataDir').value = cfg.customerDataDir;
-        if (cfg.operationsDataDir) document.getElementById('operationsDataDir').value = cfg.operationsDataDir;
         if (cfg.workDir) document.getElementById('workDir').value = cfg.workDir;
         const enabledCheckbox = document.getElementById('mediaCollectEnabled');
         const toggleText = document.getElementById('mediaCollectToggleText');
@@ -259,28 +235,6 @@ async function saveWorkDir(e) {
         status.textContent = '❌ ' + (data.error || '保存失败');
     }
     return false;
-}
-
-async function saveDataDirs(e) {
-    e.preventDefault();
-    const form = new FormData();
-    form.append('customerDataDir', document.getElementById('customerDataDir').value.trim());
-    form.append('operationsDataDir', document.getElementById('operationsDataDir').value.trim());
-    const res = await fetch('/api/config/dataDirs', { method: 'POST', body: form });
-    const data = await res.json();
-    const status = document.getElementById('dataDirsStatus');
-    if (data.ok) {
-        status.textContent = '✅ 已保存';
-        setTimeout(() => status.textContent = '', 3000);
-    } else {
-        status.textContent = '❌ ' + (data.error || '保存失败');
-    }
-    return false;
-}
-
-function resetDataDirs() {
-    document.getElementById('customerDataDir').value = '';
-    document.getElementById('operationsDataDir').value = '';
 }
 
 function saveWebhook() {

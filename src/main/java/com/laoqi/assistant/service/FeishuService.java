@@ -22,19 +22,17 @@ public class FeishuService {
     private final AppConfig appConfig;
     private final ConfigService configService;
     private final LogService logService;
-    private final CustomerService customerService;
     private final ChatSessionService chatSessionService;
 
     private String cachedToken;
     private long tokenExpiresAt;
 
     public FeishuService(AppConfig appConfig, ConfigService configService,
-                          LogService logService, CustomerService customerService,
+                          LogService logService,
                           ChatSessionService chatSessionService) {
         this.appConfig = appConfig;
         this.configService = configService;
         this.logService = logService;
-        this.customerService = customerService;
         this.chatSessionService = chatSessionService;
     }
 

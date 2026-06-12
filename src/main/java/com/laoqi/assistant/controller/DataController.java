@@ -48,28 +48,20 @@ public class DataController {
 
     private String getDataDirByType(String type) {
         if (type == null || type.isEmpty()) {
-            type = "customer";
+            return null;
         }
-        Config config = configService.load();
-        switch (type) {
-            case "customer":
-                return config.getCustomerDataDir();
-            case "operations":
-                return config.getOperationsDataDir();
-            default:
-                // Try module config
-                Map<String, Object> raw = FileUtil.readJson(appConfig.getConfigFile(), mapType, new HashMap<>());
-                Object modules = raw.get("modules");
-                if (modules instanceof List) {
-                    for (Object m : (List<?>) modules) {
-                        if (m instanceof Map && type.equals(((Map<?,?>) m).get("id"))) {
-                            Object dir = ((Map<?,?>) m).get("dir");
-                            return dir != null ? dir.toString() : null;
-                        }
-                    }
+        // Try module config
+        Map<String, Object> raw = FileUtil.readJson(appConfig.getConfigFile(), mapType, new HashMap<>());
+        Object modules = raw.get("modules");
+        if (modules instanceof List) {
+            for (Object m : (List<?>) modules) {
+                if (m instanceof Map && type.equals(((Map<?,?>) m).get("id"))) {
+                    Object dir = ((Map<?,?>) m).get("dir");
+                    return dir != null ? dir.toString() : null;
                 }
-                return null;
+            }
         }
+        return null;
     }
 
     private String getTypeLabel(String type) {
