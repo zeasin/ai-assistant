@@ -5,10 +5,11 @@ import com.laoqi.assistant.model.Config;
 import com.laoqi.assistant.service.ConfigService;
 import com.laoqi.assistant.service.LogService;
 import com.laoqi.assistant.service.OpenCodeService;
-import com.laoqi.assistant.service.PromptService;
 import com.laoqi.assistant.util.FileUtil;
 import com.laoqi.assistant.util.MarkdownUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -27,19 +28,20 @@ import java.util.stream.Stream;
 @Controller
 public class WorkReportController {
 
+    private static final Logger log = LoggerFactory.getLogger(WorkReportController.class);
     private final AppConfig appConfig;
     private final LogService logService;
     private final ConfigService configService;
     private final OpenCodeService openCodeService;
-    private final PromptService promptService;
     private static final ObjectMapper mapper = new ObjectMapper();
+    private static final String PROMPT_FILENAME = "分析提示词.md";
+    private static final String DEFAULT_PROMPT = "请读取 工作/日报/目录和 工作/周报/目录下的markdown文件，然后根据近期日报和周报内容生成一份工作分析报告，包含：\n1. 【工作重点】近期主要工作内容和重点任务\n2. 【进展总结】各项工作的进展和成果\n3. 【待办事项】需要继续跟进的未完成任务\n4. 【趋势建议】工作效率、时间分配等方面的改进建议\n\n请使用简洁的中文，适当使用小标题和列表。";
 
-    public WorkReportController(AppConfig appConfig, LogService logService, ConfigService configService, OpenCodeService openCodeService, PromptService promptService) {
+    public WorkReportController(AppConfig appConfig, LogService logService, ConfigService configService, OpenCodeService openCodeService) {
         this.appConfig = appConfig;
         this.logService = logService;
         this.configService = configService;
         this.openCodeService = openCodeService;
-        this.promptService = promptService;
     }
 
     private Path getDailyDir() {
@@ -174,14 +176,44 @@ public class WorkReportController {
         return emitter;
     }
 
+    private String readPrompt() {
+        Path dir = getAnalysisDir();
+        Path file = dir.resolve(PROMPT_FILENAME);
+        if (FileUtil.exists(file)) {
+            return FileUtil.readText(file);
+        }
+        FileUtil.writeText(file, DEFAULT_PROMPT);
+        log.info("已创建工作分析提示词文件: {}", file);
+        return DEFAULT_PROMPT;
+    }
+
+    public void writePrompt(String content) {
+        Path dir = getAnalysisDir();
+        Path file = dir.resolve(PROMPT_FILENAME);
+        FileUtil.writeText(file, content);
+    }
+
+    @GetMapping(value = "/api/work-reports/prompt", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public Map<String, Object> getPrompt() {
+        return Map.of("ok", true, "prompt", readPrompt());
+    }
+
+    @PostMapping(value = "/api/work-reports/prompt", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public Map<String, Object> savePrompt(@RequestBody Map<String, String> body) {
+        writePrompt(body.getOrDefault("prompt", ""));
+        return Map.of("ok", true);
+    }
+
     private String buildAiReportSummary() {
-        String prompt = promptService.getTemplate("work-report-analysis");
+        String prompt = readPrompt();
 
         try {
             if (!openCodeService.isHealthy()) {
                 return "⚠️ opencode serve 未启动（端口 " + appConfig.getNotesPort() + "），无法进行 AI 分析。";
             }
-            String sessionId = openCodeService.createSession(promptService.getSessionTitle("work-report-analysis"));
+            String sessionId = openCodeService.createSession("工作分析");
             return openCodeService.sendMessage(sessionId, prompt);
         } catch (Exception e) {
             return "❌ AI 分析失败：" + e.getMessage();
