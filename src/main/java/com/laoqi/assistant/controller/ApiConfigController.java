@@ -52,19 +52,6 @@ public class ApiConfigController {
         }
     }
 
-    @PostMapping("/api/config/workDir")
-    public Map<String, Object> updateWorkDir(@RequestParam String workDir) {
-        try {
-            Config cfg = configService.load();
-            cfg.setWorkDir(workDir);
-            configService.save(cfg);
-            logService.add("配置更新", "成功", "工作目录已更新为: " + workDir);
-            return Map.of("ok", true);
-        } catch (Exception e) {
-            return Map.of("ok", false, "error", e.getMessage());
-        }
-    }
-
     @PostMapping("/api/config/feishu")
     public Map<String, Object> updateFeishu(
             @RequestParam(required = false, defaultValue = "") String appId,

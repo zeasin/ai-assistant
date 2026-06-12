@@ -17,11 +17,7 @@ public class Config {
     private String feishuChatId;
     private Boolean feishuPollingEnabled;
     
-    private String workDir;
     private String logFile;
-    private String dailyDir;
-    private String weeklyDir;
-    private String remindFile;
     private Map<String, Map<String, List<String>>> columnSettings = new HashMap<>();
 
     public Config() {}
@@ -31,10 +27,6 @@ public class Config {
         c.baseDir = baseDir;
         c.feishuWebhookUrl = webhookUrl;
         c.logFile = "assistant_log.json";
-        c.dailyDir = "日报";
-        c.weeklyDir = "周报";
-        c.workDir = "工作";
-        c.remindFile = "提醒.md";
         return c;
     }
 
@@ -52,16 +44,8 @@ public class Config {
     public void setFeishuChatId(String feishuChatId) { this.feishuChatId = feishuChatId; }
     public Boolean isFeishuPollingEnabled() { return feishuPollingEnabled; }
     public void setFeishuPollingEnabled(Boolean feishuPollingEnabled) { this.feishuPollingEnabled = feishuPollingEnabled; }
-    public String getWorkDir() { return workDir; }
-    public void setWorkDir(String workDir) { this.workDir = workDir; }
     public String getLogFile() { return logFile; }
     public void setLogFile(String logFile) { this.logFile = logFile; }
-    public String getDailyDir() { return dailyDir; }
-    public void setDailyDir(String dailyDir) { this.dailyDir = dailyDir; }
-    public String getWeeklyDir() { return weeklyDir; }
-    public void setWeeklyDir(String weeklyDir) { this.weeklyDir = weeklyDir; }
-    public String getRemindFile() { return remindFile; }
-    public void setRemindFile(String remindFile) { this.remindFile = remindFile; }
     public Map<String, Map<String, List<String>>> getColumnSettings() { return columnSettings; }
     public void setColumnSettings(Map<String, Map<String, List<String>>> columnSettings) { this.columnSettings = columnSettings; }
 }

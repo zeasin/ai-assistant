@@ -39,26 +39,6 @@
 </div>
 
 <div class="card">
-    <h2>📁 工作目录配置</h2>
-    <div class="text-muted mb-2">工作相关数据（日报、周报、任务、提醒）将保存在此目录下。</div>
-    <form id="workDirForm" onsubmit="return saveWorkDir(event)">
-        <div class="form-group">
-            <label>工作目录</label>
-            <input type="text" id="workDir" placeholder="工作" style="font-family:monospace;">
-            <div class="text-muted" style="font-size:12px;margin-top:4px;">
-                相对于笔记库根目录的路径<br>
-                例如：<code>工作</code> → <code>{笔记库根目录}/工作/日报/</code><br>
-                例如：<code>我的工作</code> → <code>{笔记库根目录}/我的工作/日报/</code>
-            </div>
-        </div>
-        <div class="flex" style="gap:8px;">
-            <button type="submit" class="btn btn-primary">保存</button>
-            <span id="workDirStatus" class="text-muted" style="margin-left:4px;"></span>
-        </div>
-    </form>
-</div>
-
-<div class="card">
     <h2>🏷️ 字段标签配置</h2>
     <div class="text-muted mb-2">自定义数据表格中英文 key 显示为中文标签。未配置的 key 保持原始英文显示。</div>
     <div id="labels-container" style="margin-bottom:12px;"></div>
@@ -189,7 +169,6 @@ fetch('/api/config')
         if (cfg.feishuChatId) document.getElementById('feishuChatId').value = cfg.feishuChatId;
         if (cfg.feishuPollingEnabled) document.getElementById('feishuPollingEnabled').checked = true;
         if (cfg.baseDir) document.getElementById('baseDirPath').value = cfg.baseDir;
-        if (cfg.workDir) document.getElementById('workDir').value = cfg.workDir;
         const enabledCheckbox = document.getElementById('mediaCollectEnabled');
         const toggleText = document.getElementById('mediaCollectToggleText');
         if (cfg.mediaCollectEnabled) {
@@ -212,22 +191,6 @@ async function saveBaseDir(e) {
     const res = await fetch('/api/config/baseDir', { method: 'POST', body: form });
     const data = await res.json();
     const status = document.getElementById('baseDirStatus');
-    if (data.ok) {
-        status.textContent = '✅ 已保存';
-        setTimeout(() => status.textContent = '', 3000);
-    } else {
-        status.textContent = '❌ ' + (data.error || '保存失败');
-    }
-    return false;
-}
-
-async function saveWorkDir(e) {
-    e.preventDefault();
-    const form = new FormData();
-    form.append('workDir', document.getElementById('workDir').value.trim());
-    const res = await fetch('/api/config/workDir', { method: 'POST', body: form });
-    const data = await res.json();
-    const status = document.getElementById('workDirStatus');
     if (data.ok) {
         status.textContent = '✅ 已保存';
         setTimeout(() => status.textContent = '', 3000);

@@ -31,18 +31,6 @@ public class ConfigService {
             config.setFeishuPollingEnabled(defaultConfig.isFeishuPollingEnabled());
         }
         
-        if (config.getWorkDir() == null || config.getWorkDir().isEmpty()) {
-            config.setWorkDir(defaultConfig.getWorkDir());
-        }
-        
-        if (config.getDailyDir() == null || config.getDailyDir().isEmpty()) {
-            config.setDailyDir(defaultConfig.getDailyDir());
-        }
-        
-        if (config.getWeeklyDir() == null || config.getWeeklyDir().isEmpty()) {
-            config.setWeeklyDir(defaultConfig.getWeeklyDir());
-        }
-        
         if (config.getLogFile() == null || config.getLogFile().isEmpty()) {
             config.setLogFile(defaultConfig.getLogFile());
         }

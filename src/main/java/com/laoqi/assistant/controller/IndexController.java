@@ -9,6 +9,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import java.util.Map;
@@ -29,18 +30,15 @@ public class IndexController {
 
     @GetMapping("/")
     public String index(Model model) {
-        // 优先从笔记库读取今日综合日报文件
         String todayReport = reportService.readTodayReport();
         String reportTime;
         String error;
 
         if (todayReport != null) {
-            // 文件存在，使用文件内容
             model.addAttribute("report", MarkdownUtil.toHtml(todayReport));
             model.addAttribute("report_time", reportService.getLatestReportTime().isEmpty() ? "今日已生成" : reportService.getLatestReportTime());
             model.addAttribute("report_error", "");
         } else {
-            // 文件不存在，回退到内存中的生成结果
             String report = reportService.getLatestReport();
             String rt = reportService.getLatestReportTime();
             String err = reportService.getLatestError();
@@ -63,9 +61,6 @@ public class IndexController {
         try {
             var r = reportService.generate();
             if (r.report != null) {
-                String today = TimeUtil.todayStr();
-                String wd = TimeUtil.weekdayCn(TimeUtil.now());
-                String title = TimeUtil.greetingEmoji() + " 老齐" + TimeUtil.greetingText() + " · " + today + " · " + wd;
                 reportService.saveComprehensiveReport(r.report);
                 todoService.clearTempReminders();
                 logService.add("手动生成日报", "成功");
@@ -78,5 +73,19 @@ public class IndexController {
             logService.add("手动生成日报", "失败", e.getMessage());
             return Map.of("ok", false, "error", e.getMessage());
         }
+    }
+
+    @GetMapping("/api/report/prompt")
+    @ResponseBody
+    public Map<String, Object> getPrompt() {
+        return Map.of("ok", true, "prompt", reportService.readPrompt());
+    }
+
+    @PostMapping("/api/report/prompt")
+    @ResponseBody
+    public Map<String, Object> savePrompt(@RequestBody Map<String, String> body) {
+        reportService.writePrompt(body.getOrDefault("prompt", ""));
+        logService.add("综合日报", "保存提示词", "成功");
+        return Map.of("ok", true);
     }
 }

@@ -63,9 +63,12 @@
 <div class="card">
     <div class="flex" style="justify-content:space-between;">
         <h2>📊 AI 综合日报</h2>
-        <button class="btn btn-primary" id="genBtn" onclick="generateReport()">
-            🔄 重新生成
-        </button>
+        <div class="flex" style="gap:8px;">
+            <button class="btn btn-secondary" onclick="openPromptModal()">⚙️ 提示词</button>
+            <button class="btn btn-primary" id="genBtn" onclick="generateReport()">
+                🔄 重新生成
+            </button>
+        </div>
     </div>
 
     <th:block th:if="${report_error != null and !report_error.isEmpty()}">
@@ -80,9 +83,24 @@
         </th:block>
         <th:block th:unless="${report != null and !report.isEmpty()}">
             <div class="text-muted">
-                暂无日报数据。点击"重新生成"或等待定时任务（每天 9:00）自动推送。
+                暂无日报数据。点击"重新生成"或等待定时任务（每天 10:30）自动推送。
             </div>
         </th:block>
+    </div>
+</div>
+
+<div id="promptModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:1000;justify-content:center;align-items:center;">
+    <div style="background:#fff;border-radius:12px;padding:24px;width:90%;max-width:700px;max-height:80vh;overflow-y:auto;">
+        <div class="flex" style="justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <h3 style="margin:0;">⚙️ 日报生成提示词</h3>
+            <button class="btn btn-secondary" onclick="closePromptModal()" style="padding:4px 12px;">✕</button>
+        </div>
+        <div class="text-muted mb-2" style="font-size:12px;">可用变量：<code>{date}</code> 日期，<code>{weekday}</code> 星期</div>
+        <textarea id="promptContent" rows="12" style="width:100%;padding:10px;border:1px solid #e1e3e6;border-radius:8px;font-size:13px;font-family:monospace;resize:vertical;box-sizing:border-box;"></textarea>
+        <div class="flex" style="gap:8px;margin-top:12px;justify-content:flex-end;">
+            <button class="btn btn-secondary" onclick="closePromptModal()">取消</button>
+            <button class="btn btn-primary" onclick="savePrompt()">保存</button>
+        </div>
     </div>
 </div>
 
@@ -107,6 +125,39 @@ function generateReport() {
             toast('请求失败，请检查服务状态', 'error');
             btn.disabled = false; btn.textContent = '🔄 重新生成';
         });
+}
+
+function openPromptModal() {
+    fetch('/api/report/prompt')
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) {
+                document.getElementById('promptContent').value = data.prompt;
+                document.getElementById('promptModal').style.display = 'flex';
+            }
+        });
+}
+
+function closePromptModal() {
+    document.getElementById('promptModal').style.display = 'none';
+}
+
+function savePrompt() {
+    const prompt = document.getElementById('promptContent').value;
+    fetch('/api/report/prompt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: prompt })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.ok) {
+            toast('✅ 提示词已保存');
+            closePromptModal();
+        } else {
+            toast('保存失败', 'error');
+        }
+    });
 }
 </script>
 

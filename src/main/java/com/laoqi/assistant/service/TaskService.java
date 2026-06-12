@@ -26,11 +26,7 @@ public class TaskService {
     }
 
     private Path dataFile() {
-        String workDir = configService.load().getWorkDir();
-        if (workDir == null || workDir.isEmpty()) {
-            workDir = "工作";
-        }
-        Path taskDir = getBaseDir().resolve(workDir).resolve("任务");
+        Path taskDir = getBaseDir().resolve("AI").resolve("任务");
         if (!java.nio.file.Files.exists(taskDir)) {
             try {
                 java.nio.file.Files.createDirectories(taskDir);

@@ -39,11 +39,7 @@ public class ReminderService {
 
     private Path getRemindersDir() {
         String baseDir = configService.getBaseDir();
-        String workDir = configService.load().getWorkDir();
-        if (workDir == null || workDir.isEmpty()) {
-            workDir = "工作";
-        }
-        Path reminderDir = Paths.get(baseDir, workDir, "提醒");
+        Path reminderDir = Paths.get(baseDir, "AI", "提醒");
         if (!Files.exists(reminderDir)) {
             try {
                 Files.createDirectories(reminderDir);
