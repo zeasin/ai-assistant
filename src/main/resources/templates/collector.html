@@ -54,6 +54,10 @@
         
         .empty-state { text-align: center; padding: 40px; color: #5c5f66; }
         .empty-state svg { width: 48px; height: 48px; margin-bottom: 12px; opacity: 0.5; }
+        .result-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .result-table th { background: #f5f5f5; padding: 8px 12px; text-align: left; font-weight: 500; border-bottom: 2px solid #e1e3e6; white-space: nowrap; }
+        .result-table td { padding: 6px 12px; border-bottom: 1px solid #f0f0f0; color: #1a1b1e; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .result-table tr:hover td { background: #fafafe; }
     </style>
 </head>
 <body>
@@ -82,6 +86,16 @@
             <h2>采集结果</h2>
             <div id="taskResults"></div>
         </div>
+
+    <div class="modal-overlay" id="dataModal">
+        <div class="modal" style="width:90%;max-width:900px;max-height:85vh;display:flex;flex-direction:column;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                <h3 id="dataModalTitle" style="margin:0;">采集数据</h3>
+                <button class="btn btn-secondary" onclick="closeModal('dataModal')" style="padding:4px 12px;">✕</button>
+            </div>
+            <div id="dataModalContent" style="overflow:auto;flex:1;"></div>
+        </div>
+    </div>
 
     <div class="modal-overlay" id="taskModal">
         <div class="modal">
@@ -326,34 +340,106 @@
                 document.getElementById('taskLogsCard').style.display = 'none';
                 
                 if (data.ok && data.data && data.data.length > 0) {
-                    const html = data.data.map(result => `
+                    const html = data.data.map((result, idx) => `
                         <div class="result-item">
-                            <div class="result-time">${result.collectTime}</div>
-                            <div class="result-data">${formatJson(result.parsedData)}</div>
+                            <div style="display:flex;justify-content:space-between;align-items:center;">
+                                <div class="result-time">采集时间: ${result.collectTime}</div>
+                                <button class="btn btn-primary" style="padding:4px 12px;font-size:12px;" onclick='viewData(${idx})'>查看数据</button>
+                            </div>
                             <details style="margin-top: 8px;font-size:12px;color:#5c5f66;">
                                 <summary style="cursor:pointer;">查看原始响应</summary>
-                                <pre style="margin-top:4px;padding:8px;background:#f5f5f5;border-radius:4px;max-height:200px;overflow:auto;font-size:11px;">${result.rawResponse}</pre>
+                                <pre style="margin-top:4px;padding:8px;background:#f5f5f5;border-radius:4px;max-height:200px;overflow:auto;font-size:11px;">${escapeHtml(result.rawResponse || '')}</pre>
                             </details>
                         </div>
                     `).join('');
                     document.getElementById('taskResults').innerHTML = html;
+                    window._lastResults = data.data;
                 } else {
                     document.getElementById('taskResults').innerHTML = '<div class="empty-state">暂无采集结果</div>';
+                    window._lastResults = [];
                 }
             } catch (e) {
                 toast('加载结果失败: ' + e.message, 'error');
             }
         }
 
-        function formatJson(data) {
-            if (typeof data === 'string') {
-                try {
-                    return JSON.stringify(JSON.parse(data), null, 2);
-                } catch {
-                    return data;
-                }
+        function viewData(idx) {
+            const results = window._lastResults || [];
+            const result = results[idx];
+            if (!result) return;
+            const parsed = parseResultData(result.parsedData);
+            document.getElementById('dataModalTitle').textContent = '采集数据 · ' + (result.collectTime || '');
+            document.getElementById('dataModalContent').innerHTML = renderResultTable(parsed);
+            document.getElementById('dataModal').classList.add('active');
+        }
+
+        function parseResultData(data) {
+            if (!data) return null;
+            if (typeof data === 'object') return data;
+            try { return JSON.parse(data); } catch { return { text: data }; }
+        }
+
+        function renderResultTable(data) {
+            if (!data) return '<div class="text-muted" style="padding:12px;">无数据</div>';
+            if (typeof data === 'string') return '<div style="padding:12px;font-size:13px;">' + escapeHtml(data) + '</div>';
+
+            if (typeof data === 'object' && !Array.isArray(data) && data.articles && Array.isArray(data.articles)) {
+                return renderArrayTable(data.articles, data);
             }
-            return JSON.stringify(data, null, 2);
+            if (Array.isArray(data)) {
+                return renderArrayTable(data);
+            }
+            if (typeof data === 'object') {
+                const keys = Object.keys(data);
+                let h = '<div style="overflow-x:auto;"><table class="result-table"><thead><tr><th>字段</th><th>值</th></tr></thead><tbody>';
+                keys.forEach(k => {
+                    const v = data[k];
+                    if (Array.isArray(v)) {
+                        h += '<tr><td style="font-weight:500;white-space:nowrap;">' + escapeHtml(k) + '</td><td><em style="color:#909296;">[' + v.length + ' 条记录，点击查看]</em></td></tr>';
+                    } else {
+                        const text = v === null || v === undefined ? '' : (typeof v === 'object' ? JSON.stringify(v) : String(v));
+                        h += '<tr><td style="font-weight:500;white-space:nowrap;">' + escapeHtml(k) + '</td><td title="' + escapeHtml(text) + '">' + escapeHtml(truncate(text, 100)) + '</td></tr>';
+                    }
+                });
+                h += '</tbody></table></div>';
+                return h;
+            }
+            return '<div style="padding:12px;font-size:13px;">' + escapeHtml(String(data)) + '</div>';
+        }
+
+        function renderArrayTable(arr, meta) {
+            if (!arr || arr.length === 0) return '<div class="text-muted" style="padding:12px;">空数组</div>';
+            const first = arr[0];
+            if (typeof first !== 'object' || first === null) {
+                return '<div style="padding:12px;font-size:13px;">' + arr.map(v => escapeHtml(String(v))).join(', ') + '</div>';
+            }
+            const keys = Object.keys(first);
+            let info = '';
+            if (meta && meta.total !== undefined) {
+                info = '<div style="padding:8px 12px;font-size:12px;color:#5c5f66;">共 ' + meta.total + ' 条，当前展示 ' + arr.length + ' 条</div>';
+            }
+            let h = info + '<div style="overflow-x:auto;"><table class="result-table"><thead><tr>';
+            keys.forEach(k => { h += '<th>' + escapeHtml(k) + '</th>'; });
+            h += '</tr></thead><tbody>';
+            arr.forEach(row => {
+                h += '<tr>';
+                keys.forEach(k => {
+                    const v = row[k];
+                    const text = v === null || v === undefined ? '' : (typeof v === 'object' ? JSON.stringify(v) : String(v));
+                    h += '<td title="' + escapeHtml(text) + '">' + escapeHtml(truncate(text, 80)) + '</td>';
+                });
+                h += '</tr>';
+            });
+            h += '</tbody></table></div>';
+            return h;
+        }
+
+        function truncate(s, max) {
+            return s.length > max ? s.substring(0, max) + '...' : s;
+        }
+
+        function escapeHtml(str) {
+            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         }
 
         loadTasks();

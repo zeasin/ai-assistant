@@ -308,6 +308,9 @@ public class CollectorService {
             throw new IllegalArgumentException("Task not found: " + taskId);
         }
 
+        long startMs = System.currentTimeMillis();
+        log.info("🚀 [采集器] 任务启动: {} ({}) — {}", task.getName(), taskId, TimeUtil.nowStr());
+
         CollectorLog logEntry = new CollectorLog();
         logEntry.setId(UUID.randomUUID().toString());
         logEntry.setTaskId(taskId);
@@ -363,7 +366,8 @@ public class CollectorService {
             saveResults(taskId);
 
             logService.add("数据采集", "成功", "任务: " + task.getName());
-            log.info("Task {} executed successfully, result size: {}", taskId, rawResponse.length());
+            log.info("✅ [采集器] 任务完成: {} ({}) — {} (耗时: {}ms)",
+                    task.getName(), taskId, TimeUtil.nowStr(), System.currentTimeMillis() - startMs);
             return result;
 
         } catch (Exception e) {
@@ -374,7 +378,8 @@ public class CollectorService {
             saveLogs(taskId);
             
             logService.add("数据采集", "失败", "任务: " + task.getName() + ", 错误: " + e.getMessage());
-            log.error("Task {} execution failed: {}", taskId, e.getMessage());
+            log.error("❌ [采集器] 任务失败: {} ({}) — {} (耗时: {}ms): {}",
+                    task.getName(), taskId, TimeUtil.nowStr(), System.currentTimeMillis() - startMs, e.getMessage());
             throw new RuntimeException("Task execution failed: " + e.getMessage(), e);
         }
     }
@@ -412,17 +417,27 @@ public class CollectorService {
             if (!dir.toFile().exists()) {
                 dir.toFile().mkdirs();
             }
+
+            // 保存带元信息的结果文件: {date}_{taskId}.json
             String fileName = TimeUtil.todayStr() + "_" + task.getId() + ".json";
             Path filePath = dir.resolve(fileName);
-            
             Map<String, Object> output = new LinkedHashMap<>();
             output.put("taskId", task.getId());
             output.put("taskName", task.getName());
             output.put("collectTime", result.getCollectTime());
             output.put("data", result.getParsedData());
-            
             FileUtil.writeJson(filePath, output);
-            log.info("Result saved to: {}", filePath);
+
+            // 保存纯数据文件: data.json（每次采集覆盖）
+            Path dataFile = dir.resolve("data.json");
+            try {
+                Object parsed = mapper.readValue(result.getParsedData(), Object.class);
+                FileUtil.writeJson(dataFile, parsed);
+            } catch (Exception e) {
+                FileUtil.writeText(dataFile, result.getParsedData());
+            }
+
+            log.info("Result saved to: {}, data.json updated", filePath);
         } catch (Exception e) {
             log.error("Failed to save result to file: {}", e.getMessage());
         }
