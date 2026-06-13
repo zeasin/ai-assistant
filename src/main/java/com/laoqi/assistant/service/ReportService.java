@@ -21,7 +21,6 @@ public class ReportService {
 
     private final AppConfig appConfig;
     private final FeishuService feishuService;
-    private final TodoService todoService;
     private final LogService logService;
     private final OpenCodeService openCodeService;
     private final ConfigService configService;
@@ -31,12 +30,11 @@ public class ReportService {
     private String latestError = "";
 
     public ReportService(AppConfig appConfig,
-                          FeishuService feishuService, TodoService todoService,
+                          FeishuService feishuService,
                           LogService logService, OpenCodeService openCodeService,
                           ConfigService configService) {
         this.appConfig = appConfig;
         this.feishuService = feishuService;
-        this.todoService = todoService;
         this.logService = logService;
         this.openCodeService = openCodeService;
         this.configService = configService;
@@ -155,7 +153,6 @@ public class ReportService {
             var paras = feishuService.reportToParagraphs(r.report);
             feishuService.sendPost(title, paras);
             saveComprehensiveReport(r.report);
-            todoService.clearTempReminders();
             logService.add("日报生成", "成功", "AI 日报已生成并推送");
         } else {
             log.error("日报生成失败: {}", r.error);

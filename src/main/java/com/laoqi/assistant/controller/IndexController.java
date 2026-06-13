@@ -1,8 +1,9 @@
 package com.laoqi.assistant.controller;
 
+import com.laoqi.assistant.model.TaskData.TaskItem;
 import com.laoqi.assistant.service.LogService;
 import com.laoqi.assistant.service.ReportService;
-import com.laoqi.assistant.service.TodoService;
+import com.laoqi.assistant.service.TaskService;
 import com.laoqi.assistant.util.MarkdownUtil;
 import com.laoqi.assistant.util.TimeUtil;
 import org.springframework.stereotype.Controller;
@@ -12,19 +13,22 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseBody;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Controller
 public class IndexController {
 
     private final ReportService reportService;
-    private final TodoService todoService;
+    private final TaskService taskService;
     private final LogService logService;
 
-    public IndexController(ReportService reportService, TodoService todoService,
+    public IndexController(ReportService reportService, TaskService taskService,
                             LogService logService) {
         this.reportService = reportService;
-        this.todoService = todoService;
+        this.taskService = taskService;
         this.logService = logService;
     }
 
@@ -51,7 +55,13 @@ public class IndexController {
             model.addAttribute("report_error", err);
         }
 
-        model.addAttribute("todos", todoService.parse());
+        List<TaskItem> activeTasks = taskService.getAllTasks().stream()
+                .filter(t -> !"done".equals(t.status))
+                .collect(Collectors.toList());
+        model.addAttribute("todoHigh", activeTasks.stream().filter(t -> "high".equals(t.priority)).collect(Collectors.toList()));
+        model.addAttribute("todoMid", activeTasks.stream().filter(t -> "mid".equals(t.priority)).collect(Collectors.toList()));
+        model.addAttribute("todoLow", activeTasks.stream().filter(t -> "low".equals(t.priority)).collect(Collectors.toList()));
+        model.addAttribute("todoTotal", activeTasks.size());
         return "index";
     }
 
@@ -62,7 +72,6 @@ public class IndexController {
             var r = reportService.generate();
             if (r.report != null) {
                 reportService.saveComprehensiveReport(r.report);
-                todoService.clearTempReminders();
                 logService.add("手动生成日报", "成功");
                 return Map.of("ok", true);
             } else {

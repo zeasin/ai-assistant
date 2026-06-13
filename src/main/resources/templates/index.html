@@ -7,44 +7,30 @@
 <body>
 <th:block layout:fragment="content">
 
-<th:block th:with="total_todos=${#lists.size(todos.high) + #lists.size(todos.mid) + #lists.size(todos.low) + #lists.size(todos.daily) + #lists.size(todos.temp)}">
-
 <div class="todo-float" id="todoPanel">
     <h3>
         ⚡ 今日待办
-        <span class="todo-count" th:text="${total_todos + ' 项'}">0 项</span>
+        <span class="todo-count" th:text="${todoTotal + ' 项'}">0 项</span>
     </h3>
-    <th:block th:if="${#lists.size(todos.high) > 0}">
+    <th:block th:if="${#lists.size(todoHigh) > 0}">
     <div class="todo-group">
         <div class="group-label" style="color:#e03131;">🔴 高优先级</div>
-        <div th:each="item : ${todos.high}" class="todo-item" style="border-left-color:#e03131;" th:utext="${@utils.mdInline(item)}"></div>
+        <div th:each="item : ${todoHigh}" class="todo-item" style="border-left-color:#e03131;" th:text="${item.title}"></div>
     </div>
     </th:block>
-    <th:block th:if="${#lists.size(todos.mid) > 0}">
+    <th:block th:if="${#lists.size(todoMid) > 0}">
     <div class="todo-group">
         <div class="group-label" style="color:#e8590c;">🟡 中优先级</div>
-        <div th:each="item : ${todos.mid}" class="todo-item" style="border-left-color:#e8590c;" th:utext="${@utils.mdInline(item)}"></div>
+        <div th:each="item : ${todoMid}" class="todo-item" style="border-left-color:#e8590c;" th:text="${item.title}"></div>
     </div>
     </th:block>
-    <th:block th:if="${#lists.size(todos.low) > 0}">
+    <th:block th:if="${#lists.size(todoLow) > 0}">
     <div class="todo-group">
         <div class="group-label" style="color:#2b8a3e;">🟢 低优先级</div>
-        <div th:each="item : ${todos.low}" class="todo-item" style="border-left-color:#2b8a3e;" th:utext="${@utils.mdInline(item)}"></div>
+        <div th:each="item : ${todoLow}" class="todo-item" style="border-left-color:#2b8a3e;" th:text="${item.title}"></div>
     </div>
     </th:block>
-    <th:block th:if="${#lists.size(todos.daily) > 0}">
-    <div class="todo-group">
-        <div class="group-label" style="color:#2b8a3e;">🔄 每日循环</div>
-        <div th:each="item : ${todos.daily}" class="todo-item" style="border-left-color:#2b8a3e;" th:utext="${@utils.mdInline(item)}"></div>
-    </div>
-    </th:block>
-    <th:block th:if="${#lists.size(todos.temp) > 0}">
-    <div class="todo-group">
-        <div class="group-label" style="color:#1971c2;">📌 临时提醒</div>
-        <div th:each="item : ${todos.temp}" class="todo-item" style="border-left-color:#1971c2;" th:utext="${@utils.mdInline(item)}"></div>
-    </div>
-    </th:block>
-    <th:block th:if="${total_todos == 0}">
+    <th:block th:if="${todoTotal == 0}">
     <div class="todo-empty">✅ 暂无未完成待办</div>
     </th:block>
 </div>
@@ -110,7 +96,6 @@
     </div>
 </div>
 
-</th:block> <!-- total_todos -->
 
 <script>
 function generateReport() {
