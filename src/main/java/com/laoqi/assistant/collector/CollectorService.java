@@ -8,6 +8,7 @@ import com.laoqi.assistant.collector.model.CollectorTask;
 import com.laoqi.assistant.service.ConfigService;
 import com.laoqi.assistant.service.LogService;
 import com.laoqi.assistant.service.OpenCodeService;
+import com.laoqi.assistant.datacenter.DataSetService;
 import com.laoqi.assistant.util.FileUtil;
 import com.laoqi.assistant.util.TimeUtil;
 import org.slf4j.Logger;
@@ -34,16 +35,19 @@ public class CollectorService {
     private final OpenCodeService openCodeService;
     private final LogService logService;
     private final ConfigService configService;
+    private final DataSetService dataSetService;
     
     private final Map<String, CollectorTask> tasks = new ConcurrentHashMap<>();
     private final Map<String, List<CollectorLog>> taskLogs = new ConcurrentHashMap<>();
     private final Map<String, List<CollectorResult>> taskResults = new ConcurrentHashMap<>();
 
     public CollectorService(OpenCodeService openCodeService,
-                           LogService logService, ConfigService configService) {
+                           LogService logService, ConfigService configService,
+                           DataSetService dataSetService) {
         this.openCodeService = openCodeService;
         this.logService = logService;
         this.configService = configService;
+        this.dataSetService = dataSetService;
     }
 
     @PostConstruct
@@ -273,10 +277,13 @@ public class CollectorService {
         if (existing == null) return null;
         
         if (task.getName() != null) existing.setName(task.getName());
+        if (task.getTaskType() != null) existing.setTaskType(task.getTaskType());
         if (task.getPromptKey() != null) existing.setPromptKey(task.getPromptKey());
+        if (task.getUrl() != null) existing.setUrl(task.getUrl());
         if (task.getCronExpression() != null) existing.setCronExpression(task.getCronExpression());
         if (task.getEnabled() != null) existing.setEnabled(task.getEnabled());
         if (task.getOutputPath() != null) existing.setOutputPath(task.getOutputPath());
+        if (task.getDatasetId() != null) existing.setDatasetId(task.getDatasetId());
         if (task.getParams() != null) existing.setParams(task.getParams());
         existing.setUpdatedAt(TimeUtil.nowStr());
         
@@ -308,15 +315,22 @@ public class CollectorService {
             throw new IllegalArgumentException("Task not found: " + taskId);
         }
 
-        long startMs = System.currentTimeMillis();
-        log.info("🚀 [采集器] 任务启动: {} ({}) — {}", task.getName(), taskId, TimeUtil.nowStr());
+        String taskType = task.getTaskType();
+        if (taskType == null || taskType.isEmpty() || "ai_prompt".equals(taskType)) {
+            return executeAiPromptTask(task);
+        } else if ("url_fetch".equals(taskType)) {
+            return executeUrlFetchTask(task);
+        } else {
+            throw new IllegalArgumentException("Unknown task type: " + taskType);
+        }
+    }
 
-        CollectorLog logEntry = new CollectorLog();
-        logEntry.setId(UUID.randomUUID().toString());
-        logEntry.setTaskId(taskId);
-        logEntry.setTaskName(task.getName());
-        logEntry.setStartTime(TimeUtil.nowStr());
-        logEntry.setStatus("RUNNING");
+    private CollectorResult executeAiPromptTask(CollectorTask task) {
+        String taskId = task.getId();
+        long startMs = System.currentTimeMillis();
+        log.info("🚀 [采集器] AI任务启动: {} ({}) — {}", task.getName(), taskId, TimeUtil.nowStr());
+
+        CollectorLog logEntry = createLogEntry(task);
 
         try {
             if (!openCodeService.isHealthy()) {
@@ -325,7 +339,7 @@ public class CollectorService {
 
             String template = getPromptTemplate(task.getPromptKey());
             if (template == null) {
-                throw new RuntimeException("Prompt template not found: " + task.getPromptKey() + " (check AI/collector/prompts/)");
+                throw new RuntimeException("Prompt template not found: " + task.getPromptKey());
             }
 
             String prompt = template;
@@ -340,48 +354,143 @@ public class CollectorService {
                 sessionId = openCodeService.createSession(task.getName());
             }
             String rawResponse = openCodeService.sendMessage(sessionId, prompt);
-
             String parsedData = parseResponse(rawResponse);
 
-            CollectorResult result = new CollectorResult();
-            result.setId(UUID.randomUUID().toString());
-            result.setTaskId(taskId);
-            result.setTaskName(task.getName());
-            result.setCollectTime(TimeUtil.nowStr());
-            result.setRawResponse(rawResponse);
-            result.setParsedData(parsedData);
-
-            if (task.getOutputPath() != null && !task.getOutputPath().isEmpty()) {
-                saveResultToFile(task, result);
-            }
-
-            logEntry.setEndTime(TimeUtil.nowStr());
-            logEntry.setStatus("SUCCESS");
-            logEntry.setResultSize(rawResponse.length());
-
-            taskResults.computeIfAbsent(taskId, k -> new ArrayList<>()).add(0, result);
-            taskLogs.computeIfAbsent(taskId, k -> new ArrayList<>()).add(0, logEntry);
-
-            saveLogs(taskId);
-            saveResults(taskId);
-
-            logService.add("数据采集", "成功", "任务: " + task.getName());
-            log.info("✅ [采集器] 任务完成: {} ({}) — {} (耗时: {}ms)",
-                    task.getName(), taskId, TimeUtil.nowStr(), System.currentTimeMillis() - startMs);
+            CollectorResult result = buildResult(task, rawResponse, parsedData);
+            postExecute(task, result, logEntry, rawResponse.length(), startMs);
             return result;
 
         } catch (Exception e) {
-            logEntry.setEndTime(TimeUtil.nowStr());
-            logEntry.setStatus("FAILED");
-            logEntry.setErrorMessage(e.getMessage());
-            taskLogs.computeIfAbsent(taskId, k -> new ArrayList<>()).add(0, logEntry);
-            saveLogs(taskId);
-            
-            logService.add("数据采集", "失败", "任务: " + task.getName() + ", 错误: " + e.getMessage());
-            log.error("❌ [采集器] 任务失败: {} ({}) — {} (耗时: {}ms): {}",
-                    task.getName(), taskId, TimeUtil.nowStr(), System.currentTimeMillis() - startMs, e.getMessage());
+            failExecute(task, logEntry, e, startMs);
             throw new RuntimeException("Task execution failed: " + e.getMessage(), e);
         }
+    }
+
+    private CollectorResult executeUrlFetchTask(CollectorTask task) {
+        String taskId = task.getId();
+        long startMs = System.currentTimeMillis();
+        log.info("🚀 [采集器] URL任务启动: {} ({}) url={} — {}", task.getName(), taskId, task.getUrl(), TimeUtil.nowStr());
+
+        CollectorLog logEntry = createLogEntry(task);
+
+        try {
+            if (!openCodeService.isHealthy()) {
+                throw new RuntimeException("opencode serve is not running");
+            }
+            if (task.getUrl() == null || task.getUrl().isBlank()) {
+                throw new RuntimeException("URL未配置");
+            }
+
+            String prompt = "请访问以下URL，提取页面中的结构化数据。\n" +
+                    "URL: " + task.getUrl() + "\n\n" +
+                    "**重要：不要保存到文件，不要写入任何文件。只在回复中直接输出JSON数据。**\n\n" +
+                    "输出格式要求：\n" +
+                    "1. 直接输出JSON数组，不要包含其他文字说明\n" +
+                    "2. 用 ```json 包裹\n" +
+                    "3. 每个元素是一个对象，包含页面中的数据字段";
+
+            if (task.getDatasetId() != null && !task.getDatasetId().isEmpty()) {
+                try {
+                    var ds = dataSetService.getDataset(task.getDatasetId());
+                    if (ds != null && ds.getSchema() != null && ds.getSchema().getFields() != null) {
+                        prompt += "\n\n必须使用以下字段名（保持英文）：\n";
+                        for (var field : ds.getSchema().getFields()) {
+                            prompt += "- " + field.getName();
+                            if (field.getDisplayName() != null) {
+                                prompt += "（" + field.getDisplayName() + "）";
+                            }
+                            prompt += "\n";
+                        }
+                        prompt += "\n示例格式：[{\"title\":\"标题\",\"views\":123}, ...]";
+                    }
+                } catch (Exception e) {
+                    log.warn("Failed to load dataset schema: {}", e.getMessage());
+                }
+            }
+
+            String sessionId = openCodeService.findIdleSession();
+            if (sessionId == null) {
+                sessionId = openCodeService.createSession(task.getName());
+            }
+            String rawResponse = openCodeService.sendMessage(sessionId, prompt);
+            String parsedData = parseResponse(rawResponse);
+
+            CollectorResult result = buildResult(task, rawResponse, parsedData);
+            postExecute(task, result, logEntry, rawResponse.length(), startMs);
+            return result;
+
+        } catch (Exception e) {
+            failExecute(task, logEntry, e, startMs);
+            throw new RuntimeException("Task execution failed: " + e.getMessage(), e);
+        }
+    }
+
+    private CollectorLog createLogEntry(CollectorTask task) {
+        CollectorLog logEntry = new CollectorLog();
+        logEntry.setId(UUID.randomUUID().toString());
+        logEntry.setTaskId(task.getId());
+        logEntry.setTaskName(task.getName());
+        logEntry.setStartTime(TimeUtil.nowStr());
+        logEntry.setStatus("RUNNING");
+        return logEntry;
+    }
+
+    private CollectorResult buildResult(CollectorTask task, String rawResponse, String parsedData) {
+        CollectorResult result = new CollectorResult();
+        result.setId(UUID.randomUUID().toString());
+        result.setTaskId(task.getId());
+        result.setTaskName(task.getName());
+        result.setCollectTime(TimeUtil.nowStr());
+        result.setRawResponse(rawResponse);
+        result.setParsedData(parsedData);
+        return result;
+    }
+
+    private void postExecute(CollectorTask task, CollectorResult result, CollectorLog logEntry, int responseSize, long startMs) {
+        String taskId = task.getId();
+
+        if (task.getOutputPath() != null && !task.getOutputPath().isEmpty()) {
+            saveResultToFile(task, result);
+        }
+
+        if (task.getDatasetId() != null && !task.getDatasetId().isEmpty()) {
+            try {
+                List<Map<String, Object>> records = parseToRecords(result.getParsedData());
+                if (!records.isEmpty()) {
+                    int count = dataSetService.addRecords(task.getDatasetId(), records, "collector");
+                    log.info("Auto-imported {} records to dataset {} from task {}", count, task.getDatasetId(), taskId);
+                }
+            } catch (Exception ie) {
+                log.warn("Failed to auto-import to dataset {}: {}", task.getDatasetId(), ie.getMessage());
+            }
+        }
+
+        logEntry.setEndTime(TimeUtil.nowStr());
+        logEntry.setStatus("SUCCESS");
+        logEntry.setResultSize(responseSize);
+
+        taskResults.computeIfAbsent(taskId, k -> new ArrayList<>()).add(0, result);
+        taskLogs.computeIfAbsent(taskId, k -> new ArrayList<>()).add(0, logEntry);
+
+        saveLogs(taskId);
+        saveResults(taskId);
+
+        logService.add("数据采集", "成功", "任务: " + task.getName());
+        log.info("✅ [采集器] 任务完成: {} ({}) — {} (耗时: {}ms)",
+                task.getName(), taskId, TimeUtil.nowStr(), System.currentTimeMillis() - startMs);
+    }
+
+    private void failExecute(CollectorTask task, CollectorLog logEntry, Exception e, long startMs) {
+        String taskId = task.getId();
+        logEntry.setEndTime(TimeUtil.nowStr());
+        logEntry.setStatus("FAILED");
+        logEntry.setErrorMessage(e.getMessage());
+        taskLogs.computeIfAbsent(taskId, k -> new ArrayList<>()).add(0, logEntry);
+        saveLogs(taskId);
+
+        logService.add("数据采集", "失败", "任务: " + task.getName() + ", 错误: " + e.getMessage());
+        log.error("❌ [采集器] 任务失败: {} ({}) — {} (耗时: {}ms): {}",
+                task.getName(), taskId, TimeUtil.nowStr(), System.currentTimeMillis() - startMs, e.getMessage());
     }
 
     private String parseResponse(String rawResponse) {
@@ -403,6 +512,31 @@ public class CollectorService {
         } catch (Exception e) {
             return "{\"text\": \"\"}";
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> parseToRecords(String parsedData) {
+        List<Map<String, Object>> records = new ArrayList<>();
+        if (parsedData == null || parsedData.isBlank()) return records;
+        try {
+            Object obj = mapper.readValue(parsedData, Object.class);
+            if (obj instanceof List<?> list) {
+                for (Object item : list) {
+                    if (item instanceof Map<?, ?> map) {
+                        Map<String, Object> record = new HashMap<>();
+                        map.forEach((k, v) -> record.put(String.valueOf(k), v));
+                        records.add(record);
+                    }
+                }
+            } else if (obj instanceof Map<?, ?> map) {
+                Map<String, Object> record = new HashMap<>();
+                map.forEach((k, v) -> record.put(String.valueOf(k), v));
+                records.add(record);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to parse response as records: {}", e.getMessage());
+        }
+        return records;
     }
 
     private void saveResultToFile(CollectorTask task, CollectorResult result) {

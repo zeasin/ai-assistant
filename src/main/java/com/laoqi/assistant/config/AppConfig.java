@@ -16,7 +16,8 @@ public class AppConfig {
     private int maxHistoryChars = 6000;
 
     public Path getConfigDirPath() {
-        return Paths.get(configDir);
+        String dir = configDir != null ? configDir : ".";
+        return Paths.get(dir);
     }
 
     public Path getConfigFile() {

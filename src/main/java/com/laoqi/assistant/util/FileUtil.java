@@ -7,6 +7,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -20,8 +22,8 @@ public class FileUtil {
 
     public static <T> T readJson(Path path, Class<T> clazz, T defaultVal) {
         if (!Files.exists(path)) return defaultVal;
-        try {
-            return mapper.readValue(path.toFile(), clazz);
+        try (var reader = new InputStreamReader(Files.newInputStream(path), StandardCharsets.UTF_8)) {
+            return mapper.readValue(reader, clazz);
         } catch (Exception e) {
             log.warn("Failed to read JSON {}: {}", path, e.getMessage());
             return defaultVal;
@@ -30,8 +32,8 @@ public class FileUtil {
 
     public static <T> T readJson(Path path, TypeReference<T> typeRef, T defaultVal) {
         if (!Files.exists(path)) return defaultVal;
-        try {
-            return mapper.readValue(path.toFile(), typeRef);
+        try (var reader = new InputStreamReader(Files.newInputStream(path), StandardCharsets.UTF_8)) {
+            return mapper.readValue(reader, typeRef);
         } catch (Exception e) {
             log.warn("Failed to read JSON {}: {}", path, e.getMessage());
             return defaultVal;
@@ -41,18 +43,10 @@ public class FileUtil {
     public static void writeJson(Path path, Object obj) {
         try {
             Files.createDirectories(path.getParent());
-            log.info("Writing JSON to {}, class={}", path, obj.getClass().getSimpleName());
-            
-            // 先序列化到字符串查看
-            String json = mapper.writeValueAsString(obj);
-            log.info("Serialized JSON length={}, contains mediaCollectEnabled={}", 
-                    json.length(), json.contains("mediaCollectEnabled"));
-//            if (json.length() < 2000) {
-//                log.info("JSON content: {}", json);
-//            }
-            
-            mapper.writeValue(path.toFile(), obj);
-            log.info("Successfully wrote JSON to {}", path);
+            String json = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(obj);
+            try (var writer = new OutputStreamWriter(Files.newOutputStream(path), StandardCharsets.UTF_8)) {
+                writer.write(json);
+            }
         } catch (IOException e) {
             log.error("Failed to write JSON {}: {}", path, e.getMessage(), e);
         }

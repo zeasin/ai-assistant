@@ -58,6 +58,12 @@
         .result-table th { background: #f5f5f5; padding: 8px 12px; text-align: left; font-weight: 500; border-bottom: 2px solid #e1e3e6; white-space: nowrap; }
         .result-table td { padding: 6px 12px; border-bottom: 1px solid #f0f0f0; color: #1a1b1e; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .result-table tr:hover td { background: #fafafe; }
+        .pagination { display: flex; justify-content: center; align-items: center; gap: 4px; margin-top: 16px; }
+        .pagination button { padding: 6px 12px; font-size: 13px; border: 1px solid #e1e3e6; border-radius: 6px; background: #fff; cursor: pointer; color: #1a1b1e; }
+        .pagination button:hover:not(:disabled) { background: #f5f5f5; border-color: #7c5cfc; color: #7c5cfc; }
+        .pagination button.active { background: #7c5cfc; color: #fff; border-color: #7c5cfc; }
+        .pagination button:disabled { opacity: 0.4; cursor: not-allowed; }
+        .pagination .page-info { font-size: 13px; color: #5c5f66; margin: 0 8px; }
     </style>
 </head>
 <body>
@@ -75,6 +81,7 @@
                     <button class="btn btn-primary mt-2" onclick="showAddTaskModal()">创建第一个任务</button>
                 </div>
             </div>
+            <div class="pagination" id="pagination"></div>
         </div>
 
         <div class="card" id="taskLogsCard" style="display: none;">
@@ -108,8 +115,39 @@
                         <input type="text" id="taskName" required placeholder="例如：CSDN数据采集">
                     </div>
                     <div class="form-group">
-                        <label>提示词Key *</label>
-                        <input type="text" id="promptKey" required placeholder="例如：csdn_collect">
+                        <label>任务类型</label>
+                        <select id="taskType" onchange="toggleTaskType()">
+                            <option value="ai_prompt">AI提示词采集</option>
+                            <option value="url_fetch">URL数据抓取</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="aiPromptFields">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>提示词Key *</label>
+                            <input type="text" id="promptKey" placeholder="例如：csdn_collect">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>提示词内容 (MD格式，存储在 AI/collector/prompts/{promptKey}.md)</label>
+                            <textarea id="promptContent" rows="5" placeholder="在上方填写提示词Key后，此处编辑内容，保存时同步写入文件"></textarea>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>参数 (JSON格式)</label>
+                            <textarea id="params" rows="2" placeholder='{"platform": "csdn", "keyword": "Java"}'></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div id="urlFetchFields" style="display:none;">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>目标URL *</label>
+                            <input type="url" id="fetchUrl" placeholder="https://example.com/data">
+                        </div>
                     </div>
                 </div>
                 <div class="form-row">
@@ -124,17 +162,11 @@
                 </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label>参数 (JSON格式)</label>
-                        <textarea id="params" placeholder='{"platform": "csdn", "keyword": "Java"}'></textarea>
+                        <label>自动保存到数据集</label>
+                        <select id="datasetId">
+                            <option value="">不绑定数据集</option>
+                        </select>
                     </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>提示词内容 (MD格式，存储在 AI/collector/prompts/{promptKey}.md)</label>
-                        <textarea id="promptContent" rows="8" placeholder="在上方填写提示词Key后，此处编辑内容，保存时同步写入文件"></textarea>
-                    </div>
-                </div>
-                <div class="form-row">
                     <div class="form-group">
                         <label>启用</label>
                         <select id="enabled">
@@ -152,35 +184,70 @@
     </div>
 
     <script>
+        let allTasks = [];
+        let currentPage = 1;
+        const pageSize = 10;
+
+        async function loadDatasets() {
+            try {
+                const res = await fetch('/api/datacenter/datasets');
+                const data = await res.json();
+                if (data.ok && data.data) {
+                    const sel = document.getElementById('datasetId');
+                    const current = sel.value;
+                    sel.innerHTML = '<option value="">不绑定数据集</option>' +
+                        data.data.map(ds => `<option value="${ds.id}">${ds.name} (${ds.recordCount || 0}条)</option>`).join('');
+                    sel.value = current;
+                }
+            } catch (e) {}
+        }
+
         async function loadTasks() {
             try {
                 const res = await fetch('/api/collector/tasks');
                 const data = await res.json();
-                if (data.ok && data.data && data.data.length > 0) {
-                    renderTasks(data.data);
+                if (data.ok && data.data) {
+                    allTasks = data.data;
+                    renderTasks();
                 } else {
-                    const emptyHtml = '<div class="empty-state" id="emptyState">' +
-                        '<div>暂无采集任务</div>' +
-                        '<button class="btn btn-primary mt-2" onclick="showAddTaskModal()">创建第一个任务</button>' +
-                        '</div>';
-                    document.getElementById('taskList').innerHTML = emptyHtml;
+                    allTasks = [];
+                    document.getElementById('taskList').innerHTML =
+                        '<div class="empty-state"><div>暂无采集任务</div>' +
+                        '<button class="btn btn-primary mt-2" onclick="showAddTaskModal()">创建第一个任务</button></div>';
+                    document.getElementById('pagination').innerHTML = '';
                 }
             } catch (e) {
                 toast('加载任务失败: ' + e.message, 'error');
             }
         }
 
-        function renderTasks(tasks) {
-            const html = tasks.map(task => `
+        function renderTasks() {
+            const totalPages = Math.max(1, Math.ceil(allTasks.length / pageSize));
+            if (currentPage > totalPages) currentPage = totalPages;
+            const start = (currentPage - 1) * pageSize;
+            const pageItems = allTasks.slice(start, start + pageSize);
+
+            if (pageItems.length === 0) {
+                document.getElementById('taskList').innerHTML =
+                    '<div class="empty-state"><div>暂无采集任务</div>' +
+                    '<button class="btn btn-primary mt-2" onclick="showAddTaskModal()">创建第一个任务</button></div>';
+                document.getElementById('pagination').innerHTML = '';
+                return;
+            }
+
+            const html = pageItems.map(task => `
                 <div class="task-item ${task.enabled ? '' : 'disabled'}">
                     <div class="task-info">
                         <div class="task-name">${task.name}</div>
                         <div class="task-meta">
-                            <span>${task.promptKey}</span>
-                            <span style="margin: 0 8px;">|</span>
+                            <span class="badge-enabled" style="font-size:11px;">${task.taskType === 'url_fetch' ? '🔗 URL' : '🤖 AI'}</span>
+                            <span style="margin: 0 6px;">|</span>
+                            <span>${task.taskType === 'url_fetch' ? (task.url || '-') : task.promptKey}</span>
+                            <span style="margin: 0 6px;">|</span>
                             <span>${task.cronExpression || '手动触发'}</span>
-                            <span style="margin: 0 8px;">|</span>
+                            <span style="margin: 0 6px;">|</span>
                             <span class="${task.enabled ? 'badge-enabled' : 'badge-disabled'}">${task.enabled ? '已启用' : '已禁用'}</span>
+                            ${task.datasetId ? '<span style="margin: 0 6px;">|</span><span class="badge-enabled">→ 数据集</span>' : ''}
                         </div>
                         <div class="task-meta" style="margin-top: 4px; font-size: 12px;">
                             更新时间: ${task.updatedAt || task.createdAt || '-'}
@@ -196,13 +263,44 @@
                 </div>
             `).join('');
             document.getElementById('taskList').innerHTML = html;
+
+            renderPagination(totalPages);
+        }
+
+        function renderPagination(totalPages) {
+            if (totalPages <= 1) { document.getElementById('pagination').innerHTML = ''; return; }
+            let h = '';
+            h += `<button ${currentPage <= 1 ? 'disabled' : ''} onclick="goPage(${currentPage - 1})">上一页</button>`;
+            const maxShow = 7;
+            let startP = Math.max(1, currentPage - Math.floor(maxShow / 2));
+            let endP = Math.min(totalPages, startP + maxShow - 1);
+            if (endP - startP < maxShow - 1) startP = Math.max(1, endP - maxShow + 1);
+            if (startP > 1) { h += `<button onclick="goPage(1)">1</button>`; if (startP > 2) h += `<span class="page-info">...</span>`; }
+            for (let i = startP; i <= endP; i++) {
+                h += `<button class="${i === currentPage ? 'active' : ''}" onclick="goPage(${i})">${i}</button>`;
+            }
+            if (endP < totalPages) { if (endP < totalPages - 1) h += `<span class="page-info">...</span>`; h += `<button onclick="goPage(${totalPages})">${totalPages}</button>`; }
+            h += `<button ${currentPage >= totalPages ? 'disabled' : ''} onclick="goPage(${currentPage + 1})">下一页</button>`;
+            h += `<span class="page-info">共 ${allTasks.length} 项</span>`;
+            document.getElementById('pagination').innerHTML = h;
+        }
+
+        function goPage(page) { currentPage = page; renderTasks(); }
+
+        function toggleTaskType() {
+            const type = document.getElementById('taskType').value;
+            document.getElementById('aiPromptFields').style.display = type === 'ai_prompt' ? '' : 'none';
+            document.getElementById('urlFetchFields').style.display = type === 'url_fetch' ? '' : 'none';
         }
 
         function showAddTaskModal() {
             document.getElementById('modalTitle').textContent = '新建采集任务';
             document.getElementById('taskForm').reset();
             document.getElementById('taskId').value = '';
+            document.getElementById('taskType').value = 'ai_prompt';
+            toggleTaskType();
             document.getElementById('enabled').value = 'true';
+            loadDatasets();
             document.getElementById('taskModal').classList.add('active');
         }
 
@@ -217,9 +315,13 @@
                     document.getElementById('modalTitle').textContent = '编辑采集任务';
                     document.getElementById('taskId').value = task.id;
                     document.getElementById('taskName').value = task.name;
-                    document.getElementById('promptKey').value = task.promptKey;
+                    document.getElementById('taskType').value = task.taskType || 'ai_prompt';
+                    toggleTaskType();
+                    document.getElementById('promptKey').value = task.promptKey || '';
+                    document.getElementById('fetchUrl').value = task.url || '';
                     document.getElementById('cronExpression').value = task.cronExpression || '';
                     document.getElementById('outputPath').value = task.outputPath || '';
+                    document.getElementById('datasetId').value = task.datasetId || '';
                     document.getElementById('params').value = task.params ? JSON.stringify(task.params, null, 2) : '';
                     document.getElementById('enabled').value = String(task.enabled || false);
                     document.getElementById('promptContent').value = '';
@@ -241,9 +343,12 @@
                 const id = document.getElementById('taskId').value;
                 const task = {
                     name: document.getElementById('taskName').value,
-                    promptKey: document.getElementById('promptKey').value,
+                    taskType: document.getElementById('taskType').value,
+                    promptKey: document.getElementById('promptKey').value || null,
+                    url: document.getElementById('fetchUrl').value || null,
                     cronExpression: document.getElementById('cronExpression').value || null,
                     outputPath: document.getElementById('outputPath').value || null,
+                    datasetId: document.getElementById('datasetId').value || null,
                     params: document.getElementById('params').value ? JSON.parse(document.getElementById('params').value) : null,
                     enabled: document.getElementById('enabled').value === 'true'
                 };
@@ -258,14 +363,17 @@
                 const data = await res.json();
                 
                 if (data.ok) {
-                    const promptContent = document.getElementById('promptContent').value;
-                    const promptKey = document.getElementById('promptKey').value.trim();
-                    if (promptKey && promptContent) {
-                        await fetch(`/api/collector/prompts/${encodeURIComponent(promptKey)}`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ template: promptContent })
-                        });
+                    const taskType = document.getElementById('taskType').value;
+                    if (taskType === 'ai_prompt') {
+                        const promptContent = document.getElementById('promptContent').value;
+                        const promptKey = document.getElementById('promptKey').value.trim();
+                        if (promptKey && promptContent) {
+                            await fetch(`/api/collector/prompts/${encodeURIComponent(promptKey)}`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ template: promptContent })
+                            });
+                        }
                     }
                     toast(id ? '任务更新成功' : '任务创建成功', 'success');
                     hideModal();
@@ -443,6 +551,7 @@
         }
 
         loadTasks();
+        loadDatasets();
 
         function closeModal(id) { document.getElementById(id).classList.remove('active'); }
         document.querySelectorAll('.modal-overlay').forEach(function(m) {

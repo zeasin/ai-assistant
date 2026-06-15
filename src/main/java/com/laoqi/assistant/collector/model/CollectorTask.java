@@ -8,10 +8,13 @@ import java.util.Map;
 public class CollectorTask {
     private String id;
     private String name;
+    private String taskType;
     private String promptKey;
+    private String url;
     private String cronExpression;
     private Boolean enabled;
     private String outputPath;
+    private String datasetId;
     private Map<String, String> params;
     private String createdAt;
     private String updatedAt;
@@ -24,8 +27,14 @@ public class CollectorTask {
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
 
+    public String getTaskType() { return taskType; }
+    public void setTaskType(String taskType) { this.taskType = taskType; }
+
     public String getPromptKey() { return promptKey; }
     public void setPromptKey(String promptKey) { this.promptKey = promptKey; }
+
+    public String getUrl() { return url; }
+    public void setUrl(String url) { this.url = url; }
 
     public String getCronExpression() { return cronExpression; }
     public void setCronExpression(String cronExpression) { this.cronExpression = cronExpression; }
@@ -35,6 +44,9 @@ public class CollectorTask {
 
     public String getOutputPath() { return outputPath; }
     public void setOutputPath(String outputPath) { this.outputPath = outputPath; }
+
+    public String getDatasetId() { return datasetId; }
+    public void setDatasetId(String datasetId) { this.datasetId = datasetId; }
 
     public Map<String, String> getParams() { return params; }
     public void setParams(Map<String, String> params) { this.params = params; }
