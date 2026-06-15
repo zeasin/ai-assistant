@@ -103,6 +103,7 @@
     <div class="card" style="background:linear-gradient(135deg,#f0edff,#fafafe);border:1px solid #d9d0ff;">
         <h2 style="margin-bottom:4px;" th:text="'🤖 ' + ${module.name} + ' 分析报告'">分析报告</h2>
         <div class="text-muted mb-2" style="font-size:12px;">
+            <span id="analysis-date" style="display:none;"></span>
             <span id="analysis-elapsed" style="display:none;"></span>
         </div>
         <div id="analysis-status" class="text-muted" style="padding:20px 0;text-align:center;">
@@ -220,6 +221,7 @@ async function loadAnalysisReport() {
     var status = document.getElementById('analysis-status');
     var result = document.getElementById('analysis-result');
     var btn = document.querySelector('#tab-analysis .btn-secondary:last-child');
+    var dateSpan = document.getElementById('analysis-date');
 
     try {
         var res = await fetch('/module/' + MODULE_ID + '/analysis/report');
@@ -227,6 +229,10 @@ async function loadAnalysisReport() {
         if (data.ok && data.report) {
             status.style.display = 'none';
             result.innerHTML = marked.parse(data.report);
+            if (data.date) {
+                dateSpan.style.display = 'inline';
+                dateSpan.textContent = '📅 ' + data.date;
+            }
             isAnalysisLoaded = true;
             btn.textContent = '🔄 重新分析';
             return;
@@ -236,6 +242,7 @@ async function loadAnalysisReport() {
     status.style.display = 'block';
     status.innerHTML = '暂无 AI 分析报告。点击「生成分析」手动生成。';
     btn.textContent = '🚀 生成分析';
+    dateSpan.style.display = 'none';
 }
 
 var analysisStartTime;

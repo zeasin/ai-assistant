@@ -68,5 +68,6 @@ assistant_log.json
 collector-logs/
 *.jar
 .claude
+.mimocode/
 AGENTS.md
 CLAUDE.md

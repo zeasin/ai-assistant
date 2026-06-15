@@ -264,12 +264,32 @@ public class ModuleController {
 
         Path dir = moduleService.getModuleDir(mod);
         Path analysisDir = dir.resolve("AI分析");
+        if (!Files.exists(analysisDir)) return Map.of("ok", false, "report", "");
+
+        // 优先读取当天分析文件
         String date = TimeUtil.todayStr();
-        Path file = analysisDir.resolve(date + ".md");
-        if (Files.exists(file)) {
-            String content = FileUtil.readText(file);
-            return Map.of("ok", true, "report", content);
+        Path todayFile = analysisDir.resolve(date + ".md");
+        if (Files.exists(todayFile)) {
+            String content = FileUtil.readText(todayFile);
+            return Map.of("ok", true, "report", content, "date", date);
         }
+
+        // 当天不存在则读取 AI分析 目录下最后一份 markdown 文件
+        try (Stream<Path> stream = Files.list(analysisDir)) {
+            Path latest = stream
+                    .filter(p -> p.getFileName().toString().endsWith(".md"))
+                    .filter(p -> !p.getFileName().toString().startsWith("."))
+                    .sorted(Comparator.reverseOrder())
+                    .findFirst()
+                    .orElse(null);
+            if (latest != null) {
+                String content = FileUtil.readText(latest);
+                String fileName = latest.getFileName().toString();
+                String fileDate = fileName.endsWith(".md") ? fileName.substring(0, fileName.length() - 3) : fileName;
+                return Map.of("ok", true, "report", content, "date", fileDate);
+            }
+        } catch (Exception ignored) {}
+
         return Map.of("ok", false, "report", "");
     }
 
