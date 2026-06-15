@@ -93,6 +93,7 @@
             <div class="ds-tab active" onclick="switchTab('datasets')">数据集管理</div>
             <div class="ds-tab" onclick="switchTab('import')">数据导入</div>
             <div class="ds-tab" onclick="switchTab('browse')">数据浏览</div>
+            <div class="ds-tab" onclick="switchTab('collector')">采集器</div>
             <div class="ds-tab" onclick="switchTab('help')">帮助</div>
         </div>
 
@@ -174,6 +175,10 @@
                 <button class="btn btn-secondary" onclick="loadBrowseData()">搜索</button>
             </div>
             <div class="data-scroll" id="browseTable"></div>
+        </div>
+
+        <div class="ds-panel" id="panel-collector">
+            <iframe src="/collector" style="width:100%;height:calc(100vh - 140px);border:none;border-radius:12px;"></iframe>
         </div>
 
         <div class="ds-panel" id="panel-help">

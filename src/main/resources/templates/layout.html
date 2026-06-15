@@ -342,7 +342,6 @@
             </div>
         </div>
         <a th:classappend="${requestURI == '/tasks' ? 'active' : ''}" href="/tasks">任务</a>
-        <a th:classappend="${requestURI == '/collector' ? 'active' : ''}" href="/collector">采集器</a>
         <a th:classappend="${requestURI == '/datacenter' ? 'active' : ''}" href="/datacenter">数据中心</a>
         <a th:classappend="${requestURI == '/reminders' ? 'active' : ''}" href="/reminders">提醒</a>
         <a th:classappend="${requestURI == '/config' ? 'active' : ''}" href="/config">配置</a>
@@ -355,6 +354,11 @@
         <th:block layout:fragment="content" />
     </div>
     <script>
+        if (window.self !== window.top) {
+            document.querySelector('.nav').style.display = 'none';
+            document.querySelector('.container').style.padding = '0';
+            document.body.style.background = '#fff';
+        }
         function toast(msg, type) {
             const t = document.createElement('div');
             t.style.cssText = `
