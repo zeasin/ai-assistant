@@ -35,19 +35,9 @@ public class GlobalModelAdvice {
         return PortHealthChecker.notesRunning;
     }
 
-    @ModelAttribute("codeRunning")
-    public boolean codeRunning() {
-        return PortHealthChecker.codeRunning;
-    }
-
     @ModelAttribute("notesPort")
     public int notesPort() {
         return appConfig.getNotesPort();
-    }
-
-    @ModelAttribute("codePort")
-    public int codePort() {
-        return appConfig.getCodePort();
     }
 
     @ModelAttribute("keyLabels")

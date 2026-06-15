@@ -19,7 +19,6 @@ public class PortHealthChecker implements ApplicationRunner {
     private static final String BORDER = "=".repeat(60);
 
     public static volatile boolean notesRunning = false;
-    public static volatile boolean codeRunning = false;
 
     private final AppConfig appConfig;
     private final LogService logService;
@@ -34,7 +33,6 @@ public class PortHealthChecker implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         checkPort(appConfig.getNotesPort(), "笔记库", true);
-        checkPort(appConfig.getCodePort(), "Java项目", true);
         started = true;
         logStartupStatus();
     }
@@ -42,14 +40,11 @@ public class PortHealthChecker implements ApplicationRunner {
     private void logStartupStatus() {
         logService.add("端口检测(笔记库)", notesRunning ? "成功" : "警告",
                 "服务(笔记库) " + (notesRunning ? "已启动" : "未启动，端口: " + appConfig.getNotesPort()));
-        logService.add("端口检测(Java项目)", codeRunning ? "成功" : "警告",
-                "服务(Java项目) " + (codeRunning ? "已启动" : "未启动，端口: " + appConfig.getCodePort()));
     }
 
     @Scheduled(fixedRate = 30_000)
     public void scheduledCheck() {
         checkPort(appConfig.getNotesPort(), "笔记库", false);
-        checkPort(appConfig.getCodePort(), "Java项目", false);
     }
 
     private void checkPort(int port, String label, boolean startup) {
@@ -86,12 +81,10 @@ public class PortHealthChecker implements ApplicationRunner {
 
     private boolean getRunningStatus(int port) {
         if (port == appConfig.getNotesPort()) return notesRunning;
-        if (port == appConfig.getCodePort()) return codeRunning;
         return false;
     }
 
     private void setRunningStatus(int port, boolean status) {
         if (port == appConfig.getNotesPort()) notesRunning = status;
-        else if (port == appConfig.getCodePort()) codeRunning = status;
     }
 }

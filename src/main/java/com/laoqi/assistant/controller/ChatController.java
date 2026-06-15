@@ -31,16 +31,12 @@ public class ChatController {
     private final LogService logService;
     private final AppConfig appConfig;
 
-    public ChatController(ChatSessionService sessionService, OpenCodeService openCodeService,
-                           LogService logService, AppConfig appConfig) {
+    public ChatController(ChatSessionService sessionService, OpenCodeService openCodeService, LogService logService, AppConfig appConfig) {
         this.sessionService = sessionService;
         this.openCodeService = openCodeService;
         this.logService = logService;
         this.appConfig = appConfig;
     }
-
-
-    private static final String CODE_PREFIX = "/code ";
 
     @GetMapping
     public String chatPage(@RequestParam(required = false, defaultValue = "") String id,
@@ -131,49 +127,21 @@ public class ChatController {
         return "chat";
     }
 
-    /**
-     * 判断是否为编程AI请求：以 /code 开头
-     */
-    private boolean isCodeRequest(String text) {
-        return text.startsWith(CODE_PREFIX);
-    }
-
-    private String stripCodePrefix(String text) {
-        return text.substring(CODE_PREFIX.length());
-    }
-
     @PostMapping
     public SseEmitter chat(@RequestParam String message,
                             @RequestParam(name = "session_id") String sessionId) {
         log.info("收到对话请求: message={}, sessionId={}", message, sessionId);
-        SseEmitter emitter = new SseEmitter(0L); // 不设超时，等待AI回复
+        SseEmitter emitter = new SseEmitter(0L);
 
-        // 注册完成和超时回调
         emitter.onCompletion(() -> log.info("[chat] SSE 连接完成"));
         emitter.onError((ex) -> log.error("[chat] SSE 连接错误", ex));
 
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
-                // 以 /code 前缀判断是否走编程AI，否则默认走知识库
-                boolean isCodeRelated = isCodeRequest(message);
-                String mode = isCodeRelated ? "coding" : "knowledge";
-                String actualMessage = isCodeRelated ? stripCodePrefix(message) : message;
-
-                if (isCodeRelated) {
-                    if (!openCodeService.isCodeHealthy()) {
-                        sendError(emitter, "编程AI服务未启动，请确保 opencode serve 已在端口 " + appConfig.getCodePort() + " 运行");
-                        return;
-                    }
-                } else {
-                    if (!openCodeService.isHealthy()) {
-                        sendError(emitter, "知识库AI服务未启动，请确保 opencode serve 已在端口 " + appConfig.getNotesPort() + " 运行");
-                        return;
-                    }
-                }
+                String mode = "knowledge";
 
                 sendStatus(emitter, mode, "⏳ 正在思考...");
 
-                // Build conversation history context (same approach as Feishu)
                 String context = sessionService.buildHistoryContext(sessionId, mode);
 
                 StringBuilder fullText = new StringBuilder();
@@ -181,21 +149,13 @@ public class ChatController {
                     log.info("[chat] 恢复对话历史上下文, sessionId={}, mode={}", sessionId, mode);
                     fullText.append(context).append("\n\n---\n\n");
                 }
-                fullText.append("用户最新消息:\n").append(actualMessage);
+                fullText.append("用户最新消息:\n").append(message);
                 String fullMessage = fullText.toString();
 
-                // Always create a new opencode session for each request (same as Feishu)
-                String opencodeSessionId = isCodeRelated
-                        ? openCodeService.createCodeSession("chat-" + sessionId)
-                        : openCodeService.createSession("chat-" + sessionId);
+                String opencodeSessionId = openCodeService.createSession("chat-" + sessionId);
 
                 log.info("[chat] 开始发送消息到 opencode, opencodeSessionId={}, mode={}", opencodeSessionId, mode);
-                String reply;
-                if (isCodeRelated) {
-                    reply = openCodeService.sendCodeMessage(opencodeSessionId, fullMessage);
-                } else {
-                    reply = openCodeService.sendMessage(opencodeSessionId, fullMessage);
-                }
+                String reply = openCodeService.sendMessage(opencodeSessionId, fullMessage);
                 log.info("[chat] 收到 opencode 回复, 长度={}", reply != null ? reply.length() : 0);
 
                 if (reply != null && !reply.isEmpty()) {

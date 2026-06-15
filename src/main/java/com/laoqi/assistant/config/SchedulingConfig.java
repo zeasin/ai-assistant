@@ -9,22 +9,16 @@ import org.springframework.scheduling.config.ScheduledTaskRegistrar;
 @Configuration
 public class SchedulingConfig implements SchedulingConfigurer {
 
-    private final ThreadPoolTaskScheduler scheduler;
-
-    public SchedulingConfig() {
-        scheduler = new ThreadPoolTaskScheduler();
+    @Bean(destroyMethod = "shutdown")
+    public ThreadPoolTaskScheduler taskScheduler() {
+        ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
         scheduler.setPoolSize(4);
         scheduler.setThreadNamePrefix("scheduled-");
-        scheduler.initialize();
+        return scheduler;
     }
 
     @Override
     public void configureTasks(ScheduledTaskRegistrar taskRegistrar) {
-        taskRegistrar.setTaskScheduler(scheduler);
-    }
-
-    @Bean
-    public ThreadPoolTaskScheduler taskScheduler() {
-        return scheduler;
+        taskRegistrar.setTaskScheduler(taskScheduler());
     }
 }

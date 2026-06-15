@@ -42,10 +42,6 @@ public class OpenCodeService {
         return "http://127.0.0.1:" + appConfig.getNotesPort();
     }
 
-    private String getCodeBaseUrl() {
-        return "http://127.0.0.1:" + appConfig.getCodePort();
-    }
-
     /**
      * Create a new opencode session
      */
@@ -85,15 +81,11 @@ public class OpenCodeService {
      * then returns the complete text reply.
      */
     public String sendMessage(String sessionId, String message) throws Exception {
-        return sendMessageStreamed(getBaseUrl(), sessionId, message, false, null);
+        return sendMessageStreamed(getBaseUrl(), sessionId, message, null);
     }
 
     public String sendMessageWithImage(String sessionId, String message, String imageBase64, String imageType) throws Exception {
-        return sendMessageStreamed(getBaseUrl(), sessionId, message, false, imageBase64 != null ? Map.of("data", imageBase64, "type", imageType) : null);
-    }
-
-    public String sendCodeMessage(String sessionId, String message) throws Exception {
-        return sendMessageStreamed(getCodeBaseUrl(), sessionId, message, true, null);
+        return sendMessageStreamed(getBaseUrl(), sessionId, message, imageBase64 != null ? Map.of("data", imageBase64, "type", imageType) : null);
     }
 
     /**
@@ -101,7 +93,7 @@ public class OpenCodeService {
      * uses Jackson streaming parser to extract parts as they arrive,
      * logs each part in real-time to the backend console.
      */
-    private String sendMessageStreamed(String baseUrl, String sessionId, String message, boolean isCode, Map<String, String> imageData) throws Exception {
+    private String sendMessageStreamed(String baseUrl, String sessionId, String message, Map<String, String> imageData) throws Exception {
         Map<String, Object> body = new LinkedHashMap<>();
         List<Map<String, Object>> parts = new ArrayList<>();
         parts.add(Map.of("type", "text", "text", message));
@@ -116,7 +108,7 @@ public class OpenCodeService {
 
         String url = baseUrl + "/session/" + sessionId + "/message";
         String requestBody = mapper.writeValueAsString(body);
-        String label = isCode ? "[opencode-code]" : "[opencode]";
+        String label = "[opencode]";
 
         log.info("{} 发送消息 POST {} sessionId={}", label, url, sessionId);
 
@@ -306,96 +298,6 @@ public class OpenCodeService {
         } catch (Exception e) {
             // JSON 还没完整，或者 parts 还没解析完，忽略
             return alreadyLogged;
-        }
-    }
-
-    public String createCodeSession(String title) throws Exception {
-        Map<String, Object> body = new HashMap<>();
-        if (title != null) {
-            body.put("title", title);
-        }
-
-        String url = getCodeBaseUrl() + "/session";
-        String requestBody = mapper.writeValueAsString(body);
-
-        log.info("[opencode-code] 创建会话 POST {} body={}", url, requestBody);
-
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .header("Content-Type", "application/json; charset=UTF-8")
-                .POST(HttpRequest.BodyPublishers.ofString(requestBody, java.nio.charset.StandardCharsets.UTF_8))
-                .timeout(Duration.ofSeconds(30))
-                .build();
-
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(java.nio.charset.StandardCharsets.UTF_8));
-
-        log.info("[opencode-code] 创建会话响应 status={} body={}", response.statusCode(), response.body());
-
-        if (response.statusCode() != 200) {
-            throw new RuntimeException("opencode createCodeSession error: " + response.statusCode() + " body=" + response.body());
-        }
-
-        JsonNode json = mapper.readTree(response.body());
-        return json.get("id").asText();
-    }
-
-    public String findIdleCodeSession() {
-        try {
-            String sessionsUrl = getCodeBaseUrl() + "/session";
-            log.debug("[opencode-code] 查询所有 session GET {}", sessionsUrl);
-
-            HttpRequest sessionsRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(sessionsUrl))
-                    .GET()
-                    .timeout(Duration.ofSeconds(10))
-                    .build();
-
-            HttpResponse<String> sessionsResponse = httpClient.send(sessionsRequest, HttpResponse.BodyHandlers.ofString());
-            JsonNode sessionsJson = mapper.readTree(sessionsResponse.body());
-
-            if (sessionsJson.isArray() && sessionsJson.size() > 0) {
-                String sessionId = sessionsJson.get(0).get("id").asText();
-                log.info("[opencode-code] 使用已有 session: {}", sessionId);
-                return sessionId;
-            }
-
-            log.info("[opencode-code] 没有找到已有 session");
-            return null;
-        } catch (Exception e) {
-            log.warn("[opencode-code] 查询 session 失败: {}", e.getMessage());
-            return null;
-        }
-    }
-
-    public boolean isCodeHealthy() {
-        return checkPort(appConfig.getCodePort());
-    }
-
-    /**
-     * Check if an opencode session is still valid by querying the session list.
-     */
-    public boolean isSessionValid(int port, String sessionId) {
-        String baseUrl = "http://127.0.0.1:" + port;
-        try {
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(baseUrl + "/session"))
-                    .GET()
-                    .timeout(Duration.ofSeconds(5))
-                    .build();
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() != 200) return false;
-            JsonNode sessions = mapper.readTree(response.body());
-            if (sessions.isArray()) {
-                for (JsonNode s : sessions) {
-                    if (s.has("id") && sessionId.equals(s.get("id").asText())) {
-                        return true;
-                    }
-                }
-            }
-            return false;
-        } catch (Exception e) {
-            log.warn("[opencode] 验证 session {} 有效性失败: {}", sessionId, e.getMessage());
-            return false;
         }
     }
 

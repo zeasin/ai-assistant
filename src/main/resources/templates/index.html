@@ -42,11 +42,6 @@
         <div class="text-muted" style="font-size:11px;margin-top:2px;">端口 <span th:text="${notesPort}">14096</span></div>
     </div>
     <div class="status-item">
-        <div class="label">Java项目服务</div>
-        <div class="value" th:classappend="${codeRunning} ? 'status-up' : 'status-down'" th:text="${codeRunning} ? '● 运行中' : '● 已停止'">● 已停止</div>
-        <div class="text-muted" style="font-size:11px;margin-top:2px;">端口 <span th:text="${codePort}">14099</span></div>
-    </div>
-    <div class="status-item">
         <div class="label">最新日报</div>
         <div class="value" id="reportTime" th:text="${report_time}">尚未生成</div>
     </div>

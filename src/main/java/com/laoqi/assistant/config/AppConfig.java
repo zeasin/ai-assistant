@@ -12,7 +12,6 @@ public class AppConfig {
 
     private String configDir;
     private int notesPort = 14096;
-    private int codePort = 14099;
     private String timezone = "Asia/Shanghai";
     private int maxHistoryChars = 6000;
 
@@ -28,8 +27,6 @@ public class AppConfig {
     public void setConfigDir(String configDir) { this.configDir = configDir; }
     public int getNotesPort() { return notesPort; }
     public void setNotesPort(int notesPort) { this.notesPort = notesPort; }
-    public int getCodePort() { return codePort; }
-    public void setCodePort(int codePort) { this.codePort = codePort; }
     public String getTimezone() { return timezone; }
     public void setTimezone(String timezone) { this.timezone = timezone; }
     public int getMaxHistoryChars() { return maxHistoryChars; }

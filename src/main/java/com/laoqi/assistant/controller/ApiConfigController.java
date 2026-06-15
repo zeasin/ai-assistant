@@ -119,6 +119,15 @@ public class ApiConfigController {
         return Map.of("ok", true);
     }
 
+    @PostMapping("/api/config/collector-dir")
+    public Map<String, Object> updateCollectorDir(@RequestParam String dir) {
+        Config cfg = configService.load();
+        cfg.setCollectorOutputDir(dir);
+        configService.save(cfg);
+        logService.add("配置更新", "成功", "采集器输出目录已更新为: " + dir);
+        return Map.of("ok", true);
+    }
+
     @PostMapping("/api/config/media-collect")
     public Map<String, Object> updateMediaCollect(
             @RequestParam(name = "enabled", defaultValue = "off") String enabled,

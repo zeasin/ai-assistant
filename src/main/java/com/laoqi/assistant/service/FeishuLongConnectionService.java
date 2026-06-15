@@ -180,7 +180,7 @@ public class FeishuLongConnectionService {
             new Thread(() -> {
                 try {
                     log.info("[飞书长连接] 开始处理消息: {}", finalText);
-                    boolean isCodeRelated = isCodeRequest(finalText);
+                    boolean isCodeRelated = false;
                     sendImmediateReply(finalChatId, finalChatType, finalMessageId, isCodeRelated);
                     String reply = processMessage(finalText, finalUserKey);
                     log.info("[飞书长连接] 消息处理完成，回复长度: {}", reply != null ? reply.length() : 0);
@@ -205,75 +205,20 @@ public class FeishuLongConnectionService {
         }
     }
 
-    private boolean isCodeRequest(String text) {
-        return text.startsWith("/code ");
-    }
-
-    private String stripCodePrefix(String text) {
-        return text.substring(6);
-    }
-
     private String processMessage(String text, String userKey) {
         try {
-            boolean isCode = isCodeRequest(text);
-            String actualText = isCode ? stripCodePrefix(text) : text;
-
-            if (isCode) {
-                log.info("[飞书长连接] 检测到代码请求，已剥离前缀");
-                if (!openCodeService.isCodeHealthy()) {
-                    log.warn("[飞书长连接] 代码 AI 服务(14099)未启动");
-                    return "⚠️ 代码 AI 服务未启动，请先启动 14099 端口的 opencode 服务";
-                }
-                String reply = processCodeMessage(actualText, userKey);
-                return reply != null && !reply.isEmpty() ? "🔧 【编程AI】\n" + reply : reply;
-            } else {
-                log.info("[飞书长连接] 检测到普通消息");
-                if (!openCodeService.isHealthy()) {
-                    log.warn("[飞书长连接] 笔记库 AI 服务(14096)未启动");
-                    return "⚠️ 笔记库 AI 服务未启动，请先启动 14096 端口的 opencode 服务";
-                }
-                String reply = processNormalMessage(text, userKey);
-                return reply != null && !reply.isEmpty() ? "📚 【知识库AI】\n" + reply : reply;
+            log.info("[飞书长连接] 处理普通消息");
+            if (!openCodeService.isHealthy()) {
+                log.warn("[飞书长连接] AI 服务(14096)未启动");
+                return "⚠️ AI 服务未启动，请先启动 14096 端口的 opencode 服务";
             }
+            return processNormalMessage(text, userKey);
 
         } catch (Exception e) {
             log.error("[飞书长连接] 处理消息失败: {}", e.getMessage(), e);
             logService.add("飞书消息", "处理失败", e.getMessage());
             return "❌ 处理失败: " + e.getMessage();
         }
-    }
-
-    private String processCodeMessage(String text, String userKey) {
-        Exception lastError = null;
-        // 保存用户消息，标注为 coding 模式
-        feishuChatSessionService.saveMessage(userKey, "user", text, "coding");
-        for (int attempt = 0; attempt < 2; attempt++) {
-            try {
-                // 每次新建 session，从 feishu_sessions.json 恢复历史上下文
-                String sessionId = openCodeService.createCodeSession("飞书代码-" + userKey);
-                String context = feishuChatSessionService.buildHistoryContext(userKey, "coding");
-                String fullText = text;
-                if (context != null) {
-                    log.info("[飞书长连接] 恢复代码历史上下文");
-                    fullText = context + "\n\n---\n\n用户最新消息:\n" + text;
-                }
-
-                log.info("[飞书长连接] 发送给代码 AI: {}", fullText);
-                String reply = openCodeService.sendCodeMessage(sessionId, fullText);
-                log.info("[飞书长连接] 代码 AI 回复长度: {}", reply != null ? reply.length() : 0);
-
-                feishuChatSessionService.saveMessage(userKey, "assistant", reply, "coding");
-
-                return reply;
-
-            } catch (Exception e) {
-                log.warn("[飞书长连接] 处理代码消息失败(第{}次): {}", attempt + 1, e.getMessage());
-                lastError = e;
-            }
-        }
-        log.error("[飞书长连接] 处理代码消息失败", lastError);
-        logService.add("飞书消息", "处理失败", lastError.getMessage());
-        return "❌ 处理失败: " + lastError.getMessage();
     }
 
     private String processNormalMessage(String text, String userKey) {
@@ -312,7 +257,7 @@ public class FeishuLongConnectionService {
 
     private void sendImmediateReply(String chatId, String chatType, String messageId, boolean isCodeRelated) {
         try {
-            String waitingMsg = isCodeRelated ? "🔧 收到消息，编程AI正在思考中，请稍候..." : "📚 收到消息，知识库AI正在思考中，请稍候...";
+            String waitingMsg = "📚 收到消息，AI正在思考中，请稍候...";
             Map<String, String> contentMap = Map.of("text", waitingMsg);
             String replyContent = new Gson().toJson(contentMap);
 
@@ -392,6 +337,11 @@ public class FeishuLongConnectionService {
     @PreDestroy
     public void destroy() {
         if (wsClient != null) {
+            try {
+                wsClient.stop();
+            } catch (Exception e) {
+                log.warn("[飞书长连接] 关闭 wsClient 异常: {}", e.getMessage());
+            }
             log.info("[飞书长连接] 已关闭");
             wsClient = null;
         }

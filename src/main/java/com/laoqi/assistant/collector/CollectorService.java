@@ -86,7 +86,7 @@ public class CollectorService {
         defaultTask.setPromptKey("csdn-collect");
         defaultTask.setCronExpression("0 0 8 * * ?");
         defaultTask.setEnabled(false);
-        defaultTask.setOutputPath("自媒体/data");
+        defaultTask.setOutputPath(configService.load().getCollectorOutputDir());
         defaultTask.setCreatedAt(TimeUtil.nowStr());
         defaultTask.setUpdatedAt(TimeUtil.nowStr());
         tasks.put(defaultTask.getId(), defaultTask);
@@ -407,12 +407,20 @@ public class CollectorService {
 
     private void saveResultToFile(CollectorTask task, CollectorResult result) {
         try {
-            String baseDir = configService.load().getBaseDir();
+            var config = configService.load();
+            String baseDir = config.getBaseDir();
+
+            // 优先用任务自己的 outputPath，没有则用全局配置
+            String outputPath = task.getOutputPath();
+            if (outputPath == null || outputPath.isBlank()) {
+                outputPath = config.getCollectorOutputDir();
+            }
+
             Path dir;
             if (baseDir != null && !baseDir.isEmpty()) {
-                dir = Paths.get(baseDir).resolve(task.getOutputPath());
+                dir = Paths.get(baseDir).resolve(outputPath);
             } else {
-                dir = Paths.get(task.getOutputPath());
+                dir = Paths.get(outputPath);
             }
             if (!dir.toFile().exists()) {
                 dir.toFile().mkdirs();

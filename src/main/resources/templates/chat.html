@@ -160,12 +160,8 @@ function escapeHtml(text) {
     return d.innerHTML;
 }
 
-function isCodeRequest(text) {
-    return text.startsWith("/code ");
-}
-
 function getAIModeName(mode) {
-    return mode === 'coding' ? '💻 编程AI' : '🤖 AI 助理';
+    return '🤖 AI 助理';
 }
 
 async function saveMessage(role, content, mode) {
@@ -189,13 +185,12 @@ async function sendMessage() {
     btn.disabled = true; btn.textContent = '⏳ 思考中...';
     replyText = '';
 
-    // 保存用户消息到当前会话（根据 /code 前缀区分模式）
-    const userMode = isCodeRequest(msg) ? 'coding' : 'knowledge';
+    const userMode = 'knowledge';
     await saveMessage('user', msg, userMode);
     box.innerHTML += `<div class="chat-msg user"><div class="label">你</div><div class="text">${escapeHtml(msg)}</div></div>`;
     box.scrollTop = box.scrollHeight;
 
-    let aiMode = userMode;  // 根据消息前缀决定初始模式，后端 SSE 会进一步确认
+    let aiMode = userMode;
     const aiMsgId = 'ai-' + Date.now();
     box.innerHTML += `<div class="chat-msg ai" id="${aiMsgId}">
         <div class="label" id="ai-label-${aiMsgId}">🤖 AI 助理</div>

@@ -109,6 +109,16 @@
     </div>
 </div>
 
+<div class="card">
+    <h2>📥 采集器输出目录</h2>
+    <div class="text-muted mb-2">配置采集器数据保存的默认输出路径（相对于笔记库根目录）。每个采集任务可单独覆盖此设置。</div>
+    <div class="flex" style="flex-wrap:wrap;gap:8px;">
+        <input type="text" id="collectorOutputDir" style="flex:1;min-width:300px;padding:10px 14px;border:1px solid #e1e3e6;border-radius:8px;font-size:14px;outline:none;background:#fff;color:#1a1b1e;font-family:monospace;" placeholder="自媒体/data">
+        <button class="btn btn-primary" onclick="saveCollectorDir()">保存</button>
+    </div>
+    <div id="collectorDirStatus" class="text-muted mt-2"></div>
+</div>
+
 <style>
 .form-group { margin-bottom: 12px; }
 .form-group label {
@@ -171,6 +181,9 @@ fetch('/api/config')
         }
         if (cfg.mediaCollectTime) {
             document.getElementById('mediaCollectTime').value = cfg.mediaCollectTime;
+        }
+        if (cfg.collectorOutputDir) {
+            document.getElementById('collectorOutputDir').value = cfg.collectorOutputDir;
         }
         enabledCheckbox.addEventListener('change', function() {
             toggleText.textContent = this.checked ? '已开启' : '已关闭';
@@ -370,6 +383,21 @@ function selectChat(el) {
     document.getElementById('feishuChatId').value = id;
     document.getElementById('chatList').style.display = 'none';
     toast('已选择群聊，点击保存即可', 'success');
+}
+
+async function saveCollectorDir() {
+    const value = document.getElementById('collectorOutputDir').value.trim();
+    const form = new FormData();
+    form.append('dir', value || '自媒体/data');
+    const res = await fetch('/api/config/collector-dir', { method: 'POST', body: form });
+    const data = await res.json();
+    const status = document.getElementById('collectorDirStatus');
+    if (data.ok) {
+        status.textContent = '✅ 已保存';
+        setTimeout(() => status.textContent = '', 3000);
+    } else {
+        status.textContent = '❌ ' + (data.error || '保存失败');
+    }
 }
 
 async function testFeishu() {

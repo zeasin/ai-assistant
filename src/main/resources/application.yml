@@ -23,7 +23,6 @@ spring:
 app:
   config-dir: ${ASSISTANT_CONFIG_DIR:.}
   notes-port: 14096
-  code-port: 14099
   timezone: Asia/Shanghai
   max-history-chars: 6000
 
@@ -38,10 +37,15 @@ logging:
   level:
     root: INFO
     com.laoqi.assistant.service.SchedulerService: DEBUG
-    com.laoqi.assistant.service.MediaDataCollectorService: DEBUG
     com.laoqi.assistant.service.ConfigService: DEBUG
     com.laoqi.assistant.service.FeishuService: DEBUG
     com.laoqi.assistant.service.OpenCodeService: DEBUG
   pattern:
     console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: ${user.dir}/app.log
+  logback:
+    rollingpolicy:
+      max-file-size: 10MB
+      max-history: 7
 

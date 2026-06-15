@@ -321,11 +321,7 @@
 </head>
 <body>
     <div th:if="${!notesRunning}" class="port-banner">
-        <span>⚠️ 笔记库服务 (端口 <span th:text="${notesPort}">14096</span>) 未启动</span>
-        <button class="port-close" onclick="this.parentElement.remove()">✕</button>
-    </div>
-    <div th:if="${!codeRunning}" class="port-banner" style="background:#fff3e0;border-bottom-color:#ff9800;">
-        <span>⚠️ Java 项目服务 (端口 <span th:text="${codePort}">14099</span>) 未启动</span>
+        <span>⚠️ AI 服务 (端口 <span th:text="${notesPort}">14096</span>) 未启动</span>
         <button class="port-close" onclick="this.parentElement.remove()">✕</button>
     </div>
 

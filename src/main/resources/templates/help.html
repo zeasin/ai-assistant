@@ -26,9 +26,8 @@
         </tbody>
     </table>
     <h3 style="font-size:15px;margin:16px 0 8px;">启动步骤</h3>
-    <pre style="background:#1e1e2e;color:#cdd6f4;padding:16px;border-radius:8px;font-size:13px;line-height:1.6;overflow-x:auto;"># 1. 先启动两个 opencode serve 服务（必须）
-opencode serve --port 14096  # AI 聊天/笔记库服务
-opencode serve --port 14099  # 代码分析服务
+    <pre style="background:#1e1e2e;color:#cdd6f4;padding:16px;border-radius:8px;font-size:13px;line-height:1.6;overflow-x:auto;"># 1. 启动 opencode serve 服务（必须）
+opencode serve --port 14096
 
 # 2. 编译项目
 mvn package -q
@@ -44,17 +43,16 @@ java -jar target/ai-assistant-2.0.0.jar
 <div class="card">
     <h2>🧠 AI 引擎（opencode serve）</h2>
     <p class="text-muted" style="line-height:1.7;">
-        系统依赖两个 <strong>opencode serve</strong> 实例提供所有 AI 能力，缺一不可：
+        系统依赖 <strong>opencode serve</strong> 实例提供 AI 能力：
     </p>
     <table class="log-table">
         <thead><tr><th>服务</th><th>端口</th><th>用途</th></tr></thead>
         <tbody>
-            <tr><td><strong>AI 聊天/笔记库</strong></td><td>14096</td><td>综合日报、智能问答、数据采集</td></tr>
-            <tr><td><strong>代码分析</strong></td><td>14099</td><td>Java 项目分析、代码知识库</td></tr>
+            <tr><td><strong>AI 服务</strong></td><td>14096</td><td>综合日报、智能问答、数据采集、AI分析</td></tr>
         </tbody>
     </table>
     <p class="text-muted" style="line-height:1.7;margin-top:8px;">
-        启动后可在顶部导航栏看到连接状态指示器。红色表示服务未启动，绿色表示正常。
+        启动后可在顶部导航栏看到连接状态指示器。绿色表示正常。
     </p>
 </div>
 
@@ -126,19 +124,7 @@ java -jar target/ai-assistant-2.0.0.jar
     <p class="text-muted" style="line-height:1.7;">
         与 AI 助理对话，它会读取整个笔记库来回答问题。支持流式响应、实时状态显示、历史会话管理。
     </p>
-    <h3 style="margin-top:16px;margin-bottom:8px;font-size:14px;">路由规则</h3>
-    <table class="log-table">
-        <thead><tr><th>输入</th><th>路由</th><th>AI 引擎</th></tr></thead>
-        <tbody>
-            <tr><td>普通文字（默认）</td><td>📚 知识库AI</td><td>14096 端口 opencode（笔记库）</td></tr>
-            <tr><td><code>/code 你的问题</code></td><td>🔧 编程AI</td><td>14099 端口 opencode（代码分析）</td></tr>
-        </tbody>
-    </table>
-    <p class="text-muted" style="line-height:1.7;margin-top:8px;">
-        <strong>注意：</strong>路由规则基于消息前缀，而非关键词匹配。不以 <code>/code </code> 开头的消息一律走知识库AI。
-        前缀在发送给 AI 前会自动剥离，AI 不会看到 <code>/code </code> 前缀。
-    </p>
-    <h3 style="margin-top:20px;font-size:14px;">核心特性</h3>
+        <h3 style="margin-top:20px;font-size:14px;">核心特性</h3>
     <ul class="text-muted" style="line-height:1.7;padding-left:20px;margin-top:8px;">
         <li><strong>流式响应</strong> — 回答逐字显示，无需等待全部生成完毕</li>
         <li><strong>实时状态</strong> — AI 读取笔记时显示 📖 文件名，知道它在做什么</li>
@@ -310,18 +296,6 @@ java -jar target/ai-assistant-2.0.0.jar
         <li>无需额外配置，应用启动后自动连接飞书 WebSocket 网关</li>
     </ul>
 
-    <h3 style="margin-top:24px;">🎯 消息路由规则</h3>
-    <p class="text-muted" style="line-height:1.7;">
-        所有消息默认走知识库，仅以 <code>/code </code> 开头的消息触发编程 AI。
-        前缀在发送给 AI 前自动剥离。
-    </p>
-    <table class="log-table" style="margin-top:8px;">
-        <thead><tr><th>飞书消息</th><th>路由</th><th>说明</th></tr></thead>
-        <tbody>
-            <tr><td>今天对接了1个新客户...</td><td>📚 知识库AI</td><td>默认走笔记库，读取笔记库数据回答</td></tr>
-            <tr><td>/code 帮我写个用户管理...</td><td>🔧 编程AI</td><td>走代码分析引擎，访问项目代码</td></tr>
-        </tbody>
-    </table>
 </div>
 
 <div class="card">
@@ -331,7 +305,7 @@ java -jar target/ai-assistant-2.0.0.jar
         <tbody>
             <tr><td>页面提示"未配置笔记库根目录"</td><td>未在设置页配置笔记库路径</td><td>前往 <a href="/config">配置页</a> 设置「笔记库根目录」</td></tr>
             <tr><td>AI 对话/日报/分析无响应</td><td>opencode serve 未启动</td><td>确保已启动 <code>opencode serve --port 14096</code></td></tr>
-            <tr><td>顶部导航栏显示服务红色</td><td>opencode serve 端口未连接</td><td>检查 14096/14099 端口是否正常启动</td></tr>
+            <tr><td>顶部导航栏显示服务红色</td><td>opencode serve 端口未连接</td><td>检查 14096 端口是否正常启动</td></tr>
             <tr><td>飞书推送失败</td><td>Webhook URL 错误或网络问题</td><td>在 <a href="/config">配置页</a> 检查并更新 Webhook 地址</td></tr>
             <tr><td>获取飞书 token 失败</td><td>App ID 或 App Secret 错误</td><td>去飞书开发者后台复制正确的凭据</td></tr>
             <tr><td>客户端访问页面白屏</td><td>端口被占用或服务未启动</td><td>检查 6790 端口是否被占用；查看后台日志</td></tr>
