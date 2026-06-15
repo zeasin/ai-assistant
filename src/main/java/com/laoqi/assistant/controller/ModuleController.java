@@ -22,6 +22,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -32,6 +33,11 @@ public class ModuleController {
 
     private static final Logger log = LoggerFactory.getLogger(ModuleController.class);
     private static final ObjectMapper mapper = new ObjectMapper();
+    private static final ExecutorService moduleExecutor = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "module-sse");
+        t.setDaemon(true);
+        return t;
+    });
 
     private final ModuleService moduleService;
     private final ModuleDataService moduleDataService;
@@ -231,7 +237,7 @@ public class ModuleController {
             return emitter;
         }
 
-        Executors.newSingleThreadExecutor().execute(() -> {
+        moduleExecutor.execute(() -> {
             try {
                 Map<String, Object> statusEvent = Map.of("type", "status",
                         "content", "⏳ AI 正在分析 " + mod.getName() + " 数据...");

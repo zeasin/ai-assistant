@@ -176,7 +176,7 @@ public class DataController {
         }
         
         Path targetDir = resolveDataDir(baseDir, dataDir);
-        Path filePath = targetDir.resolve(fileName + ".json");
+        Path filePath = safeResolveFile(targetDir, fileName);
         
         if (!Files.exists(filePath)) {
             result.put("ok", false);
@@ -224,7 +224,7 @@ public class DataController {
         }
         
         Path targetDir = resolveDataDir(baseDir, dataDir);
-        Path filePath = targetDir.resolve(fileName + ".json");
+        Path filePath = safeResolveFile(targetDir, fileName);
         
         if (!Files.exists(filePath)) {
             result.put("ok", false);
@@ -306,7 +306,7 @@ public class DataController {
         }
         
         Path targetDir = resolveDataDir(baseDir, dataDir);
-        Path filePath = targetDir.resolve(fileName + ".json");
+        Path filePath = safeResolveFile(targetDir, fileName);
         
         if (!Files.exists(filePath)) {
             result.put("ok", false);
@@ -402,7 +402,7 @@ public class DataController {
         }
         
         Path targetDir = resolveDataDir(baseDir, dataDir);
-        Path filePath = targetDir.resolve(fileName + ".json");
+        Path filePath = safeResolveFile(targetDir, fileName);
         
         if (!Files.exists(filePath)) {
             result.put("ok", false);
@@ -492,7 +492,7 @@ public class DataController {
         }
         
         Path targetDir = resolveDataDir(baseDir, dataDir);
-        Path filePath = targetDir.resolve(fileName + ".json");
+        Path filePath = safeResolveFile(targetDir, fileName);
         
         if (!Files.exists(filePath)) {
             result.put("ok", false);
@@ -544,7 +544,20 @@ public class DataController {
     }
 
     private Path resolveDataDir(Path baseDir, String dataDir) {
-        return baseDir.resolve(dataDir).resolve("data");
+        Path target = baseDir.resolve(dataDir).resolve("data").normalize();
+        Path base = baseDir.normalize();
+        if (!target.startsWith(base)) {
+            throw new SecurityException("路径越界: " + target);
+        }
+        return target;
+    }
+
+    private Path safeResolveFile(Path dir, String fileName) {
+        Path resolved = dir.resolve(fileName + ".json").normalize();
+        if (!resolved.startsWith(dir.normalize())) {
+            throw new SecurityException("文件名越界: " + fileName);
+        }
+        return resolved;
     }
 
     private Map<String, Object> extractGroups(Map<String, Object> data) {

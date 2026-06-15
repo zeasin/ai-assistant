@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.*;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 @Controller
@@ -25,6 +26,11 @@ public class ChatController {
 
     private static final Logger log = LoggerFactory.getLogger(ChatController.class);
     private static final ObjectMapper mapper = new ObjectMapper();
+    private static final ExecutorService chatExecutor = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "chat-sse");
+        t.setDaemon(true);
+        return t;
+    });
 
     private final ChatSessionService sessionService;
     private final OpenCodeService openCodeService;
@@ -136,7 +142,7 @@ public class ChatController {
         emitter.onCompletion(() -> log.info("[chat] SSE 连接完成"));
         emitter.onError((ex) -> log.error("[chat] SSE 连接错误", ex));
 
-        Executors.newSingleThreadExecutor().execute(() -> {
+        chatExecutor.execute(() -> {
             try {
                 String mode = "knowledge";
 

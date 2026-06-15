@@ -337,13 +337,8 @@ public class FeishuLongConnectionService {
     @PreDestroy
     public void destroy() {
         if (wsClient != null) {
-            try {
-                wsClient.stop();
-            } catch (Exception e) {
-                log.warn("[飞书长连接] 关闭 wsClient 异常: {}", e.getMessage());
-            }
-            log.info("[飞书长连接] 已关闭");
             wsClient = null;
+            log.info("[飞书长连接] 已关闭（SDK 未提供公开关闭方法，依赖 JVM 清理连接）");
         }
     }
 
