@@ -84,11 +84,12 @@
 
 ### 环境要求
 
-| 组件 | 要求 |
-|------|------|
-| JDK | 17+ |
-| Maven | 3.8+ |
-| AI 大脑 | OpenCode（当前）/ ClaudeCode（即将支持） |
+| 组件 | 要求 | 说明 |
+|------|------|------|
+| JDK | 17+ | |
+| Maven | 3.8+ | |
+| AI 大脑 | OpenCode（当前） | 两个 serve 实例：14096（知识库）/ 14099（编程） |
+| Ollama | 可选 | 用于语义检索加速，安装后自动启用 |
 
 ### 一键启动
 
@@ -269,28 +270,33 @@ public void dailyMeetingSummary() {
 ai-assistant/
 ├── src/main/java/com/laoqi/assistant/
 │   ├── AssistantApplication.java        # 启动入口
-│   ├── entity/                          # 4 个数据库实体
-│   │   ├── ChatSessionEntity.java
-│   │   ├── ChatMessageEntity.java
-│   │   ├── FeishuSessionEntity.java
-│   │   └── FeishuMessageEntity.java
-│   ├── mapper/                          # 4 个 MyBatis-Plus Mapper
+│   ├── entity/                          # MyBatis-Plus 实体
+│   │   ├── ChatSessionEntity.java       # Web 聊天会话
+│   │   ├── ChatMessageEntity.java       # Web 聊天消息
+│   │   ├── FeishuSessionEntity.java     # 飞书会话
+│   │   └── FeishuMessageEntity.java     # 飞书消息
+│   ├── mapper/                          # MyBatis-Plus Mapper
 │   ├── service/
-│   │   ├── db/                          # 8 个数据库 Service
+│   │   ├── db/                          # 数据库 Service 层
 │   │   │   ├── ChatSessionDbService.java
 │   │   │   ├── ChatMessageDbService.java
 │   │   │   ├── FeishuSessionDbService.java
 │   │   │   └── FeishuMessageDbService.java
-│   │   ├── OpenCodeService.java         # AI 服务客户端
-│   │   ├── FeishuService.java           # 飞书集成
+│   │   ├── OpenCodeService.java         # AI 服务客户端 (opencode serve)
+│   │   ├── ChatSessionService.java      # Web 对话管理
+│   │   ├── FeishuChatSessionService.java # 飞书对话管理
+│   │   ├── FeishuService.java           # 飞书消息推送
+│   │   ├── FeishuLongConnectionService.java # 飞书长连接
+│   │   ├── ReportService.java           # 日报生成 (基于 opencode)
 │   │   ├── SchedulerService.java        # 定时任务
 │   │   ├── ConfigService.java           # 配置管理
+│   │   ├── MediaDataCollectorService.java # CSDN/知乎数据采集
 │   │   └── ...
-│   ├── controller/                      # 15 个控制器
-│   ├── model/                           # 数据模型
+│   ├── controller/                      # 18 个控制器
+│   ├── model/                           # 数据模型 (POJO)
 │   └── util/                            # 工具类
 ├── src/main/resources/
-│   ├── templates/                       # 15 个 Thymeleaf 模板
+│   ├── templates/                       # 16 个 Thymeleaf 模板
 │   └── application.yml                  # Spring Boot 配置
 ├── config.json                          # 运行时配置
 └── pom.xml
@@ -306,8 +312,9 @@ ai-assistant/
 | **ORM** | MyBatis-Plus 3.5.16 |
 | **数据库** | SQLite（聊天记录）+ JSON 文件（业务数据） |
 | **前端** | Thymeleaf + 原生 JS（无框架） |
-| **AI 大脑** | OpenCode（当前）/ ClaudeCode（即将支持） |
+| **AI 大脑** | OpenCode（当前） |
 | **IM 集成** | 飞书 OpenAPI + WebSocket（当前）/ 钉钉、企业微信（即将支持） |
+| **语义检索** | LangChain4j + Ollama（可选） |
 
 ---
 

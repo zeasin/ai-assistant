@@ -236,8 +236,8 @@ D:/projects/assistant-v2/
                         ├─ 检查对应 opencode 端口健康状态
                         ├─ 创建 SseEmitter (300s timeout)
                         ├─ 后台线程:
-                        │   ├─ openCodeService.findIdleSession()
-                        │   │   └─ GET /session → 复用第一个可用会话
+                        │   ├─ openCodeService.createSession("chat-" + sessionId)
+                        │   │   └─ POST /session → 每次新建隔离会话
                         │   ├─ openCodeService.sendMessage(sessionId, message)
                         │   │   └─ POST /session/{id}/message (600s timeout)
                         │   │   └─ 流式读取响应 → 逐 part 解析 (text/reasoning/tool_use)
@@ -682,7 +682,7 @@ mvn spring-boot:run
 
 ## 11. 已知限制与风险
 
-- **ReportService.generate() 为桩方法**：当前始终返回 "AI 引擎未配置"，需集成 opencode serve
+- **ReportService.generate() 依赖 opencode serve**：通过 opencode 生成日报，opencode 不可用时返回错误提示；日报质量取决于 prompt 模板和笔记库数据质量
 - **opencode serve 单线程**：避免对同一会话的并发请求
 - **JSON 手动解析**：FeishuService 使用手动 JSON 转义，未使用 Jackson 序列化
 - **无认证机制**：Web UI 无登录保护，仅限本地或内网使用
