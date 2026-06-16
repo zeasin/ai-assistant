@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
 import java.nio.file.*;
+import java.security.MessageDigest;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -46,14 +47,14 @@ public class DataSetService {
             if (baseDir == null || baseDir.isEmpty()) {
                 throw new IllegalStateException("baseDir is empty");
             }
-            Path dir = Paths.get(baseDir).resolve("数据中心");
+            Path dir = Paths.get(baseDir).resolve("AI").resolve("数据中心");
             if (!Files.exists(dir)) {
                 Files.createDirectories(dir);
             }
             return dir;
         } catch (Exception e) {
             log.warn("Failed to get data center dir: {}, using fallback", e.getMessage());
-            Path fallback = Paths.get(System.getProperty("user.dir")).resolve("数据中心");
+            Path fallback = Paths.get(System.getProperty("user.dir")).resolve("AI").resolve("数据中心");
             try {
                 if (!Files.exists(fallback)) {
                     Files.createDirectories(fallback);
@@ -214,10 +215,23 @@ public class DataSetService {
 
         List<Map<String, Object>> existing = loadRecords(datasetId);
 
+        Set<String> existingHashes = new HashSet<>();
+        for (Map<String, Object> r : existing) {
+            String hash = computeHash(r);
+            if (hash != null) existingHashes.add(hash);
+        }
+
+        int skipped = 0;
         for (Map<String, Object> record : newRecords) {
+            String hash = computeHash(record);
+            if (hash != null && existingHashes.contains(hash)) {
+                skipped++;
+                continue;
+            }
             record.put("_id", UUID.randomUUID().toString().substring(0, 8));
             record.put("_source", source);
             record.put("_importTime", TimeUtil.nowStr());
+            if (hash != null) existingHashes.add(hash);
             existing.add(record);
         }
 
@@ -232,13 +246,16 @@ public class DataSetService {
         Map<String, Object> importRecord = new LinkedHashMap<>();
         importRecord.put("source", source);
         importRecord.put("time", TimeUtil.nowStr());
-        importRecord.put("count", newRecords.size());
+        importRecord.put("total", newRecords.size());
+        importRecord.put("imported", newRecords.size() - skipped);
+        importRecord.put("skipped", skipped);
         importRecord.put("data", newRecords);
         FileUtil.writeJson(importPath, importRecord);
 
-        logService.add("数据中心", "导入数据", ds.getName() + " (" + source + ", " + newRecords.size() + "条)");
-        log.info("Added {} records to dataset {} from {}", newRecords.size(), datasetId, source);
-        return newRecords.size();
+        int imported = newRecords.size() - skipped;
+        logService.add("数据中心", "导入数据", ds.getName() + " (" + source + ", " + imported + "条" + (skipped > 0 ? ", 跳过" + skipped + "条重复" : "") + ")");
+        log.info("Added {} records (skipped {} duplicates) to dataset {} from {}", imported, skipped, datasetId, source);
+        return imported;
     }
 
     public boolean deleteRecord(String datasetId, String recordId) {
@@ -273,6 +290,33 @@ public class DataSetService {
                         .findFirst()
                         .orElse(null);
             }
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static final Set<String> META_FIELDS = Set.of("_id", "_source", "_importTime", "_hash");
+    private static final com.fasterxml.jackson.databind.ObjectMapper HASH_MAPPER =
+            new com.fasterxml.jackson.databind.ObjectMapper();
+
+    @SuppressWarnings("unchecked")
+    private String computeHash(Map<String, Object> record) {
+        try {
+            TreeMap<String, String> data = new TreeMap<>();
+            for (Map.Entry<String, Object> entry : record.entrySet()) {
+                if (!META_FIELDS.contains(entry.getKey())) {
+                    data.put(entry.getKey(), entry.getValue() != null ? entry.getValue().toString() : "");
+                }
+            }
+            if (data.isEmpty()) return null;
+            String json = HASH_MAPPER.writeValueAsString(data);
+            MessageDigest md = MessageDigest.getInstance("MD5");
+            byte[] digest = md.digest(json.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder();
+            for (byte b : digest) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
         } catch (Exception e) {
             return null;
         }

@@ -102,9 +102,9 @@ public class CollectorService {
             String baseDir = configService.load().getBaseDir();
             Path dir;
             if (baseDir != null && !baseDir.isEmpty()) {
-                dir = Paths.get(baseDir).resolve("ai").resolve("collector");
+                dir = Paths.get(baseDir).resolve("AI").resolve("数据中心").resolve("collector");
             } else {
-                dir = Paths.get(System.getProperty("user.dir")).resolve("ai").resolve("collector");
+                dir = Paths.get(System.getProperty("user.dir")).resolve("AI").resolve("数据中心").resolve("collector");
             }
             if (!Files.exists(dir)) {
                 Files.createDirectories(dir);

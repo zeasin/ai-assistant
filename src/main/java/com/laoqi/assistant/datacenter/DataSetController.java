@@ -8,6 +8,8 @@ import com.laoqi.assistant.service.ModuleService;
 import com.laoqi.assistant.service.ConfigService;
 import com.laoqi.assistant.model.ModuleDefinition;
 import com.laoqi.assistant.util.FileUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -21,6 +23,7 @@ import java.util.regex.Pattern;
 @RequestMapping("/api/datacenter")
 public class DataSetController {
 
+    private static final Logger log = LoggerFactory.getLogger(DataSetController.class);
     private static final ObjectMapper mapper = new ObjectMapper();
     private static final Pattern JSON_BLOCK = Pattern.compile("```(?:json)?\\s*([\\s\\S]*?)\\s*```");
 
@@ -114,7 +117,8 @@ public class DataSetController {
     public ResponseEntity<Map<String, Object>> importExcel(
             @PathVariable String id,
             @RequestParam("file") MultipartFile file,
-            @RequestParam(value = "mapping", required = false) String mappingJson) {
+            @RequestParam(value = "mapping", required = false) String mappingJson,
+            @RequestParam(value = "useAi", defaultValue = "false") boolean useAi) {
         try {
             DataSet ds = dataSetService.getDataset(id);
             if (ds == null) {
@@ -131,6 +135,13 @@ public class DataSetController {
                 records = importService.importExcelWithAutoDetect(file, ds.getSchema());
             } else {
                 records = importService.importExcel(file, mapping);
+            }
+
+            if (useAi && !records.isEmpty()) {
+                if (!openCodeService.isHealthy()) {
+                    return ResponseEntity.ok(Map.of("ok", false, "error", "AI服务未运行"));
+                }
+                records = normalizeWithAi(records, ds);
             }
 
             int count = dataSetService.addRecords(id, records, "excel");
@@ -161,6 +172,7 @@ public class DataSetController {
             }
 
             Object dataObj = body.get("data");
+            boolean useAi = Boolean.TRUE.equals(body.get("useAi"));
             List<Map<String, Object>> records = new ArrayList<>();
 
             if (dataObj instanceof List<?> dataList) {
@@ -175,6 +187,13 @@ public class DataSetController {
                 Map<String, Object> record = new HashMap<>();
                 map.forEach((k, v) -> record.put(String.valueOf(k), v));
                 records.add(record);
+            }
+
+            if (useAi && !records.isEmpty()) {
+                if (!openCodeService.isHealthy()) {
+                    return ResponseEntity.ok(Map.of("ok", false, "error", "AI服务未运行"));
+                }
+                records = normalizeWithAi(records, ds);
             }
 
             int count = dataSetService.addRecords(id, records, "manual");
@@ -433,5 +452,65 @@ public class DataSetController {
         sb.append("3. 不要输出其他说明文字\n");
 
         return sb.toString();
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> normalizeWithAi(List<Map<String, Object>> records, DataSet ds) throws Exception {
+        StringBuilder prompt = new StringBuilder();
+        prompt.append("请将以下数据按Schema定义进行标准化处理。\n\n");
+
+        if (ds.getSchema() != null && ds.getSchema().getFields() != null && !ds.getSchema().getFields().isEmpty()) {
+            prompt.append("目标Schema：\n");
+            for (DataField field : ds.getSchema().getFields()) {
+                prompt.append("- ").append(field.getName());
+                if (field.getDisplayName() != null) prompt.append("（").append(field.getDisplayName()).append("）");
+                if (field.getType() != null) prompt.append(" [").append(field.getType()).append("]");
+                prompt.append("\n");
+            }
+            prompt.append("\n");
+        }
+
+        prompt.append("处理要求：\n");
+        prompt.append("1. 将原始字段名映射到Schema字段名（如\"阅读量\"→views，\"点赞数\"→likes）\n");
+        prompt.append("2. 统一日期格式为 yyyy-MM-dd\n");
+        prompt.append("3. 数值字段转为数字类型\n");
+        prompt.append("4. 空值用空字符串或null填充\n");
+        prompt.append("5. 保留所有有意义的数据，不要丢失字段\n\n");
+
+        prompt.append("原始数据（共").append(records.size()).append("条）：\n");
+        try {
+            String recordsJson = mapper.writeValueAsString(records);
+            prompt.append("```json\n");
+            prompt.append(recordsJson, 0, Math.min(recordsJson.length(), 8000));
+            if (recordsJson.length() > 8000) prompt.append("...");
+            prompt.append("\n```\n\n");
+        } catch (Exception e) {
+            prompt.append("（数据序列化失败）\n\n");
+        }
+
+        prompt.append("直接输出标准化后的JSON数组，用 ```json 包裹，不要输出其他说明文字。");
+
+        String sessionId = openCodeService.findIdleSession();
+        if (sessionId == null) {
+            sessionId = openCodeService.createSession("数据标准化");
+        }
+
+        String rawResponse = openCodeService.sendMessage(sessionId, prompt.toString());
+        String jsonData = extractJsonFromResponse(rawResponse);
+
+        Object parsed = mapper.readValue(jsonData, Object.class);
+        List<Map<String, Object>> result = new ArrayList<>();
+        if (parsed instanceof List<?> list) {
+            for (Object item : list) {
+                if (item instanceof Map<?, ?> map) {
+                    Map<String, Object> record = new HashMap<>();
+                    map.forEach((k, v) -> record.put(String.valueOf(k), v));
+                    result.add(record);
+                }
+            }
+        }
+
+        log.info("AI normalized {} records to {} records", records.size(), result.size());
+        return result.isEmpty() ? records : result;
     }
 }

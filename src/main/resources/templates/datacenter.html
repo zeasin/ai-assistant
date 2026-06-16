@@ -106,11 +106,14 @@
         <div class="ds-panel" id="panel-import">
             <div class="import-section">
                 <h3>Excel导入</h3>
-                <div class="form-row">
-                    <div class="form-group">
+                <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:12px;">
+                    <div class="form-group" style="flex:1;margin-bottom:0;">
                         <label>选择数据集</label>
                         <select id="importDatasetId"></select>
                     </div>
+                    <label style="display:flex;align-items:center;gap:4px;cursor:pointer;white-space:nowrap;padding-bottom:8px;font-size:13px;">
+                        <input type="checkbox" id="excelUseAi"> AI处理
+                    </label>
                 </div>
                 <div class="upload-area" id="uploadArea" onclick="document.getElementById('excelFile').click()">
                     <input type="file" id="excelFile" accept=".xlsx,.xls" onchange="handleFileSelect(this)">
@@ -128,11 +131,14 @@
 
             <div class="import-section">
                 <h3>JSON导入</h3>
-                <div class="form-row">
-                    <div class="form-group">
+                <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:12px;">
+                    <div class="form-group" style="flex:1;margin-bottom:0;">
                         <label>选择数据集</label>
                         <select id="jsonImportDatasetId"></select>
                     </div>
+                    <label style="display:flex;align-items:center;gap:4px;cursor:pointer;white-space:nowrap;padding-bottom:8px;font-size:13px;">
+                        <input type="checkbox" id="jsonUseAi"> AI处理
+                    </label>
                 </div>
                 <div class="form-group">
                     <label>JSON数据（对象或数组）</label>
@@ -609,9 +615,13 @@
                 mapping[sel.dataset.excelCol] = sel.value;
             });
 
+            const useAi = document.getElementById('excelUseAi').checked;
             const formData = new FormData();
             formData.append('file', currentFile);
             formData.append('mapping', JSON.stringify(mapping));
+            formData.append('useAi', useAi);
+
+            if (useAi) toast('AI正在处理数据，请稍候...', 'success');
 
             try {
                 const res = await fetch('/api/datacenter/datasets/' + datasetId + '/import/excel', { method: 'POST', body: formData });
@@ -641,10 +651,13 @@
             let parsed;
             try { parsed = JSON.parse(raw); } catch (e) { toast('JSON格式错误: ' + e.message, 'error'); return; }
 
+            const useAi = document.getElementById('jsonUseAi').checked;
+            if (useAi) toast('AI正在处理数据，请稍候...', 'success');
+
             try {
                 const res = await fetch('/api/datacenter/datasets/' + datasetId + '/import/json', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ data: parsed })
+                    body: JSON.stringify({ data: parsed, useAi: useAi })
                 });
                 const data = await res.json();
                 if (data.ok) {
