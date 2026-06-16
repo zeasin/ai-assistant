@@ -18,6 +18,7 @@ public class Config {
     private Boolean feishuPollingEnabled;
     
     private String logFile;
+    private List<Map<String, Object>> modules;
     private String aiProvider = "opencode";
     private String llmApiKey = "";
     private String llmBaseUrl = "https://api.deepseek.com";
@@ -51,6 +52,8 @@ public class Config {
     public void setFeishuPollingEnabled(Boolean feishuPollingEnabled) { this.feishuPollingEnabled = feishuPollingEnabled; }
     public String getLogFile() { return logFile; }
     public void setLogFile(String logFile) { this.logFile = logFile; }
+    public List<Map<String, Object>> getModules() { return modules; }
+    public void setModules(List<Map<String, Object>> modules) { this.modules = modules; }
     public String getAiProvider() { return aiProvider; }
     public void setAiProvider(String aiProvider) { this.aiProvider = aiProvider; }
     public String getLlmApiKey() { return llmApiKey; }

@@ -32,6 +32,7 @@ public class FeishuLongConnectionService {
     private final ConfigService configService;
     private final OpenCodeService openCodeService;
     private final LlmService llmService;
+    private final NoteAssistantService noteAssistantService;
     private final LogService logService;
     private final FeishuChatSessionService feishuChatSessionService;
     private final AppConfig appConfig;
@@ -43,12 +44,14 @@ public class FeishuLongConnectionService {
     public FeishuLongConnectionService(ConfigService configService,
                                         OpenCodeService openCodeService,
                                         LlmService llmService,
+                                        NoteAssistantService noteAssistantService,
                                         LogService logService,
                                         FeishuChatSessionService feishuChatSessionService,
                                         AppConfig appConfig) {
         this.configService = configService;
         this.openCodeService = openCodeService;
         this.llmService = llmService;
+        this.noteAssistantService = noteAssistantService;
         this.logService = logService;
         this.feishuChatSessionService = feishuChatSessionService;
         this.appConfig = appConfig;
@@ -226,7 +229,12 @@ public class FeishuLongConnectionService {
             if (useDirectLlm) {
                 log.info("[飞书长连接] 使用 LLM 直连模式");
                 if (!llmService.isAvailable()) {
-                    return "⚠️ LLM API Key 未配置，请在 application.yml 中设置 app.llm.api-key";
+                    return "⚠️ LLM API Key 未配置，请在配置页填写";
+                }
+                // 判断是否需要工具编排
+                if (noteAssistantService.needsOrchestration(text)) {
+                    log.info("[飞书长连接] 需要工具编排，转 NoteAssistant");
+                    return processNoteAssistant(text, userKey);
                 }
                 return processNormalMessageDirect(text, userKey);
             }
@@ -277,8 +285,24 @@ public class FeishuLongConnectionService {
         return "❌ 处理失败: " + lastError.getMessage();
     }
 
+    private String processNoteAssistant(String text, String userKey) {
+        // 工具编排模式
+        feishuChatSessionService.saveMessage(userKey, "user", text, "knowledge");
+        try {
+            log.info("[飞书长连接] NoteAssistant 编排: {}", text);
+            String reply = noteAssistantService.chat(userKey, text);
+            log.info("[飞书长连接] NoteAssistant 回复长度: {}", reply != null ? reply.length() : 0);
+            feishuChatSessionService.saveMessage(userKey, "assistant", reply, "knowledge");
+            return reply;
+        } catch (Exception e) {
+            log.error("[飞书长连接] NoteAssistant 处理失败: {}", e.getMessage(), e);
+            logService.add("飞书消息", "处理失败", e.getMessage());
+            return "❌ 编排处理失败: " + e.getMessage();
+        }
+    }
+
     private String processNormalMessageDirect(String text, String userKey) {
-        // 新模式：Java 直连 LLM
+        // 新模式：Java 直连 LLM（纯问答）
         feishuChatSessionService.saveMessage(userKey, "user", text, "knowledge");
         try {
             String context = feishuChatSessionService.buildHistoryContext(userKey, "knowledge", text);

@@ -232,15 +232,13 @@ LangChain4j 自动调 NoteTools.readNote(...)
   → BUG记录改名为 BUG跟踪 → 改 Java 代码重新部署
 
 ✅ 正确：AI 编排
-  Java 只提供三个工具：listDir / readFile / writeFile
+  Java 提供四个工具：listDir / readFile / writeFile / searchFiles
   AI 自己决定：
-    1. listDir("") → 看到有 工作/
-    2. listDir("工作") → 看到 BUG记录/
-    3. readFile("工作/BUG记录/schema.json")
-    4. readFile("工作/BUG记录/rules.md")
-    5. readFile("工作/BUG记录/data.json")
-    6. 生成 JSON → writeFile
-  → BUG记录改名为 BUG跟踪 → AI 下次自己找到，不需要改代码
+    第1步 — 必读规则：readFile("AGENTS.md") → 了解笔记库目录结构和所有保存规则
+    第2步 — 定位目录：searchFiles("BUG") → 或 listDir 按规则找目标目录
+    第3步 — 了解格式：readFile("项目/data/BUG记录.json") → 看现有数据格式
+    第4步 — 生成并写入：生成 JSON → writeFile 保存
+  → AGENTS.md 改了保存规则 → AI 下次先读规则，自动适配，不需要改代码
 ```
 
 ### 那 Java 编排还能用在哪
