@@ -30,7 +30,13 @@
     </div>
 
     <div class="chat-main">
-        <div class="card" style="flex:1;display:flex;flex-direction:column;margin:0;border-radius:0 12px 12px 0;">
+        <div style="padding:8px 16px;background:#f8f9fa;border-bottom:1px solid #e1e3e6;display:flex;align-items:center;gap:8px;font-size:12px;color:#666;">
+            <span>AI 引擎：</span>
+            <span th:if="${ai_provider == 'direct'}" style="background:#e6f7e6;color:#1a7a1a;padding:2px 8px;border-radius:4px;font-weight:600;">🧠 LLM 直连</span>
+            <span th:unless="${ai_provider == 'direct'}" style="background:#e8f0fe;color:#1a73e8;padding:2px 8px;border-radius:4px;font-weight:600;">🔄 Opencode</span>
+            <a href="/config" style="margin-left:auto;color:#1a73e8;text-decoration:none;">切换 →</a>
+        </div>
+        <div class="card" style="flex:1;display:flex;flex-direction:column;margin:0;border-radius:0;">
             <div class="chat-box" id="chatBox">
                 <th:block th:if="${current != null and current.messages != null and #lists.size(current.messages) > 0}">
                     <th:block th:each="m : ${current.messages}">

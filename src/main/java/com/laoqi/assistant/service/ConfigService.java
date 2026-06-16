@@ -30,6 +30,18 @@ public class ConfigService {
         if (config.isFeishuPollingEnabled() == null) {
             config.setFeishuPollingEnabled(defaultConfig.isFeishuPollingEnabled());
         }
+        if (config.getAiProvider() == null || config.getAiProvider().isEmpty()) {
+            config.setAiProvider("opencode");
+        }
+        if (config.getLlmBaseUrl() == null || config.getLlmBaseUrl().isEmpty()) {
+            config.setLlmBaseUrl("https://api.deepseek.com");
+        }
+        if (config.getLlmModel() == null || config.getLlmModel().isEmpty()) {
+            config.setLlmModel("deepseek-chat");
+        }
+        if (config.getLlmTimeout() <= 0) {
+            config.setLlmTimeout(60);
+        }
     }
 
     public String getBaseDir() {

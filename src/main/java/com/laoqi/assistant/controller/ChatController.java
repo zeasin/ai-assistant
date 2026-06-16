@@ -6,6 +6,8 @@ import com.laoqi.assistant.model.ChatSession.ChatMessage;
 import com.laoqi.assistant.service.ChatSessionService;
 import com.laoqi.assistant.service.ChatSessionService.SessionsData;
 import com.laoqi.assistant.config.AppConfig;
+import com.laoqi.assistant.service.ConfigService;
+import com.laoqi.assistant.service.LlmService;
 import com.laoqi.assistant.service.LogService;
 import com.laoqi.assistant.service.OpenCodeService;
 import com.laoqi.assistant.util.TimeUtil;
@@ -34,12 +36,18 @@ public class ChatController {
 
     private final ChatSessionService sessionService;
     private final OpenCodeService openCodeService;
+    private final LlmService llmService;
+    private final ConfigService configService;
     private final LogService logService;
     private final AppConfig appConfig;
 
-    public ChatController(ChatSessionService sessionService, OpenCodeService openCodeService, LogService logService, AppConfig appConfig) {
+    public ChatController(ChatSessionService sessionService, OpenCodeService openCodeService,
+                          LlmService llmService, ConfigService configService,
+                          LogService logService, AppConfig appConfig) {
         this.sessionService = sessionService;
         this.openCodeService = openCodeService;
+        this.llmService = llmService;
+        this.configService = configService;
         this.logService = logService;
         this.appConfig = appConfig;
     }
@@ -130,6 +138,7 @@ public class ChatController {
         model.addAttribute("current", current);
         model.addAttribute("current_id", currentId);
         model.addAttribute("current_mode", effectiveMode);
+        model.addAttribute("ai_provider", configService.load().getAiProvider());
         return "chat";
     }
 
@@ -145,9 +154,13 @@ public class ChatController {
         String mode = "knowledge";
         sessionService.saveMessage(sessionId, "user", message, mode);
 
+        // 判断使用哪种 AI 模式
+        var config = configService.load();
+        boolean useDirectLlm = "direct".equals(config.getAiProvider());
+
         chatExecutor.execute(() -> {
             try {
-                sendStatus(emitter, mode, "⏳ 正在思考...");
+                sendStatus(emitter, mode, useDirectLlm ? "🧠 LLM 直连思考中..." : "⏳ 正在思考...");
 
                 String context = sessionService.buildHistoryContext(sessionId, mode, message);
 
@@ -158,15 +171,24 @@ public class ChatController {
                 }
                 fullText.append("用户最新消息:\n").append(message);
                 String fullMessage = fullText.toString();
-                log.info("[chat] 完整 prompt:\n{}", fullMessage);
 
-                String opencodeSessionId = openCodeService.createSession("chat-" + sessionId);
+                String replyText;
+                if (useDirectLlm) {
+                    // 新模式：Java 直连 DeepSeek
+                    log.info("[chat] 使用 LLM 直连模式");
+                    if (!llmService.isAvailable()) {
+                        throw new IllegalStateException("LLM API Key 未配置，请在 application.yml 中设置 app.llm.api-key");
+                    }
+                    replyText = llmService.chat("你是一个知识库助手，基于笔记库上下文回答问题。请用中文回答。", fullMessage);
+                } else {
+                    // 旧模式：走 opencode serve
+                    log.info("[chat] 使用 opencode 模式");
+                    String opencodeSessionId = openCodeService.createSession("chat-" + sessionId);
+                    String reply = openCodeService.sendMessage(opencodeSessionId, fullMessage);
+                    replyText = (reply != null && !reply.isEmpty()) ? reply : "(AI 未返回回复)";
+                }
 
-                log.info("[chat] 开始发送消息到 opencode, opencodeSessionId={}, mode={}", opencodeSessionId, mode);
-                String reply = openCodeService.sendMessage(opencodeSessionId, fullMessage);
-                log.info("[chat] 收到 opencode 回复, 长度={}", reply != null ? reply.length() : 0);
-
-                String replyText = (reply != null && !reply.isEmpty()) ? reply : "(AI 未返回回复)";
+                log.info("[chat] 收到回复, 长度={}", replyText.length());
                 sessionService.saveMessage(sessionId, "assistant", replyText, mode);
                 sendText(emitter, mode, replyText);
                 sendDone(emitter, mode);

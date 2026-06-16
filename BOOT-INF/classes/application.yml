@@ -30,7 +30,15 @@ app:
     base-url: http://127.0.0.1:11434
     model: nomic-embed-text
     timeout-seconds: 30
-  # LLM 直连配置已移至 Web 配置页（/config），在 config.json 中管理
+  llm:
+    api-key: sk-IwBKOtmu2qdngCnfVVO7SC213uqGFiWM
+    # ${LLM_API_KEY:}
+    # 兼容 OpenAI Chat Completions 格式的 API 地址
+    # DeepSeek: https://api.deepseek.com
+    # 商汤日日新: https://api.sensenova.cn/v1（请从商汤后台确认）
+    base-url: https://token.sensenova.cn/v1
+    model: sensenova-6.7-flash-lite
+    timeout-seconds: 60
 
 mybatis-plus:
   configuration:

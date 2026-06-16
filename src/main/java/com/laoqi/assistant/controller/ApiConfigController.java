@@ -128,6 +128,30 @@ public class ApiConfigController {
         return Map.of("ok", false, "error", "该功能已废弃，采集器数据现保存至数据中心");
     }
 
+    @PostMapping("/api/config/ai-provider")
+    public Map<String, Object> updateAiProvider(@RequestParam String provider) {
+        if (!"opencode".equals(provider) && !"direct".equals(provider)) {
+            return Map.of("ok", false, "error", "无效的 provider: " + provider + "，仅支持 opencode / direct");
+        }
+        Config cfg = configService.load();
+        cfg.setAiProvider(provider);
+        configService.save(cfg);
+        logService.add("配置更新", "成功", "AI 引擎切换为: " + provider);
+        return Map.of("ok", true, "provider", provider);
+    }
+
+    @PostMapping("/api/config/llm")
+    public Map<String, Object> updateLlmConfig(@RequestBody Map<String, Object> body) {
+        Config cfg = configService.load();
+        if (body.containsKey("apiKey")) cfg.setLlmApiKey((String) body.get("apiKey"));
+        if (body.containsKey("baseUrl")) cfg.setLlmBaseUrl((String) body.get("baseUrl"));
+        if (body.containsKey("model")) cfg.setLlmModel((String) body.get("model"));
+        if (body.containsKey("timeout")) cfg.setLlmTimeout(((Number) body.get("timeout")).intValue());
+        configService.save(cfg);
+        logService.add("配置更新", "成功", "LLM 配置已更新");
+        return Map.of("ok", true);
+    }
+
     @PostMapping("/api/config/media-collect")
     public Map<String, Object> updateMediaCollect(
             @RequestParam(name = "enabled", defaultValue = "off") String enabled,

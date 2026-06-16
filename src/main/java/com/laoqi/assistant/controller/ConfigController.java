@@ -33,6 +33,7 @@ public class ConfigController {
                 Map.of("id", "morning_report", "time", "每天 09:00", "desc", "生成综合日报")
         ));
         model.addAttribute("ollama_available", ollamaEmbeddingService.isAvailable());
+        model.addAttribute("config", configService.load());
         return "config";
     }
 

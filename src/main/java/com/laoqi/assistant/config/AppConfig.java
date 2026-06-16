@@ -12,6 +12,7 @@ public class AppConfig {
 
     private String configDir;
     private int notesPort = 14096;
+    private int codePort = 14099;
     private String timezone = "Asia/Shanghai";
     private int maxHistoryChars = 6000;
 
@@ -28,6 +29,8 @@ public class AppConfig {
     public void setConfigDir(String configDir) { this.configDir = configDir; }
     public int getNotesPort() { return notesPort; }
     public void setNotesPort(int notesPort) { this.notesPort = notesPort; }
+    public int getCodePort() { return codePort; }
+    public void setCodePort(int codePort) { this.codePort = codePort; }
     public String getTimezone() { return timezone; }
     public void setTimezone(String timezone) { this.timezone = timezone; }
     public int getMaxHistoryChars() { return maxHistoryChars; }
@@ -44,4 +47,19 @@ public class AppConfig {
     public void setOllamaModel(String ollamaModel) { this.ollamaModel = ollamaModel; }
     public int getOllamaTimeoutSeconds() { return ollamaTimeoutSeconds; }
     public void setOllamaTimeoutSeconds(int ollamaTimeoutSeconds) { this.ollamaTimeoutSeconds = ollamaTimeoutSeconds; }
+
+    // LLM direct config
+    private String llmApiKey = "";
+    private String llmBaseUrl = "https://api.deepseek.com";
+    private String llmModel = "deepseek-chat";
+    private int llmTimeoutSeconds = 60;
+
+    public String getLlmApiKey() { return llmApiKey; }
+    public void setLlmApiKey(String llmApiKey) { this.llmApiKey = llmApiKey; }
+    public String getLlmBaseUrl() { return llmBaseUrl; }
+    public void setLlmBaseUrl(String llmBaseUrl) { this.llmBaseUrl = llmBaseUrl; }
+    public String getLlmModel() { return llmModel; }
+    public void setLlmModel(String llmModel) { this.llmModel = llmModel; }
+    public int getLlmTimeoutSeconds() { return llmTimeoutSeconds; }
+    public void setLlmTimeoutSeconds(int llmTimeoutSeconds) { this.llmTimeoutSeconds = llmTimeoutSeconds; }
 }

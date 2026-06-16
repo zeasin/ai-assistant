@@ -125,6 +125,49 @@
     <div id="collectorDirStatus" class="text-muted mt-2"></div>
 </div>
 
+<div class="card">
+    <h2>🧠 AI 引擎</h2>
+    <div class="text-muted mb-2">选择 AI 服务模式并配置 LLM 连接参数。修改后立即生效，无需重启。</div>
+    <form id="aiProviderForm" onsubmit="return saveAiProvider(event)">
+        <div class="form-group">
+            <label>AI 服务模式</label>
+            <select id="aiProvider" style="width:100%;padding:10px 14px;border:1px solid #e1e3e6;border-radius:8px;font-size:14px;outline:none;background:#fff;color:#1a1b1e;">
+                <option value="opencode">🔄 Opencode（旧模式，需启动 opencode serve）</option>
+                <option value="direct">🧠 LLM 直连（新模式，Java 直调，无需额外服务）</option>
+            </select>
+            <div class="text-muted" style="font-size:12px;margin-top:4px;">
+                <strong>Opencode</strong>：走 opencode serve（端口 14096），适合需要 AI 工具编排的场景。<br>
+                <strong>LLM 直连</strong>：Java 直调 LLM API，响应更快，无需启动额外服务。
+            </div>
+        </div>
+
+        <div id="llmConfigFields" style="display:{{ 'block' if config.get('aiProvider') == 'direct' else 'none' }};">
+            <div class="form-group">
+                <label>API Key</label>
+                <input type="password" id="llmApiKey" value="{{ config.llmApiKey or '' }}" placeholder="sk-xxxxxxxxxxxx">
+                <div class="desc">LLM API 密钥</div>
+            </div>
+            <div class="form-group">
+                <label>API 地址</label>
+                <input type="text" id="llmBaseUrl" value="{{ config.llmBaseUrl or 'https://api.deepseek.com' }}" placeholder="https://api.deepseek.com">
+                <div class="desc">兼容 OpenAI 格式的 API 地址。DeepSeek: https://api.deepseek.com，商汤: https://api.sensenova.cn/v1</div>
+            </div>
+            <div class="form-group">
+                <label>模型名</label>
+                <input type="text" id="llmModel" value="{{ config.llmModel or 'deepseek-chat' }}" placeholder="deepseek-chat">
+                <div class="desc">模型名称，如 deepseek-chat、sensenova-6.7-flash-lite</div>
+            </div>
+            <div class="form-group">
+                <label>超时（秒）</label>
+                <input type="number" id="llmTimeout" value="{{ config.llmTimeout or 60 }}" min="10" max="300">
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary">保存</button>
+        <span id="aiProviderStatus" class="text-muted" style="margin-left:8px;"></span>
+    </form>
+</div>
+
 <style>
 .form-group { margin-bottom: 12px; }
 .form-group label {
@@ -191,6 +234,14 @@ fetch('/api/config')
         if (cfg.collectorOutputDir) {
             document.getElementById('collectorOutputDir').value = cfg.collectorOutputDir;
         }
+        if (cfg.aiProvider) {
+            document.getElementById('aiProvider').value = cfg.aiProvider;
+        }
+        if (cfg.llmApiKey) document.getElementById('llmApiKey').value = cfg.llmApiKey;
+        if (cfg.llmBaseUrl) document.getElementById('llmBaseUrl').value = cfg.llmBaseUrl;
+        if (cfg.llmModel) document.getElementById('llmModel').value = cfg.llmModel;
+        if (cfg.llmTimeout) document.getElementById('llmTimeout').value = cfg.llmTimeout;
+        toggleLlmConfig();
         enabledCheckbox.addEventListener('change', function() {
             toggleText.textContent = this.checked ? '已开启' : '已关闭';
         });
@@ -389,6 +440,46 @@ function selectChat(el) {
     document.getElementById('feishuChatId').value = id;
     document.getElementById('chatList').style.display = 'none';
     toast('已选择群聊，点击保存即可', 'success');
+}
+
+function toggleLlmConfig() {
+    const show = document.getElementById('aiProvider').value === 'direct';
+    document.getElementById('llmConfigFields').style.display = show ? 'block' : 'none';
+}
+
+document.getElementById('aiProvider').addEventListener('change', toggleLlmConfig);
+
+async function saveAiProvider(e) {
+    e.preventDefault();
+    const provider = document.getElementById('aiProvider').value;
+
+    // 先保存 AI 引擎模式
+    const form = new FormData();
+    form.append('provider', provider);
+    const res = await fetch('/api/config/ai-provider', { method: 'POST', body: form });
+    const data = await res.json();
+    const status = document.getElementById('aiProviderStatus');
+    if (!data.ok) {
+        status.textContent = '❌ ' + (data.error || '保存失败');
+        return false;
+    }
+
+    // 再保存 LLM 配置
+    await fetch('/api/config/llm', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            apiKey: document.getElementById('llmApiKey').value,
+            baseUrl: document.getElementById('llmBaseUrl').value,
+            model: document.getElementById('llmModel').value,
+            timeout: parseInt(document.getElementById('llmTimeout').value) || 60,
+        }),
+    });
+
+    status.textContent = '✅ 已保存';
+    setTimeout(() => status.textContent = '', 3000);
+    toggleLlmConfig();
+    return false;
 }
 
 async function saveCollectorDir() {

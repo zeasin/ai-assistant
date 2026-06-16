@@ -31,6 +31,7 @@ public class FeishuLongConnectionService {
 
     private final ConfigService configService;
     private final OpenCodeService openCodeService;
+    private final LlmService llmService;
     private final LogService logService;
     private final FeishuChatSessionService feishuChatSessionService;
     private final AppConfig appConfig;
@@ -41,11 +42,13 @@ public class FeishuLongConnectionService {
 
     public FeishuLongConnectionService(ConfigService configService,
                                         OpenCodeService openCodeService,
+                                        LlmService llmService,
                                         LogService logService,
                                         FeishuChatSessionService feishuChatSessionService,
                                         AppConfig appConfig) {
         this.configService = configService;
         this.openCodeService = openCodeService;
+        this.llmService = llmService;
         this.logService = logService;
         this.feishuChatSessionService = feishuChatSessionService;
         this.appConfig = appConfig;
@@ -126,6 +129,15 @@ public class FeishuLongConnectionService {
                 log.warn("[飞书长连接] 获取发送者信息失败", e);
             }
             if (senderOpenId == null) senderOpenId = "unknown";
+
+            // 群聊消息必须 @机器人 才处理，私聊消息全部处理
+            if (!"p2p".equals(chatType)) {
+                var mentions = event.getEvent().getMessage().getMentions();
+                if (mentions == null || mentions.length == 0) {
+                    log.debug("[飞书长连接] 群聊消息未 @机器人，跳过");
+                    return;
+                }
+            }
 
             log.info("[飞书长连接] 收到消息: msgType={}, chatType={}, sender={}", msgType, chatType, senderOpenId);
             log.info("[飞书长连接] 消息内容: {}", content);
@@ -208,6 +220,18 @@ public class FeishuLongConnectionService {
     private String processMessage(String text, String userKey) {
         try {
             log.info("[飞书长连接] 处理普通消息");
+            var config = configService.load();
+            boolean useDirectLlm = "direct".equals(config.getAiProvider());
+
+            if (useDirectLlm) {
+                log.info("[飞书长连接] 使用 LLM 直连模式");
+                if (!llmService.isAvailable()) {
+                    return "⚠️ LLM API Key 未配置，请在 application.yml 中设置 app.llm.api-key";
+                }
+                return processNormalMessageDirect(text, userKey);
+            }
+
+            // 旧模式：走 opencode
             if (!openCodeService.isHealthy()) {
                 log.warn("[飞书长连接] AI 服务(14096)未启动");
                 return "⚠️ AI 服务未启动，请先启动 14096 端口的 opencode 服务";
@@ -222,12 +246,11 @@ public class FeishuLongConnectionService {
     }
 
     private String processNormalMessage(String text, String userKey) {
-        // 保存用户消息，标注为 knowledge 模式
+        // 旧模式：走 opencode
         feishuChatSessionService.saveMessage(userKey, "user", text, "knowledge");
         Exception lastError = null;
         for (int attempt = 0; attempt < 2; attempt++) {
             try {
-                // 每次新建 session，恢复历史上下文
                 String sessionId = openCodeService.createSession("飞书-" + userKey);
                 String context = feishuChatSessionService.buildHistoryContext(userKey, "knowledge", text);
                 StringBuilder fullText = new StringBuilder();
@@ -242,7 +265,6 @@ public class FeishuLongConnectionService {
                 log.info("[飞书长连接] AI 回复长度: {}", reply != null ? reply.length() : 0);
 
                 feishuChatSessionService.saveMessage(userKey, "assistant", reply, "knowledge");
-
                 return reply;
 
             } catch (Exception e) {
@@ -253,6 +275,32 @@ public class FeishuLongConnectionService {
         log.error("[飞书长连接] 处理普通消息失败", lastError);
         logService.add("飞书消息", "处理失败", lastError.getMessage());
         return "❌ 处理失败: " + lastError.getMessage();
+    }
+
+    private String processNormalMessageDirect(String text, String userKey) {
+        // 新模式：Java 直连 LLM
+        feishuChatSessionService.saveMessage(userKey, "user", text, "knowledge");
+        try {
+            String context = feishuChatSessionService.buildHistoryContext(userKey, "knowledge", text);
+            StringBuilder fullText = new StringBuilder();
+            if (context != null) {
+                log.info("[飞书长连接] 恢复知识库历史上下文");
+                fullText.append(context).append("\n\n---\n\n");
+            }
+            fullText.append("用户最新消息:\n").append(text);
+
+            log.info("[飞书长连接] 发送给 LLM 直连: {}", fullText);
+            String reply = llmService.chat("你是一个知识库助手，基于笔记库上下文回答问题。请用中文回答。", fullText.toString());
+            log.info("[飞书长连接] LLM 回复长度: {}", reply != null ? reply.length() : 0);
+
+            feishuChatSessionService.saveMessage(userKey, "assistant", reply, "knowledge");
+            return reply;
+
+        } catch (Exception e) {
+            log.error("[飞书长连接] LLM 直连处理失败: {}", e.getMessage(), e);
+            logService.add("飞书消息", "处理失败", e.getMessage());
+            return "❌ 处理失败: " + e.getMessage();
+        }
     }
 
     private void sendImmediateReply(String chatId, String chatType, String messageId, boolean isCodeRelated) {
@@ -271,7 +319,11 @@ public class FeishuLongConnectionService {
                                 .build())
                         .build();
 
-                client.im().message().create(req);
+                var immediateResp = client.im().message().create(req);
+                // 记录已发送消息 ID，防止循环处理
+                if (immediateResp.getData() != null && immediateResp.getData().getMessageId() != null) {
+                    processedMessages.add(immediateResp.getData().getMessageId());
+                }
                 log.info("[飞书长连接] 已发送等待提示");
             } else {
                 var req = com.lark.oapi.service.im.v1.model.ReplyMessageReq.newBuilder()
@@ -309,7 +361,14 @@ public class FeishuLongConnectionService {
                 if (resp.getCode() != 0) {
                     log.warn("[飞书长连接] 发送消息失败: {}", resp.getMsg());
                 } else {
-                    log.info("[飞书长连接] ✅ 已回复");
+                    // 记录已发送消息 ID，防止 WebSocket 回推导致循环处理
+                    String sentMsgId = resp.getData() != null ? resp.getData().getMessageId() : null;
+                    if (sentMsgId != null) {
+                        processedMessages.add(sentMsgId);
+                        log.info("[飞书长连接] ✅ 已回复 (msgId={})", sentMsgId);
+                    } else {
+                        log.info("[飞书长连接] ✅ 已回复");
+                    }
                     logService.add("飞书消息", "已回复", "");
                 }
             } else {

@@ -18,6 +18,11 @@ public class Config {
     private Boolean feishuPollingEnabled;
     
     private String logFile;
+    private String aiProvider = "opencode";
+    private String llmApiKey = "";
+    private String llmBaseUrl = "https://api.deepseek.com";
+    private String llmModel = "deepseek-chat";
+    private int llmTimeout = 60;
     private Map<String, Map<String, List<String>>> columnSettings = new HashMap<>();
 
     public Config() {}
@@ -46,6 +51,16 @@ public class Config {
     public void setFeishuPollingEnabled(Boolean feishuPollingEnabled) { this.feishuPollingEnabled = feishuPollingEnabled; }
     public String getLogFile() { return logFile; }
     public void setLogFile(String logFile) { this.logFile = logFile; }
+    public String getAiProvider() { return aiProvider; }
+    public void setAiProvider(String aiProvider) { this.aiProvider = aiProvider; }
+    public String getLlmApiKey() { return llmApiKey; }
+    public void setLlmApiKey(String llmApiKey) { this.llmApiKey = llmApiKey; }
+    public String getLlmBaseUrl() { return llmBaseUrl; }
+    public void setLlmBaseUrl(String llmBaseUrl) { this.llmBaseUrl = llmBaseUrl; }
+    public String getLlmModel() { return llmModel; }
+    public void setLlmModel(String llmModel) { this.llmModel = llmModel; }
+    public int getLlmTimeout() { return llmTimeout; }
+    public void setLlmTimeout(int llmTimeout) { this.llmTimeout = llmTimeout; }
     public Map<String, Map<String, List<String>>> getColumnSettings() { return columnSettings; }
     public void setColumnSettings(Map<String, Map<String, List<String>>> columnSettings) { this.columnSettings = columnSettings; }
 }
