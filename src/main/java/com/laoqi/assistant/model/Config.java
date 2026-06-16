@@ -19,7 +19,6 @@ public class Config {
     
     private String logFile;
     private Map<String, Map<String, List<String>>> columnSettings = new HashMap<>();
-    private String collectorOutputDir = "自媒体/data";
 
     public Config() {}
 
@@ -49,6 +48,4 @@ public class Config {
     public void setLogFile(String logFile) { this.logFile = logFile; }
     public Map<String, Map<String, List<String>>> getColumnSettings() { return columnSettings; }
     public void setColumnSettings(Map<String, Map<String, List<String>>> columnSettings) { this.columnSettings = columnSettings; }
-    public String getCollectorOutputDir() { return collectorOutputDir; }
-    public void setCollectorOutputDir(String collectorOutputDir) { this.collectorOutputDir = collectorOutputDir; }
 }

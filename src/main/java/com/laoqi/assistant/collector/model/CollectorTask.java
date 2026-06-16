@@ -13,7 +13,6 @@ public class CollectorTask {
     private String url;
     private String cronExpression;
     private Boolean enabled;
-    private String outputPath;
     private String datasetId;
     private Map<String, String> params;
     private String createdAt;
@@ -41,9 +40,6 @@ public class CollectorTask {
 
     public Boolean getEnabled() { return enabled; }
     public void setEnabled(Boolean enabled) { this.enabled = enabled; }
-
-    public String getOutputPath() { return outputPath; }
-    public void setOutputPath(String outputPath) { this.outputPath = outputPath; }
 
     public String getDatasetId() { return datasetId; }
     public void setDatasetId(String datasetId) { this.datasetId = datasetId; }

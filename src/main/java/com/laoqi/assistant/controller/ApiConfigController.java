@@ -121,11 +121,7 @@ public class ApiConfigController {
 
     @PostMapping("/api/config/collector-dir")
     public Map<String, Object> updateCollectorDir(@RequestParam String dir) {
-        Config cfg = configService.load();
-        cfg.setCollectorOutputDir(dir);
-        configService.save(cfg);
-        logService.add("配置更新", "成功", "采集器输出目录已更新为: " + dir);
-        return Map.of("ok", true);
+        return Map.of("ok", false, "error", "该功能已废弃，采集器数据现保存至数据中心");
     }
 
     @PostMapping("/api/config/media-collect")

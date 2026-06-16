@@ -90,7 +90,6 @@ public class CollectorService {
         defaultTask.setPromptKey("csdn-collect");
         defaultTask.setCronExpression("0 0 8 * * ?");
         defaultTask.setEnabled(false);
-        defaultTask.setOutputPath(configService.load().getCollectorOutputDir());
         defaultTask.setCreatedAt(TimeUtil.nowStr());
         defaultTask.setUpdatedAt(TimeUtil.nowStr());
         tasks.put(defaultTask.getId(), defaultTask);
@@ -282,7 +281,6 @@ public class CollectorService {
         if (task.getUrl() != null) existing.setUrl(task.getUrl());
         if (task.getCronExpression() != null) existing.setCronExpression(task.getCronExpression());
         if (task.getEnabled() != null) existing.setEnabled(task.getEnabled());
-        if (task.getOutputPath() != null) existing.setOutputPath(task.getOutputPath());
         if (task.getDatasetId() != null) existing.setDatasetId(task.getDatasetId());
         if (task.getParams() != null) existing.setParams(task.getParams());
         existing.setUpdatedAt(TimeUtil.nowStr());
@@ -533,52 +531,6 @@ public class CollectorService {
             log.warn("Failed to parse response as records: {}", e.getMessage());
         }
         return records;
-    }
-
-    private void saveResultToFile(CollectorTask task, CollectorResult result) {
-        try {
-            var config = configService.load();
-            String baseDir = config.getBaseDir();
-
-            // 优先用任务自己的 outputPath，没有则用全局配置
-            String outputPath = task.getOutputPath();
-            if (outputPath == null || outputPath.isBlank()) {
-                outputPath = config.getCollectorOutputDir();
-            }
-
-            Path dir;
-            if (baseDir != null && !baseDir.isEmpty()) {
-                dir = Paths.get(baseDir).resolve(outputPath);
-            } else {
-                dir = Paths.get(outputPath);
-            }
-            if (!dir.toFile().exists()) {
-                dir.toFile().mkdirs();
-            }
-
-            // 保存带元信息的结果文件: {date}_{taskId}.json
-            String fileName = TimeUtil.todayStr() + "_" + task.getId() + ".json";
-            Path filePath = dir.resolve(fileName);
-            Map<String, Object> output = new LinkedHashMap<>();
-            output.put("taskId", task.getId());
-            output.put("taskName", task.getName());
-            output.put("collectTime", result.getCollectTime());
-            output.put("data", result.getParsedData());
-            FileUtil.writeJson(filePath, output);
-
-            // 保存纯数据文件: data.json（每次采集覆盖）
-            Path dataFile = dir.resolve("data.json");
-            try {
-                Object parsed = mapper.readValue(result.getParsedData(), Object.class);
-                FileUtil.writeJson(dataFile, parsed);
-            } catch (Exception e) {
-                FileUtil.writeText(dataFile, result.getParsedData());
-            }
-
-            log.info("Result saved to: {}, data.json updated", filePath);
-        } catch (Exception e) {
-            log.error("Failed to save result to file: {}", e.getMessage());
-        }
     }
 
     public List<CollectorLog> getTaskLogs(String taskId) {
