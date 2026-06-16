@@ -141,25 +141,25 @@
             </div>
         </div>
 
-        <div id="llmConfigFields" style="display:{{ 'block' if config.get('aiProvider') == 'direct' else 'none' }};">
+        <div id="llmConfigFields" th:style="${config.aiProvider == 'direct' ? 'display:block' : 'display:none'}">
             <div class="form-group">
                 <label>API Key</label>
-                <input type="password" id="llmApiKey" value="{{ config.llmApiKey or '' }}" placeholder="sk-xxxxxxxxxxxx">
+                <input type="password" id="llmApiKey" th:value="${config.llmApiKey ?: ''}" placeholder="sk-xxxxxxxxxxxx">
                 <div class="desc">LLM API 密钥</div>
             </div>
             <div class="form-group">
                 <label>API 地址</label>
-                <input type="text" id="llmBaseUrl" value="{{ config.llmBaseUrl or 'https://api.deepseek.com' }}" placeholder="https://api.deepseek.com">
+                <input type="text" id="llmBaseUrl" th:value="${config.llmBaseUrl ?: 'https://api.deepseek.com'}" placeholder="https://api.deepseek.com">
                 <div class="desc">兼容 OpenAI 格式的 API 地址。DeepSeek: https://api.deepseek.com，商汤: https://api.sensenova.cn/v1</div>
             </div>
             <div class="form-group">
                 <label>模型名</label>
-                <input type="text" id="llmModel" value="{{ config.llmModel or 'deepseek-chat' }}" placeholder="deepseek-chat">
+                <input type="text" id="llmModel" th:value="${config.llmModel ?: 'deepseek-chat'}" placeholder="deepseek-chat">
                 <div class="desc">模型名称，如 deepseek-chat、sensenova-6.7-flash-lite</div>
             </div>
             <div class="form-group">
                 <label>超时（秒）</label>
-                <input type="number" id="llmTimeout" value="{{ config.llmTimeout or 60 }}" min="10" max="300">
+                <input type="number" id="llmTimeout" th:value="${config.llmTimeout ?: 60}" min="10" max="300">
             </div>
         </div>
 

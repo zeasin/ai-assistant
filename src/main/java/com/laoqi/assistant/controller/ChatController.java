@@ -177,7 +177,7 @@ public class ChatController {
                     // 新模式：Java 直连 DeepSeek
                     log.info("[chat] 使用 LLM 直连模式");
                     if (!llmService.isAvailable()) {
-                        throw new IllegalStateException("LLM API Key 未配置，请在 application.yml 中设置 app.llm.api-key");
+                        throw new IllegalStateException("LLM API Key 未配置，请在配置页填写");
                     }
                     replyText = llmService.chat("你是一个知识库助手，基于笔记库上下文回答问题。请用中文回答。", fullMessage);
                 } else {

@@ -23,6 +23,7 @@ public class ReportService {
     private final FeishuService feishuService;
     private final LogService logService;
     private final OpenCodeService openCodeService;
+    private final LlmService llmService;
     private final ConfigService configService;
 
     private String latestReport = "";
@@ -32,11 +33,13 @@ public class ReportService {
     public ReportService(AppConfig appConfig,
                           FeishuService feishuService,
                           LogService logService, OpenCodeService openCodeService,
+                          LlmService llmService,
                           ConfigService configService) {
         this.appConfig = appConfig;
         this.feishuService = feishuService;
         this.logService = logService;
         this.openCodeService = openCodeService;
+        this.llmService = llmService;
         this.configService = configService;
     }
 
@@ -85,23 +88,36 @@ public class ReportService {
     public ReportResult generate() {
         ReportResult result = new ReportResult();
         try {
-            if (!openCodeService.isHealthy()) {
-                result.error = "opencode serve 未启动";
-                latestReport = "";
-                latestError = result.error;
-                return result;
-            }
-
             String prompt = readPrompt();
             prompt = prompt.replace("{date}", TimeUtil.todayStr());
             prompt = prompt.replace("{weekday}", TimeUtil.weekdayCn(TimeUtil.now()));
 
-            String sessionId = openCodeService.findIdleSession();
-            if (sessionId == null) {
-                sessionId = openCodeService.createSession("综合日报");
+            var config = configService.load();
+            boolean useDirectLlm = "direct".equals(config.getAiProvider());
+
+            String report;
+            if (useDirectLlm) {
+                if (!llmService.isAvailable()) {
+                    result.error = "LLM API Key 未配置";
+                    latestReport = "";
+                    latestError = result.error;
+                    return result;
+                }
+                report = llmService.chat("你是一个日报生成助手，根据工作笔记生成综合日报。请用中文回复。", prompt);
+            } else {
+                if (!openCodeService.isHealthy()) {
+                    result.error = "opencode serve 未启动";
+                    latestReport = "";
+                    latestError = result.error;
+                    return result;
+                }
+                String sessionId = openCodeService.findIdleSession();
+                if (sessionId == null) {
+                    sessionId = openCodeService.createSession("综合日报");
+                }
+                report = openCodeService.sendMessage(sessionId, prompt);
             }
 
-            String report = openCodeService.sendMessage(sessionId, prompt);
             if (report != null && !report.isEmpty()) {
                 result.report = report;
                 latestReport = report;

@@ -30,7 +30,6 @@ app:
     base-url: http://127.0.0.1:11434
     model: nomic-embed-text
     timeout-seconds: 30
-  # LLM 直连配置已移至 Web 配置页（/config），在 config.json 中管理
 
 mybatis-plus:
   configuration:

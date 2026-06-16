@@ -24,7 +24,7 @@ public class NoteAssistantService {
     private static final Logger log = LoggerFactory.getLogger(NoteAssistantService.class);
     private static final ObjectMapper mapper = new ObjectMapper();
 
-    private final ConfigService configService;
+    private final LlmConfigResolver configResolver;
     private final NoteTools noteTools;
     private final HttpClient httpClient;
 
@@ -91,8 +91,8 @@ public class NoteAssistantService {
 
     private static final int MAX_TOOL_ROUNDS = 25;
 
-    public NoteAssistantService(ConfigService configService, NoteTools noteTools) {
-        this.configService = configService;
+    public NoteAssistantService(LlmConfigResolver configResolver, NoteTools noteTools) {
+        this.configResolver = configResolver;
         this.noteTools = noteTools;
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(15))
@@ -100,42 +100,8 @@ public class NoteAssistantService {
                 .build();
     }
 
-    // ========== 配置读取 ==========
-
-    private String getApiKey() {
-        var cfg = configService.load();
-        String key = cfg.getLlmApiKey();
-        if (key != null && !key.isEmpty()) return key;
-        key = System.getenv("LLM_API_KEY");
-        if (key != null && !key.isEmpty()) return key;
-        key = System.getenv("DEEPSEEK_API_KEY");
-        return key;
-    }
-
-    private String getBaseUrl() {
-        var cfg = configService.load();
-        String url = cfg.getLlmBaseUrl();
-        if (url != null && !url.isEmpty()) return url;
-        url = System.getenv("LLM_BASE_URL");
-        if (url != null && !url.isEmpty()) return url;
-        return "https://api.deepseek.com";
-    }
-
-    private String getModel() {
-        var cfg = configService.load();
-        String m = cfg.getLlmModel();
-        if (m != null && !m.isEmpty()) return m;
-        return "deepseek-chat";
-    }
-
-    private int getTimeout() {
-        var cfg = configService.load();
-        return cfg.getLlmTimeout() > 0 ? cfg.getLlmTimeout() : 60;
-    }
-
     public boolean isAvailable() {
-        String key = getApiKey();
-        return key != null && !key.isEmpty();
+        return configResolver.isAvailable();
     }
 
     // ========== 公开 API ==========
@@ -159,10 +125,10 @@ public class NoteAssistantService {
             throw new IllegalStateException("LLM API Key 未配置，请在配置页填写");
         }
 
-        String apiKey = getApiKey();
-        String baseUrl = getBaseUrl();
-        String model = getModel();
-        int timeout = getTimeout();
+        String apiKey = configResolver.resolveApiKey();
+        String baseUrl = configResolver.resolveBaseUrl();
+        String model = configResolver.resolveModel();
+        int timeout = configResolver.resolveTimeout();
         if (baseUrl.endsWith("/")) baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
 
         @SuppressWarnings("unchecked")

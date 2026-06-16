@@ -195,8 +195,7 @@ public class FeishuLongConnectionService {
             new Thread(() -> {
                 try {
                     log.info("[飞书长连接] 开始处理消息: {}", finalText);
-                    boolean isCodeRelated = false;
-                    sendImmediateReply(finalChatId, finalChatType, finalMessageId, isCodeRelated);
+                    sendImmediateReply(finalChatId, finalChatType, finalMessageId);
                     String reply = processMessage(finalText, finalUserKey);
                     log.info("[飞书长连接] 消息处理完成，回复长度: {}", reply != null ? reply.length() : 0);
                     if (reply != null && !reply.isEmpty()) {
@@ -327,7 +326,7 @@ public class FeishuLongConnectionService {
         }
     }
 
-    private void sendImmediateReply(String chatId, String chatType, String messageId, boolean isCodeRelated) {
+    private void sendImmediateReply(String chatId, String chatType, String messageId) {
         try {
             String waitingMsg = "📚 收到消息，AI正在思考中，请稍候...";
             Map<String, String> contentMap = Map.of("text", waitingMsg);

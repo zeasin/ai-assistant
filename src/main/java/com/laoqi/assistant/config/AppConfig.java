@@ -47,19 +47,4 @@ public class AppConfig {
     public void setOllamaModel(String ollamaModel) { this.ollamaModel = ollamaModel; }
     public int getOllamaTimeoutSeconds() { return ollamaTimeoutSeconds; }
     public void setOllamaTimeoutSeconds(int ollamaTimeoutSeconds) { this.ollamaTimeoutSeconds = ollamaTimeoutSeconds; }
-
-    // LLM direct config
-    private String llmApiKey = "";
-    private String llmBaseUrl = "https://api.deepseek.com";
-    private String llmModel = "deepseek-chat";
-    private int llmTimeoutSeconds = 60;
-
-    public String getLlmApiKey() { return llmApiKey; }
-    public void setLlmApiKey(String llmApiKey) { this.llmApiKey = llmApiKey; }
-    public String getLlmBaseUrl() { return llmBaseUrl; }
-    public void setLlmBaseUrl(String llmBaseUrl) { this.llmBaseUrl = llmBaseUrl; }
-    public String getLlmModel() { return llmModel; }
-    public void setLlmModel(String llmModel) { this.llmModel = llmModel; }
-    public int getLlmTimeoutSeconds() { return llmTimeoutSeconds; }
-    public void setLlmTimeoutSeconds(int llmTimeoutSeconds) { this.llmTimeoutSeconds = llmTimeoutSeconds; }
 }

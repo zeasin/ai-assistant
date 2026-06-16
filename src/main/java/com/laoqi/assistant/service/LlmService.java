@@ -1,8 +1,6 @@
 package com.laoqi.assistant.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.laoqi.assistant.config.AppConfig;
-import com.laoqi.assistant.model.Config;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -18,7 +16,7 @@ import java.util.*;
  * 直连 LLM API（兼容 OpenAI 格式），不走 opencode serve。
  * 支持任意兼容 OpenAI Chat Completions 接口的提供商：
  * DeepSeek、商汤日日新、阿里通义、百度千帆、智谱、OpenAI 等。
- * 通过 application.yml 配置 base-url 切换。
+ * 配置读取统一委托给 LlmConfigResolver，消除与 NoteAssistantService 的重复。
  */
 @Service
 public class LlmService {
@@ -26,13 +24,11 @@ public class LlmService {
     private static final Logger log = LoggerFactory.getLogger(LlmService.class);
     private static final ObjectMapper mapper = new ObjectMapper();
 
-    private final AppConfig appConfig;
-    private final ConfigService configService;
+    private final LlmConfigResolver configResolver;
     private final HttpClient httpClient;
 
-    public LlmService(AppConfig appConfig, ConfigService configService) {
-        this.appConfig = appConfig;
-        this.configService = configService;
+    public LlmService(LlmConfigResolver configResolver) {
+        this.configResolver = configResolver;
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(15))
                 .version(HttpClient.Version.HTTP_1_1)
@@ -40,87 +36,10 @@ public class LlmService {
     }
 
     /**
-     * 加载 LLM 配置（优先使用 config.json 中的 Web 配置，其次 application.yml）
-     */
-    private Config loadLlmConfig() {
-        try {
-            return configService.load();
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    /**
-     * 获取 API Key，按优先级：
-     * 1. config.json 中 Web 页面配置的 llmApiKey
-     * 2. 环境变量 LLM_API_KEY
-     * 3. 环境变量 DEEPSEEK_API_KEY
-     * 4. application.yml 的 app.llm.api-key
-     */
-    private String resolveApiKey() {
-        // 1. Web 配置
-        Config cfg = loadLlmConfig();
-        if (cfg != null) {
-            String key = cfg.getLlmApiKey();
-            if (key != null && !key.isEmpty()) return key;
-        }
-        // 2. 环境变量
-        String key = System.getenv("LLM_API_KEY");
-        if (key != null && !key.isEmpty()) return key;
-        key = System.getenv("DEEPSEEK_API_KEY");
-        if (key != null && !key.isEmpty()) return key;
-        // 3. yml 配置（兜底）
-        key = appConfig.getLlmApiKey();
-        if (key != null && !key.isEmpty() && !key.startsWith("$")) return key;
-        return "";
-    }
-
-    /**
-     * 获取 API Base URL
-     */
-    private String resolveBaseUrl() {
-        Config cfg = loadLlmConfig();
-        if (cfg != null) {
-            String url = cfg.getLlmBaseUrl();
-            if (url != null && !url.isEmpty()) return url;
-        }
-        String envUrl = System.getenv("LLM_BASE_URL");
-        if (envUrl != null && !envUrl.isEmpty()) return envUrl;
-        String url = appConfig.getLlmBaseUrl();
-        if (url != null && !url.isEmpty() && !url.startsWith("$")) return url;
-        return "https://api.deepseek.com";
-    }
-
-    /**
-     * 获取模型名
-     */
-    public String resolveModel() {
-        Config cfg = loadLlmConfig();
-        if (cfg != null) {
-            String model = cfg.getLlmModel();
-            if (model != null && !model.isEmpty()) return model;
-        }
-        String m = appConfig.getLlmModel();
-        if (m != null && !m.isEmpty()) return m;
-        return "deepseek-chat";
-    }
-
-    /**
-     * 获取超时秒数
-     */
-    private int resolveTimeout() {
-        Config cfg = loadLlmConfig();
-        if (cfg != null && cfg.getLlmTimeout() > 0) return cfg.getLlmTimeout();
-        int t = appConfig.getLlmTimeoutSeconds();
-        return t > 0 ? t : 60;
-    }
-
-    /**
      * 检查 LLM 直连是否可用（API Key 已配置）
      */
     public boolean isAvailable() {
-        String apiKey = resolveApiKey();
-        return apiKey != null && !apiKey.isEmpty();
+        return configResolver.isAvailable();
     }
 
     /**
@@ -140,21 +59,20 @@ public class LlmService {
      * 同步调用 LLM，返回完整回复文本
      */
     public String chat(List<Map<String, String>> messages) throws Exception {
-        String apiKey = resolveApiKey();
+        String apiKey = configResolver.resolveApiKey();
         if (apiKey == null || apiKey.isEmpty()) {
-            throw new IllegalStateException("LLM API Key 未配置，请在 application.yml 中设置 app.llm.api-key" +
-                    "，或设置环境变量 LLM_API_KEY / DEEPSEEK_API_KEY");
+            throw new IllegalStateException("LLM API Key 未配置，请在配置页填写，或设置环境变量 LLM_API_KEY / DEEPSEEK_API_KEY");
         }
 
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("model", resolveModel());
+        body.put("model", configResolver.resolveModel());
         body.put("messages", messages);
         body.put("temperature", 0.7);
         body.put("stream", false);
 
         String jsonBody = mapper.writeValueAsString(body);
 
-        String baseUrl = resolveBaseUrl();
+        String baseUrl = configResolver.resolveBaseUrl();
         // 确保不以 / 结尾
         if (baseUrl.endsWith("/")) {
             baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
@@ -167,7 +85,7 @@ public class LlmService {
                 .header("Content-Type", "application/json")
                 .header("Authorization", "Bearer " + apiKey)
                 .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
-                .timeout(Duration.ofSeconds(resolveTimeout()))
+                .timeout(Duration.ofSeconds(configResolver.resolveTimeout()))
                 .build();
 
         long start = System.currentTimeMillis();
@@ -197,19 +115,13 @@ public class LlmService {
         Map<String, Object> usage = (Map<String, Object>) json.get("usage");
         if (usage != null) {
             log.info("[llm] 模型={} 耗时={}ms token={}",
-                    resolveModel(), elapsed, usage);
+                    configResolver.resolveModel(), elapsed, usage);
         } else {
-            log.info("[llm] 模型={} 耗时={}ms", resolveModel(), elapsed);
+            log.info("[llm] 模型={} 耗时={}ms", configResolver.resolveModel(), elapsed);
         }
 
         return content != null ? content : "";
     }
 
-    /**
-     * 判断当前是否使用"新模式"（Java 直连 LLM）
-     */
-    public boolean isDirectMode(ConfigService configService) {
-        var config = configService.load();
-        return "direct".equals(config.getAiProvider());
-    }
+
 }

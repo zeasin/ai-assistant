@@ -483,3 +483,25 @@ SQLite（会话历史 + 语义检索） ←→ SessionService（不动）
 4. **现有 SessionService 不用动**：SQLite 管理会话历史 + 语义检索，与 LangChain4j 互补
 5. **记录场景提速**：从 opencode 几分钟 → LangChain4j + flash 模型 10-20 秒
 6. **分步迁移风险低**：直连和 opencode 可以并跑，逐个场景切换
+
+## 待优化项
+
+### 1. 历史压缩（控制 Token 消耗）
+
+**问题**：
+`NoteAssistantService.sessionHistories` 会累积每次编排的历史消息。第一次编排产生 8 条消息（system + user + 6 轮工具调用 + 回复），第二次再产生 8 条，第三次... Token 消耗会线性增长。
+
+**方案**：
+每次编排完成后，将整段对话压缩成一条摘要消息（语义摘要 + 关键结果），替代原始工具调用细节。
+
+```
+第1次编排后：
+  [原始] system + user + 3次tool_call + 3次tool_result + reply = 9条消息
+  [压缩] system + "用户记录了BUG：xxx，保存在 项目/data/BUG记录.json" = 2条消息
+```
+
+**实现思路**：
+- 每次 `chat()` 返回后，调用 LLM 将本轮对话压缩成一段摘要
+- 清空 `sessionHistories` 中的原始消息
+- 只保留 system prompt + 压缩后的摘要
+- 也可以直接用文本截断 + 关键信息提取（更省 token）
