@@ -37,16 +37,19 @@ public class ChatController {
     private final ChatSessionService sessionService;
     private final OpenCodeService openCodeService;
     private final LlmService llmService;
+    private final NoteAssistantService noteAssistantService;
     private final ConfigService configService;
     private final LogService logService;
     private final AppConfig appConfig;
 
     public ChatController(ChatSessionService sessionService, OpenCodeService openCodeService,
-                          LlmService llmService, ConfigService configService,
+                          LlmService llmService, NoteAssistantService noteAssistantService,
+                          ConfigService configService,
                           LogService logService, AppConfig appConfig) {
         this.sessionService = sessionService;
         this.openCodeService = openCodeService;
         this.llmService = llmService;
+        this.noteAssistantService = noteAssistantService;
         this.configService = configService;
         this.logService = logService;
         this.appConfig = appConfig;
@@ -174,12 +177,18 @@ public class ChatController {
 
                 String replyText;
                 if (useDirectLlm) {
-                    // 新模式：Java 直连 DeepSeek
+                    // 新模式：Java 直连 LLM
                     log.info("[chat] 使用 LLM 直连模式");
                     if (!llmService.isAvailable()) {
                         throw new IllegalStateException("LLM API Key 未配置，请在配置页填写");
                     }
-                    replyText = llmService.chat("你是一个知识库助手，基于笔记库上下文回答问题。请用中文回答。", fullMessage);
+                    // 判断是否需要工具编排（记笔记等）
+                    if (noteAssistantService.needsOrchestration(message)) {
+                        log.info("[chat] 需要工具编排，转 NoteAssistant");
+                        replyText = noteAssistantService.chat(sessionId, message);
+                    } else {
+                        replyText = llmService.chat("你是一个知识库助手，基于笔记库上下文回答问题。请用中文回答。", fullMessage);
+                    }
                 } else {
                     // 旧模式：走 opencode serve
                     log.info("[chat] 使用 opencode 模式");

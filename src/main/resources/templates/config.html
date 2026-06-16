@@ -222,15 +222,6 @@ fetch('/api/config')
         if (cfg.feishuChatId) document.getElementById('feishuChatId').value = cfg.feishuChatId;
         if (cfg.feishuPollingEnabled) document.getElementById('feishuPollingEnabled').checked = true;
         if (cfg.baseDir) document.getElementById('baseDirPath').value = cfg.baseDir;
-        const enabledCheckbox = document.getElementById('mediaCollectEnabled');
-        const toggleText = document.getElementById('mediaCollectToggleText');
-        if (cfg.mediaCollectEnabled) {
-            enabledCheckbox.checked = true;
-            toggleText.textContent = '已开启';
-        }
-        if (cfg.mediaCollectTime) {
-            document.getElementById('mediaCollectTime').value = cfg.mediaCollectTime;
-        }
         if (cfg.collectorOutputDir) {
             document.getElementById('collectorOutputDir').value = cfg.collectorOutputDir;
         }
@@ -242,9 +233,6 @@ fetch('/api/config')
         if (cfg.llmModel) document.getElementById('llmModel').value = cfg.llmModel;
         if (cfg.llmTimeout) document.getElementById('llmTimeout').value = cfg.llmTimeout;
         toggleLlmConfig();
-        enabledCheckbox.addEventListener('change', function() {
-            toggleText.textContent = this.checked ? '已开启' : '已关闭';
-        });
     })
     .catch(() => {});
 
