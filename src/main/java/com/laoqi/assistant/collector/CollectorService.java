@@ -449,10 +449,6 @@ public class CollectorService {
     private void postExecute(CollectorTask task, CollectorResult result, CollectorLog logEntry, int responseSize, long startMs) {
         String taskId = task.getId();
 
-        if (task.getOutputPath() != null && !task.getOutputPath().isEmpty()) {
-            saveResultToFile(task, result);
-        }
-
         if (task.getDatasetId() != null && !task.getDatasetId().isEmpty()) {
             try {
                 List<Map<String, Object>> records = parseToRecords(result.getParsedData());

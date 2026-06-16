@@ -4,10 +4,15 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.laoqi.assistant.datacenter.model.*;
 import com.laoqi.assistant.service.OpenCodeService;
+import com.laoqi.assistant.service.ModuleService;
+import com.laoqi.assistant.service.ConfigService;
+import com.laoqi.assistant.model.ModuleDefinition;
+import com.laoqi.assistant.util.FileUtil;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.file.Path;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -22,13 +27,19 @@ public class DataSetController {
     private final DataSetService dataSetService;
     private final DataSetImportService importService;
     private final OpenCodeService openCodeService;
+    private final ModuleService moduleService;
+    private final ConfigService configService;
 
     public DataSetController(DataSetService dataSetService,
                              DataSetImportService importService,
-                             OpenCodeService openCodeService) {
+                             OpenCodeService openCodeService,
+                             ModuleService moduleService,
+                             ConfigService configService) {
         this.dataSetService = dataSetService;
         this.importService = importService;
         this.openCodeService = openCodeService;
+        this.moduleService = moduleService;
+        this.configService = configService;
     }
 
     @GetMapping("/datasets")
@@ -265,5 +276,162 @@ public class DataSetController {
         }
 
         return "[]";
+    }
+
+    @GetMapping("/modules")
+    public ResponseEntity<Map<String, Object>> getModules() {
+        List<ModuleDefinition> modules = moduleService.getModules();
+        List<Map<String, String>> result = new ArrayList<>();
+        for (ModuleDefinition mod : modules) {
+            result.add(Map.of(
+                "id", mod.getId() != null ? mod.getId() : "",
+                "name", mod.getName() != null ? mod.getName() : "",
+                "dir", mod.getDir() != null ? mod.getDir() : ""
+            ));
+        }
+        return ResponseEntity.ok(Map.of("ok", true, "data", result));
+    }
+
+    @PostMapping("/datasets/{id}/export")
+    public ResponseEntity<Map<String, Object>> exportToModule(
+            @PathVariable String id,
+            @RequestBody Map<String, Object> body) {
+        try {
+            DataSet ds = dataSetService.getDataset(id);
+            if (ds == null) {
+                return ResponseEntity.ok(Map.of("ok", false, "error", "数据集不存在"));
+            }
+
+            String moduleId = (String) body.get("moduleId");
+            if (moduleId == null || moduleId.isEmpty()) {
+                return ResponseEntity.ok(Map.of("ok", false, "error", "请选择目标模块"));
+            }
+
+            ModuleDefinition mod = moduleService.getModule(moduleId);
+            if (mod == null) {
+                return ResponseEntity.ok(Map.of("ok", false, "error", "模块不存在: " + moduleId));
+            }
+
+            List<Map<String, Object>> allRecords = dataSetService.loadRecords(id);
+
+            @SuppressWarnings("unchecked")
+            List<String> recordIds = (List<String>) body.get("recordIds");
+            List<Map<String, Object>> records;
+            if (recordIds != null && !recordIds.isEmpty()) {
+                Set<String> idSet = new HashSet<>(recordIds);
+                records = allRecords.stream()
+                    .filter(r -> idSet.contains(r.get("_id")))
+                    .toList();
+            } else {
+                records = allRecords;
+            }
+
+            if (records.isEmpty()) {
+                return ResponseEntity.ok(Map.of("ok", false, "error", "没有可导出的数据"));
+            }
+
+            String customPrompt = (String) body.get("prompt");
+
+            Path dataDir = moduleService.getModuleDataDir(mod);
+            String sampleData = readSampleData(dataDir, mod);
+
+            String prompt = buildExportPrompt(records, ds, mod, sampleData, customPrompt);
+
+            if (!openCodeService.isHealthy()) {
+                return ResponseEntity.ok(Map.of("ok", false, "error", "AI服务未运行"));
+            }
+
+            String sessionId = openCodeService.findIdleSession();
+            if (sessionId == null) {
+                sessionId = openCodeService.createSession("数据导出");
+            }
+
+            String rawResponse = openCodeService.sendMessage(sessionId, prompt);
+            String jsonData = extractJsonFromResponse(rawResponse);
+
+            Object parsed = mapper.readValue(jsonData, Object.class);
+            String fileName = "data_export_" + System.currentTimeMillis() + ".json";
+            Path filePath = dataDir.resolve(fileName);
+            FileUtil.writeJson(filePath, parsed);
+
+            return ResponseEntity.ok(Map.of(
+                "ok", true,
+                "count", records.size(),
+                "file", fileName,
+                "module", mod.getName(),
+                "message", "成功导出 " + records.size() + " 条记录到 " + mod.getName()
+            ));
+
+        } catch (Exception e) {
+            return ResponseEntity.ok(Map.of("ok", false, "error", "导出失败: " + e.getMessage()));
+        }
+    }
+
+    private String readSampleData(Path dataDir, ModuleDefinition mod) {
+        StringBuilder sb = new StringBuilder();
+        if (mod.getDataFiles() != null) {
+            for (String fileName : mod.getDataFiles()) {
+                Path file = dataDir.resolve(fileName);
+                if (FileUtil.exists(file)) {
+                    String content = FileUtil.readText(file);
+                    if (!content.isEmpty()) {
+                        sb.append("--- ").append(fileName).append(" ---\n");
+                        sb.append(content, 0, Math.min(content.length(), 2000));
+                        sb.append("\n\n");
+                    }
+                }
+            }
+        }
+        if (sb.isEmpty() && FileUtil.exists(dataDir)) {
+            try {
+                var files = java.nio.file.Files.list(dataDir);
+                files.filter(p -> p.toString().endsWith(".json"))
+                    .limit(2)
+                    .forEach(p -> {
+                        String content = FileUtil.readText(p);
+                        sb.append("--- ").append(p.getFileName()).append(" ---\n");
+                        sb.append(content, 0, Math.min(content.length(), 2000));
+                        sb.append("\n\n");
+                    });
+            } catch (Exception e) {}
+        }
+        return sb.toString();
+    }
+
+    private String buildExportPrompt(List<Map<String, Object>> records, DataSet ds,
+                                      ModuleDefinition mod, String sampleData, String customPrompt) {
+        StringBuilder sb = new StringBuilder();
+
+        if (customPrompt != null && !customPrompt.isBlank()) {
+            sb.append(customPrompt).append("\n\n");
+        } else {
+            sb.append("请将以下数据转换为业务数据格式。\n\n");
+        }
+
+        sb.append("目标模块: ").append(mod.getName()).append("\n");
+        sb.append("目标目录: ").append(mod.getDir()).append("/data/\n\n");
+
+        if (!sampleData.isEmpty()) {
+            sb.append("现有业务数据格式样例（请保持一致）：\n");
+            sb.append("```\n").append(sampleData).append("\n```\n\n");
+        }
+
+        sb.append("待导出数据（共").append(records.size()).append("条）：\n");
+        try {
+            String recordsJson = mapper.writeValueAsString(records);
+            sb.append("```json\n");
+            sb.append(recordsJson, 0, Math.min(recordsJson.length(), 8000));
+            if (recordsJson.length() > 8000) sb.append("...");
+            sb.append("\n```\n\n");
+        } catch (Exception e) {
+            sb.append("（数据序列化失败）\n\n");
+        }
+
+        sb.append("要求：\n");
+        sb.append("1. 参考现有业务数据格式，将待导出数据转换为相同格式\n");
+        sb.append("2. 直接输出JSON数组，用 ```json 包裹\n");
+        sb.append("3. 不要输出其他说明文字\n");
+
+        return sb.toString();
     }
 }

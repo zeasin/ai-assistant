@@ -155,10 +155,6 @@
                         <label>Cron表达式</label>
                         <input type="text" id="cronExpression" placeholder="例如：0 0 8 * * ? (每天8点)">
                     </div>
-                    <div class="form-group">
-                        <label>输出路径</label>
-                        <input type="text" id="outputPath" placeholder="结果保存路径（相对于笔记库）">
-                    </div>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
@@ -320,7 +316,6 @@
                     document.getElementById('promptKey').value = task.promptKey || '';
                     document.getElementById('fetchUrl').value = task.url || '';
                     document.getElementById('cronExpression').value = task.cronExpression || '';
-                    document.getElementById('outputPath').value = task.outputPath || '';
                     document.getElementById('datasetId').value = task.datasetId || '';
                     document.getElementById('params').value = task.params ? JSON.stringify(task.params, null, 2) : '';
                     document.getElementById('enabled').value = String(task.enabled || false);
@@ -347,7 +342,6 @@
                     promptKey: document.getElementById('promptKey').value || null,
                     url: document.getElementById('fetchUrl').value || null,
                     cronExpression: document.getElementById('cronExpression').value || null,
-                    outputPath: document.getElementById('outputPath').value || null,
                     datasetId: document.getElementById('datasetId').value || null,
                     params: document.getElementById('params').value ? JSON.parse(document.getElementById('params').value) : null,
                     enabled: document.getElementById('enabled').value === 'true'

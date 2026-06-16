@@ -173,6 +173,7 @@
             <div class="search-bar">
                 <input type="text" id="browseKeyword" placeholder="搜索..." onkeydown="if(event.key==='Enter')loadBrowseData()">
                 <button class="btn btn-secondary" onclick="loadBrowseData()">搜索</button>
+                <button class="btn btn-primary" onclick="showExportModal()">导出到业务</button>
             </div>
             <div class="data-scroll" id="browseTable"></div>
         </div>
@@ -272,6 +273,42 @@
                 </div>
             </div>
         </div>
+
+    <!-- Export Modal -->
+    <div class="modal-overlay" id="exportModal">
+        <div class="modal" style="width:650px;">
+            <h3>导出到业务目录</h3>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>目标模块 *</label>
+                    <select id="exportModuleId"></select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>导出范围</label>
+                    <select id="exportScope">
+                        <option value="all">全部数据</option>
+                        <option value="filtered">当前筛选结果</option>
+                        <option value="selected">已选中的记录</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>AI转换提示词（可编辑）</label>
+                    <textarea id="exportPrompt" rows="6" placeholder="留空使用默认提示词...">请将以下数据转换为业务数据格式。参考现有业务数据格式样例，将待导出数据转换为相同格式。直接输出JSON数组，用 ```json 包裹。</textarea>
+                </div>
+            </div>
+            <div style="font-size:12px;color:#5c5f66;margin-bottom:12px;">
+                AI会读取目标模块目录下的现有数据文件作为格式参考，然后将选中数据转换为相同格式后保存。
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('exportModal')">取消</button>
+                <button type="button" class="btn btn-primary" id="exportBtn" onclick="executeExport()">AI转换并导出</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Create/Edit Dataset Modal -->
     <div class="modal-overlay" id="datasetModal">
@@ -674,11 +711,11 @@
         function renderBrowseTable(records, datasetId) {
             if (!records || records.length === 0) {
                 document.getElementById('browseTable').innerHTML = '<div class="empty-state">暂无数据</div>';
+                selectedRecordIds = [];
                 return;
             }
 
-            const schemaFields = allDatasets.find(d => d.id === datasetId);
-            const ds = allDatasets.find(d => d.id === datasetId);
+            selectedRecordIds = [];
 
             const allKeys = new Set();
             records.forEach(r => {
@@ -688,14 +725,20 @@
             });
             const cols = [...allKeys];
 
-            let h = `<div style="font-size:12px;color:#5c5f66;margin-bottom:8px;">共 ${records.length} 条记录</div>`;
+            let h = `<div style="font-size:12px;color:#5c5f66;margin-bottom:8px;display:flex;align-items:center;gap:12px;">`;
+            h += `<span>共 ${records.length} 条记录</span>`;
+            h += `<label style="cursor:pointer;"><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this, '${datasetId}')"> 全选</label>`;
+            h += `<span id="selectedCount" style="color:#7c5cfc;"></span>`;
+            h += `</div>`;
             h += '<table class="data-table"><thead><tr>';
+            h += '<th style="width:30px;"><input type="checkbox" id="selectAllHead" onchange="toggleSelectAll(this, \'' + datasetId + '\')"></th>';
             h += '<th class="col-id">ID</th><th class="col-source">来源</th>';
             cols.forEach(c => { h += `<th>${esc(c)}</th>`; });
             h += '<th class="col-actions"></th>';
             h += '</tr></thead><tbody>';
             records.forEach(r => {
                 h += '<tr>';
+                h += `<td><input type="checkbox" class="record-cb" data-id="${esc(r._id || '')}" onchange="toggleRecordSelect()"></td>`;
                 h += `<td class="col-id" style="font-size:11px;color:#909296;">${esc(r._id || '')}</td>`;
                 h += `<td class="col-source"><span class="badge badge-gray">${esc(r._source || '')}</span></td>`;
                 cols.forEach(c => {
@@ -708,6 +751,20 @@
             });
             h += '</tbody></table>';
             document.getElementById('browseTable').innerHTML = h;
+        }
+
+        function toggleSelectAll(cb, datasetId) {
+            document.querySelectorAll('.record-cb').forEach(c => { c.checked = cb.checked; });
+            toggleRecordSelect();
+        }
+
+        function toggleRecordSelect() {
+            selectedRecordIds = [];
+            document.querySelectorAll('.record-cb:checked').forEach(c => {
+                selectedRecordIds.push(c.dataset.id);
+            });
+            const el = document.getElementById('selectedCount');
+            if (el) el.textContent = selectedRecordIds.length > 0 ? `已选 ${selectedRecordIds.length} 条` : '';
         }
 
         function browseDataset(id) {
@@ -724,6 +781,62 @@
             });
             document.querySelectorAll('.ds-panel').forEach(p => p.classList.remove('active'));
             document.getElementById('panel-' + tab).classList.add('active');
+        }
+
+        async function showExportModal() {
+            const datasetId = document.getElementById('browseDatasetId').value;
+            if (!datasetId) { toast('请先选择数据集', 'error'); return; }
+            try {
+                const res = await fetch('/api/datacenter/modules');
+                const data = await res.json();
+                if (data.ok && data.data) {
+                    const sel = document.getElementById('exportModuleId');
+                    sel.innerHTML = '<option value="">选择目标模块...</option>' +
+                        data.data.map(m => `<option value="${m.id}">${m.name} (${m.dir})</option>`).join('');
+                }
+            } catch (e) {}
+            document.getElementById('exportModal').classList.add('active');
+        }
+
+        let selectedRecordIds = [];
+
+        async function executeExport() {
+            const datasetId = document.getElementById('browseDatasetId').value;
+            const moduleId = document.getElementById('exportModuleId').value;
+            const scope = document.getElementById('exportScope').value;
+            const prompt = document.getElementById('exportPrompt').value;
+
+            if (!datasetId) { toast('请先选择数据集', 'error'); return; }
+            if (!moduleId) { toast('请选择目标模块', 'error'); return; }
+
+            document.getElementById('exportBtn').disabled = true;
+            document.getElementById('exportBtn').textContent = 'AI转换中...';
+
+            try {
+                let recordIds = null;
+                if (scope === 'selected' && selectedRecordIds.length > 0) {
+                    recordIds = selectedRecordIds;
+                }
+
+                const body = { moduleId, recordIds, prompt: prompt || null };
+                const res = await fetch('/api/datacenter/datasets/' + datasetId + '/export', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const data = await res.json();
+                if (data.ok) {
+                    toast(data.message, 'success');
+                    closeModal('exportModal');
+                } else {
+                    toast(data.error, 'error');
+                }
+            } catch (e) {
+                toast('导出失败: ' + e.message, 'error');
+            } finally {
+                document.getElementById('exportBtn').disabled = false;
+                document.getElementById('exportBtn').textContent = 'AI转换并导出';
+            }
         }
 
         async function deleteRecord(datasetId, recordId) {
