@@ -12,6 +12,7 @@ public class DataSet {
     private DataSchema schema;
     private String outputDir;
     private Map<String, ImportConfig> importConfigs = new HashMap<>();
+    private int recordCount;
     private String createdAt;
     private String updatedAt;
 
@@ -34,6 +35,9 @@ public class DataSet {
 
     public Map<String, ImportConfig> getImportConfigs() { return importConfigs; }
     public void setImportConfigs(Map<String, ImportConfig> importConfigs) { this.importConfigs = importConfigs; }
+
+    public int getRecordCount() { return recordCount; }
+    public void setRecordCount(int recordCount) { this.recordCount = recordCount; }
 
     public String getCreatedAt() { return createdAt; }
     public void setCreatedAt(String createdAt) { this.createdAt = createdAt; }

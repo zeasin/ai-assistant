@@ -1,22 +1,34 @@
 package com.laoqi.assistant.datacenter;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.laoqi.assistant.datacenter.model.*;
+import com.laoqi.assistant.datacenter.model.DataField;
+import com.laoqi.assistant.datacenter.model.DataSchema;
+import com.laoqi.assistant.datacenter.model.DataSet;
+import com.laoqi.assistant.datacenter.model.ImportConfig;
+import com.laoqi.assistant.entity.DataSetEntity;
+import com.laoqi.assistant.entity.DataSetRecordEntity;
 import com.laoqi.assistant.service.ConfigService;
 import com.laoqi.assistant.service.LogService;
-import com.laoqi.assistant.util.FileUtil;
+import com.laoqi.assistant.service.db.DataSetDbService;
+import com.laoqi.assistant.service.db.DataSetRecordDbService;
 import com.laoqi.assistant.util.TimeUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
-import java.nio.file.*;
+import javax.sql.DataSource;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.sql.Connection;
+import java.sql.Statement;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
 @Service
 public class DataSetService {
@@ -24,104 +36,125 @@ public class DataSetService {
     private static final Logger log = LoggerFactory.getLogger(DataSetService.class);
     private static final ObjectMapper mapper = new ObjectMapper();
     private static final int MAX_RECORDS = 10000;
+    private static final Set<String> META_FIELDS = Set.of("_id", "_source", "_importTime", "_hash");
 
     private final ConfigService configService;
     private final LogService logService;
-    private final Map<String, DataSet> datasets = new ConcurrentHashMap<>();
+    private final DataSource dataSource;
+    private final DataSetDbService dataSetDbService;
+    private final DataSetRecordDbService recordDbService;
 
-    public DataSetService(ConfigService configService, LogService logService) {
+    public DataSetService(ConfigService configService, LogService logService,
+                          DataSource dataSource, DataSetDbService dataSetDbService,
+                          DataSetRecordDbService recordDbService) {
         this.configService = configService;
         this.logService = logService;
+        this.dataSource = dataSource;
+        this.dataSetDbService = dataSetDbService;
+        this.recordDbService = recordDbService;
     }
 
     @PostConstruct
     public void init() {
         log.info("Initializing DataSetService");
-        loadDatasets();
-        log.info("Loaded {} datasets", datasets.size());
+        createTables();
+        migrateFromFiles();
+        log.info("DataSetService initialized");
     }
 
-    private Path getDataCenterDir() {
+    private void createTables() {
+        try (Connection conn = dataSource.getConnection(); Statement stmt = conn.createStatement()) {
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS data_center_datasets (
+                    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                    dataset_id      TEXT NOT NULL UNIQUE,
+                    name            TEXT NOT NULL,
+                    description     TEXT,
+                    schema_json     TEXT,
+                    import_configs_json TEXT,
+                    created_at      TEXT NOT NULL,
+                    updated_at      TEXT NOT NULL
+                )
+                """);
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS data_center_records (
+                    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                    record_id       TEXT NOT NULL,
+                    dataset_id      TEXT NOT NULL,
+                    data_json       TEXT NOT NULL,
+                    source          TEXT,
+                    content_hash    TEXT,
+                    created_at      TEXT NOT NULL
+                )
+                """);
+            stmt.execute("CREATE INDEX IF NOT EXISTS idx_records_dataset ON data_center_records(dataset_id)");
+            stmt.execute("CREATE INDEX IF NOT EXISTS idx_records_hash ON data_center_records(dataset_id, content_hash)");
+            log.info("Data center tables initialized");
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to create data center tables", e);
+        }
+    }
+
+    private void migrateFromFiles() {
         try {
             String baseDir = configService.getBaseDir();
-            if (baseDir == null || baseDir.isEmpty()) {
-                throw new IllegalStateException("baseDir is empty");
+            if (baseDir == null || baseDir.isEmpty()) return;
+
+            Path fileDir = java.nio.file.Paths.get(baseDir).resolve("AI").resolve("数据中心");
+            Path datasetsFile = fileDir.resolve("datasets.json");
+            if (!java.nio.file.Files.exists(datasetsFile)) return;
+
+            List<DataSet> fileDatasets = mapper.readValue(datasetsFile.toFile(),
+                    new TypeReference<List<DataSet>>() {});
+            if (fileDatasets == null || fileDatasets.isEmpty()) return;
+
+            long dbCount = dataSetDbService.count();
+            if (dbCount > 0) {
+                log.info("Database already has {} datasets, skipping file migration", dbCount);
+                return;
             }
-            Path dir = Paths.get(baseDir).resolve("AI").resolve("数据中心");
-            if (!Files.exists(dir)) {
-                Files.createDirectories(dir);
-            }
-            return dir;
-        } catch (Exception e) {
-            log.warn("Failed to get data center dir: {}, using fallback", e.getMessage());
-            Path fallback = Paths.get(System.getProperty("user.dir")).resolve("AI").resolve("数据中心");
-            try {
-                if (!Files.exists(fallback)) {
-                    Files.createDirectories(fallback);
-                }
-            } catch (Exception ex) {
-                log.error("Failed to create fallback dir: {}", ex.getMessage());
-            }
-            return fallback;
-        }
-    }
 
-    private Path getDatasetsFile() {
-        return getDataCenterDir().resolve("datasets.json");
-    }
+            log.info("Migrating {} datasets from files to database", fileDatasets.size());
+            for (DataSet ds : fileDatasets) {
+                saveDatasetToDb(ds);
 
-    private Path getDatasetDir(String datasetId) {
-        return getDataCenterDir().resolve(datasetId);
-    }
-
-    private Path getDataFile(String datasetId) {
-        return getDatasetDir(datasetId).resolve("data.json");
-    }
-
-    private Path getImportsDir(String datasetId) {
-        return getDatasetDir(datasetId).resolve("imports");
-    }
-
-    private void loadDatasets() {
-        try {
-            Path file = getDatasetsFile();
-            if (FileUtil.exists(file)) {
-                List<DataSet> loaded = FileUtil.readJson(file,
-                        new TypeReference<List<DataSet>>() {}, new ArrayList<>());
-                for (DataSet ds : loaded) {
-                    datasets.put(ds.getId(), ds);
+                Path dsDir = fileDir.resolve(ds.getId());
+                Path dataFile = dsDir.resolve("data.json");
+                if (java.nio.file.Files.exists(dataFile)) {
+                    List<Map<String, Object>> records = mapper.readValue(dataFile.toFile(),
+                            new TypeReference<List<Map<String, Object>>>() {});
+                    if (records != null) {
+                        for (Map<String, Object> record : records) {
+                            saveRecordToDb(ds.getId(), record, "migrated");
+                        }
+                    }
                 }
             }
+            log.info("File migration completed");
         } catch (Exception e) {
-            log.error("Failed to load datasets: {}", e.getMessage());
+            log.warn("File migration failed: {}", e.getMessage());
         }
     }
 
-    private void saveDatasets() {
-        try {
-            FileUtil.writeJson(getDatasetsFile(), new ArrayList<>(datasets.values()));
-        } catch (Exception e) {
-            log.error("Failed to save datasets: {}", e.getMessage());
+    public List<DataSet> getAllDatasets() {
+        List<DataSet> result = new ArrayList<>();
+        List<DataSetEntity> entities = dataSetDbService.list();
+        for (DataSetEntity entity : entities) {
+            DataSet ds = toModel(entity);
+            ds.setRecordCount(recordDbService.countByDataset(ds.getId()));
+            result.add(ds);
         }
+        return result;
     }
 
-    public List<DataSetInfo> getAllDatasets() {
-        return datasets.values().stream()
-                .map(ds -> {
-                    List<Map<String, Object>> records = loadRecords(ds.getId());
-                    String lastImport = getLastImportTime(ds.getId());
-                    return new DataSetInfo(ds, records.size(), lastImport);
-                })
-                .sorted((a, b) -> {
-                    if (a.getCreatedAt() == null) return 1;
-                    if (b.getCreatedAt() == null) return -1;
-                    return b.getCreatedAt().compareTo(a.getCreatedAt());
-                })
-                .collect(Collectors.toList());
-    }
-
-    public DataSet getDataset(String id) {
-        return datasets.get(id);
+    public DataSet getDataset(String datasetId) {
+        LambdaQueryWrapper<DataSetEntity> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(DataSetEntity::getDatasetId, datasetId);
+        DataSetEntity entity = dataSetDbService.getOne(wrapper);
+        if (entity == null) return null;
+        DataSet ds = toModel(entity);
+        ds.setRecordCount(recordDbService.countByDataset(datasetId));
+        return ds;
     }
 
     public DataSet createDataset(DataSet ds) {
@@ -129,24 +162,9 @@ public class DataSetService {
         ds.setId(id);
         ds.setCreatedAt(TimeUtil.nowStr());
         ds.setUpdatedAt(TimeUtil.nowStr());
-        if (ds.getSchema() == null) {
-            ds.setSchema(new DataSchema());
-        }
-        if (ds.getOutputDir() == null || ds.getOutputDir().isEmpty()) {
-            ds.setOutputDir("数据中心/" + id);
-        }
+        if (ds.getSchema() == null) ds.setSchema(new DataSchema());
 
-        datasets.put(id, ds);
-        saveDatasets();
-
-        Path dsDir = getDatasetDir(id);
-        try {
-            Files.createDirectories(dsDir);
-            Files.createDirectories(getImportsDir(id));
-            FileUtil.writeJson(getDataFile(id), new ArrayList<>());
-        } catch (Exception e) {
-            log.error("Failed to create dataset directory: {}", e.getMessage());
-        }
+        saveDatasetToDb(ds);
 
         logService.add("数据中心", "创建数据集", ds.getName());
         log.info("Created dataset: {} ({})", ds.getName(), id);
@@ -154,150 +172,166 @@ public class DataSetService {
     }
 
     public DataSet updateDataset(String id, DataSet update) {
-        DataSet existing = datasets.get(id);
+        DataSet existing = getDataset(id);
         if (existing == null) return null;
 
         if (update.getName() != null) existing.setName(update.getName());
         if (update.getDescription() != null) existing.setDescription(update.getDescription());
         if (update.getSchema() != null) existing.setSchema(update.getSchema());
-        if (update.getOutputDir() != null) existing.setOutputDir(update.getOutputDir());
         if (update.getImportConfigs() != null) existing.setImportConfigs(update.getImportConfigs());
         existing.setUpdatedAt(TimeUtil.nowStr());
 
-        saveDatasets();
+        saveDatasetToDb(existing);
         log.info("Updated dataset: {}", id);
         return existing;
     }
 
-    public boolean deleteDataset(String id) {
-        DataSet removed = datasets.remove(id);
-        if (removed == null) return false;
+    public boolean deleteDataset(String datasetId) {
+        DataSet ds = getDataset(datasetId);
+        if (ds == null) return false;
 
-        saveDatasets();
-        try {
-            Path dsDir = getDatasetDir(id);
-            if (Files.exists(dsDir)) {
-                deleteRecursively(dsDir);
-            }
-        } catch (Exception e) {
-            log.warn("Failed to delete dataset directory: {}", e.getMessage());
-        }
+        LambdaQueryWrapper<DataSetRecordEntity> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(DataSetRecordEntity::getDatasetId, datasetId);
+        recordDbService.remove(wrapper);
 
-        logService.add("数据中心", "删除数据集", removed.getName());
-        log.info("Deleted dataset: {} ({})", removed.getName(), id);
+        LambdaQueryWrapper<DataSetEntity> dsWrapper = new LambdaQueryWrapper<>();
+        dsWrapper.eq(DataSetEntity::getDatasetId, datasetId);
+        dataSetDbService.remove(dsWrapper);
+
+        logService.add("数据中心", "删除数据集", ds.getName());
+        log.info("Deleted dataset: {} ({})", ds.getName(), datasetId);
         return true;
     }
 
-    private void deleteRecursively(Path path) throws Exception {
-        if (Files.isDirectory(path)) {
-            try (var entries = Files.list(path)) {
-                for (Path entry : entries.toList()) {
-                    deleteRecursively(entry);
-                }
+    public List<Map<String, Object>> loadRecords(String datasetId) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        List<DataSetRecordEntity> entities = recordDbService.listByDataset(datasetId);
+        for (DataSetRecordEntity entity : entities) {
+            try {
+                Map<String, Object> record = mapper.readValue(entity.getDataJson(),
+                        new TypeReference<Map<String, Object>>() {});
+                record.put("_id", entity.getRecordId());
+                record.put("_source", entity.getSource());
+                record.put("_importTime", entity.getCreatedAt());
+                result.add(record);
+            } catch (Exception e) {
+                log.warn("Failed to parse record: {}", e.getMessage());
             }
         }
-        Files.deleteIfExists(path);
-    }
-
-    public List<Map<String, Object>> loadRecords(String datasetId) {
-        Path file = getDataFile(datasetId);
-        if (!FileUtil.exists(file)) return new ArrayList<>();
-        return FileUtil.readJson(file, new TypeReference<List<Map<String, Object>>>() {}, new ArrayList<>());
-    }
-
-    public void saveRecords(String datasetId, List<Map<String, Object>> records) {
-        FileUtil.writeJson(getDataFile(datasetId), records);
+        return result;
     }
 
     public int addRecords(String datasetId, List<Map<String, Object>> newRecords, String source) {
-        DataSet ds = datasets.get(datasetId);
+        DataSet ds = getDataset(datasetId);
         if (ds == null) throw new IllegalArgumentException("Dataset not found: " + datasetId);
 
-        List<Map<String, Object>> existing = loadRecords(datasetId);
-
-        Set<String> existingHashes = new HashSet<>();
-        for (Map<String, Object> r : existing) {
-            String hash = computeHash(r);
-            if (hash != null) existingHashes.add(hash);
-        }
-
         int skipped = 0;
+        int imported = 0;
         for (Map<String, Object> record : newRecords) {
             String hash = computeHash(record);
-            if (hash != null && existingHashes.contains(hash)) {
+            if (hash != null && recordDbService.existsByHash(datasetId, hash)) {
                 skipped++;
                 continue;
             }
-            record.put("_id", UUID.randomUUID().toString().substring(0, 8));
-            record.put("_source", source);
-            record.put("_importTime", TimeUtil.nowStr());
-            if (hash != null) existingHashes.add(hash);
-            existing.add(record);
+            saveRecordToDb(datasetId, record, source);
+            imported++;
         }
 
-        if (existing.size() > MAX_RECORDS) {
-            existing = new ArrayList<>(existing.subList(existing.size() - MAX_RECORDS, existing.size()));
-        }
-
-        saveRecords(datasetId, existing);
-
-        String importFile = TimeUtil.todayStr() + "_" + source + ".json";
-        Path importPath = getImportsDir(datasetId).resolve(importFile);
-        Map<String, Object> importRecord = new LinkedHashMap<>();
-        importRecord.put("source", source);
-        importRecord.put("time", TimeUtil.nowStr());
-        importRecord.put("total", newRecords.size());
-        importRecord.put("imported", newRecords.size() - skipped);
-        importRecord.put("skipped", skipped);
-        importRecord.put("data", newRecords);
-        FileUtil.writeJson(importPath, importRecord);
-
-        int imported = newRecords.size() - skipped;
-        logService.add("数据中心", "导入数据", ds.getName() + " (" + source + ", " + imported + "条" + (skipped > 0 ? ", 跳过" + skipped + "条重复" : "") + ")");
+        logService.add("数据中心", "导入数据", ds.getName() + " (" + source + ", " + imported + "条" +
+                (skipped > 0 ? ", 跳过" + skipped + "条重复" : "") + ")");
         log.info("Added {} records (skipped {} duplicates) to dataset {} from {}", imported, skipped, datasetId, source);
         return imported;
     }
 
     public boolean deleteRecord(String datasetId, String recordId) {
-        List<Map<String, Object>> records = loadRecords(datasetId);
-        boolean removed = records.removeIf(r -> recordId.equals(r.get("_id")));
-        if (removed) {
-            saveRecords(datasetId, records);
-        }
-        return removed;
+        LambdaQueryWrapper<DataSetRecordEntity> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(DataSetRecordEntity::getDatasetId, datasetId)
+               .eq(DataSetRecordEntity::getRecordId, recordId);
+        return recordDbService.remove(wrapper);
     }
 
     public List<Map<String, Object>> searchRecords(String datasetId, String keyword) {
-        List<Map<String, Object>> records = loadRecords(datasetId);
-        if (keyword == null || keyword.isBlank()) return records;
-
+        if (keyword == null || keyword.isBlank()) {
+            return loadRecords(datasetId);
+        }
+        List<Map<String, Object>> all = loadRecords(datasetId);
         String lower = keyword.toLowerCase();
-        return records.stream()
+        return all.stream()
                 .filter(r -> r.values().stream()
                         .anyMatch(v -> v != null && v.toString().toLowerCase().contains(lower)))
-                .collect(Collectors.toList());
+                .toList();
     }
 
-    private String getLastImportTime(String datasetId) {
+    private void saveDatasetToDb(DataSet ds) {
+        LambdaQueryWrapper<DataSetEntity> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(DataSetEntity::getDatasetId, ds.getId());
+        DataSetEntity existing = dataSetDbService.getOne(wrapper);
+
         try {
-            Path importsDir = getImportsDir(datasetId);
-            if (!Files.exists(importsDir)) return null;
-            try (var files = Files.list(importsDir)) {
-                return files
-                        .filter(p -> p.toString().endsWith(".json"))
-                        .sorted(Comparator.reverseOrder())
-                        .map(p -> p.getFileName().toString().replace(".json", ""))
-                        .findFirst()
-                        .orElse(null);
+            String schemaJson = ds.getSchema() != null ? mapper.writeValueAsString(ds.getSchema()) : null;
+            String importJson = ds.getImportConfigs() != null ? mapper.writeValueAsString(ds.getImportConfigs()) : null;
+
+            if (existing != null) {
+                existing.setName(ds.getName());
+                existing.setDescription(ds.getDescription());
+                existing.setSchemaJson(schemaJson);
+                existing.setImportConfigsJson(importJson);
+                existing.setUpdatedAt(ds.getUpdatedAt());
+                dataSetDbService.updateById(existing);
+            } else {
+                DataSetEntity entity = new DataSetEntity();
+                entity.setDatasetId(ds.getId());
+                entity.setName(ds.getName());
+                entity.setDescription(ds.getDescription());
+                entity.setSchemaJson(schemaJson);
+                entity.setImportConfigsJson(importJson);
+                entity.setCreatedAt(ds.getCreatedAt());
+                entity.setUpdatedAt(ds.getUpdatedAt());
+                dataSetDbService.save(entity);
             }
         } catch (Exception e) {
-            return null;
+            log.error("Failed to save dataset to DB: {}", e.getMessage());
         }
     }
 
-    private static final Set<String> META_FIELDS = Set.of("_id", "_source", "_importTime", "_hash");
-    private static final com.fasterxml.jackson.databind.ObjectMapper HASH_MAPPER =
-            new com.fasterxml.jackson.databind.ObjectMapper();
+    private void saveRecordToDb(String datasetId, Map<String, Object> record, String source) {
+        String recordId = UUID.randomUUID().toString().substring(0, 8);
+        String hash = computeHash(record);
+        try {
+            String dataJson = mapper.writeValueAsString(record);
+            DataSetRecordEntity entity = new DataSetRecordEntity();
+            entity.setRecordId(recordId);
+            entity.setDatasetId(datasetId);
+            entity.setDataJson(dataJson);
+            entity.setSource(source);
+            entity.setContentHash(hash);
+            entity.setCreatedAt(TimeUtil.nowStr());
+            recordDbService.save(entity);
+        } catch (Exception e) {
+            log.error("Failed to save record to DB: {}", e.getMessage());
+        }
+    }
+
+    private DataSet toModel(DataSetEntity entity) {
+        DataSet ds = new DataSet();
+        ds.setId(entity.getDatasetId());
+        ds.setName(entity.getName());
+        ds.setDescription(entity.getDescription());
+        ds.setCreatedAt(entity.getCreatedAt());
+        ds.setUpdatedAt(entity.getUpdatedAt());
+        try {
+            if (entity.getSchemaJson() != null) {
+                ds.setSchema(mapper.readValue(entity.getSchemaJson(), DataSchema.class));
+            }
+            if (entity.getImportConfigsJson() != null) {
+                ds.setImportConfigs(mapper.readValue(entity.getImportConfigsJson(),
+                        new TypeReference<Map<String, ImportConfig>>() {}));
+            }
+        } catch (Exception e) {
+            log.warn("Failed to parse schema: {}", e.getMessage());
+        }
+        return ds;
+    }
 
     @SuppressWarnings("unchecked")
     private String computeHash(Map<String, Object> record) {
@@ -309,9 +343,9 @@ public class DataSetService {
                 }
             }
             if (data.isEmpty()) return null;
-            String json = HASH_MAPPER.writeValueAsString(data);
+            String json = mapper.writeValueAsString(data);
             MessageDigest md = MessageDigest.getInstance("MD5");
-            byte[] digest = md.digest(json.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            byte[] digest = md.digest(json.getBytes(StandardCharsets.UTF_8));
             StringBuilder sb = new StringBuilder();
             for (byte b : digest) {
                 sb.append(String.format("%02x", b));
