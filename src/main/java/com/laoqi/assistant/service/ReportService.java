@@ -16,7 +16,7 @@ import java.nio.file.Paths;
 public class ReportService {
 
     private static final Logger log = LoggerFactory.getLogger(ReportService.class);
-    private static final String PROMPT_FILENAME = "综合日报提示词.md";
+    private static final String PROMPT_FILENAME = "分析提示词.md";
     private static final String DEFAULT_PROMPT = "现在是{date} {weekday}。请根据我的工作笔记生成今天的综合日报。内容需要涵盖：今日重点工作、客户沟通情况、开发进展、文章发布情况、明日计划。请按以下格式输出：\n\n【今日重点】\n...\n\n【客户沟通】\n...\n\n【开发进展】\n...\n\n【文章发布】\n...\n\n【明日计划】\n...\n\n注意：如果某个板块没有相关信息，请写\"暂无\"。请使用中文回复。";
 
     private final AppConfig appConfig;
@@ -45,9 +45,7 @@ public class ReportService {
     }
 
     private Path getPromptsDir() {
-        String baseDir = configService.getBaseDir();
-        if (baseDir == null || baseDir.isEmpty()) return null;
-        return Paths.get(baseDir).resolve("AI").resolve("prompts");
+        return getComprehensiveReportDir();
     }
 
     public String readPrompt() {
