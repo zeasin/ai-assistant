@@ -142,13 +142,14 @@ public class ChatController {
         emitter.onCompletion(() -> log.info("[chat] SSE 连接完成"));
         emitter.onError((ex) -> log.error("[chat] SSE 连接错误", ex));
 
+        String mode = "knowledge";
+        sessionService.saveMessage(sessionId, "user", message, mode);
+
         chatExecutor.execute(() -> {
             try {
-                String mode = "knowledge";
-
                 sendStatus(emitter, mode, "⏳ 正在思考...");
 
-                String context = sessionService.buildHistoryContext(sessionId, mode);
+                String context = sessionService.buildHistoryContext(sessionId, mode, message);
 
                 StringBuilder fullText = new StringBuilder();
                 if (context != null) {
@@ -157,6 +158,7 @@ public class ChatController {
                 }
                 fullText.append("用户最新消息:\n").append(message);
                 String fullMessage = fullText.toString();
+                log.info("[chat] 完整 prompt:\n{}", fullMessage);
 
                 String opencodeSessionId = openCodeService.createSession("chat-" + sessionId);
 
@@ -164,12 +166,9 @@ public class ChatController {
                 String reply = openCodeService.sendMessage(opencodeSessionId, fullMessage);
                 log.info("[chat] 收到 opencode 回复, 长度={}", reply != null ? reply.length() : 0);
 
-                if (reply != null && !reply.isEmpty()) {
-                    sendText(emitter, mode, reply);
-                } else {
-                    sendText(emitter, mode, "(AI 未返回回复)");
-                }
-
+                String replyText = (reply != null && !reply.isEmpty()) ? reply : "(AI 未返回回复)";
+                sessionService.saveMessage(sessionId, "assistant", replyText, mode);
+                sendText(emitter, mode, replyText);
                 sendDone(emitter, mode);
 
             } catch (Exception e) {

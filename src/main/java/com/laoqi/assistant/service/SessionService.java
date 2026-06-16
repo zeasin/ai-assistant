@@ -19,11 +19,14 @@ import org.springframework.stereotype.Service;
 import javax.sql.DataSource;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.Base64;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -31,7 +34,9 @@ public class SessionService {
 
     private static final Logger log = LoggerFactory.getLogger(SessionService.class);
 
-    private static final float COSINE_THRESHOLD = 0.3f;
+    private static final float COSINE_THRESHOLD = 0.5f;
+    private static final int MAX_TURNS_PER_SESSION = 4;
+    private static final int MAX_GLOBAL_TURNS = 8;
     private static final int DEFAULT_FALLBACK_TURNS = 3;
     private static final int EMBEDDING_DIM = 768;
 
@@ -58,8 +63,6 @@ public class SessionService {
     @PostConstruct
     public void init() {
         createTables();
-        migrateFromOldTables();
-        dropOldTables();
     }
 
     private void createTables() {
@@ -96,7 +99,7 @@ public class SessionService {
                     id          INTEGER PRIMARY KEY AUTOINCREMENT,
                     session_id  TEXT NOT NULL,
                     turn_order  INTEGER NOT NULL,
-                    embedding   BLOB NOT NULL,
+                    embedding   TEXT NOT NULL,
                     created_at  TEXT NOT NULL,
                     FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
                 )
@@ -108,80 +111,7 @@ public class SessionService {
         }
     }
 
-    private void migrateFromOldTables() {
-        long newCount = sessionDbService.count();
-        if (newCount > 0) {
-            log.debug("New tables already have {} sessions, skipping migration", newCount);
-            return;
-        }
 
-        try (Connection conn = dataSource.getConnection(); Statement stmt = conn.createStatement()) {
-            boolean hasChatSessions = false;
-            boolean hasFeishuSessions = false;
-            try {
-                stmt.execute("SELECT COUNT(*) FROM chat_sessions");
-                hasChatSessions = true;
-            } catch (SQLException e) {
-                log.debug("Old chat_sessions table does not exist, skipping web migration");
-            }
-            try {
-                stmt.execute("SELECT COUNT(*) FROM feishu_sessions");
-                hasFeishuSessions = true;
-            } catch (SQLException e) {
-                log.debug("Old feishu_sessions table does not exist, skipping feishu migration");
-            }
-
-            if (!hasChatSessions && !hasFeishuSessions) {
-                return;
-            }
-
-            log.info("Migrating data from old tables to new tables...");
-
-            if (hasChatSessions) {
-                stmt.execute("""
-                    INSERT INTO sessions (id, source, title, mode, created_at, updated_at)
-                    SELECT id, 'web', title, mode, created_at, updated_at FROM chat_sessions
-                    """);
-                stmt.execute("""
-                    INSERT INTO messages (session_id, source, role, content, mode, created_at)
-                    SELECT session_id, 'web', role, content, mode, created_at FROM chat_messages
-                    """);
-                log.info("Migrated web sessions and messages");
-            }
-
-            if (hasFeishuSessions) {
-                stmt.execute("""
-                    INSERT INTO sessions (id, source, title, chat_id, chat_type,
-                                          open_code_session_id, open_code_code_session_id,
-                                          mode, created_at, updated_at)
-                    SELECT user_key, 'feishu', '', chat_id, chat_type,
-                           open_code_session_id, open_code_code_session_id,
-                           'knowledge', created, updated FROM feishu_sessions
-                    """);
-                stmt.execute("""
-                    INSERT INTO messages (session_id, source, role, content, mode, created_at)
-                    SELECT user_key, 'feishu', role, content, COALESCE(mode, 'knowledge'), created_at FROM feishu_messages
-                    """);
-                log.info("Migrated feishu sessions and messages");
-            }
-
-            log.info("Migration from old tables complete");
-        } catch (SQLException e) {
-            log.warn("Migration from old tables failed: {}", e.getMessage());
-        }
-    }
-
-    private void dropOldTables() {
-        try (Connection conn = dataSource.getConnection(); Statement stmt = conn.createStatement()) {
-            stmt.execute("DROP TABLE IF EXISTS feishu_messages");
-            stmt.execute("DROP TABLE IF EXISTS feishu_sessions");
-            stmt.execute("DROP TABLE IF EXISTS chat_messages");
-            stmt.execute("DROP TABLE IF EXISTS chat_sessions");
-            log.info("Old tables (chat_*, feishu_*) dropped");
-        } catch (SQLException e) {
-            log.warn("Failed to drop old tables: {}", e.getMessage());
-        }
-    }
 
     // ========== Session CRUD ==========
 
@@ -308,7 +238,7 @@ public class SessionService {
             TurnEmbeddingEntity te = new TurnEmbeddingEntity();
             te.setSessionId(sessionId);
             te.setTurnOrder(nextTurn);
-            te.setEmbedding(blob);
+            te.setEmbedding(Base64.getEncoder().encodeToString(blob));
             te.setCreatedAt(TimeUtil.nowStr());
             turnEmbeddingDbService.save(te);
         } catch (Exception e) {
@@ -316,13 +246,7 @@ public class SessionService {
         }
     }
 
-    // ========== History Context (semantic retrieval) ==========
-
-    public static class HistoryTurn {
-        public int turnOrder;
-        public float score;
-        public List<MessageEntity> messages = new ArrayList<>();
-    }
+    // ========== History Context (semantic retrieval / long-term memory) ==========
 
     public String buildHistoryContext(String sessionId, String mode) {
         return buildHistoryContext(sessionId, mode, null);
@@ -343,42 +267,110 @@ public class SessionService {
         if (filtered.isEmpty()) return null;
 
         if (currentQuery == null || currentQuery.isBlank()
-                || !ollamaEmbeddingService.isAvailable()
-                || filtered.size() <= DEFAULT_FALLBACK_TURNS * 2) {
-            return buildSimpleContext(filtered);
-        }
-
-        List<TurnEmbeddingEntity> embeddings = turnEmbeddingDbService.listBySession(sessionId);
-        if (embeddings.isEmpty()) {
-            return buildSimpleContext(filtered);
+                || !ollamaEmbeddingService.isAvailable()) {
+            String ctx = buildSimpleContext(filtered);
+            log.info("[ctx] 无 query 或 Ollama 不可用，使用全部历史（{} 条消息）", filtered.size());
+            return ctx;
         }
 
         Embedding queryEmb = ollamaEmbeddingService.embed(currentQuery).orElse(null);
         if (queryEmb == null) {
-            return buildSimpleContext(filtered);
+            String ctx = buildSimpleContext(filtered);
+            log.info("[ctx] 嵌入失败，回退全部历史（{} 条消息）", filtered.size());
+            return ctx;
         }
 
-        List<HistoryTurn> scoredTurns = new ArrayList<>();
-        for (TurnEmbeddingEntity te : embeddings) {
-            float[] vec = byteArrayToFloatArray(te.getEmbedding());
+        String globalContext = searchGlobalContext(queryEmb, sessionId, currentQuery);
+        if (globalContext != null) {
+            log.info("[ctx] 命中跨会话语义检索");
+            return globalContext;
+        }
+
+        if (filtered.size() <= DEFAULT_FALLBACK_TURNS * 2) {
+            String ctx = buildSimpleContext(filtered);
+            log.info("[ctx] 消息少（{}），使用全部历史", filtered.size());
+            return ctx;
+        }
+        String ctx = buildRecentContext(filtered);
+        log.info("[ctx] 无语义命中，回退最近 {} 轮", DEFAULT_FALLBACK_TURNS);
+        return ctx;
+    }
+
+    private String searchGlobalContext(Embedding queryEmb, String currentSessionId, String query) {
+        List<TurnEmbeddingEntity> allEmbeddings = turnEmbeddingDbService.list();
+        if (allEmbeddings.isEmpty()) return null;
+
+        List<ScoredTurn> scored = new ArrayList<>();
+        for (TurnEmbeddingEntity te : allEmbeddings) {
+            float[] vec = byteArrayToFloatArray(Base64.getDecoder().decode(te.getEmbedding()));
             float score = cosineSimilarity(queryEmb.vector(), vec);
-            scoredTurns.add(new HistoryTurn() {{
-                turnOrder = te.getTurnOrder();
-                score = score;
-            }});
+            scored.add(new ScoredTurn(te.getSessionId(), te.getTurnOrder(), score));
         }
 
-        List<Integer> selectedOrders = scoredTurns.stream()
-                .filter(t -> t.score > COSINE_THRESHOLD)
-                .map(t -> t.turnOrder)
-                .sorted()
-                .collect(Collectors.toList());
+        if (scored.isEmpty()) return null;
 
-        if (selectedOrders.isEmpty()) {
-            return buildRecentContext(filtered);
+        scored.sort((a, b) -> Float.compare(b.score, a.score));
+
+        Map<String, Integer> perSessionCount = new java.util.HashMap<>();
+        List<ScoredTurn> matches = new ArrayList<>();
+        for (ScoredTurn t : scored) {
+            if (t.score <= COSINE_THRESHOLD) break;
+            int count = perSessionCount.getOrDefault(t.sessionId, 0);
+            if (count >= MAX_TURNS_PER_SESSION) continue;
+            perSessionCount.put(t.sessionId, count + 1);
+            matches.add(t);
+            if (matches.size() >= MAX_GLOBAL_TURNS) break;
         }
 
-        return buildTurnContext(filtered, selectedOrders);
+        log.info("语义检索: query=\"{}\", 全库 {} 条向量(排除当前会话), 命中 {} 轮", query, allEmbeddings.size(), matches.size());
+        for (ScoredTurn t : matches) {
+            log.info("  session={} turn={} score={}", t.sessionId, t.turnOrder, String.format("%.2f", t.score));
+        }
+
+        if (matches.isEmpty()) return null;
+
+        return buildGlobalContext(matches, currentSessionId);
+    }
+
+    private String buildGlobalContext(List<ScoredTurn> matches, String currentSessionId) {
+        Map<String, List<ScoredTurn>> bySession = matches.stream()
+                .collect(Collectors.groupingBy(t -> t.sessionId));
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("以下是相关历史对话（长期记忆）：\n\n");
+
+        for (Map.Entry<String, List<ScoredTurn>> entry : bySession.entrySet()) {
+            String sid = entry.getKey();
+            List<MessageEntity> msgs = messageDbService.listBySession(sid);
+            Set<Integer> turnOrders = entry.getValue().stream()
+                    .map(t -> t.turnOrder).collect(Collectors.toSet());
+
+            SessionEntity session = sessionDbService.getById(sid);
+            String header;
+            if (sid.equals(currentSessionId)) {
+                header = "当前对话";
+            } else if (session != null && session.getTitle() != null
+                    && !session.getTitle().isEmpty() && !"新对话".equals(session.getTitle())) {
+                header = "历史对话 - " + session.getTitle();
+            } else {
+                header = "其他历史对话";
+            }
+            sb.append("【").append(header).append("】\n\n");
+
+            int msgIdx = 0;
+            int turnIdx = 0;
+            while (msgIdx + 1 < msgs.size()) {
+                if (turnOrders.contains(turnIdx)) {
+                    sb.append("用户: ").append(msgs.get(msgIdx).getContent()).append("\n\n");
+                    sb.append("AI: ").append(msgs.get(msgIdx + 1).getContent()).append("\n\n");
+                }
+                msgIdx += 2;
+                turnIdx++;
+            }
+        }
+
+        sb.append("---\n\n请基于以上历史对话，继续回复用户的最新消息。");
+        return sb.toString();
     }
 
     private String buildSimpleContext(List<MessageEntity> filtered) {
@@ -408,41 +400,19 @@ public class SessionService {
         return sb.toString();
     }
 
-    private String buildTurnContext(List<MessageEntity> allMsgs, List<Integer> selectedOrders) {
-        List<String> turnRanges = new ArrayList<>();
-        int msgIdx = 0;
-        int turnIdx = 0;
-        while (msgIdx < allMsgs.size() && turnIdx < selectedOrders.size()) {
-            int targetTurn = selectedOrders.get(turnIdx);
-            for (int t = 0; t <= targetTurn && msgIdx + 1 < allMsgs.size(); t++) {
-                if (msgIdx + 1 < allMsgs.size() && t == targetTurn) {
-                    turnRanges.add(allMsgs.get(msgIdx).getContent());
-                    if (msgIdx + 1 < allMsgs.size()) {
-                        turnRanges.add(allMsgs.get(msgIdx + 1).getContent());
-                    }
-                }
-                msgIdx += 2;
-            }
-            turnIdx++;
-        }
-
-        if (turnRanges.isEmpty()) {
-            return null;
-        }
-
-        StringBuilder sb = new StringBuilder();
-        sb.append("以下是相关的对话历史，供参考：\n\n");
-        boolean isUser = true;
-        for (String content : turnRanges) {
-            String label = isUser ? "用户" : "AI";
-            sb.append(label).append(": ").append(content).append("\n\n");
-            isUser = !isUser;
-        }
-        sb.append("---\n\n请基于以上历史对话，继续回复用户的最新消息。");
-        return sb.toString();
-    }
-
     // ========== Embedding utilities ==========
+
+    public static class ScoredTurn {
+        public String sessionId;
+        public int turnOrder;
+        public float score;
+
+        public ScoredTurn(String sessionId, int turnOrder, float score) {
+            this.sessionId = sessionId;
+            this.turnOrder = turnOrder;
+            this.score = score;
+        }
+    }
 
     private float cosineSimilarity(float[] a, float[] b) {
         if (a.length != b.length) return 0;

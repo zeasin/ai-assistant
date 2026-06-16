@@ -58,4 +58,9 @@ public class GlobalModelAdvice {
     public boolean ollamaAvailable() {
         return ollamaEmbeddingService.isAvailable();
     }
+
+    @ModelAttribute("ollamaModel")
+    public String ollamaModel() {
+        return appConfig.getOllamaModel();
+    }
 }

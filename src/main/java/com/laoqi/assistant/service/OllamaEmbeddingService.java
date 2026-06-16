@@ -51,7 +51,7 @@ public class OllamaEmbeddingService {
             }
 
             String body = new String(conn.getInputStream().readAllBytes());
-            if (!body.contains("\"name\":\"" + modelName + "\"")) {
+            if (!body.contains("\"name\":\"" + modelName + "\"") && !body.contains("\"name\":\"" + modelName + ":")) {
                 log.warn("⚠️ Embedding 模型 '{}' 未安装, 请执行: ollama pull {}", modelName, modelName);
                 logService.add("Ollama", "模型未安装", "请执行: ollama pull " + modelName);
                 this.available = false;

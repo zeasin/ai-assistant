@@ -11,7 +11,7 @@ public class TurnEmbeddingEntity {
     private Integer id;
     private String sessionId;
     private Integer turnOrder;
-    private byte[] embedding;
+    private String embedding;
     private String createdAt;
 
     public Integer getId() { return id; }
@@ -20,8 +20,8 @@ public class TurnEmbeddingEntity {
     public void setSessionId(String sessionId) { this.sessionId = sessionId; }
     public Integer getTurnOrder() { return turnOrder; }
     public void setTurnOrder(Integer turnOrder) { this.turnOrder = turnOrder; }
-    public byte[] getEmbedding() { return embedding; }
-    public void setEmbedding(byte[] embedding) { this.embedding = embedding; }
+    public String getEmbedding() { return embedding; }
+    public void setEmbedding(String embedding) { this.embedding = embedding; }
     public String getCreatedAt() { return createdAt; }
     public void setCreatedAt(String createdAt) { this.createdAt = createdAt; }
 }

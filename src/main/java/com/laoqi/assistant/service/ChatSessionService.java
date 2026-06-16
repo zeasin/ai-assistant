@@ -1,24 +1,16 @@
 package com.laoqi.assistant.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.laoqi.assistant.config.AppConfig;
 import com.laoqi.assistant.entity.MessageEntity;
 import com.laoqi.assistant.entity.SessionEntity;
 import com.laoqi.assistant.model.ChatSession;
 import com.laoqi.assistant.model.ChatSession.ChatMessage;
-import com.laoqi.assistant.model.Config;
 import com.laoqi.assistant.service.db.MessageDbService;
 import com.laoqi.assistant.service.db.SessionDbService;
-import com.laoqi.assistant.util.FileUtil;
-import com.laoqi.assistant.util.TimeUtil;
-import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -27,80 +19,16 @@ public class ChatSessionService {
 
     private static final Logger log = LoggerFactory.getLogger(ChatSessionService.class);
 
-    private final AppConfig appConfig;
-    private final ConfigService configService;
     private final SessionService sessionService;
     private final SessionDbService sessionDbService;
     private final MessageDbService messageDbService;
 
-    public ChatSessionService(AppConfig appConfig, ConfigService configService,
-                              SessionService sessionService,
+    public ChatSessionService(SessionService sessionService,
                               SessionDbService sessionDbService,
                               MessageDbService messageDbService) {
-        this.appConfig = appConfig;
-        this.configService = configService;
         this.sessionService = sessionService;
         this.sessionDbService = sessionDbService;
         this.messageDbService = messageDbService;
-    }
-
-    // ========== 旧 JSON 迁移（兼容旧数据） ==========
-
-    @PostConstruct
-    public void init() {
-        migrateFromJson();
-    }
-
-    private void migrateFromJson() {
-        Path oldFile = getChatSessionsFile();
-        if (!Files.exists(oldFile)) {
-            log.debug("No old chat_sessions.json found, skipping migration");
-            return;
-        }
-
-        long count = sessionDbService.count(new QueryWrapper<SessionEntity>().eq("source", "web"));
-        if (count > 0) {
-            log.info("New tables already have {} web sessions, skipping JSON migration", count);
-            return;
-        }
-
-        log.info("Found chat_sessions.json, starting migration to new tables...");
-        SessionsData oldData = FileUtil.readJson(oldFile, SessionsData.class, new SessionsData());
-        int sessionCount = 0;
-        int msgCount = 0;
-
-        for (ChatSession session : oldData.sessions) {
-            SessionEntity se = new SessionEntity();
-            se.setId(session.getId());
-            se.setSource("web");
-            se.setTitle(session.getTitle() != null ? session.getTitle() : "新对话");
-            se.setMode(session.getMode() != null ? session.getMode() : "knowledge");
-            se.setCreatedAt(session.getCreated() != null ? session.getCreated() : TimeUtil.nowStr());
-            se.setUpdatedAt(session.getUpdated() != null ? session.getUpdated() : TimeUtil.nowStr());
-            sessionDbService.save(se);
-            sessionCount++;
-
-            if (session.getMessages() != null) {
-                for (ChatMessage msg : session.getMessages()) {
-                    MessageEntity me = new MessageEntity();
-                    me.setSessionId(session.getId());
-                    me.setSource("web");
-                    me.setRole(msg.getRole());
-                    me.setContent(msg.getContent());
-                    me.setMode(msg.getMode() != null ? msg.getMode() : session.getMode());
-                    me.setCreatedAt(msg.getTime() != null ? msg.getTime() : TimeUtil.nowStr());
-                    messageDbService.save(me);
-                    msgCount++;
-                }
-            }
-        }
-
-        try {
-            Files.move(oldFile, oldFile.resolveSibling("chat_sessions.json.bak"));
-            log.info("JSON migration complete: {} sessions, {} messages. Old file renamed to .bak", sessionCount, msgCount);
-        } catch (Exception e) {
-            log.warn("Failed to rename old file: {}", e.getMessage());
-        }
     }
 
     // ========== 公开 API ==========
@@ -196,11 +124,5 @@ public class ChatSessionService {
         }
         session.setMessages(messages);
         return session;
-    }
-
-    private Path getChatSessionsFile() {
-        Config config = configService.load();
-        String chatDir = "chat";
-        return Paths.get(configService.getBaseDir()).resolve(chatDir).resolve("chat_sessions.json");
     }
 }

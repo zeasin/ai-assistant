@@ -229,7 +229,7 @@ public class FeishuLongConnectionService {
             try {
                 // 每次新建 session，恢复历史上下文
                 String sessionId = openCodeService.createSession("飞书-" + userKey);
-                String context = feishuChatSessionService.buildHistoryContext(userKey, "knowledge");
+                String context = feishuChatSessionService.buildHistoryContext(userKey, "knowledge", text);
                 StringBuilder fullText = new StringBuilder();
                 if (context != null) {
                     log.info("[飞书长连接] 恢复知识库历史上下文");
