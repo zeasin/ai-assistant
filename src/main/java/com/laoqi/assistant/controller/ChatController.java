@@ -9,6 +9,7 @@ import com.laoqi.assistant.config.AppConfig;
 import com.laoqi.assistant.service.ConfigService;
 import com.laoqi.assistant.service.LlmService;
 import com.laoqi.assistant.service.LogService;
+import com.laoqi.assistant.service.NoteAssistantService;
 import com.laoqi.assistant.service.OpenCodeService;
 import com.laoqi.assistant.util.TimeUtil;
 import org.slf4j.Logger;
