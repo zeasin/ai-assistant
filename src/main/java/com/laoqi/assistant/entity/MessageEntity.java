@@ -4,12 +4,13 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 
-@TableName("feishu_messages")
-public class FeishuMessageEntity {
+@TableName("messages")
+public class MessageEntity {
 
     @TableId(type = IdType.AUTO)
     private Integer id;
-    private String userKey;
+    private String sessionId;
+    private String source;
     private String role;
     private String content;
     private String mode;
@@ -17,8 +18,10 @@ public class FeishuMessageEntity {
 
     public Integer getId() { return id; }
     public void setId(Integer id) { this.id = id; }
-    public String getUserKey() { return userKey; }
-    public void setUserKey(String userKey) { this.userKey = userKey; }
+    public String getSessionId() { return sessionId; }
+    public void setSessionId(String sessionId) { this.sessionId = sessionId; }
+    public String getSource() { return source; }
+    public void setSource(String source) { this.source = source; }
     public String getRole() { return role; }
     public void setRole(String role) { this.role = role; }
     public String getContent() { return content; }

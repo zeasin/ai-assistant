@@ -3,20 +3,27 @@ package com.laoqi.assistant.entity;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 
-@TableName("feishu_sessions")
-public class FeishuSessionEntity {
+@TableName("sessions")
+public class SessionEntity {
 
     @TableId
-    private String userKey;
+    private String id;
+    private String source;
+    private String title;
     private String chatId;
     private String chatType;
     private String openCodeSessionId;
     private String openCodeCodeSessionId;
-    private String created;
-    private String updated;
+    private String mode;
+    private String createdAt;
+    private String updatedAt;
 
-    public String getUserKey() { return userKey; }
-    public void setUserKey(String userKey) { this.userKey = userKey; }
+    public String getId() { return id; }
+    public void setId(String id) { this.id = id; }
+    public String getSource() { return source; }
+    public void setSource(String source) { this.source = source; }
+    public String getTitle() { return title; }
+    public void setTitle(String title) { this.title = title; }
     public String getChatId() { return chatId; }
     public void setChatId(String chatId) { this.chatId = chatId; }
     public String getChatType() { return chatType; }
@@ -25,8 +32,10 @@ public class FeishuSessionEntity {
     public void setOpenCodeSessionId(String openCodeSessionId) { this.openCodeSessionId = openCodeSessionId; }
     public String getOpenCodeCodeSessionId() { return openCodeCodeSessionId; }
     public void setOpenCodeCodeSessionId(String openCodeCodeSessionId) { this.openCodeCodeSessionId = openCodeCodeSessionId; }
-    public String getCreated() { return created; }
-    public void setCreated(String created) { this.created = created; }
-    public String getUpdated() { return updated; }
-    public void setUpdated(String updated) { this.updated = updated; }
+    public String getMode() { return mode; }
+    public void setMode(String mode) { this.mode = mode; }
+    public String getCreatedAt() { return createdAt; }
+    public void setCreatedAt(String createdAt) { this.createdAt = createdAt; }
+    public String getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(String updatedAt) { this.updatedAt = updatedAt; }
 }

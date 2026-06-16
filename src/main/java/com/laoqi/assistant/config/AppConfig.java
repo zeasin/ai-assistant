@@ -32,4 +32,16 @@ public class AppConfig {
     public void setTimezone(String timezone) { this.timezone = timezone; }
     public int getMaxHistoryChars() { return maxHistoryChars; }
     public void setMaxHistoryChars(int maxHistoryChars) { this.maxHistoryChars = maxHistoryChars; }
+
+    // Ollama embedding config
+    private String ollamaBaseUrl = "http://127.0.0.1:11434";
+    private String ollamaModel = "nomic-embed-text";
+    private int ollamaTimeoutSeconds = 30;
+
+    public String getOllamaBaseUrl() { return ollamaBaseUrl; }
+    public void setOllamaBaseUrl(String ollamaBaseUrl) { this.ollamaBaseUrl = ollamaBaseUrl; }
+    public String getOllamaModel() { return ollamaModel; }
+    public void setOllamaModel(String ollamaModel) { this.ollamaModel = ollamaModel; }
+    public int getOllamaTimeoutSeconds() { return ollamaTimeoutSeconds; }
+    public void setOllamaTimeoutSeconds(int ollamaTimeoutSeconds) { this.ollamaTimeoutSeconds = ollamaTimeoutSeconds; }
 }

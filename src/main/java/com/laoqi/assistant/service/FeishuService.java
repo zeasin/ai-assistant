@@ -1,8 +1,6 @@
 package com.laoqi.assistant.service;
 
 import com.laoqi.assistant.config.AppConfig;
-import com.laoqi.assistant.model.ChatSession;
-import com.laoqi.assistant.model.ChatSession.ChatMessage;
 import com.laoqi.assistant.util.TimeUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,18 +20,15 @@ public class FeishuService {
     private final AppConfig appConfig;
     private final ConfigService configService;
     private final LogService logService;
-    private final ChatSessionService chatSessionService;
 
     private String cachedToken;
     private long tokenExpiresAt;
 
     public FeishuService(AppConfig appConfig, ConfigService configService,
-                          LogService logService,
-                          ChatSessionService chatSessionService) {
+                          LogService logService) {
         this.appConfig = appConfig;
         this.configService = configService;
         this.logService = logService;
-        this.chatSessionService = chatSessionService;
     }
 
     public String getTenantToken(String appId, String appSecret) throws IOException {

@@ -1,11 +1,11 @@
 package com.laoqi.assistant.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.laoqi.assistant.entity.FeishuMessageEntity;
-import com.laoqi.assistant.entity.FeishuSessionEntity;
+import com.laoqi.assistant.entity.MessageEntity;
+import com.laoqi.assistant.entity.SessionEntity;
 import com.laoqi.assistant.model.ChatSession.ChatMessage;
-import com.laoqi.assistant.service.db.FeishuMessageDbService;
-import com.laoqi.assistant.service.db.FeishuSessionDbService;
+import com.laoqi.assistant.service.db.MessageDbService;
+import com.laoqi.assistant.service.db.SessionDbService;
 import com.laoqi.assistant.util.FileUtil;
 import com.laoqi.assistant.util.TimeUtil;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -25,15 +25,18 @@ public class FeishuChatSessionService {
 
     private static final Logger log = LoggerFactory.getLogger(FeishuChatSessionService.class);
 
-    private final FeishuSessionDbService feishuSessionDbService;
-    private final FeishuMessageDbService feishuMessageDbService;
+    private final SessionService sessionService;
+    private final SessionDbService sessionDbService;
+    private final MessageDbService messageDbService;
     private final ConfigService configService;
 
-    public FeishuChatSessionService(FeishuSessionDbService feishuSessionDbService,
-                                    FeishuMessageDbService feishuMessageDbService,
+    public FeishuChatSessionService(SessionService sessionService,
+                                    SessionDbService sessionDbService,
+                                    MessageDbService messageDbService,
                                     ConfigService configService) {
-        this.feishuSessionDbService = feishuSessionDbService;
-        this.feishuMessageDbService = feishuMessageDbService;
+        this.sessionService = sessionService;
+        this.sessionDbService = sessionDbService;
+        this.messageDbService = messageDbService;
         this.configService = configService;
     }
 
@@ -56,70 +59,53 @@ public class FeishuChatSessionService {
 
     public SessionsData load() {
         SessionsData data = new SessionsData();
-        List<FeishuSessionEntity> entities = feishuSessionDbService.list(
-                new QueryWrapper<FeishuSessionEntity>().orderByDesc("updated"));
-        for (FeishuSessionEntity se : entities) {
+        List<SessionEntity> entities = sessionDbService.listBySourceOrderByUpdate("feishu");
+        for (SessionEntity se : entities) {
             data.sessions.add(toModel(se));
         }
         return data;
     }
 
     public void save(SessionsData data) {
-        feishuMessageDbService.remove(null);
-        feishuSessionDbService.remove(null);
+        messageDbService.getBaseMapper().delete(
+                new QueryWrapper<MessageEntity>().eq("source", "feishu"));
+        sessionDbService.getBaseMapper().delete(
+                new QueryWrapper<SessionEntity>().eq("source", "feishu"));
         for (FeishuSession session : data.sessions) {
-            FeishuSessionEntity se = new FeishuSessionEntity();
-            se.setUserKey(session.userKey);
+            SessionEntity se = new SessionEntity();
+            se.setId(session.userKey);
+            se.setSource("feishu");
+            se.setTitle("");
             se.setChatId(session.chatId);
             se.setChatType(session.chatType);
             se.setOpenCodeSessionId(session.openCodeSessionId);
             se.setOpenCodeCodeSessionId(session.openCodeCodeSessionId);
-            se.setCreated(session.created);
-            se.setUpdated(session.updated);
-            feishuSessionDbService.save(se);
+            se.setCreatedAt(session.created);
+            se.setUpdatedAt(session.updated);
+            sessionDbService.save(se);
 
             if (session.messages != null) {
                 for (ChatMessage msg : session.messages) {
-                    FeishuMessageEntity me = new FeishuMessageEntity();
-                    me.setUserKey(session.userKey);
+                    MessageEntity me = new MessageEntity();
+                    me.setSessionId(session.userKey);
+                    me.setSource("feishu");
                     me.setRole(msg.getRole());
                     me.setContent(msg.getContent());
                     me.setMode(msg.getMode());
                     me.setCreatedAt(msg.getTime());
-                    feishuMessageDbService.save(me);
+                    messageDbService.save(me);
                 }
             }
         }
     }
 
     public FeishuSession getOrCreate(String userKey, String chatId, String chatType) {
-        FeishuSessionEntity se = feishuSessionDbService.getById(userKey);
-        if (se != null) {
-            return toModel(se);
-        }
-
-        String now = TimeUtil.nowStr();
-
-        FeishuSessionEntity entity = new FeishuSessionEntity();
-        entity.setUserKey(userKey);
-        entity.setChatId(chatId);
-        entity.setChatType(chatType);
-        entity.setCreated(now);
-        entity.setUpdated(now);
-        feishuSessionDbService.save(entity);
-
-        FeishuSession session = new FeishuSession();
-        session.userKey = userKey;
-        session.chatId = chatId;
-        session.chatType = chatType;
-        session.created = now;
-        session.updated = now;
-        session.messages = new ArrayList<>();
-        return session;
+        SessionEntity se = sessionService.getOrCreateFeishuSession(userKey, chatId, chatType);
+        return toModel(se);
     }
 
     public FeishuSession get(String userKey) {
-        FeishuSessionEntity se = feishuSessionDbService.getById(userKey);
+        SessionEntity se = sessionService.getSession(userKey);
         if (se == null) return null;
         return toModel(se);
     }
@@ -129,67 +115,34 @@ public class FeishuChatSessionService {
     }
 
     public void saveMessage(String userKey, String role, String content, String mode) {
-        String now = TimeUtil.nowStr();
-
-        FeishuMessageEntity msg = new FeishuMessageEntity();
-        msg.setUserKey(userKey);
-        msg.setRole(role);
-        msg.setContent(content);
-        msg.setMode(mode);
-        msg.setCreatedAt(now);
-        feishuMessageDbService.save(msg);
-
-        FeishuSessionEntity update = new FeishuSessionEntity();
-        update.setUserKey(userKey);
-        update.setUpdated(now);
-        feishuSessionDbService.updateById(update);
+        sessionService.saveMessage(userKey, role, content, mode, "feishu");
     }
 
     public void setOpenCodeSessionId(String userKey, String sessionId) {
-        FeishuSessionEntity update = new FeishuSessionEntity();
-        update.setUserKey(userKey);
+        SessionEntity update = new SessionEntity();
+        update.setId(userKey);
         update.setOpenCodeSessionId(sessionId);
-        update.setUpdated(TimeUtil.nowStr());
-        feishuSessionDbService.updateById(update);
+        update.setUpdatedAt(TimeUtil.nowStr());
+        sessionDbService.updateById(update);
     }
 
     public void setOpenCodeCodeSessionId(String userKey, String sessionId) {
-        FeishuSessionEntity update = new FeishuSessionEntity();
-        update.setUserKey(userKey);
+        SessionEntity update = new SessionEntity();
+        update.setId(userKey);
         update.setOpenCodeCodeSessionId(sessionId);
-        update.setUpdated(TimeUtil.nowStr());
-        feishuSessionDbService.updateById(update);
+        update.setUpdatedAt(TimeUtil.nowStr());
+        sessionDbService.updateById(update);
     }
 
     public String buildHistoryContext(String userKey, String mode) {
-        List<FeishuMessageEntity> allMsgs = feishuMessageDbService.listByUserKey(userKey);
-
-        List<FeishuMessageEntity> filtered = new ArrayList<>();
-        for (FeishuMessageEntity msg : allMsgs) {
-            if (mode != null && mode.equals(msg.getMode())) {
-                filtered.add(msg);
-            }
-        }
-        if (filtered.size() <= 1) return null;
-
-        StringBuilder sb = new StringBuilder();
-        sb.append("以下是之前的对话历史，供参考：\n\n");
-
-        List<FeishuMessageEntity> history = filtered.subList(0, filtered.size() - 1);
-        for (FeishuMessageEntity msg : history) {
-            String label = "user".equals(msg.getRole()) ? "用户" : "AI";
-            sb.append(label).append(": ").append(msg.getContent()).append("\n\n");
-        }
-        sb.append("---\n\n请基于以上历史对话，继续回复用户的最新消息。");
-        return sb.toString();
+        return sessionService.buildHistoryContext(userKey, mode, null);
     }
 
     public void deleteSession(String userKey) {
-        feishuMessageDbService.remove(new QueryWrapper<FeishuMessageEntity>().eq("user_key", userKey));
-        feishuSessionDbService.removeById(userKey);
+        sessionService.deleteSession(userKey);
     }
 
-    // ========== 迁移旧数据 ==========
+    // ========== 旧 JSON 迁移 ==========
 
     @PostConstruct
     public void migrateFromJson() {
@@ -199,38 +152,41 @@ public class FeishuChatSessionService {
             return;
         }
 
-        long count = feishuSessionDbService.count();
+        long count = sessionDbService.count(new QueryWrapper<SessionEntity>().eq("source", "feishu"));
         if (count > 0) {
-            log.info("SQLite already has {} feishu sessions, skipping JSON migration", count);
+            log.info("New tables already have {} feishu sessions, skipping JSON migration", count);
             return;
         }
 
-        log.info("Found feishu_sessions.json, starting migration to SQLite...");
+        log.info("Found feishu_sessions.json, starting migration to new tables...");
         SessionsData oldData = FileUtil.readJson(oldFile, new TypeReference<SessionsData>() {}, new SessionsData());
         int sessionCount = 0;
         int msgCount = 0;
 
         for (FeishuSession session : oldData.sessions) {
-            FeishuSessionEntity se = new FeishuSessionEntity();
-            se.setUserKey(session.userKey);
+            SessionEntity se = new SessionEntity();
+            se.setId(session.userKey);
+            se.setSource("feishu");
+            se.setTitle("");
             se.setChatId(session.chatId);
             se.setChatType(session.chatType);
             se.setOpenCodeSessionId(session.openCodeSessionId);
             se.setOpenCodeCodeSessionId(session.openCodeCodeSessionId);
-            se.setCreated(session.created != null ? session.created : TimeUtil.nowStr());
-            se.setUpdated(session.updated != null ? session.updated : TimeUtil.nowStr());
-            feishuSessionDbService.save(se);
+            se.setCreatedAt(session.created != null ? session.created : TimeUtil.nowStr());
+            se.setUpdatedAt(session.updated != null ? session.updated : TimeUtil.nowStr());
+            sessionDbService.save(se);
             sessionCount++;
 
             if (session.messages != null) {
                 for (ChatMessage msg : session.messages) {
-                    FeishuMessageEntity me = new FeishuMessageEntity();
-                    me.setUserKey(session.userKey);
+                    MessageEntity me = new MessageEntity();
+                    me.setSessionId(session.userKey);
+                    me.setSource("feishu");
                     me.setRole(msg.getRole());
                     me.setContent(msg.getContent());
                     me.setMode(msg.getMode());
                     me.setCreatedAt(msg.getTime() != null ? msg.getTime() : TimeUtil.nowStr());
-                    feishuMessageDbService.save(me);
+                    messageDbService.save(me);
                     msgCount++;
                 }
             }
@@ -238,7 +194,7 @@ public class FeishuChatSessionService {
 
         try {
             Files.move(oldFile, oldFile.resolveSibling("feishu_sessions.json.bak"));
-            log.info("Feishu migration complete: {} sessions, {} messages. Old file renamed to .bak", sessionCount, msgCount);
+            log.info("Feishu JSON migration complete: {} sessions, {} messages. Old file renamed to .bak", sessionCount, msgCount);
         } catch (Exception e) {
             log.warn("Failed to rename old feishu_sessions.json: {}", e.getMessage());
         }
@@ -250,19 +206,20 @@ public class FeishuChatSessionService {
 
     // ========== 内部转换 ==========
 
-    private FeishuSession toModel(FeishuSessionEntity se) {
+    private FeishuSession toModel(SessionEntity se) {
+        if (se == null) return null;
         FeishuSession session = new FeishuSession();
-        session.userKey = se.getUserKey();
-        session.chatId = se.getChatId();
-        session.chatType = se.getChatType();
+        session.userKey = se.getId();
+        session.chatId = se.getChatId() != null ? se.getChatId() : "";
+        session.chatType = se.getChatType() != null ? se.getChatType() : "p2p";
         session.openCodeSessionId = se.getOpenCodeSessionId();
         session.openCodeCodeSessionId = se.getOpenCodeCodeSessionId();
-        session.created = se.getCreated();
-        session.updated = se.getUpdated();
+        session.created = se.getCreatedAt();
+        session.updated = se.getUpdatedAt();
 
-        List<FeishuMessageEntity> msgEntities = feishuMessageDbService.listByUserKey(se.getUserKey());
+        List<MessageEntity> msgEntities = messageDbService.listBySession(se.getId());
         List<ChatMessage> messages = new ArrayList<>();
-        for (FeishuMessageEntity me : msgEntities) {
+        for (MessageEntity me : msgEntities) {
             messages.add(new ChatMessage(me.getRole(), me.getContent(), me.getCreatedAt(), me.getMode()));
         }
         session.messages = messages;

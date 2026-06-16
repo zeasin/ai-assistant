@@ -15,13 +15,16 @@ public class ConfigController {
     private final LogService logService;
     private final FeishuService feishuService;
     private final ReportService reportService;
+    private final OllamaEmbeddingService ollamaEmbeddingService;
 
     public ConfigController(ConfigService configService, LogService logService,
-                             FeishuService feishuService, ReportService reportService) {
+                             FeishuService feishuService, ReportService reportService,
+                             OllamaEmbeddingService ollamaEmbeddingService) {
         this.configService = configService;
         this.logService = logService;
         this.feishuService = feishuService;
         this.reportService = reportService;
+        this.ollamaEmbeddingService = ollamaEmbeddingService;
     }
 
     @GetMapping
@@ -29,6 +32,7 @@ public class ConfigController {
         model.addAttribute("scheduler_jobs", List.of(
                 Map.of("id", "morning_report", "time", "每天 09:00", "desc", "生成综合日报")
         ));
+        model.addAttribute("ollama_available", ollamaEmbeddingService.isAvailable());
         return "config";
     }
 

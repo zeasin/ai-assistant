@@ -7,6 +7,12 @@
 <body>
 <th:block layout:fragment="content">
 
+<div class="alert" th:classappend="${!ollama_available} ? 'alert-warning' : 'alert-ok'" th:if="${!ollama_available}" style="margin-bottom:16px;">
+    <strong>⚠️ Ollama 未运行</strong> — 语义检索不可用，将回退最近 3 轮对话。
+    请确保 <code>ollama serve</code> 已启动并已拉取 <code>nomic-embed-text</code> 模型：
+    <code style="display:block;margin-top:4px;">ollama pull nomic-embed-text</code>
+</div>
+
 <div class="card">
     <h2>⚙️ 定时任务</h2>
     <ul class="scheduler-list">

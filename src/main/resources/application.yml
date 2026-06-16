@@ -25,6 +25,10 @@ app:
   notes-port: 14096
   timezone: Asia/Shanghai
   max-history-chars: 6000
+  ollama:
+    base-url: http://127.0.0.1:11434
+    model: nomic-embed-text
+    timeout-seconds: 30
 
 mybatis-plus:
   configuration:

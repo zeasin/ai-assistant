@@ -1,6 +1,8 @@
 # Chat History Semantic Retrieval
 
 > 重构数据库设计，用 LangChain4j + Ollama 本地 embedding 实现聊天历史的语义相关度筛选。
+>
+> **✅ 已实现 (2026-06-16)** — 见 `SessionService`、`OllamaEmbeddingService` 及相关文件。
 
 ## 问题
 

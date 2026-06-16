@@ -4,6 +4,7 @@ import com.laoqi.assistant.model.Config;
 import com.laoqi.assistant.service.ConfigService;
 import com.laoqi.assistant.service.FeishuService;
 import com.laoqi.assistant.service.LogService;
+import com.laoqi.assistant.service.OllamaEmbeddingService;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
@@ -15,12 +16,15 @@ public class ApiConfigController {
     private final ConfigService configService;
     private final FeishuService feishuService;
     private final LogService logService;
+    private final OllamaEmbeddingService ollamaEmbeddingService;
 
     public ApiConfigController(ConfigService configService, FeishuService feishuService,
-                                LogService logService) {
+                                LogService logService,
+                                OllamaEmbeddingService ollamaEmbeddingService) {
         this.configService = configService;
         this.feishuService = feishuService;
         this.logService = logService;
+        this.ollamaEmbeddingService = ollamaEmbeddingService;
     }
 
     @GetMapping("/api/config")
@@ -129,5 +133,10 @@ public class ApiConfigController {
             @RequestParam(name = "enabled", defaultValue = "off") String enabled,
             @RequestParam(name = "time", defaultValue = "08:00") String time) {
         return Map.of("ok", false, "error", "该功能已迁移至独立采集器模块，请使用 /api/collector/tasks API");
+    }
+
+    @GetMapping("/api/ollama/status")
+    public Map<String, Object> ollamaStatus() {
+        return Map.of("available", ollamaEmbeddingService.isAvailable());
     }
 }
