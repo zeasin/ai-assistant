@@ -184,7 +184,7 @@
 .chat-status {
     font-size: 12px; color: #888; line-height: 1.5;
     padding: 6px 0; font-style: italic;
-liao'    height: 0; opacity: 0; overflow: hidden;
+    height: 0; opacity: 0; overflow: hidden;
     transition: all 0.2s;
 }
 .chat-status.visible {
@@ -365,8 +365,11 @@ async function sendMessage() {
                         document.getElementById('status-' + aiMsgId).classList.remove('visible');
                         document.getElementById('reply-' + aiMsgId).innerHTML = '<span style="color:#ff6b6b;">❌ ' + escapeHtml(data.content) + '</span>';
                     } else if (data.type === 'done') {
-                        document.getElementById('status-' + aiMsgId).classList.remove('visible');
-                        // 回复已由后端自动保存，刷新侧边栏以更新标题
+                        const statusEl = document.getElementById('status-' + aiMsgId);
+                        if (statusEl) {
+                            statusEl.classList.remove('visible');
+                            statusEl.textContent = '';
+                        }
                         loadSessionList();
                     }
                 } catch (e) { /* skip malformed events */ }
