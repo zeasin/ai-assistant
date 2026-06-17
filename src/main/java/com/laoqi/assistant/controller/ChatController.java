@@ -163,7 +163,7 @@ public class ChatController {
             } catch (Exception e) {
                 log.error("对话请求处理失败", e);
                 try {
-                    sendError(emitter, "AI 服务调用失败: " + e.getMessage());
+                    sendError(emitter, resolveErrorMessage(e));
                 } catch (Exception ex) {
                     log.error("发送错误信息失败", ex);
                     try {
@@ -259,5 +259,33 @@ public class ChatController {
                 log.error("无法完成错误发送", ex);
             }
         }
+    }
+
+    private String resolveErrorMessage(Exception e) {
+        String msg = e.getMessage();
+        if (msg != null) {
+            if (msg.contains("Insufficient Balance") || msg.contains("insufficient_balance")) {
+                return "API 余额不足，请登录 DeepSeek 平台充值后重试。";
+            }
+            if (msg.contains("Rate limit") || msg.contains("rate_limit")) {
+                return "请求过于频繁，请稍后再试。";
+            }
+            if (msg.contains("invalid_api_key") || msg.contains("Incorrect API key")) {
+                return "API Key 无效，请在配置页检查并更新。";
+            }
+            if (msg.contains("context_length_exceeded") || msg.contains("maximum context length")) {
+                return "对话过长，请开启新对话。";
+            }
+            // 尝试提取 API 返回的 error message
+            int idx = msg.indexOf("\"message\":\"");
+            if (idx != -1) {
+                int start = idx + "\"message\":\"".length();
+                int end = msg.indexOf("\"", start);
+                if (end != -1) {
+                    return "AI 服务错误: " + msg.substring(start, end);
+                }
+            }
+        }
+        return "AI 服务调用失败: " + (msg != null ? msg : "未知错误");
     }
 }
