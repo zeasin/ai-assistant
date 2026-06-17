@@ -3,9 +3,9 @@ package com.laoqi.assistant.service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.deepseek.api.DeepSeekApi;
-import org.springframework.ai.deepseek.DeepSeekChatModel;
-import org.springframework.ai.deepseek.DeepSeekChatOptions;
+import org.springframework.ai.openai.OpenAiChatModel;
+import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.stereotype.Service;
 
 /**
@@ -137,19 +137,19 @@ public class NoteAssistantService {
             baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
         }
 
-        DeepSeekApi deepSeekApi = DeepSeekApi.builder()
+        OpenAiApi openAiApi = OpenAiApi.builder()
                 .baseUrl(baseUrl)
                 .apiKey(apiKey)
                 .restClientBuilder(configResolver.buildRestClientBuilder())
                 .build();
 
-        DeepSeekChatOptions options = DeepSeekChatOptions.builder()
+        OpenAiChatOptions options = OpenAiChatOptions.builder()
                 .model(model)
                 .build();
 
-        DeepSeekChatModel chatModel = DeepSeekChatModel.builder()
-                .deepSeekApi(deepSeekApi)
-                .options(options)
+        OpenAiChatModel chatModel = OpenAiChatModel.builder()
+                .openAiApi(openAiApi)
+                .defaultOptions(options)
                 .build();
 
         return ChatClient.builder(chatModel)

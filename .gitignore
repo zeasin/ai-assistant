@@ -74,3 +74,11 @@ CLAUDE.md
 sensenova-extension-ds.js
 sensenova-extension.js
 nul
+
+# ========== 构建输出 ==========
+BOOT-INF/
+META-INF/
+org/
+
+# ========== 运行时数据 ==========
+memory*.db
