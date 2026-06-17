@@ -153,13 +153,14 @@ public class CodingController {
             return Map.of("ok", false, "error", "记录不存在");
         }
         boolean processing = "处理中".equals(entity.getElapsed());
-        return Map.of(
-                "ok", true,
-                "done", !processing,
-                "success", entity.getSuccess(),
-                "response", entity.getResponse(),
-                "elapsed", processing ? "" : entity.getElapsed()
-        );
+        Map<String, Object> result = new HashMap<>();
+        result.put("ok", true);
+        result.put("done", !processing);
+        result.put("success", entity.getSuccess());
+        result.put("response", entity.getResponse());
+        result.put("elapsed", processing ? "" : entity.getElapsed());
+        result.put("startTime", entity.getTime());
+        return result;
     }
 
     @PostMapping("/test")

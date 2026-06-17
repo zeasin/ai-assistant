@@ -344,15 +344,15 @@ async function runDebug() {
 }
 
 async function pollDebugResult(recordId, btn) {
-    const maxAttempts = 180; // 180 * 5s = 15分钟
+    const maxAttempts = 720; // 720 * 5s = 60分钟
     let attempts = 0;
+    let startTime = null;
     const poll = async () => {
         attempts++;
         try {
             const res = await fetch('/coding/debug/status/' + recordId);
             const data = await res.json();
             if (data.ok && data.done) {
-                // 完成
                 if (data.success) {
                     document.getElementById('debugResult').textContent = data.response;
                     document.getElementById('debugResult').style.display = 'block';
@@ -361,20 +361,28 @@ async function pollDebugResult(recordId, btn) {
                     document.getElementById('debugStatus').textContent = '❌ ' + (data.response || '排查失败');
                 }
                 btn.disabled = false; btn.textContent = '▶ 执行排查';
-                // 刷新记录列表
                 loadRecords();
-                // 如果切到记录标签页，刷新
                 const panelRecords = document.getElementById('panel-records');
                 if (panelRecords.classList.contains('active')) {
                     refreshRecordsList();
                 }
                 return;
             } else if (data.ok && !data.done) {
-                document.getElementById('debugStatus').textContent = '⏳ 排查中...（' + (attempts * 5) + '秒）';
+                // 计算实际已运行时间
+                if (!startTime && data.startTime) {
+                    startTime = new Date(data.startTime.replace(' ', 'T'));
+                }
+                let elapsed = '';
+                if (startTime) {
+                    const sec = Math.floor((Date.now() - startTime.getTime()) / 1000);
+                    if (sec < 60) elapsed = sec + '秒';
+                    else elapsed = Math.floor(sec / 60) + '分' + (sec % 60) + '秒';
+                }
+                document.getElementById('debugStatus').textContent = '⏳ 排查中...（已运行 ' + elapsed + '）';
                 if (attempts < maxAttempts) {
                     setTimeout(poll, 5000);
                 } else {
-                    document.getElementById('debugStatus').textContent = '⏰ 排查超时（超过15分钟），请简化问题后重试';
+                    document.getElementById('debugStatus').textContent = '⏰ 排查已超过60分钟，后台仍在运行，请到「排查历史」查看最新结果';
                     btn.disabled = false; btn.textContent = '▶ 执行排查';
                 }
             } else {
@@ -382,7 +390,7 @@ async function pollDebugResult(recordId, btn) {
                 btn.disabled = false; btn.textContent = '▶ 执行排查';
             }
         } catch (e) {
-            document.getElementById('debugStatus').textContent = '❌ 轮询失败: ' + e.message;
+            document.getElementById('debugStatus').textContent = '⏳ 连接中...（' + (attempts * 5) + '秒）';
             if (attempts < maxAttempts) {
                 setTimeout(poll, 5000);
             } else {

@@ -107,18 +107,17 @@ public class CodePiService {
                     System.currentTimeMillis() - start);
         }
 
-        // 4. 构建命令
-        // Windows 上 pi 是 Node.js 脚本，需要用 cmd /c 执行
+        // 4. 构建命令 — 通过 stdin 传 prompt，避免 Windows 命令行长度/转义问题
         boolean isWin = System.getProperty("os.name").toLowerCase().contains("win");
         ProcessBuilder pb;
         if (isWin) {
             pb = new ProcessBuilder(
-                    "cmd", "/c", "pi", "-p", prompt, "--no-session",
+                    "cmd", "/c", "pi", "--no-session",
                     "--tools", "read,bash,grep,find,ls"
             );
         } else {
             pb = new ProcessBuilder(
-                    piPath, "-p", prompt, "--no-session",
+                    piPath, "--no-session",
                     "--tools", "read,bash,grep,find,ls"
             );
         }
@@ -126,12 +125,18 @@ public class CodePiService {
         pb.environment().put("PI_OFFLINE", "1");
         pb.environment().put("TERM", "dumb");
 
-        log.info("[CodePi] 开始执行 pi CLI | timeout={}s | dir={} | prompt={}...", timeoutSec, projectDir,
-                prompt.substring(0, Math.min(80, prompt.length())));
+        log.info("[CodePi] 开始执行 pi CLI | timeout={}s | dir={} | prompt_len={}",
+                timeoutSec, projectDir, prompt.length());
 
-        // 5. 执行
+        // 5. 执行 — 通过 stdin 写入 prompt
         try {
             Process process = pb.start();
+
+            // 将 prompt 写入 stdin 后关闭
+            try (OutputStream stdin = process.getOutputStream()) {
+                stdin.write(prompt.getBytes(StandardCharsets.UTF_8));
+                stdin.flush();
+            }
 
             // 读取 stdout / stderr
             StringBuilder stdout = new StringBuilder();
