@@ -7,6 +7,8 @@ import org.springframework.stereotype.Service;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -296,6 +298,63 @@ public class CodePiService {
                 if (f.exists() && f.canExecute()) return c;
             }
         return "pi";
+    }
+
+    /**
+     * 检测 pi CLI 是否已安装，返回状态信息
+     */
+    public Map<String, Object> checkPiStatus() {
+        Map<String, Object> status = new HashMap<>();
+        String piPath = findPiExecutable();
+        boolean installed = !"pi".equals(piPath) || checkPiExists();
+        status.put("installed", installed);
+        status.put("path", piPath);
+        if (installed) {
+            try {
+                String version = runPiVersion(piPath);
+                status.put("version", version);
+                status.put("ok", true);
+            } catch (Exception e) {
+                status.put("version", null);
+                status.put("ok", true);
+            }
+        } else {
+            status.put("version", null);
+            status.put("ok", false);
+        }
+        return status;
+    }
+
+    private boolean checkPiExists() {
+        try {
+            ProcessBuilder pb = new ProcessBuilder("cmd", "/c", "pi", "--version");
+            Process p = pb.start();
+            return p.waitFor(3, TimeUnit.SECONDS) && p.exitValue() == 0;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private String runPiVersion(String piPath) {
+        try {
+            ProcessBuilder pb;
+            if (System.getProperty("os.name").toLowerCase().contains("win")) {
+                pb = new ProcessBuilder("cmd", "/c", "pi", "--version");
+            } else {
+                pb = new ProcessBuilder(piPath, "--version");
+            }
+            pb.environment().put("TERM", "dumb");
+            Process p = pb.start();
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8))) {
+                String v = reader.readLine();
+                if (p.waitFor(3, TimeUnit.SECONDS) && v != null) {
+                    return v.trim();
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return null;
     }
 
     private static String truncate(String s, int maxLen) {

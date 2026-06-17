@@ -85,9 +85,28 @@
             </div>
             <div class="status-card">
                 <div class="label">Pi CLI</div>
-                <div class="value ok">就绪</div>
+                <div class="value" th:classappend="${piStatus != null and piStatus.get('ok')} ? 'ok' : 'no'">
+                    <span th:if="${piStatus != null and piStatus.get('version') != null}" th:text="${piStatus.get('version')}"></span>
+                    <span th:if="${piStatus == null or piStatus.get('version') == null}" th:text="${piStatus != null and piStatus.get('installed')} ? '已安装' : '未安装'"></span>
+                </div>
             </div>
         </div>
+    </div>
+
+    <div class="card">
+        <h2>📦 Pi CLI 安装</h2>
+        <p style="font-size:14px;line-height:1.8;">
+            Pi CLI 是本系统的代码排查引擎，需要先安装到服务器上才能使用。
+        </p>
+        <div style="background:#1a1a2e;color:#e0e0e0;border-radius:8px;padding:16px;font-family:monospace;font-size:13px;line-height:1.6;margin:12px 0;">
+            # 通过 npm 全局安装<br>
+            npm install -g @earendil-works/pi<br><br>
+            # 验证是否安装成功<br>
+            pi --version
+        </div>
+        <p style="font-size:13px;color:#5c5f66;">
+            📖 详细文档：<a href="https://pi.dev/docs/latest" target="_blank" rel="noopener" style="color:#5c3dcf;text-decoration:underline;">https://pi.dev/docs/latest</a>
+        </p>
     </div>
 
     <div class="card">

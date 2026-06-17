@@ -50,6 +50,7 @@ public class CodingController {
         model.addAttribute("config", config);
         model.addAttribute("records", codingBotService.getRecentRecords(20));
         model.addAttribute("connected", codingBotService.isConnected());
+        model.addAttribute("piStatus", codePiService.checkPiStatus());
         log.info("[编程AI] 页面加载: connected={}, records={}, dir={}",
                 codingBotService.isConnected(), codingBotService.getRecentRecords(20).size(),
                 config.getCodingProjectDir());
