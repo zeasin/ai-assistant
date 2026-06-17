@@ -5,6 +5,7 @@ import com.laoqi.assistant.service.CodePiService;
 import com.laoqi.assistant.service.ConfigService;
 import com.laoqi.assistant.service.FeishuCodingBotService;
 import com.laoqi.assistant.service.LogService;
+import com.laoqi.assistant.util.MarkdownUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Controller;
@@ -63,7 +64,28 @@ public class CodingController {
         var all = codingBotService.getAllRecords();
         int to = Math.min(limit, all.size());
         log.debug("[编程AI] 查询记录: limit={}, total={}, returned={}", limit, all.size(), to);
-        return Map.of("ok", true, "records", all.subList(0, to));
+        return Map.of("ok", true, "records", all.subList(0, to).stream().map(CodingController::toDto).toList());
+    }
+
+    /**
+     * 把 CodingRecordEntity 转成 Map，并预渲染 response 为 HTML（与笔记栏目一致，规避前端 marked 的转义问题）
+     */
+    private static Map<String, Object> toDto(CodingRecordEntity e) {
+        Map<String, Object> m = new HashMap<>();
+        m.put("id", e.getId());
+        m.put("time", e.getTime());
+        m.put("startTime", e.getStartTime());
+        m.put("endTime", e.getEndTime());
+        m.put("duration", e.getDuration());
+        m.put("aiEngine", e.getAiEngine());
+        m.put("message", e.getMessage());
+        m.put("response", e.getResponse());
+        m.put("responseHtml", MarkdownUtil.toHtml(e.getResponse()));
+        m.put("elapsed", e.getElapsed());
+        m.put("success", e.getSuccess());
+        m.put("source", e.getSource());
+        m.put("projectDir", e.getProjectDir());
+        return m;
     }
 
     /**
@@ -120,7 +142,7 @@ public class CodingController {
                     entity.setDuration((int) ((endMs - startMs) / 1000));
                     if (result.isSuccess()) {
                         String output = result.getOutput();
-                        if (output.length() > 5000) output = output.substring(0, 5000) + "\n\n...（截断）";
+                        // 数据库存完整结果（不截断）
                         entity.setResponse(output);
                         entity.setSuccess(true);
                     } else {
@@ -168,6 +190,7 @@ public class CodingController {
         result.put("done", !processing);
         result.put("success", entity.getSuccess());
         result.put("response", entity.getResponse());
+        result.put("responseHtml", MarkdownUtil.toHtml(entity.getResponse()));
         result.put("elapsed", processing ? "" : entity.getElapsed());
         result.put("startTime", entity.getTime());
         result.put("duration", processing ? null : entity.getDuration());

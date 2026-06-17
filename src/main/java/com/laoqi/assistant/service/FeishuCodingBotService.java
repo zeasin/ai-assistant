@@ -262,9 +262,7 @@ public class FeishuCodingBotService {
 
             if (result.isSuccess()) {
                 String output = result.getOutput();
-                if (output.length() > 8000) output = output.substring(0, 8000) + "\n\n...（截断）";
-                String cardBody = CodePiService.mdToFeishuCard("**排查结果如下：**\n" + output);
-                sendCardReply(chatId, chatType, messageId, cardBody, "编程AI ⏱" + result.getElapsedStr());
+                // 数据库存完整结果（不截断）
                 if (entity != null) {
                     entity.setEndTime(endTime);
                     entity.setDuration((int) ((endMs - startMs) / 1000));
@@ -273,6 +271,11 @@ public class FeishuCodingBotService {
                     entity.setElapsed(result.getElapsedStr());
                     updateRecord(entity);
                 }
+                // 飞书卡片截断展示
+                String cardOutput = output;
+                if (cardOutput.length() > 15000) cardOutput = cardOutput.substring(0, 15000) + "\n\n...（截断）";
+                String cardBody = "**排查结果如下：**\n" + cardOutput;
+                sendCardReply(chatId, chatType, messageId, cardBody, "编程AI ⏱" + result.getElapsedStr());
             } else {
                 String err = result.getError() != null ? result.getError() : "未知错误";
                 sendReply(chatId, chatType, messageId, "⚠️ 排查失败（" + result.getElapsedStr() + "）：" + err);
@@ -523,7 +526,7 @@ public class FeishuCodingBotService {
             entity.setStartTime(now);
             entity.setAiEngine("pi");
             entity.setMessage(message.length() > 1000 ? message.substring(0, 1000) : message);
-            entity.setResponse(response.length() > 5000 ? response.substring(0, 5000) : response);
+            entity.setResponse(response.length() > 15000 ? response.substring(0, 15000) : response);
             entity.setElapsed(elapsed);
             entity.setSuccess(success);
             entity.setSource(source);

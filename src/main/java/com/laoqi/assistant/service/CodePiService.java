@@ -161,11 +161,26 @@ public class CodePiService {
                 case "agent_end":
                     flushStreamBuf(streamBuf);
                     log.info("[Pi] ═══ agent end ═══");
-                    if (content.isEmpty()) {
-                        String msgs = extractRaw(line, "messages");
-                        if (msgs != null) extractTextFromMessages(msgs, content);
+                    break;
+                case "message_end": {
+                    String msgType = extractNestedStr(line, "message", "role");
+                    if ("assistant".equals(msgType)) {
+                        flushStreamBuf(streamBuf);
+                        String msgRaw = extractRaw(line, "message");
+                        if (msgRaw != null) {
+                            String contentRaw = extractRaw(msgRaw, "content");
+                            if (contentRaw != null) {
+                                StringBuilder finalContent = new StringBuilder();
+                                extractTextFromContent(contentRaw, finalContent);
+                                if (!finalContent.isEmpty()) {
+                                    content.setLength(0);
+                                    content.append(finalContent);
+                                }
+                            }
+                        }
                     }
                     break;
+                }
                 case "turn_start":
                     flushStreamBuf(streamBuf);
                     log.info("[Pi] ─── turn start ───");
@@ -175,11 +190,14 @@ public class CodePiService {
                     log.info("[Pi] ─── turn end ───");
                     break;
                 case "message_update": {
-                    String delta = extractNestedStr(line, "assistantMessageEvent", "delta");
-                    if (delta != null && !delta.isEmpty()) {
-                        content.append(delta);
-                        streamBuf.append(delta);
-                        maybeFlushStreamBuf(streamBuf);
+                    String eventRaw = extractRaw(line, "assistantMessageEvent");
+                    if (eventRaw != null) {
+                        String deltaType = extractStr(eventRaw, "type");
+                        String delta = extractStr(eventRaw, "delta");
+                        if (delta != null && !delta.isEmpty()) {
+                            streamBuf.append(delta);
+                            maybeFlushStreamBuf(streamBuf);
+                        }
                     }
                     break;
                 }
@@ -247,8 +265,31 @@ public class CodePiService {
         int i = start;
         while (i < json.length()) {
             char c = json.charAt(i);
-            if (c == '\\' && i + 1 < json.length()) { sb.append(json.charAt(i + 1)); i += 2; }
-            else if (c == '"') break;
+            if (c == '\\' && i + 1 < json.length()) {
+                char next = json.charAt(i + 1);
+                switch (next) {
+                    case 'n': sb.append('\n'); break;
+                    case 'r': sb.append('\r'); break;
+                    case 't': sb.append('\t'); break;
+                    case '\\': sb.append('\\'); break;
+                    case '\"': sb.append('"'); break;
+                    case '/': sb.append('/'); break;
+                    case 'u':
+                        if (i + 5 < json.length()) {
+                            try {
+                                sb.append((char) Integer.parseInt(json.substring(i + 2, i + 6), 16));
+                                i += 5;
+                            } catch (NumberFormatException e) {
+                                sb.append('u');
+                            }
+                        } else {
+                            sb.append('u');
+                        }
+                        break;
+                    default: sb.append(next); break;
+                }
+                i += 2;
+            } else if (c == '"') break;
             else { sb.append(c); i++; }
         }
         return sb.toString();
@@ -309,6 +350,59 @@ public class CodePiService {
             }
         } catch (Exception e) {
             log.warn("[CodePi] extractText fail: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * 从 content 数组提取 text 类型内容（跳过 thinking）
+     * content 格式: [{"type":"text","text":"回答"},{"type":"thinking","thinking":"思考"}]
+     */
+    private static void extractTextFromContent(String contentRaw, StringBuilder out) {
+        if (contentRaw == null || contentRaw.isEmpty()) return;
+        try {
+            int idx = 0;
+            while (true) {
+                int ti = contentRaw.indexOf("\"type\":\"text\"", idx);
+                if (ti < 0) break;
+                int vi = contentRaw.indexOf("\"text\":\"", ti);
+                if (vi < 0) break;
+                int start = vi + 8;
+                StringBuilder sb = new StringBuilder();
+                int i = start;
+                while (i < contentRaw.length()) {
+                    char c = contentRaw.charAt(i);
+                    if (c == '\\' && i + 1 < contentRaw.length()) {
+                        char next = contentRaw.charAt(i + 1);
+                        switch (next) {
+                            case 'n': sb.append('\n'); break;
+                            case 'r': sb.append('\r'); break;
+                            case 't': sb.append('\t'); break;
+                            case '\\': sb.append('\\'); break;
+                            case '\"': sb.append('"'); break;
+                            case '/': sb.append('/'); break;
+                            case 'u':
+                                if (i + 5 < contentRaw.length()) {
+                                    try {
+                                        sb.append((char) Integer.parseInt(contentRaw.substring(i + 2, i + 6), 16));
+                                        i += 5;
+                                    } catch (NumberFormatException e) {
+                                        sb.append('u');
+                                    }
+                                } else {
+                                    sb.append('u');
+                                }
+                                break;
+                            default: sb.append(next); break;
+                        }
+                        i += 2;
+                    } else if (c == '"') break;
+                    else { sb.append(c); i++; }
+                }
+                if (!sb.isEmpty()) out.append(sb).append('\n');
+                idx = i + 1;
+            }
+        } catch (Exception e) {
+            log.warn("[CodePi] extractTextFromContent fail: {}", e.getMessage());
         }
     }
 
