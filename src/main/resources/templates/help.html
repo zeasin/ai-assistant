@@ -1,8 +1,12 @@
-<!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" th:replace="layout :: layout(~{::title}, ~{::#content})">
-<head><title>帮助 - AI 助理 v3.0</title></head>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title layout:fragment="title">帮助 - AI 助理 v3.0</title>
+</head>
 <body>
-<div id="content" class="container py-4">
+<th:block layout:fragment="content">
+<div class="container py-4">
 
     <h1 class="mb-4">📖 AI 助理 v3.0 帮助</h1>
 
@@ -98,5 +102,6 @@ java -jar target/ai-assistant-3.0.0.jar
     </section>
 
 </div>
+</th:block>
 </body>
 </html>
