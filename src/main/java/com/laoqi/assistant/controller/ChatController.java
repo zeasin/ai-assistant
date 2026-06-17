@@ -58,28 +58,38 @@ public class ChatController {
                            @RequestParam(required = false, defaultValue = "knowledge") String mode,
                            Model model) {
         model.addAttribute("chatMode", mode);
-        // 加载会话列表，避免模板中 #lists.size(sessions) 因 null 报错
         var data = sessionService.load();
+
+        // 用户明确要求新对话
+        if ("new".equals(id)) {
+            ChatSession newSession = sessionService.createSession("新对话", mode);
+            return "redirect:/chat?id=" + newSession.getId() + "&mode=" + mode;
+        }
+
+        // 如果没有任何会话，自动创建一个
+        if (data.sessions.isEmpty()) {
+            ChatSession newSession = sessionService.createSession("新对话", mode);
+            return "redirect:/chat?id=" + newSession.getId() + "&mode=" + mode;
+        }
+
+        // 有会话但 URL 没有 id 参数，跳转到最近的会话
+        if (id.isEmpty() && data.current != null) {
+            return "redirect:/chat?id=" + data.current + "&mode=" + mode;
+        }
+
         model.addAttribute("sessions", data.sessions);
 
-        // 确定当前选中的会话 ID
-        String currentId;
-        if (!id.isEmpty() && !"new".equals(id)) {
-            currentId = id;
-        } else {
-            currentId = data.current != null ? data.current : "";
-        }
+        // 确定当前选中的会话 ID：优先使用 URL 参数，否则使用最近的会话
+        String currentId = !id.isEmpty() ? id : data.current;
         model.addAttribute("current_id", currentId);
         model.addAttribute("current_mode", mode);
 
         // 加载当前会话（含消息列表）
-        if (!currentId.isEmpty()) {
-            ChatSession session = sessionService.getSession(currentId);
-            if (session != null) {
-                model.addAttribute("sessionId", session.getId());
-                model.addAttribute("sessionTitle", session.getTitle());
-                model.addAttribute("current", session);
-            }
+        ChatSession session = sessionService.getSession(currentId);
+        if (session != null) {
+            model.addAttribute("sessionId", session.getId());
+            model.addAttribute("sessionTitle", session.getTitle());
+            model.addAttribute("current", session);
         }
         model.addAttribute("ai_provider", "direct");
         return "chat";
@@ -114,8 +124,17 @@ public class ChatController {
                            @RequestParam(required = false, defaultValue = "") String sessionId,
                            @RequestParam(required = false, defaultValue = "knowledge") String mode) {
         SseEmitter emitter = new SseEmitter(300_000L);
-        String finalSessionId = (sessionId == null || sessionId.isEmpty()) ?
-                sessionService.createSession("新对话", mode).getId() : sessionId;
+        String finalSessionId;
+        if (sessionId == null || sessionId.isEmpty()) {
+            var data = sessionService.load();
+            if (data.current != null && !data.current.isEmpty()) {
+                finalSessionId = data.current;
+            } else {
+                finalSessionId = sessionService.createSession("新对话", mode).getId();
+            }
+        } else {
+            finalSessionId = sessionId;
+        }
 
         chatExecutor.execute(() -> {
             try {

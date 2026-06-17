@@ -170,6 +170,34 @@ function getAIModeName(mode) {
     return '🤖 AI 助理';
 }
 
+// 动态加载左侧会话列表
+async function loadSessionList() {
+    try {
+        const res = await fetch('/chat/history');
+        const data = await res.json();
+        const list = document.getElementById('sessionList');
+        if (!list) return;
+
+        if (!data.sessions || data.sessions.length === 0) {
+            list.innerHTML = '<div class="session-empty">暂无历史对话</div>';
+            return;
+        }
+
+        let html = '';
+        for (const s of data.sessions) {
+            const activeClass = s.id === currentSessionId ? ' active' : '';
+            html += `<div class="session-item${activeClass}" data-sid="${s.id}" id="sess-${s.id}">
+                <div class="session-title">${escapeHtml(s.title || '新对话')}</div>
+                <div class="session-meta">${escapeHtml(s.updated || '')}</div>
+                <button class="session-del" data-sid="${s.id}">✕</button>
+            </div>`;
+        }
+        list.innerHTML = html;
+    } catch (e) {
+        // 静默失败，不影响主流程
+    }
+}
+
 async function sendMessage() {
     const input = document.getElementById('chatInput');
     const box = document.getElementById('chatBox');
@@ -180,6 +208,8 @@ async function sendMessage() {
     input.value = '';
     btn.disabled = true; btn.textContent = '⏳ 思考中...';
     replyText = '';
+
+    const isNewSession = !currentSessionId;
 
     // 消息由后端自动保存，前端无需调用 saveMessage
     const userMode = 'knowledge';
@@ -197,7 +227,7 @@ async function sendMessage() {
 
     const form = new FormData();
     form.append('message', msg);
-    form.append('session_id', currentSessionId);
+    form.append('sessionId', currentSessionId);
 
     try {
         const res = await fetch('/chat/send', { method: 'POST', body: form });
@@ -220,6 +250,8 @@ async function sendMessage() {
                     // 处理 sessionId 事件（首次发送时建立 session）
                     if (data.type === 'session' && data.sessionId) {
                         currentSessionId = data.sessionId;
+                        // 更新 URL，不刷新页面
+                        history.replaceState(null, '', '/chat?id=' + data.sessionId);
                     }
                     // 如果有 mode 信息，更新我们的变量
                     if (data.mode) {
@@ -250,7 +282,8 @@ async function sendMessage() {
                         document.getElementById('reply-' + aiMsgId).innerHTML = '<span style="color:#ff6b6b;">❌ ' + escapeHtml(data.content) + '</span>';
                     } else if (data.type === 'done') {
                         document.getElementById('status-' + aiMsgId).style.display = 'none';
-                        // 回复已由后端自动保存
+                        // 回复已由后端自动保存，刷新侧边栏以更新标题
+                        loadSessionList();
                     }
                 } catch (e) { /* skip malformed events */ }
             }
@@ -268,7 +301,6 @@ function switchSession(id) {
 }
 
 function newSession() {
-    currentSessionId = '';
     window.location.href = '/chat?id=new';
 }
 
