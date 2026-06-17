@@ -1,12 +1,15 @@
 package com.laoqi.assistant.controller;
 
 import com.laoqi.assistant.config.AppConfig;
+import com.laoqi.assistant.entity.LlmProfileEntity;
 import com.laoqi.assistant.service.ConfigService;
+import com.laoqi.assistant.service.LlmConfigResolver;
 import com.laoqi.assistant.service.LlmService;
 import com.laoqi.assistant.service.LogService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -28,17 +31,25 @@ public class ImageRecognitionController {
     private final ConfigService configService;
     private final LlmService llmService;
     private final LogService logService;
+    private final LlmConfigResolver llmConfigResolver;
 
     public ImageRecognitionController(AppConfig appConfig, ConfigService configService,
-                                       LlmService llmService, LogService logService) {
+                                       LlmService llmService, LogService logService,
+                                       LlmConfigResolver llmConfigResolver) {
         this.appConfig = appConfig;
         this.configService = configService;
         this.llmService = llmService;
         this.logService = logService;
+        this.llmConfigResolver = llmConfigResolver;
     }
 
     @GetMapping
-    public String page() {
+    public String page(Model model) {
+        List<LlmProfileEntity> allProfiles = llmConfigResolver.getAllProfiles();
+        List<LlmProfileEntity> visionModels = allProfiles.stream()
+                .filter(p -> Boolean.TRUE.equals(p.getVisionSupport()))
+                .collect(Collectors.toList());
+        model.addAttribute("visionModels", visionModels);
         return "image_recognition";
     }
 
@@ -124,7 +135,8 @@ public class ImageRecognitionController {
     @PostMapping("/recognize-sync")
     @ResponseBody
     public Map<String, Object> recognizeSync(@RequestParam("image") MultipartFile image,
-                                              @RequestParam(value = "prompt", defaultValue = "") String prompt) {
+                                              @RequestParam(value = "prompt", defaultValue = "") String prompt,
+                                              @RequestParam(value = "modelName", defaultValue = "") String modelName) {
         try {
             byte[] imageBytes = image.getBytes();
             String imageType = image.getContentType();
@@ -137,7 +149,7 @@ public class ImageRecognitionController {
             if (!llmService.isAvailable()) {
                 return Map.of("ok", false, "error", "LLM API Key 未配置");
             }
-            String reply = llmService.chatWithImage("你是一个图片分析助手，请用中文回答。", userPrompt, base64Image, imageType);
+            String reply = llmService.chatWithImage("你是一个图片分析助手，请用中文回答。", userPrompt, base64Image, imageType, modelName);
 
             String imageUrl = "data:" + imageType + ";base64," + base64Image;
             String result = (reply != null && !reply.isEmpty()) ? reply : "(AI 未返回结果)";
@@ -156,6 +168,7 @@ public class ImageRecognitionController {
         try {
             String filePath = body.get("path");
             String prompt = body.getOrDefault("prompt", "请详细分析这张图片的内容");
+            String modelName = body.getOrDefault("modelName", "");
 
             Path baseDir = Paths.get(configService.getBaseDir());
             Path file = baseDir.resolve(filePath).normalize();
@@ -170,7 +183,7 @@ public class ImageRecognitionController {
             if (!llmService.isAvailable()) {
                 return Map.of("ok", false, "error", "LLM API Key 未配置");
             }
-            String reply = llmService.chatWithImage("你是一个图片分析助手，请用中文回答。", prompt, base64Image, imageType);
+            String reply = llmService.chatWithImage("你是一个图片分析助手，请用中文回答。", prompt, base64Image, imageType, modelName);
 
             String imageUrl = "/image-recognition/thumb?path=" + java.net.URLEncoder.encode(filePath, "UTF-8");
             String result = (reply != null && !reply.isEmpty()) ? reply : "(AI 未返回结果)";

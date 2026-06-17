@@ -61,7 +61,7 @@
                     <select id="modelSelector" style="padding:10px 12px;border:1px solid #e1e3e6;border-radius:8px;background:#fff;font-size:13px;outline:none;max-width:180px;">
                         <th:block th:if="${#lists.size(llm_models) > 0}">
                             <th:block th:each="m : ${llm_models}">
-                                <option th:value="${m.name}" th:selected="${m.isDefault}" th:text="${m.name}">模型</option>
+                                <option th:value="${m.name}" th:selected="${m.name == default_model}" th:text="${m.name}">模型</option>
                             </th:block>
                         </th:block>
                         <th:block th:unless="${#lists.size(llm_models) > 0}">
@@ -341,6 +341,11 @@ addEventListener('DOMContentLoaded', () => {
             switchSession(sid);
         }
     });
+    // 选中默认模型，无默认则选第一条
+    const modelSel = document.getElementById('modelSelector');
+    if (modelSel && modelSel.options.length > 0 && !modelSel.value) {
+        modelSel.selectedIndex = 0;
+    }
 });
 </script>
 

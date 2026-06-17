@@ -38,7 +38,20 @@
                 <textarea id="uploadPrompt" rows="3" style="width:100%; padding:10px 12px; border:1px solid #e1e3e6; border-radius:8px; font-size:14px; resize:vertical; outline:none; font-family:inherit;">请识别这张图片中的内容。</textarea>
             </div>
 
-            <button type="button" class="btn btn-primary" id="submitBtn" style="width:100%;" onclick="uploadAndRecognize()">🔍 开始识别</button>
+            <div style="display:flex; gap:8px;">
+                <select id="modelSelector" style="flex:1; padding:10px 12px; border:1px solid #e1e3e6; border-radius:8px; background:#fff; font-size:14px; outline:none;">
+                    <th:block th:if="${#lists.size(visionModels) > 0}">
+                        <option value="">选择多模态模型...</option>
+                        <th:block th:each="m : ${visionModels}">
+                            <option th:value="${m.name}" th:text="${m.name + ' (' + m.model + ')'}">模型</option>
+                        </th:block>
+                    </th:block>
+                    <th:block th:unless="${#lists.size(visionModels) > 0}">
+                        <option value="">暂无支持多模态的模型，请在配置页添加</option>
+                    </th:block>
+                </select>
+                <button type="button" class="btn btn-primary" id="submitBtn" style="white-space:nowrap;" onclick="uploadAndRecognize()">🔍 开始识别</button>
+            </div>
         </form>
     </div>
 
@@ -58,7 +71,20 @@
             <textarea id="browsePrompt" rows="3" style="width:100%; padding:10px 12px; border:1px solid #e1e3e6; border-radius:8px; font-size:14px; resize:vertical; outline:none; font-family:inherit;">请识别这张图片中的内容。</textarea>
         </div>
 
-        <button class="btn btn-primary" id="browseSubmitBtn" onclick="recognizeFile()" style="width:100%;" disabled>🔍 识别选中图片</button>
+        <div style="display:flex; gap:8px;">
+            <select id="browseModelSelector" style="flex:1; padding:10px 12px; border:1px solid #e1e3e6; border-radius:8px; background:#fff; font-size:14px; outline:none;">
+                <th:block th:if="${#lists.size(visionModels) > 0}">
+                    <option value="">选择多模态模型...</option>
+                    <th:block th:each="m : ${visionModels}">
+                        <option th:value="${m.name}" th:text="${m.name + ' (' + m.model + ')'}">模型</option>
+                    </th:block>
+                </th:block>
+                <th:block th:unless="${#lists.size(visionModels) > 0}">
+                    <option value="">暂无支持多模态的模型，请在配置页添加</option>
+                </th:block>
+            </select>
+            <button class="btn btn-primary" id="browseSubmitBtn" onclick="recognizeFile()" style="white-space:nowrap;" disabled>🔍 识别选中图片</button>
+        </div>
     </div>
 </div>
 
@@ -150,12 +176,16 @@ dropZone.addEventListener('drop', function(e) {
 async function uploadAndRecognize() {
     const input = document.getElementById('fileInput');
     if (!input.files || !input.files[0]) { toast('请先选择图片', 'error'); return; }
+    const modelSel = document.getElementById('modelSelector');
+    const modelName = modelSel ? modelSel.value : '';
+    if (!modelName) { toast('请选择多模态模型', 'error'); return; }
     const btn = document.getElementById('submitBtn');
     btn.disabled = true; btn.textContent = '⏳ 识别中，请稍候...';
 
     const fd = new FormData();
     fd.append('image', input.files[0]);
     fd.append('prompt', document.getElementById('uploadPrompt').value);
+    fd.append('modelName', modelName);
 
     try {
         const resp = await fetch('/image-recognition/recognize-sync', { method: 'POST', body: fd });
@@ -218,6 +248,9 @@ function filterImages() {
 
 async function recognizeFile() {
     if (!selectedImage) return;
+    const modelSel = document.getElementById('browseModelSelector');
+    const modelName = modelSel ? modelSel.value : '';
+    if (!modelName) { toast('请选择多模态模型', 'error'); return; }
     const btn = document.getElementById('browseSubmitBtn');
     btn.disabled = true; btn.textContent = '⏳ 识别中，请稍候...';
 
@@ -225,7 +258,7 @@ async function recognizeFile() {
         const resp = await fetch('/image-recognition/recognize-file', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({path: selectedImage, prompt: document.getElementById('browsePrompt').value})
+            body: JSON.stringify({path: selectedImage, prompt: document.getElementById('browsePrompt').value, modelName: modelName})
         });
         const data = await resp.json();
         if (data.ok) {

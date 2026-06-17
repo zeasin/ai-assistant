@@ -464,8 +464,12 @@ function renderLlmModels() {
         html += '<td style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;word-break:break-all;"><code>' + escapeHtml(m.baseUrl || '') + '</code></td>';
         html += '<td>' + (m.timeout || 600) + 's</td>';
         html += '<td>' + (vision ? '✅' : '—') + '</td>';
+        html += '<td>' + (isDefault ? '✅ 默认' : '—') + '</td>';
         html += '<td>';
         html += '<button class="btn btn-secondary" onclick="editLlmModel(' + m.id + ')" style="padding:2px 8px;font-size:11px;margin-right:4px;">编辑</button>';
+        if (!isDefault) {
+            html += '<button class="btn btn-secondary" onclick="setDefaultModel(' + m.id + ')" style="padding:2px 8px;font-size:11px;margin-right:4px;">设为默认</button>';
+        }
         html += '<button class="btn btn-secondary" onclick="deleteLlmModel(' + m.id + ')" style="padding:2px 8px;font-size:11px;color:#ef4444;">删除</button>';
         html += '</td></tr>';
     });

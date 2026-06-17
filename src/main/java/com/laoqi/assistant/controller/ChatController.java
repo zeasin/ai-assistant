@@ -1,6 +1,7 @@
 package com.laoqi.assistant.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.laoqi.assistant.entity.LlmProfileEntity;
 import com.laoqi.assistant.model.ChatSession;
 import com.laoqi.assistant.model.ChatSession.ChatMessage;
 import com.laoqi.assistant.service.ChatSessionService;
@@ -97,6 +98,8 @@ public class ChatController {
         }
         model.addAttribute("ai_provider", "direct");
         model.addAttribute("llm_models", llmConfigResolver.getAllProfiles());
+        LlmProfileEntity defaultProfile = llmConfigResolver.getDefaultProfile();
+        model.addAttribute("default_model", defaultProfile != null ? defaultProfile.getName() : "");
         return "chat";
     }
 
