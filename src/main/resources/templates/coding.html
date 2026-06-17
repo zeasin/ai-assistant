@@ -317,10 +317,10 @@ async function testCoding() {
 async function runDebug() {
     const msg = document.getElementById('debugMessage').value.trim();
     if (!msg) { toast('请输入问题描述', 'error'); return; }
-    const btn = event.target;
-    btn.disabled = true; btn.textContent = '⏳ 执行中...';
+    const btn = document.querySelector('.btn-secondary[onclick="runDebug()"]') || event.target;
+    btn.disabled = true; btn.textContent = '⏳ 启动排查...';
     document.getElementById('debugResult').style.display = 'none';
-    document.getElementById('debugStatus').textContent = '⏳ pi CLI 排查中...';
+    document.getElementById('debugStatus').textContent = '⏳ 正在启动排查...';
     try {
         const res = await fetch('/coding/debug', {
             method: 'POST', headers: {'Content-Type':'application/json'},
@@ -328,16 +328,77 @@ async function runDebug() {
         });
         const data = await res.json();
         if (data.ok) {
-            document.getElementById('debugResult').textContent = data.result;
-            document.getElementById('debugResult').style.display = 'block';
-            document.getElementById('debugStatus').textContent = '✅ 完成（' + (data.elapsed || '') + '）';
+            const recordId = data.recordId;
+            document.getElementById('debugStatus').textContent = '⏳ 排查已启动(#' + recordId + ')，请等待结果...';
+            btn.textContent = '⏳ 排查中...';
+            // 轮询结果
+            pollDebugResult(recordId, btn);
         } else {
-            document.getElementById('debugStatus').textContent = '❌ ' + (data.error || '失败');
+            document.getElementById('debugStatus').textContent = '❌ ' + (data.error || '启动失败');
+            btn.disabled = false; btn.textContent = '▶ 执行排查';
         }
     } catch (e) {
-        document.getElementById('debugStatus').textContent = '❌ ' + e.message;
+        document.getElementById('debugStatus').textContent = '❌ 请求失败: ' + e.message;
+        btn.disabled = false; btn.textContent = '▶ 执行排查';
     }
-    btn.disabled = false; btn.textContent = '▶ 执行排查';
+}
+
+async function pollDebugResult(recordId, btn) {
+    const maxAttempts = 180; // 180 * 5s = 15分钟
+    let attempts = 0;
+    const poll = async () => {
+        attempts++;
+        try {
+            const res = await fetch('/coding/debug/status/' + recordId);
+            const data = await res.json();
+            if (data.ok && data.done) {
+                // 完成
+                if (data.success) {
+                    document.getElementById('debugResult').textContent = data.response;
+                    document.getElementById('debugResult').style.display = 'block';
+                    document.getElementById('debugStatus').textContent = '✅ 完成（' + (data.elapsed || '') + '）';
+                } else {
+                    document.getElementById('debugStatus').textContent = '❌ ' + (data.response || '排查失败');
+                }
+                btn.disabled = false; btn.textContent = '▶ 执行排查';
+                // 刷新记录列表
+                loadRecords();
+                // 如果切到记录标签页，刷新
+                const panelRecords = document.getElementById('panel-records');
+                if (panelRecords.classList.contains('active')) {
+                    refreshRecordsList();
+                }
+                return;
+            } else if (data.ok && !data.done) {
+                document.getElementById('debugStatus').textContent = '⏳ 排查中...（' + (attempts * 5) + '秒）';
+                if (attempts < maxAttempts) {
+                    setTimeout(poll, 5000);
+                } else {
+                    document.getElementById('debugStatus').textContent = '⏰ 排查超时（超过15分钟），请简化问题后重试';
+                    btn.disabled = false; btn.textContent = '▶ 执行排查';
+                }
+            } else {
+                document.getElementById('debugStatus').textContent = '❌ ' + (data.error || '查询状态失败');
+                btn.disabled = false; btn.textContent = '▶ 执行排查';
+            }
+        } catch (e) {
+            document.getElementById('debugStatus').textContent = '❌ 轮询失败: ' + e.message;
+            if (attempts < maxAttempts) {
+                setTimeout(poll, 5000);
+            } else {
+                btn.disabled = false; btn.textContent = '▶ 执行排查';
+            }
+        }
+    };
+    setTimeout(poll, 3000); // 3秒后开始第一次轮询
+}
+
+async function refreshRecordsList() {
+    try {
+        const res = await fetch('/coding/records?limit=50');
+        const data = await res.json();
+        if (data.ok) records = data.records;
+    } catch (e) {}
 }
 </script>
 

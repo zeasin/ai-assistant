@@ -1,5 +1,6 @@
 package com.laoqi.assistant.controller;
 
+import com.laoqi.assistant.entity.CodingRecordEntity;
 import com.laoqi.assistant.service.CodePiService;
 import com.laoqi.assistant.service.ConfigService;
 import com.laoqi.assistant.service.FeishuCodingBotService;
@@ -11,6 +12,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
+import java.util.concurrent.*;
 
 /**
  * 编程AI 独立页面控制器
@@ -26,6 +28,11 @@ public class CodingController {
     private final FeishuCodingBotService codingBotService;
     private final CodePiService codePiService;
     private final LogService logService;
+    private final ExecutorService debugExecutor = Executors.newFixedThreadPool(3, r -> {
+        Thread t = new Thread(r, "coding-debug");
+        t.setDaemon(true);
+        return t;
+    });
 
     public CodingController(ConfigService configService,
                             FeishuCodingBotService codingBotService,
@@ -58,6 +65,13 @@ public class CodingController {
         return Map.of("ok", true, "records", all.subList(0, to));
     }
 
+    /**
+     * 异步启动手动调试：
+     * 1. 立即保存"处理中"记录到 SQLite
+     * 2. 后台线程执行 pi CLI
+     * 3. 完成后更新记录
+     * 4. 前端轮询 /coding/debug/status/{id} 获取结果
+     */
     @PostMapping("/debug")
     @ResponseBody
     public Map<String, Object> debug(@RequestBody Map<String, String> body) {
@@ -75,32 +89,77 @@ public class CodingController {
             return Map.of("ok", false, "error", "请先配置项目目录");
         }
 
-        log.info("[编程AI] 手动调试: dir={}, msg={}...", projectDir,
+        log.info("[编程AI] 手动调试(异步): dir={}, msg={}...", projectDir,
                 message.length() > 80 ? message.substring(0, 80) + "..." : message);
 
-        // 手动调试不设超时限制（用 1800s = 30分钟）
-        CodePiService.CodePiResult result = codePiService.analyze(message, projectDir, 1800);
-        log.info("[编程AI] 手动调试完成: success={}, elapsed={}, output_len={}",
-                result.isSuccess(), result.getElapsedStr(),
-                result.isSuccess() ? result.getOutput().length() : 0);
+        // 1. 立即写入"处理中"记录
+        Long recordId = codingBotService.saveRecord(
+                message, "🔄 正在排查中...", "处理中", false, "debug", projectDir);
+        log.info("[编程AI] 手动调试记录已写入: id={}", recordId);
 
-        logService.add("编程AI调试", result.isSuccess() ? "成功" : "失败",
-                String.format("耗时%s | dir=%s", result.getElapsedStr(), projectDir));
+        // 2. 后台执行 pi CLI（不超时限制）
+        Long finalRecordId = recordId;
+        String finalProjectDir = projectDir;
+        debugExecutor.execute(() -> {
+            try {
+                log.info("[编程AI] 后台排查开始: recordId={}", finalRecordId);
+                CodePiService.CodePiResult result = codePiService.analyze(message, finalProjectDir, 1800);
 
-        // 手动调试也写入 SQLite 记录
-        String source = "debug";
-        if (result.isSuccess()) {
-            String output = result.getOutput();
-            if (output.length() > 5000) output = output.substring(0, 5000) + "\n\n...（截断）";
-            codingBotService.saveRecord(message, output, result.getElapsedStr(), true, source, projectDir);
-            log.info("[编程AI] 手动调试成功记录已保存");
-            return Map.of("ok", true, "result", result.getOutput(), "elapsed", result.getElapsedStr());
-        } else {
-            String errorMsg = result.getError() != null ? result.getError() : "未知错误";
-            codingBotService.saveRecord(message, "失败: " + errorMsg, result.getElapsedStr(), false, source, projectDir);
-            log.info("[编程AI] 手动调试失败记录已保存");
-            return Map.of("ok", false, "error", errorMsg, "elapsed", result.getElapsedStr());
+                log.info("[编程AI] 后台排查完成: recordId={}, success={}, elapsed={}",
+                        finalRecordId, result.isSuccess(), result.getElapsedStr());
+
+                // 3. 更新记录
+                CodingRecordEntity entity = codingBotService.getRecordById(finalRecordId);
+                if (entity != null) {
+                    if (result.isSuccess()) {
+                        String output = result.getOutput();
+                        if (output.length() > 5000) output = output.substring(0, 5000) + "\n\n...（截断）";
+                        entity.setResponse(output);
+                        entity.setSuccess(true);
+                    } else {
+                        String err = result.getError() != null ? result.getError() : "未知错误";
+                        entity.setResponse("失败: " + err);
+                        entity.setSuccess(false);
+                    }
+                    entity.setElapsed(result.getElapsedStr());
+                    codingBotService.updateRecord(entity);
+                    log.info("[编程AI] 记录已更新: id={}, success={}", finalRecordId, entity.getSuccess());
+                }
+
+                logService.add("编程AI调试", result.isSuccess() ? "成功" : "失败",
+                        String.format("耗时%s | dir=%s | recordId=%d",
+                                result.getElapsedStr(), finalProjectDir, finalRecordId));
+            } catch (Exception e) {
+                log.error("[编程AI] 后台排查异常: recordId={}, err={}", finalRecordId, e.getMessage(), e);
+                CodingRecordEntity entity = codingBotService.getRecordById(finalRecordId);
+                if (entity != null) {
+                    entity.setResponse("异常: " + e.getMessage());
+                    entity.setSuccess(false);
+                    entity.setElapsed("失败");
+                    codingBotService.updateRecord(entity);
+                }
+            }
+        });
+
+        // 4. 立即返回 recordId
+        return Map.of("ok", true, "recordId", recordId, "message", "排查已启动，请稍候...");
+    }
+
+    @GetMapping("/debug/status/{recordId}")
+    @ResponseBody
+    public Map<String, Object> debugStatus(@PathVariable Long recordId) {
+        CodingRecordEntity entity = codingBotService.getRecordById(recordId);
+        if (entity == null) {
+            return Map.of("ok", false, "error", "记录不存在");
         }
+        boolean processing = "处理中".equals(entity.getElapsed());
+        return Map.of(
+                "ok", true,
+                "done", !processing,
+                "success", entity.getSuccess(),
+                "response", entity.getResponse(),
+                "elapsed", processing ? "" : entity.getElapsed()
+        );
     }
 
     @PostMapping("/test")
@@ -122,7 +181,6 @@ public class CodingController {
         log.info("[编程AI] 测试消息: chatId={}, appId={}...", chatId,
                 appId.length() > 8 ? appId.substring(0, 8) + "..." : appId);
 
-        // 如果 WebSocket 未连接，尝试启动
         if (!codingBotService.isConnected()) {
             log.info("[编程AI] 测试消息: WebSocket 未连接，尝试启动");
             try {
@@ -139,7 +197,6 @@ public class CodingController {
             return Map.of("ok", false, "error", "编程机器人正在启动连接中，请稍后重试");
         }
 
-        // 通过飞书 API 发送测试消息到群聊
         try {
             String now = java.time.LocalDateTime.now()
                     .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));

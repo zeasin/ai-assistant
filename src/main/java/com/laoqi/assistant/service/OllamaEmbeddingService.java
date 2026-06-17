@@ -15,7 +15,7 @@ import java.net.URI;
 
 /**
  * Ollama Embedding 向量化服务。
- * v0.3.0 基于 Spring AI 2.0 EmbeddingModel API，替代 LangChain4j。
+ * v0.4.0 基于 Spring AI 2.0 EmbeddingModel API，替代 LangChain4j。
  */
 @Service
 public class OllamaEmbeddingService {

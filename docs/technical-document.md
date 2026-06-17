@@ -1,4 +1,4 @@
-> ⚠️ *本文档描述 v2.0 架构，已过时。当前 v0.3.0 使用 Spring AI 2.0 + Spring Boot 4.1，零外部服务依赖。详见 README.md*
+> ⚠️ *本文档描述 v2.0 架构，已过时。当前 v0.4.0 使用 Spring AI 2.0 + Spring Boot 4.1，零外部服务依赖。详见 README.md*
 
 # AI 助理 v2.0 技术文档
 
@@ -646,7 +646,7 @@ time, action, status(成功/失败/警告), detail
 ### 启动
 ```powershell
 mvn package -q
-java -jar target/ai-assistant-0.3.0.jar
+java -jar target/ai-assistant-0.4.0.jar
 ```
 
 或开发模式直接运行：

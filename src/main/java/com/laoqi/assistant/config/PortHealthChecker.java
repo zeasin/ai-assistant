@@ -11,7 +11,7 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 
 /**
- * 端口健康检测 — v0.3.0 简化版。
+ * 端口健康检测 — v0.4.0 简化版。
  * 只检测 Ollama 服务（语义检索用），不再需要 opencode serve。
  */
 @Component

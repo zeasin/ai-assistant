@@ -30,7 +30,7 @@ public class ConfigService {
         if (config.isFeishuPollingEnabled() == null) {
             config.setFeishuPollingEnabled(defaultConfig.isFeishuPollingEnabled());
         }
-        // aiProvider 废弃 v0.3.0 — 始终直连 LLM
+        // aiProvider 废弃 v0.4.0 — 始终直连 LLM
         if (config.getLlmBaseUrl() == null || config.getLlmBaseUrl().isEmpty()) {
             config.setLlmBaseUrl("https://api.deepseek.com");
         }

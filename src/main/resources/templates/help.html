@@ -2,7 +2,7 @@
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{layout}">
 <head>
-    <title layout:fragment="title">帮助 - AI 助理 v0.3.0</title>
+    <title layout:fragment="title">帮助 - AI 助理 v0.4.0</title>
 </head>
 <body>
 <th:block layout:fragment="content">
@@ -10,7 +10,7 @@
 
     <div class="help-header">
         <h1>帮助中心</h1>
-        <p class="text-muted">AI 助理 v0.3.0 — 功能指南与常见问题</p>
+        <p class="text-muted">AI 助理 v0.4.0 — 功能指南与常见问题</p>
     </div>
 
     <div class="help-sections">
@@ -22,7 +22,7 @@
                 <h2>快速开始</h2>
             </div>
             <div class="card-body">
-                <p>AI 助理 v0.3.0 基于 Spring AI 2.0 直连 LLM API，无需外部编排服务。启动后访问 <a href="/config">/config</a> 配置笔记库根目录和 API Key 即可使用全部功能。</p>
+                <p>AI 助理 v0.4.0 基于 Spring AI 2.0 直连 LLM API，无需外部编排服务。启动后访问 <a href="/config">/config</a> 配置笔记库根目录和 API Key 即可使用全部功能。</p>
                 <h3>前置依赖</h3>
                 <table class="help-table">
                     <tr><th>依赖</th><th>说明</th><th>必须</th></tr>
@@ -33,7 +33,7 @@
                 <h3>启动步骤</h3>
                 <pre># 1. 配置 API Key（/config 页面或环境变量 DEEPSEEK_API_KEY）
 # 2. 启动应用
-java -jar target/ai-assistant-0.3.0.jar
+java -jar target/ai-assistant-0.4.0.jar
 # 3. 访问 http://localhost:6790</pre>
                 <p class="tip">提示：先配 API Key 和笔记库路径，否则 AI 功能和文件操作不可用。</p>
             </div>
@@ -381,7 +381,7 @@ java -jar target/ai-assistant-0.3.0.jar
                     <tr><td>"未配置笔记库根目录"</td><td>未配置笔记库路径</td><td>在 /config 页面设置</td></tr>
                     <tr><td>语义检索不可用</td><td>Ollama 未启动</td><td><code>ollama run nomic-embed-text</code></td></tr>
                     <tr><td>飞书消息收不到</td><td>Webhook URL 未配置或无效</td><td>在 /config 配置并测试</td></tr>
-                    <tr><td>对话消息未保存</td><td>参数名不匹配</td><td>确保使用 v0.3.0 最新代码</td></tr>
+                    <tr><td>对话消息未保存</td><td>参数名不匹配</td><td>确保使用 v0.4.0 最新代码</td></tr>
                 </table>
             </div>
         </section>

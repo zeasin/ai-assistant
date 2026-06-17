@@ -482,7 +482,7 @@ public class FeishuCodingBotService {
         logService.add("编程AI", action, detail);
     }
 
-    public void saveRecord(String message, String response, String elapsed, boolean success, String source, String projectDir) {
+    public Long saveRecord(String message, String response, String elapsed, boolean success, String source, String projectDir) {
         try {
             CodingRecordEntity entity = new CodingRecordEntity();
             entity.setTime(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
@@ -493,9 +493,11 @@ public class FeishuCodingBotService {
             entity.setSource(source);
             entity.setProjectDir(projectDir != null && projectDir.length() > 200 ? projectDir.substring(0, 200) : projectDir);
             recordDbService.save(entity);
-            log.debug("[编程AI] 记录已保存: source={}, success={}, elapsed={}", source, success, elapsed);
+            log.debug("[编程AI] 记录已保存: source={}, success={}, elapsed={}, id={}", source, success, elapsed, entity.getId());
+            return entity.getId();
         } catch (Exception e) {
             log.error("[编程AI] 保存记录失败: {}", e.getMessage());
+            return null;
         }
     }
 
@@ -514,6 +516,23 @@ public class FeishuCodingBotService {
         } catch (Exception e) {
             log.warn("[编程AI] 查询全部记录失败: {}", e.getMessage());
             return List.of();
+        }
+    }
+
+    public void updateRecord(CodingRecordEntity entity) {
+        try {
+            recordDbService.updateById(entity);
+        } catch (Exception e) {
+            log.error("[编程AI] 更新记录失败: {}", e.getMessage());
+        }
+    }
+
+    public CodingRecordEntity getRecordById(Long id) {
+        try {
+            return recordDbService.getById(id);
+        } catch (Exception e) {
+            log.warn("[编程AI] 查询记录失败: {}", e.getMessage());
+            return null;
         }
     }
 
