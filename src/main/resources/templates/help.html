@@ -6,161 +6,458 @@
 </head>
 <body>
 <th:block layout:fragment="content">
-<div class="help-layout">
+<div class="help">
 
-    <div class="help-hero">
-        <h1>AI 助理 v3.0 帮助</h1>
-        <p class="text-muted" style="font-size:15px;">快速上手 · 功能指南 · 常见问题</p>
+    <div class="help-header">
+        <h1>帮助中心</h1>
+        <p class="text-muted">AI 助理 v3.0 — 功能指南与常见问题</p>
     </div>
 
-    <div class="help-grid">
-        <section class="help-card">
-            <div class="help-icon">🚀</div>
-            <h2>快速开始</h2>
-            <p>AI 助理 v3.0 基于 <strong>Spring AI 2.0</strong>，直接调用 LLM API，无需外部编排服务。</p>
-            <h3>前置依赖</h3>
-            <table class="table">
-                <tr><th>依赖</th><th>说明</th><th>必须</th></tr>
-                <tr><td>Java 17+</td><td>运行时</td><td>✅</td></tr>
-                <tr><td>LLM API Key</td><td>DeepSeek 等兼容 API</td><td>✅</td></tr>
-                <tr><td>Ollama</td><td>语义检索加速</td><td>🔘 可选</td></tr>
-            </table>
-            <h3>启动步骤</h3>
-            <pre># 配置 API Key（/config 页面或环境变量）
-# export DEEPSEEK_API_KEY=sk-xxxxx
+    <div class="help-sections">
 
-# 启动应用
+        <!-- 快速开始 -->
+        <section class="help-card" id="quickstart">
+            <div class="card-header">
+                <span class="card-icon">🚀</span>
+                <h2>快速开始</h2>
+            </div>
+            <div class="card-body">
+                <p>AI 助理 v3.0 基于 Spring AI 2.0 直连 LLM API，无需外部编排服务。启动后访问 <a href="/config">/config</a> 配置笔记库根目录和 API Key 即可使用全部功能。</p>
+                <h3>前置依赖</h3>
+                <table class="help-table">
+                    <tr><th>依赖</th><th>说明</th><th>必须</th></tr>
+                    <tr><td>Java 17+</td><td>运行时环境</td><td class="yes">✅</td></tr>
+                    <tr><td>LLM API Key</td><td>DeepSeek 等兼容 API</td><td class="yes">✅</td></tr>
+                    <tr><td>Ollama</td><td>语义检索加速（nomic-embed-text）</td><td class="no">🔘 可选</td></tr>
+                </table>
+                <h3>启动步骤</h3>
+                <pre># 1. 配置 API Key（/config 页面或环境变量 DEEPSEEK_API_KEY）
+# 2. 启动应用
 java -jar target/ai-assistant-3.0.0.jar
-
-# 访问 http://localhost:6790</pre>
-            <p class="text-muted">先去 <a href="/config">/config</a> 配置笔记库根目录和 API Key。</p>
+# 3. 访问 http://localhost:6790</pre>
+                <p class="tip">提示：先配 API Key 和笔记库路径，否则 AI 功能和文件操作不可用。</p>
+            </div>
         </section>
 
-        <section class="help-card">
-            <div class="help-icon">💬</div>
-            <h2>对话模块</h2>
-            <ul>
-                <li><strong>知识库对话</strong> — 结合笔记库历史和语义检索回答问题</li>
-                <li><strong>创作式对话</strong> — 开启新会话，AI 无历史上下文</li>
-                <li><strong>笔记操作</strong> — 让 AI 读/写笔记库文件</li>
-            </ul>
+        <!-- 导航 -->
+        <section class="help-card" id="nav">
+            <div class="card-header">
+                <span class="card-icon">🧭</span>
+                <h2>页面导航</h2>
+            </div>
+            <div class="card-body">
+                <table class="help-table">
+                    <tr><th>菜单</th><th>URL</th><th>功能</th></tr>
+                    <tr><td>📊 综合</td><td><code>/</code></td><td>首页看板，展示综合日报 + 待办事项侧边栏</td></tr>
+                    <tr><td>💬 对话</td><td><code>/chat</code></td><td>AI 对话（知识库/创作模式），支持语义检索</td></tr>
+                    <tr><td>📝 笔记</td><td><code>/browse</code></td><td>笔记库文件浏览与 Markdown 预览</td></tr>
+                    <tr><td>📸 识图</td><td><code>/image-recognition</code></td><td>图片识别分析（LLM 多模态）</td></tr>
+                    <tr><td>📁 工作模块</td><td><code>/module/{id}</code></td><td>业务数据管理（自媒体/客户等），含 AI 分析</td></tr>
+                    <tr><td>🗄️ 数据</td><td><code>/datacenter</code></td><td>数据中心，结构化数据集管理、导入导出</td></tr>
+                    <tr><td>📋 任务</td><td><code>/tasks</code></td><td>任务看板，高/中/低优先级管理</td></tr>
+                    <tr><td>⏰ 提醒</td><td><code>/reminders</code></td><td>定时提醒配置（一次性/每日/每周等）</td></tr>
+                    <tr><td>📡 采集</td><td><code>/collector</code></td><td>数据采集器，定时抓取 URL 或 AI 提取数据</td></tr>
+                    <tr><td>🤖 AI 指南</td><td><code>/ai-guide</code></td><td>AGENTS.md 编辑与 AI 记忆文件管理</td></tr>
+                    <tr><td>📋 日志</td><td><code>/log</code></td><td>操作日志查看（最近 100 条）</td></tr>
+                    <tr><td>⚙️ 配置</td><td><code>/config</code></td><td>系统配置（API Key、飞书、Ollama 状态等）</td></tr>
+                </table>
+            </div>
         </section>
 
-        <section class="help-card">
-            <div class="help-icon">📊</div>
-            <h2>业务数据</h2>
-            <p>在笔记库中设置模块，每个模块可配置 JSON/CSV 数据文件，AI 自动分析给出洞察。</p>
+        <!-- AI 对话 -->
+        <section class="help-card" id="chat">
+            <div class="card-header">
+                <span class="card-icon">💬</span>
+                <h2>AI 对话</h2>
+            </div>
+            <div class="card-body">
+                <p>支持多轮对话，包含历史上下文（同会话）和跨会话语义检索（需 Ollama）。AI 可自主调用工具操作笔记库。</p>
+                <h3>工作模式</h3>
+                <ul>
+                    <li><strong>知识库对话</strong>（默认）— 注入历史上下文 + 语义检索，适合基于笔记库的问答</li>
+                    <li><strong>创作式对话</strong> — 无历史上下文，适合独立创作或开放讨论</li>
+                </ul>
+                <h3>SSE 实时流式响应</h3>
+                <p>发送消息后，后端通过 Server-Sent Events 推送到前端，事件类型：</p>
+                <table class="help-table">
+                    <tr><th>事件</th><th>说明</th></tr>
+                    <tr><td><code>session</code></td><td>建立会话，返回 sessionId，前端更新 URL</td></tr>
+                    <tr><td><code>status</code></td><td>进度指示（处理中/读取文件/写入等）</td></tr>
+                    <tr><td><code>text</code></td><td>AI 回复文本</td></tr>
+                    <tr><td><code>done</code></td><td>流式完成</td></tr>
+                    <tr><td><code>error</code></td><td>错误信息</td></tr>
+                </table>
+                <h3>笔记工具（@Tool 自动编排）</h3>
+                <p>AI 根据对话内容自主决定是否调用以下工具，无需手动指定：</p>
+                <ul>
+                    <li><code>listDir(path)</code> — 列出笔记库目录内容</li>
+                    <li><code>readFile(path)</code> — 读取文件（上限 8000 字符）</li>
+                    <li><code>writeFile(path, content)</code> — 写入文件</li>
+                    <li><code>searchFiles(keyword)</code> — 按文件名搜索（最多 20 条）</li>
+                </ul>
+                <h3>语义检索 / 长期记忆</h3>
+                <p>需要启动 Ollama（<code>ollama run nomic-embed-text</code>）。AI 回复后自动生成 768 维向量并跨会话检索相似轮次（余弦相似度阈值 0.5），为当前对话提供相关历史背景。Ollama 不可用时回退最近 3 轮对话。</p>
+                <h3>对话管理</h3>
+                <ul>
+                    <li>左侧历史会话列表，支持切换、删除</li>
+                    <li>消息自动保存至 SQLite，刷新页面不丢失</li>
+                    <li>导出对话为 Markdown</li>
+                </ul>
+            </div>
         </section>
 
-        <section class="help-card">
-            <div class="help-icon">📸</div>
-            <h2>图片识别</h2>
-            <p>利用 LLM 多模态能力分析图片。支持 PNG / JPG / GIF / WebP / BMP。</p>
+        <!-- 业务数据模块 -->
+        <section class="help-card" id="modules">
+            <div class="card-header">
+                <span class="card-icon">📁</span>
+                <h2>业务数据模块</h2>
+            </div>
+            <div class="card-body">
+                <p>工作模块是业务数据的组织单元。每个模块包含数据文件（JSON）、文档树、AI 分析提示词。模块在 <code>/config</code> 页面配置。</p>
+                <h3>模块配置（config.json）</h3>
+                <pre>{
+  "modules": [
+    {"id": "self-media", "name": "自媒体",
+     "dir": "自媒体", "icon": "📝",
+     "dataFiles": ["data.json"]},
+    {"id": "customer", "name": "客户管理",
+     "dir": "企业/客户管理", "icon": "👥",
+     "dataFiles": ["data.json"]}
+  ]
+}</pre>
+                <h3>功能</h3>
+                <ul>
+                    <li><strong>数据表格</strong> — 查看、新增、编辑、删除记录（支持 JSON 嵌套结构）</li>
+                    <li><strong>文档浏览</strong> — 模块目录下的 Markdown 文件树，在线预览</li>
+                    <li><strong>AI 分析</strong> — SSE 流式分析模块数据并生成洞察报告</li>
+                    <li><strong>自定义提示词</strong> — 每个模块可配置专属 AI 分析提示词</li>
+                    <li><strong>列设置</strong> — 自定义表格列显示名称、顺序和可见性</li>
+                    <li><strong>字段标签</strong> — 在配置页为英文 key 设置中文标签</li>
+                </ul>
+            </div>
         </section>
 
-        <section class="help-card">
-            <div class="help-icon">☀️</div>
-            <h2>日报系统</h2>
-            <ul>
-                <li><strong>工作日 09:00</strong> — 自动生成综合日报</li>
-                <li><strong>工作日 18:00</strong> — 下班提醒推送飞书</li>
-                <li>日报存储在 <code>AI/综合日报/</code></li>
-            </ul>
+        <!-- 数据中心 -->
+        <section class="help-card" id="datacenter">
+            <div class="card-header">
+                <span class="card-icon">🗄️</span>
+                <h2>数据中心</h2>
+            </div>
+            <div class="card-body">
+                <p>结构化数据管理平台，支持多数据集的定义、导入、导出和搜索。</p>
+                <h3>数据集管理</h3>
+                <ul>
+                    <li>创建带 Schema 的数据集（字段名、类型、显示名、必填、默认值）</li>
+                    <li>记录浏览、搜索（关键词匹配）、删除</li>
+                    <li>自动 MD5 去重</li>
+                </ul>
+                <h3>导入方式</h3>
+                <ul>
+                    <li><strong>Excel 导入</strong> — 自动检测列头、模糊匹配字段映射，支持 AI 智能归一化</li>
+                    <li><strong>JSON 导入</strong> — 直接粘贴或上传 JSON 数据</li>
+                    <li><strong>URL 导入</strong> — AI 自动访问 URL 并提取结构化数据</li>
+                </ul>
+                <h3>导出</h3>
+                <p>将数据集记录导出到工作模块，AI 自动转换为模块格式。</p>
+            </div>
         </section>
 
-        <section class="help-card">
-            <div class="help-icon">📡</div>
-            <h2>数据采集</h2>
-            <p>定时从指定 URL 采集数据，AI 分析提取为结构化 JSON，存入数据中心。</p>
+        <!-- 数据采集器 -->
+        <section class="help-card" id="collector">
+            <div class="card-header">
+                <span class="card-icon">📡</span>
+                <h2>数据采集器</h2>
+            </div>
+            <div class="card-body">
+                <p>定时采集外部数据并提取为结构化 JSON，支持动态 Cron 调度。</p>
+                <h3>任务类型</h3>
+                <ul>
+                    <li><strong>AI 提示模板</strong> — 发送提示词给 LLM，从回复中提取 JSON</li>
+                    <li><strong>URL 抓取</strong> — AI 访问 URL 并提取数据</li>
+                </ul>
+                <h3>功能</h3>
+                <ul>
+                    <li>每个任务独立配置 Cron 表达式</li>
+                    <li>执行结果自动去重（MD5）</li>
+                    <li>可关联数据集自动导入</li>
+                    <li>执行日志查看</li>
+                    <li>默认内置"CSDN 数据采集"任务</li>
+                </ul>
+            </div>
         </section>
 
-        <section class="help-card">
-            <div class="help-icon">🔧</div>
-            <h2>配置项</h2>
-            <p>所有配置在 <a href="/config">/config</a> 页面管理。</p>
-            <table class="table">
-                <tr><th>配置项</th><th>说明</th></tr>
-                <tr><td>笔记库根目录</td><td>所有业务数据的存放根目录</td></tr>
-                <tr><td>API Key</td><td>LLM API 密钥</td></tr>
-                <tr><td>飞书集成</td><td>Webhook URL 和应用凭证</td></tr>
-            </table>
+        <!-- 图片识别 -->
+        <section class="help-card" id="image">
+            <div class="card-header">
+                <span class="card-icon">📸</span>
+                <h2>图片识别</h2>
+            </div>
+            <div class="card-body">
+                <p>利用 LLM 多模态（Vision）能力分析笔记库中的图片。</p>
+                <ul>
+                    <li>从笔记库目录浏览并选择图片</li>
+                    <li>直接上传图片进行分析</li>
+                    <li>支持格式：PNG / JPG / GIF / WebP / BMP</li>
+                    <li>分析结果可保存到笔记库</li>
+                </ul>
+            </div>
         </section>
 
-        <section class="help-card">
-            <div class="help-icon">🆘</div>
-            <h2>常见问题</h2>
-            <table class="table">
-                <tr><th>问题</th><th>原因</th><th>解决</th></tr>
-                <tr><td>AI 回复"API Key 未配置"</td><td>未配置 API Key</td><td>在 /config 填写</td></tr>
-                <tr><td>AI 回复为空</td><td>超时或网络问题</td><td>检查网络，超时设为 600s</td></tr>
-                <tr><td>语义检索不可用</td><td>Ollama 未启动</td><td><code>ollama run nomic-embed-text</code></td></tr>
-            </table>
+        <!-- 任务看板 -->
+        <section class="help-card" id="tasks">
+            <div class="card-header">
+                <span class="card-icon">📋</span>
+                <h2>任务看板</h2>
+            </div>
+            <div class="card-body">
+                <p>任务数据存储在 <code>AI/任务/data.json</code>。</p>
+                <ul>
+                    <li>任务字段：标题、描述、状态（待办/完成）、优先级（高/中/低）、截止日期</li>
+                    <li>首页侧边栏按优先级显示未完成任务</li>
+                    <li>支持新增、编辑、删除</li>
+                </ul>
+            </div>
         </section>
 
-        <section class="help-card">
-            <div class="help-icon">🏗️</div>
-            <h2>技术架构</h2>
-            <ul>
-                <li><strong>Spring Boot 4.1</strong> + Spring AI 2.0 + Java 17</li>
-                <li><strong>AI 引擎</strong>：ChatClient 直连 LLM</li>
-                <li><strong>工具编排</strong>：<code>@Tool</code> + ToolCallingAdvisor</li>
-                <li><strong>语义检索</strong>：Ollama + nomic-embed-text</li>
-                <li><strong>存储</strong>：SQLite (MyBatis-Plus) + JSON</li>
-            </ul>
+        <!-- 定时提醒 -->
+        <section class="help-card" id="reminders">
+            <div class="card-header">
+                <span class="card-icon">⏰</span>
+                <h2>定时提醒</h2>
+            </div>
+            <div class="card-body">
+                <p>通过飞书推送定时提醒，支持多种重复类型。</p>
+                <h3>提醒类型</h3>
+                <ul>
+                    <li><strong>一次性</strong> — 指定日期时间触发</li>
+                    <li><strong>每日</strong> — 每天固定时间</li>
+                    <li><strong>每周</strong> — 每周指定日期的固定时间</li>
+                    <li><strong>每月</strong> — 每月指定日期的固定时间</li>
+                    <li><strong>每年</strong> — 每年指定日期的固定时间</li>
+                </ul>
+                <h3>内置提醒</h3>
+                <ul>
+                    <li><strong>工作日 18:00</strong> — 下班日报提醒（推送飞书）</li>
+                </ul>
+                <p>系统每分钟检查一次到期提醒，触发后通过飞书 Webhook 推送。</p>
+            </div>
         </section>
+
+        <!-- 日报系统 -->
+        <section class="help-card" id="report">
+            <div class="card-header">
+                <span class="card-icon">☀️</span>
+                <h2>综合日报</h2>
+            </div>
+            <div class="card-body">
+                <p>AI 自动生成综合日报，整合工作笔记、当日日报、AI 记忆文件等内容。</p>
+                <h3>自动生成（工作日 09:00）</h3>
+                <ul>
+                    <li>读取 AGENTS.md（前 3000 字符）了解项目规则</li>
+                    <li>读取 AI 记忆文件了解近期上下文</li>
+                    <li>读取当日工作日报</li>
+                    <li>调用 LLM 生成综合日报并保存至 <code>AI/综合日报/</code></li>
+                </ul>
+                <h3>自动推送（工作日 18:00）</h3>
+                <p>通过飞书 Webhook 推送下班日报提醒。</p>
+                <h3>手动操作</h3>
+                <ul>
+                    <li>首页一键触发日报生成</li>
+                    <li>自定义分析提示词</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- 文件浏览 -->
+        <section class="help-card" id="browse">
+            <div class="card-header">
+                <span class="card-icon">📝</span>
+                <h2>笔记文件浏览</h2>
+            </div>
+            <div class="card-body">
+                <p>基于笔记库根目录的文件管理工具。</p>
+                <ul>
+                    <li><strong>目录树</strong> — 浏览笔记库目录结构</li>
+                    <li><strong>Markdown 预览</strong> — 渲染为 HTML 查看</li>
+                    <li><strong>文件操作</strong> — 新建 .md 文件、删除文件</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- AI 指南 -->
+        <section class="help-card" id="aiguide">
+            <div class="card-header">
+                <span class="card-icon">🤖</span>
+                <h2>AI 指南</h2>
+            </div>
+            <div class="card-body">
+                <p>管理 AI 对话的规则文件（AGENTS.md）和长期记忆文件。</p>
+                <h3>AGENTS.md</h3>
+                <p>AI 在对话中每次都会读取的规则文件，定义笔记库目录结构、数据格式、操作规范。可在页面直接编辑保存。</p>
+                <h3>AI 记忆文件</h3>
+                <p>存储在 <code>AI/记忆/</code> 目录。在日报生成和对话语义检索中被引用。支持查看、编辑、新建、删除。</p>
+            </div>
+        </section>
+
+        <!-- 飞书集成 -->
+        <section class="help-card" id="feishu">
+            <div class="card-header">
+                <span class="card-icon">✈️</span>
+                <h2>飞书集成</h2>
+            </div>
+            <div class="card-body">
+                <p>支持飞书 Webhook 消息推送和 Bot API 消息接收与自动回复。</p>
+                <h3>Webhook 推送</h3>
+                <ul>
+                    <li>日报推送、下班提醒、文章提醒</li>
+                    <li>富文本格式（标题 + 段落 + 引用）</li>
+                </ul>
+                <h3>Bot API（自建应用）</h3>
+                <ul>
+                    <li>配置 App ID / App Secret / Chat ID</li>
+                    <li>WebSocket 长连接接收群聊/单聊消息（需应用被 @ 或被加好友）</li>
+                    <li>AI 自动回复（同对话系统，飞书消息作为独立会话管理）</li>
+                    <li>启用手动切换，默认关闭</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- 配置 -->
+        <section class="help-card" id="config">
+            <div class="card-header">
+                <span class="card-icon">⚙️</span>
+                <h2>系统配置</h2>
+            </div>
+            <div class="card-body">
+                <p>所有配置通过 <a href="/config">/config</a> 页面管理，无需手动编辑文件。配置存储在 <code>config.json</code>。</p>
+                <table class="help-table">
+                    <tr><th>配置项</th><th>说明</th></tr>
+                    <tr><td>LLM API Key</td><td>DeepSeek 等兼容 API 密钥（必须）</td></tr>
+                    <tr><td>API 地址</td><td>兼容 OpenAI 格式的 API 地址</td></tr>
+                    <tr><td>模型名</td><td>如 deepseek-chat</td></tr>
+                    <tr><td>超时时间</td><td>建议 ≥300 秒</td></tr>
+                    <tr><td>笔记库根目录</td><td>所有业务数据的存放根目录（必须）</td></tr>
+                    <tr><td>飞书 Webhook URL</td><td>消息推送 URL</td></tr>
+                    <tr><td>飞书应用凭证</td><td>App ID / Secret，用于 Bot API</td></tr>
+                    <tr><td>字段标签</td><td>英文 key → 中文标签映射</td></tr>
+                </table>
+                <h3>配置优先级</h3>
+                <p>Web 页面配置 &gt; 环境变量（DEEPSEEK_API_KEY / LLM_API_KEY / LLM_BASE_URL / LLM_MODEL）&gt; 默认值</p>
+            </div>
+        </section>
+
+        <!-- 技术架构 -->
+        <section class="help-card" id="arch">
+            <div class="card-header">
+                <span class="card-icon">🏗️</span>
+                <h2>技术架构</h2>
+            </div>
+            <div class="card-body">
+                <table class="help-table">
+                    <tr><th>组件</th><th>技术</th></tr>
+                    <tr><td>框架</td><td>Spring Boot 4.1.0 + Spring AI 2.0.0 + Java 17</td></tr>
+                    <tr><td>AI 引擎</td><td>ChatClient 直连 LLM（OpenAI 兼容协议）</td></tr>
+                    <tr><td>工具编排</td><td>@Tool 注解 + ToolCallingAdvisor（自动路由）</td></tr>
+                    <tr><td>语义检索</td><td>Ollama + nomic-embed-text（768 维向量）</td></tr>
+                    <tr><td>会话存储</td><td>SQLite（MyBatis-Plus）— sessions / messages / turn_embeddings</td></tr>
+                    <tr><td>业务存储</td><td>JSON / Markdown 文件（笔记库目录下）</td></tr>
+                    <tr><td>前端</td><td>Thymeleaf 模板</td></tr>
+                    <tr><td>飞书集成</td><td>HttpURLConnection（Webhook）+ Lark SDK（WebSocket）</td></tr>
+                </table>
+            </div>
+        </section>
+
+        <!-- 常见问题 -->
+        <section class="help-card" id="faq">
+            <div class="card-header">
+                <span class="card-icon">❓</span>
+                <h2>常见问题</h2>
+            </div>
+            <div class="card-body">
+                <table class="help-table">
+                    <tr><th>问题</th><th>原因</th><th>解决</th></tr>
+                    <tr><td>AI 回复"API Key 未配置"</td><td>未在 /config 填写 API Key</td><td>配置页填写 LLM API Key</td></tr>
+                    <tr><td>AI 回复为空</td><td>LLM 超时或返回空</td><td>检查网络，超时设为 600s</td></tr>
+                    <tr><td>"未配置笔记库根目录"</td><td>未配置笔记库路径</td><td>在 /config 页面设置</td></tr>
+                    <tr><td>语义检索不可用</td><td>Ollama 未启动</td><td><code>ollama run nomic-embed-text</code></td></tr>
+                    <tr><td>飞书消息收不到</td><td>Webhook URL 未配置或无效</td><td>在 /config 配置并测试</td></tr>
+                    <tr><td>对话消息未保存</td><td>参数名不匹配</td><td>确保使用 v3.0 最新代码</td></tr>
+                </table>
+            </div>
+        </section>
+
     </div>
 
 </div>
 
 <style>
-.help-layout {
-    max-width: 960px; margin: 0 auto; padding: 32px 24px;
+.help {
+    max-width: 800px; margin: 0 auto; padding: 32px 24px;
 }
-.help-hero {
-    text-align: center; margin-bottom: 40px;
+.help-header {
+    text-align: center; margin-bottom: 36px;
 }
-.help-hero h1 {
-    font-size: 28px; margin: 0 0 8px;
+.help-header h1 {
+    font-size: 26px; margin: 0 0 6px;
 }
-.help-grid {
-    display: flex; flex-direction: column; gap: 16px;
+.help-header p {
+    font-size: 14px; margin: 0;
+}
+.help-sections {
+    display: flex; flex-direction: column; gap: 20px;
 }
 .help-card {
-    background: #fff; border: 1px solid #e1e3e6; border-radius: 12px;
-    padding: 20px; break-inside: avoid;
+    background: #fff; border: 1px solid #e1e3e6; border-radius: 10px; overflow: hidden;
 }
-.help-card h2 {
-    font-size: 16px; margin: 0 0 10px; display: flex; align-items: center; gap: 6px;
+.card-header {
+    display: flex; align-items: center; gap: 8px;
+    padding: 14px 20px; background: #fafafa;
+    border-bottom: 1px solid #e1e3e6;
 }
-.help-card h3 {
-    font-size: 13px; margin: 14px 0 6px; color: #5c5f66;
+.card-icon { font-size: 20px; }
+.card-header h2 {
+    margin: 0; font-size: 15px; font-weight: 600;
 }
-.help-card p, .help-card li {
-    font-size: 13px; line-height: 1.6; color: #333;
+.card-body {
+    padding: 16px 20px;
 }
-.help-card ul {
-    padding-left: 16px; margin: 6px 0;
+.card-body p {
+    margin: 0 0 10px; font-size: 13px; line-height: 1.7; color: #333;
 }
-.help-card ul li {
-    margin-bottom: 4px;
+.card-body p:last-child { margin-bottom: 0; }
+.card-body h3 {
+    font-size: 13px; font-weight: 600; margin: 14px 0 6px; color: #5c5f66;
 }
-.help-card .table {
-    width: 100%; font-size: 12px; margin: 6px 0;
+.card-body ul {
+    margin: 6px 0; padding-left: 16px;
 }
-.help-card .table th {
-    background: #f5f5f7; white-space: nowrap;
+.card-body ul li {
+    font-size: 13px; line-height: 1.7; color: #333; margin-bottom: 3px;
 }
-.help-card .table td, .help-card .table th {
-    padding: 5px 8px;
-}
-.help-card pre {
-    background: #1e1e2e; color: #cdd6f4; padding: 12px; border-radius: 8px;
+.card-body pre {
+    background: #1e1e2e; color: #cdd6f4; padding: 12px 14px; border-radius: 6px;
     font-size: 12px; line-height: 1.6; overflow-x: auto; margin: 8px 0;
 }
-.help-icon {
-    font-size: 24px; margin-bottom: 4px;
+.card-body code {
+    font-size: 12px; background: #f0f0f0; padding: 1px 5px; border-radius: 3px;
 }
-
+.card-body .tip {
+    font-size: 12px; color: #7c5cfc; background: #f5f3ff; padding: 8px 12px;
+    border-radius: 6px; margin-top: 8px;
+}
+.help-table {
+    width: 100%; font-size: 12px; border-collapse: collapse; margin: 6px 0;
+}
+.help-table th {
+    background: #f5f5f7; font-weight: 600; text-align: left;
+    padding: 6px 10px; border-bottom: 1px solid #e1e3e6; white-space: nowrap;
+}
+.help-table td {
+    padding: 6px 10px; border-bottom: 1px solid #f0f0f0;
+}
+.help-table tr:last-child td { border-bottom: none; }
+.help-table .yes { color: #10b981; }
+.help-table .no { color: #909296; }
 </style>
 </body>
 </html>
