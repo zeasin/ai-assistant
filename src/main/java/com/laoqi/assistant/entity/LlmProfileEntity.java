@@ -15,6 +15,7 @@ public class LlmProfileEntity {
     private String model;
     private Integer timeout;
     private Boolean isDefault;
+    private Boolean visionSupport;
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -30,4 +31,6 @@ public class LlmProfileEntity {
     public void setTimeout(Integer timeout) { this.timeout = timeout; }
     public Boolean getIsDefault() { return isDefault; }
     public void setIsDefault(Boolean isDefault) { this.isDefault = isDefault; }
+    public Boolean getVisionSupport() { return visionSupport; }
+    public void setVisionSupport(Boolean visionSupport) { this.visionSupport = visionSupport; }
 }

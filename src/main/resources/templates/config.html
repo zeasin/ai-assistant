@@ -157,6 +157,12 @@
                 <label style="font-size:12px;">超时(秒)</label>
                 <input type="number" id="newModelTimeout" value="600" min="10" max="900" style="width:100%;padding:8px 10px;border:1px solid #e1e3e6;border-radius:6px;font-size:13px;">
             </div>
+            <div class="form-group" style="flex:0 0 auto;display:flex;align-items:center;padding-top:18px;">
+                <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;white-space:nowrap;">
+                    <input type="checkbox" id="newModelVision" style="width:16px;height:16px;cursor:pointer;">
+                    支持多模态（识图）
+                </label>
+            </div>
         </div>
         <div class="flex" style="gap:8px;margin-top:8px;">
             <button class="btn btn-primary" id="llmSubmitBtn" onclick="submitLlmModel()">添加模型</button>
@@ -447,16 +453,17 @@ function renderLlmModels() {
     empty.style.display = 'none';
 
     let html = '<table class="log-table"><thead><tr>' +
-        '<th>名称</th><th>模型</th><th>API 地址</th><th>超时</th><th>默认</th><th>操作</th>' +
+        '<th>名称</th><th>模型</th><th>API 地址</th><th>超时</th><th>多模态</th><th>默认</th><th>操作</th>' +
         '</tr></thead><tbody>';
     llmModels.forEach(function(m) {
         const isDefault = m.isDefault;
+        const vision = m.visionSupport;
         html += '<tr id="lm-row-' + m.id + '">';
         html += '<td><strong>' + escapeHtml(m.name) + '</strong></td>';
         html += '<td><code>' + escapeHtml(m.model || '') + '</code></td>';
         html += '<td style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;word-break:break-all;"><code>' + escapeHtml(m.baseUrl || '') + '</code></td>';
         html += '<td>' + (m.timeout || 600) + 's</td>';
-        html += '<td>' + (isDefault ? '✅' : '<button class="btn btn-secondary" onclick="setDefaultModel(' + m.id + ')" style="padding:2px 8px;font-size:11px;">设为默认</button>') + '</td>';
+        html += '<td>' + (vision ? '✅' : '—') + '</td>';
         html += '<td>';
         html += '<button class="btn btn-secondary" onclick="editLlmModel(' + m.id + ')" style="padding:2px 8px;font-size:11px;margin-right:4px;">编辑</button>';
         html += '<button class="btn btn-secondary" onclick="deleteLlmModel(' + m.id + ')" style="padding:2px 8px;font-size:11px;color:#ef4444;">删除</button>';
@@ -472,6 +479,7 @@ function resetLlmForm() {
     document.getElementById('newModelBaseUrl').value = 'https://api.deepseek.com';
     document.getElementById('newModelModel').value = '';
     document.getElementById('newModelTimeout').value = '600';
+    document.getElementById('newModelVision').checked = false;
     document.getElementById('llmFormTitle').textContent = '添加模型';
     document.getElementById('llmSubmitBtn').textContent = '添加模型';
     document.getElementById('llmCancelBtn').style.display = 'none';
@@ -485,6 +493,7 @@ async function submitLlmModel() {
     const baseUrlEl = document.getElementById('newModelBaseUrl');
     const modelEl = document.getElementById('newModelModel');
     const timeoutEl = document.getElementById('newModelTimeout');
+    const visionEl = document.getElementById('newModelVision');
     const status = document.getElementById('llmModelsStatus');
 
     const name = nameEl.value.trim();
@@ -496,6 +505,7 @@ async function submitLlmModel() {
         baseUrl: baseUrlEl.value || 'https://api.deepseek.com',
         model: modelEl.value || 'deepseek-chat',
         timeout: parseInt(timeoutEl.value) || 600,
+        visionSupport: visionEl.checked,
     };
 
     if (llmEditingId !== null) {
@@ -538,6 +548,7 @@ function editLlmModel(id) {
     document.getElementById('newModelBaseUrl').value = model.baseUrl || 'https://api.deepseek.com';
     document.getElementById('newModelModel').value = model.model || '';
     document.getElementById('newModelTimeout').value = model.timeout || 600;
+    document.getElementById('newModelVision').checked = model.visionSupport === true;
     document.getElementById('llmFormTitle').textContent = '编辑模型: ' + model.name;
     document.getElementById('llmSubmitBtn').textContent = '保存修改';
     document.getElementById('llmCancelBtn').style.display = 'inline-block';

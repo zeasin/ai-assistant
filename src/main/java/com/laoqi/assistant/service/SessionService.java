@@ -106,13 +106,14 @@ public class SessionService {
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_turn_embeddings_session ON turn_embeddings(session_id)");
             stmt.execute("""
                 CREATE TABLE IF NOT EXISTS llm_profiles (
-                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                    name        TEXT NOT NULL UNIQUE,
-                    api_key     TEXT NOT NULL DEFAULT '',
-                    base_url    TEXT NOT NULL DEFAULT 'https://api.deepseek.com',
-                    model       TEXT NOT NULL DEFAULT 'deepseek-chat',
-                    timeout     INTEGER NOT NULL DEFAULT 600,
-                    is_default  INTEGER NOT NULL DEFAULT 0
+                    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name            TEXT NOT NULL UNIQUE,
+                    api_key         TEXT NOT NULL DEFAULT '',
+                    base_url        TEXT NOT NULL DEFAULT 'https://api.deepseek.com',
+                    model           TEXT NOT NULL DEFAULT 'deepseek-chat',
+                    timeout         INTEGER NOT NULL DEFAULT 600,
+                    is_default      INTEGER NOT NULL DEFAULT 0,
+                    vision_support  INTEGER NOT NULL DEFAULT 0
                 )
                 """);
             log.info("New tables (sessions, messages, turn_embeddings, llm_profiles) initialized");
