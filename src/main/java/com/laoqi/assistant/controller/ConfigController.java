@@ -16,15 +16,18 @@ public class ConfigController {
     private final FeishuService feishuService;
     private final ReportService reportService;
     private final OllamaEmbeddingService ollamaEmbeddingService;
+    private final LlmConfigResolver llmConfigResolver;
 
     public ConfigController(ConfigService configService, LogService logService,
                              FeishuService feishuService, ReportService reportService,
-                             OllamaEmbeddingService ollamaEmbeddingService) {
+                             OllamaEmbeddingService ollamaEmbeddingService,
+                             LlmConfigResolver llmConfigResolver) {
         this.configService = configService;
         this.logService = logService;
         this.feishuService = feishuService;
         this.reportService = reportService;
         this.ollamaEmbeddingService = ollamaEmbeddingService;
+        this.llmConfigResolver = llmConfigResolver;
     }
 
     @GetMapping
@@ -34,6 +37,7 @@ public class ConfigController {
         ));
         model.addAttribute("ollama_available", ollamaEmbeddingService.isAvailable());
         model.addAttribute("config", configService.load());
+        model.addAttribute("llm_models", llmConfigResolver.getAllProfiles());
         return "config";
     }
 
@@ -42,7 +46,7 @@ public class ConfigController {
     public Map<String, Object> triggerJob(@RequestParam String job) {
         try {
             switch (job) {
-                case "generate_report" -> reportService.generateAndPush();
+                case "generate_report", "morning" -> reportService.generateAndPush();
                 default -> throw new IllegalArgumentException("未知任务: " + job);
             }
             logService.add("手动触发", "成功", job);

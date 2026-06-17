@@ -1,10 +1,13 @@
 package com.laoqi.assistant.controller;
 
+import com.laoqi.assistant.entity.LlmProfileEntity;
 import com.laoqi.assistant.model.Config;
 import com.laoqi.assistant.service.ConfigService;
 import com.laoqi.assistant.service.FeishuService;
 import com.laoqi.assistant.service.LogService;
+import com.laoqi.assistant.service.LlmConfigResolver;
 import com.laoqi.assistant.service.OllamaEmbeddingService;
+import com.laoqi.assistant.service.db.LlmProfileDbService;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
@@ -17,14 +20,20 @@ public class ApiConfigController {
     private final FeishuService feishuService;
     private final LogService logService;
     private final OllamaEmbeddingService ollamaEmbeddingService;
+    private final LlmProfileDbService llmProfileDbService;
+    private final LlmConfigResolver llmConfigResolver;
 
     public ApiConfigController(ConfigService configService, FeishuService feishuService,
                                 LogService logService,
-                                OllamaEmbeddingService ollamaEmbeddingService) {
+                                OllamaEmbeddingService ollamaEmbeddingService,
+                                LlmProfileDbService llmProfileDbService,
+                                LlmConfigResolver llmConfigResolver) {
         this.configService = configService;
         this.feishuService = feishuService;
         this.logService = logService;
         this.ollamaEmbeddingService = ollamaEmbeddingService;
+        this.llmProfileDbService = llmProfileDbService;
+        this.llmConfigResolver = llmConfigResolver;
     }
 
     @GetMapping("/api/config")
@@ -149,6 +158,27 @@ public class ApiConfigController {
         if (body.containsKey("timeout")) cfg.setLlmTimeout(((Number) body.get("timeout")).intValue());
         configService.save(cfg);
         logService.add("配置更新", "成功", "LLM 配置已更新");
+
+        // Also sync to llm_profiles table
+        List<LlmProfileEntity> profiles = llmProfileDbService.listAllOrdered();
+        if (profiles.isEmpty()) {
+            LlmProfileEntity p = new LlmProfileEntity();
+            p.setName("default");
+            p.setApiKey((String) body.get("apiKey"));
+            p.setBaseUrl((String) body.get("baseUrl"));
+            p.setModel((String) body.get("model"));
+            p.setTimeout(body.containsKey("timeout") ? ((Number) body.get("timeout")).intValue() : 600);
+            p.setIsDefault(true);
+            llmProfileDbService.save(p);
+        } else {
+            LlmProfileEntity p = profiles.get(0);
+            if (body.containsKey("apiKey")) p.setApiKey((String) body.get("apiKey"));
+            if (body.containsKey("baseUrl")) p.setBaseUrl((String) body.get("baseUrl"));
+            if (body.containsKey("model")) p.setModel((String) body.get("model"));
+            if (body.containsKey("timeout")) p.setTimeout(((Number) body.get("timeout")).intValue());
+            llmProfileDbService.updateById(p);
+        }
+
         return Map.of("ok", true);
     }
 
@@ -162,5 +192,99 @@ public class ApiConfigController {
     @GetMapping("/api/ollama/status")
     public Map<String, Object> ollamaStatus() {
         return Map.of("available", ollamaEmbeddingService.isAvailable());
+    }
+
+    // ========== LLM Profile endpoints (SQLite) ==========
+
+    @GetMapping("/api/config/llm-profiles")
+    public Map<String, Object> listLlmProfiles() {
+        List<LlmProfileEntity> profiles = llmProfileDbService.listAllOrdered();
+        return Map.of("ok", true, "profiles", profiles);
+    }
+
+    @PostMapping("/api/config/llm-profiles")
+    public Map<String, Object> saveLlmProfile(@RequestBody LlmProfileEntity profile) {
+        if (profile.getName() == null || profile.getName().trim().isEmpty()) {
+            return Map.of("ok", false, "error", "模型名称不能为空");
+        }
+        profile.setName(profile.getName().trim());
+
+        // Check for duplicate name
+        LlmProfileEntity existing = llmProfileDbService.findByName(profile.getName());
+        if (profile.getId() != null) {
+            // Update existing
+            if (existing != null && !existing.getId().equals(profile.getId())) {
+                return Map.of("ok", false, "error", "模型名称已存在");
+            }
+            if (profile.getTimeout() == null) profile.setTimeout(600);
+            llmProfileDbService.updateById(profile);
+            logService.add("配置更新", "成功", "LLM 模型已更新: " + profile.getName());
+        } else {
+            // Create new
+            if (existing != null) {
+                return Map.of("ok", false, "error", "模型名称已存在");
+            }
+            if (profile.getTimeout() == null) profile.setTimeout(600);
+            if (profile.getIsDefault() == null) profile.setIsDefault(false);
+
+            // If this is the only profile, make it default
+            List<LlmProfileEntity> all = llmProfileDbService.listAllOrdered();
+            if (all.isEmpty()) {
+                profile.setIsDefault(true);
+            }
+
+            // If setting as default, unset others
+            if (Boolean.TRUE.equals(profile.getIsDefault())) {
+                clearDefaultFlag();
+            }
+
+            llmProfileDbService.save(profile);
+            logService.add("配置更新", "成功", "LLM 模型已添加: " + profile.getName());
+        }
+        return Map.of("ok", true, "profile", profile);
+    }
+
+    @DeleteMapping("/api/config/llm-profiles/{id}")
+    public Map<String, Object> deleteLlmProfile(@PathVariable Long id) {
+        LlmProfileEntity profile = llmProfileDbService.getById(id);
+        if (profile == null) {
+            return Map.of("ok", false, "error", "模型不存在");
+        }
+        llmProfileDbService.removeById(id);
+        logService.add("配置更新", "成功", "LLM 模型已删除: " + profile.getName());
+
+        // If the deleted profile was the default, assign next one
+        if (Boolean.TRUE.equals(profile.getIsDefault())) {
+            List<LlmProfileEntity> remaining = llmProfileDbService.listAllOrdered();
+            if (!remaining.isEmpty()) {
+                LlmProfileEntity newDefault = remaining.get(0);
+                newDefault.setIsDefault(true);
+                llmProfileDbService.updateById(newDefault);
+            }
+        }
+        return Map.of("ok", true);
+    }
+
+    @PostMapping("/api/config/llm-profiles/{id}/default")
+    public Map<String, Object> setDefaultLlmProfile(@PathVariable Long id) {
+        LlmProfileEntity profile = llmProfileDbService.getById(id);
+        if (profile == null) {
+            return Map.of("ok", false, "error", "模型不存在");
+        }
+        clearDefaultFlag();
+        profile.setIsDefault(true);
+        llmProfileDbService.updateById(profile);
+        logService.add("配置更新", "成功", "默认 LLM 模型已切换为: " + profile.getName());
+        return Map.of("ok", true, "profile", profile);
+    }
+
+    private void clearDefaultFlag() {
+        List<LlmProfileEntity> all = llmProfileDbService.listAllOrdered();
+        for (LlmProfileEntity p : all) {
+            if (Boolean.TRUE.equals(p.getIsDefault())) {
+                p.setIsDefault(false);
+                llmProfileDbService.updateById(p);
+            }
+        }
     }
 }

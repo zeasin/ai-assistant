@@ -1,25 +1,69 @@
 package com.laoqi.assistant.service;
 
+import com.laoqi.assistant.entity.LlmProfileEntity;
 import com.laoqi.assistant.model.Config;
+import com.laoqi.assistant.service.db.LlmProfileDbService;
+import jakarta.annotation.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
-/**
- * 统一解析 LLM 配置（API Key、Base URL、模型名、超时），
- * 按优先级：config.json Web 配置 > 环境变量
- * 不读取 application.yml，LLM 配置仅通过 config.json 或环境变量指定。
- *
- * 被 LlmService 和 NoteAssistantService 共用，消除重复代码。
- */
+import java.util.List;
+import java.util.stream.Collectors;
+
 @Component
+@DependsOn("sessionService")
 public class LlmConfigResolver {
+
+    private static final Logger log = LoggerFactory.getLogger(LlmConfigResolver.class);
 
     private final ConfigService configService;
     private final RestClient.Builder llmRestClientBuilder;
+    private final LlmProfileDbService llmProfileDbService;
 
-    public LlmConfigResolver(ConfigService configService, RestClient.Builder llmRestClientBuilder) {
+    public LlmConfigResolver(ConfigService configService, RestClient.Builder llmRestClientBuilder,
+                             LlmProfileDbService llmProfileDbService) {
         this.configService = configService;
         this.llmRestClientBuilder = llmRestClientBuilder;
+        this.llmProfileDbService = llmProfileDbService;
+    }
+
+    @PostConstruct
+    public void init() {
+        migrateLegacyConfig();
+    }
+
+    private void migrateLegacyConfig() {
+        List<LlmProfileEntity> existing = llmProfileDbService.listAllOrdered();
+        if (!existing.isEmpty()) return;
+
+        Config cfg = loadConfig();
+        String apiKey = cfg != null ? cfg.getLlmApiKey() : "";
+        if (apiKey == null || apiKey.isEmpty()) {
+            apiKey = System.getenv("LLM_API_KEY");
+        }
+        if (apiKey == null || apiKey.isEmpty()) {
+            apiKey = System.getenv("DEEPSEEK_API_KEY");
+        }
+        if (apiKey == null || apiKey.isEmpty()) return;
+
+        String baseUrl = (cfg != null && cfg.getLlmBaseUrl() != null && !cfg.getLlmBaseUrl().isEmpty())
+                ? cfg.getLlmBaseUrl() : "https://api.deepseek.com";
+        String model = (cfg != null && cfg.getLlmModel() != null && !cfg.getLlmModel().isEmpty())
+                ? cfg.getLlmModel() : "deepseek-chat";
+        int timeout = (cfg != null && cfg.getLlmTimeout() > 0) ? cfg.getLlmTimeout() : 600;
+
+        LlmProfileEntity profile = new LlmProfileEntity();
+        profile.setName("default");
+        profile.setApiKey(apiKey);
+        profile.setBaseUrl(baseUrl);
+        profile.setModel(model);
+        profile.setTimeout(timeout);
+        profile.setIsDefault(true);
+        llmProfileDbService.save(profile);
+        log.info("Migrated legacy LLM config to llm_profiles table (model={})", model);
     }
 
     private Config loadConfig() {
@@ -30,13 +74,27 @@ public class LlmConfigResolver {
         }
     }
 
-    /**
-     * 获取 API Key，按优先级：
-     * 1. config.json 中 Web 页面配置的 llmApiKey
-     * 2. 环境变量 LLM_API_KEY
-     * 3. 环境变量 DEEPSEEK_API_KEY
-     */
+    private LlmProfileEntity resolveDefaultProfile() {
+        LlmProfileEntity profile = llmProfileDbService.findDefault();
+        if (profile == null) {
+            List<LlmProfileEntity> all = llmProfileDbService.listAllOrdered();
+            if (!all.isEmpty()) {
+                profile = all.get(0);
+            }
+        }
+        return profile;
+    }
+
+    private LlmProfileEntity resolveProfile(String name) {
+        if (name == null || name.isEmpty()) return resolveDefaultProfile();
+        LlmProfileEntity profile = llmProfileDbService.findByName(name);
+        if (profile == null) return resolveDefaultProfile();
+        return profile;
+    }
+
     public String resolveApiKey() {
+        LlmProfileEntity p = resolveDefaultProfile();
+        if (p != null) return p.getApiKey();
         Config cfg = loadConfig();
         if (cfg != null) {
             String key = cfg.getLlmApiKey();
@@ -49,10 +107,9 @@ public class LlmConfigResolver {
         return "";
     }
 
-    /**
-     * 获取 API Base URL
-     */
     public String resolveBaseUrl() {
+        LlmProfileEntity p = resolveDefaultProfile();
+        if (p != null) return p.getBaseUrl();
         Config cfg = loadConfig();
         if (cfg != null) {
             String url = cfg.getLlmBaseUrl();
@@ -63,10 +120,9 @@ public class LlmConfigResolver {
         return "https://api.deepseek.com";
     }
 
-    /**
-     * 获取模型名
-     */
     public String resolveModel() {
+        LlmProfileEntity p = resolveDefaultProfile();
+        if (p != null) return p.getModel();
         Config cfg = loadConfig();
         if (cfg != null) {
             String model = cfg.getLlmModel();
@@ -75,28 +131,67 @@ public class LlmConfigResolver {
         return "deepseek-chat";
     }
 
-    /**
-     * 获取超时秒数
-     */
     public int resolveTimeout() {
+        LlmProfileEntity p = resolveDefaultProfile();
+        if (p != null && p.getTimeout() != null && p.getTimeout() > 0) return p.getTimeout();
         Config cfg = loadConfig();
         if (cfg != null && cfg.getLlmTimeout() > 0) return cfg.getLlmTimeout();
         return 60;
     }
 
-    /**
-     * 检查 LLM 直连是否可用（API Key 已配置）
-     */
     public boolean isAvailable() {
         String apiKey = resolveApiKey();
         return apiKey != null && !apiKey.isEmpty();
     }
 
-    /**
-     * 返回 Spring 管理的 RestClient.Builder Bean。
-     * 该 Bean 已配置 JDK HttpClient + 显式超时（见 LlmRestClientConfig）。
-     */
     public RestClient.Builder buildRestClientBuilder() {
         return llmRestClientBuilder;
+    }
+
+    // ========== Profile-based resolution (for multi-model) ==========
+
+    public String resolveApiKey(String profileName) {
+        LlmProfileEntity p = resolveProfile(profileName);
+        if (p != null) {
+            String key = p.getApiKey();
+            if (key != null && !key.isEmpty()) return key;
+        }
+        return resolveApiKey();
+    }
+
+    public String resolveBaseUrl(String profileName) {
+        LlmProfileEntity p = resolveProfile(profileName);
+        if (p != null) {
+            String url = p.getBaseUrl();
+            if (url != null && !url.isEmpty()) return url;
+        }
+        return resolveBaseUrl();
+    }
+
+    public String resolveModel(String profileName) {
+        LlmProfileEntity p = resolveProfile(profileName);
+        if (p != null) {
+            String m = p.getModel();
+            if (m != null && !m.isEmpty()) return m;
+        }
+        return resolveModel();
+    }
+
+    public int resolveTimeout(String profileName) {
+        LlmProfileEntity p = resolveProfile(profileName);
+        if (p != null && p.getTimeout() != null && p.getTimeout() > 0) return p.getTimeout();
+        return resolveTimeout();
+    }
+
+    public List<LlmProfileEntity> getAllProfiles() {
+        return llmProfileDbService.listAllOrdered();
+    }
+
+    public LlmProfileEntity getDefaultProfile() {
+        return resolveDefaultProfile();
+    }
+
+    public LlmProfileEntity getProfileByName(String name) {
+        return llmProfileDbService.findByName(name);
     }
 }

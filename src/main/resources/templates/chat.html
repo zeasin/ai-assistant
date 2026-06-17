@@ -54,10 +54,22 @@
                 </th:block>
             </div>
 
-            <div class="chat-input" style="border-top:1px solid #e1e3e6;padding-top:12px;margin-top:12px;">
-                <input type="text" id="chatInput" placeholder="输入你的问题..."
-                       onkeydown="if(event.key==='Enter') sendMessage()">
-                <button class="btn btn-primary" id="chatBtn" onclick="sendMessage()">发送</button>
+            <div class="chat-input" style="border-top:1px solid #e1e3e6;padding-top:12px;margin-top:12px;flex-wrap:wrap;gap:8px;">
+                <div style="display:flex;gap:8px;width:100%;">
+                    <input type="text" id="chatInput" placeholder="输入你的问题..."
+                           onkeydown="if(event.key==='Enter') sendMessage()" style="flex:1;">
+                    <select id="modelSelector" style="padding:10px 12px;border:1px solid #e1e3e6;border-radius:8px;background:#fff;font-size:13px;outline:none;max-width:180px;">
+                        <th:block th:if="${#lists.size(llm_models) > 0}">
+                            <th:block th:each="m : ${llm_models}">
+                                <option th:value="${m.name}" th:selected="${m.isDefault}" th:text="${m.name}">模型</option>
+                            </th:block>
+                        </th:block>
+                        <th:block th:unless="${#lists.size(llm_models) > 0}">
+                            <option value="">默认模型</option>
+                        </th:block>
+                    </select>
+                    <button class="btn btn-primary" id="chatBtn" onclick="sendMessage()">发送</button>
+                </div>
             </div>
         </div>
     </div>
@@ -225,9 +237,11 @@ async function sendMessage() {
     </div>`;
     box.scrollTop = box.scrollHeight;
 
+    const modelSelector = document.getElementById('modelSelector');
     const form = new FormData();
     form.append('message', msg);
     form.append('sessionId', currentSessionId);
+    if (modelSelector) form.append('modelName', modelSelector.value);
 
     try {
         const res = await fetch('/chat/send', { method: 'POST', body: form });

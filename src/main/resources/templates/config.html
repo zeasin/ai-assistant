@@ -126,35 +126,44 @@
 </div>
 
 <div class="card">
-    <h2>🧠 AI 引擎</h2>
-    <div class="text-muted mb-2">AI 引擎采用 Spring AI 2.0 直连 LLM（v3.0），无需外部服务。</div>
-    <form id="llmConfigForm" onsubmit="return saveLlmConfig(event)">
-        <div id="llmConfigFields" style="display:block">
-            <div class="form-group">
-                <label>API Key</label>
-                <input type="password" id="llmApiKey" th:value="${config.llmApiKey ?: ''}" placeholder="sk-xxxxxxxxxxxx">
-                <div class="desc">LLM API 密钥</div>
+    <h2>🧠 AI 模型</h2>
+    <div class="text-muted mb-2">配置 LLM 模型列表。第一个模型将自动设为默认，可在对话页面切换模型。</div>
+
+    <div id="llmModelsContainer" style="margin-bottom:16px;">
+        <div class="text-muted" style="font-size:13px;padding:12px 0;" id="llmModelsEmpty">暂无模型，请点击下方"添加模型"。</div>
+        <div id="llmModelsList"></div>
+    </div>
+
+    <div style="border-top:1px solid #e1e3e6;padding-top:16px;">
+        <h3 style="font-size:14px;margin:0 0 12px;" id="llmFormTitle">添加模型</h3>
+        <div class="form-row" style="gap:8px;flex-wrap:wrap;">
+            <div class="form-group" style="flex:1;min-width:120px;">
+                <label style="font-size:12px;">名称</label>
+                <input type="text" id="newModelName" placeholder="如 DeepSeek" style="width:100%;padding:8px 10px;border:1px solid #e1e3e6;border-radius:6px;font-size:13px;">
             </div>
-            <div class="form-group">
-                <label>API 地址</label>
-                <input type="text" id="llmBaseUrl" th:value="${config.llmBaseUrl ?: 'https://api.deepseek.com'}" placeholder="https://api.deepseek.com">
-                <div class="desc">兼容 OpenAI 格式的 API 地址。DeepSeek: https://api.deepseek.com，商汤: https://token.sensenova.cn/v1</div>
+            <div class="form-group" style="flex:2;min-width:200px;">
+                <label style="font-size:12px;">API Key</label>
+                <input type="password" id="newModelApiKey" placeholder="sk-xxxxxxxxxxxx" style="width:100%;padding:8px 10px;border:1px solid #e1e3e6;border-radius:6px;font-size:13px;">
             </div>
-            <div class="form-group">
-                <label>模型名</label>
-                <input type="text" id="llmModel" th:value="${config.llmModel ?: 'deepseek-v4-flash'}" placeholder="deepseek-v4-flash">
-                <div class="desc">模型名称，如 deepseek-v4-flash、sensenova-6.7-flash-lite</div>
+            <div class="form-group" style="flex:1;min-width:160px;">
+                <label style="font-size:12px;">API 地址</label>
+                <input type="text" id="newModelBaseUrl" value="https://api.deepseek.com" style="width:100%;padding:8px 10px;border:1px solid #e1e3e6;border-radius:6px;font-size:13px;font-family:monospace;">
             </div>
-            <div class="form-group">
-                <label>超时（秒）</label>
-                <input type="number" id="llmTimeout" th:value="${config.llmTimeout ?: 600}" min="10" max="900">
-                <div class="desc">建议设置 ≥300 秒，以适应长对话和工具调用场景</div>
+            <div class="form-group" style="flex:0 0 100px;">
+                <label style="font-size:12px;">模型名</label>
+                <input type="text" id="newModelModel" placeholder="deepseek-chat" style="width:100%;padding:8px 10px;border:1px solid #e1e3e6;border-radius:6px;font-size:13px;font-family:monospace;">
+            </div>
+            <div class="form-group" style="flex:0 0 80px;">
+                <label style="font-size:12px;">超时(秒)</label>
+                <input type="number" id="newModelTimeout" value="600" min="10" max="900" style="width:100%;padding:8px 10px;border:1px solid #e1e3e6;border-radius:6px;font-size:13px;">
             </div>
         </div>
-
-        <button type="submit" class="btn btn-primary">保存</button>
-        <span id="llmConfigStatus" class="text-muted" style="margin-left:8px;"></span>
-    </form>
+        <div class="flex" style="gap:8px;margin-top:8px;">
+            <button class="btn btn-primary" id="llmSubmitBtn" onclick="submitLlmModel()">添加模型</button>
+            <button class="btn btn-secondary" id="llmCancelBtn" onclick="cancelEditLlmModel()" style="display:none;">取消</button>
+            <span id="llmModelsStatus" class="text-muted" style="margin-left:4px;"></span>
+        </div>
+    </div>
 </div>
 
 <style>
@@ -211,10 +220,6 @@ fetch('/api/config')
         if (cfg.feishuChatId) document.getElementById('feishuChatId').value = cfg.feishuChatId;
         if (cfg.feishuPollingEnabled) document.getElementById('feishuPollingEnabled').checked = true;
         if (cfg.baseDir) document.getElementById('baseDirPath').value = cfg.baseDir;
-        if (cfg.llmApiKey) document.getElementById('llmApiKey').value = cfg.llmApiKey;
-        if (cfg.llmBaseUrl) document.getElementById('llmBaseUrl').value = cfg.llmBaseUrl;
-        if (cfg.llmModel) document.getElementById('llmModel').value = cfg.llmModel;
-        if (cfg.llmTimeout) document.getElementById('llmTimeout').value = cfg.llmTimeout;
     })
     .catch(() => {});
 
@@ -403,6 +408,7 @@ function escapeHtml(str) {
 // Load labels on page init
 document.addEventListener('DOMContentLoaded', function() {
     setTimeout(loadLabels, 100);
+    setTimeout(loadLlmModels, 200);
 });
 
 function selectChat(el) {
@@ -413,31 +419,180 @@ function selectChat(el) {
 }
 
 
-// v3.0 — 仅 LLM 直连模式
-async function saveLlmConfig(e) {
-    e.preventDefault();
-    const res = await fetch('/api/config/llm', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-            apiKey: document.getElementById('llmApiKey').value,
-            baseUrl: document.getElementById('llmBaseUrl').value,
-            model: document.getElementById('llmModel').value,
-            timeout: parseInt(document.getElementById('llmTimeout').value) || 600,
-        }),
+// ===== LLM 模型管理 =====
+
+let llmModels = [];
+let llmEditingId = null;
+
+function loadLlmModels() {
+    fetch('/api/config/llm-profiles')
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) {
+                llmModels = data.profiles || [];
+                renderLlmModels();
+            }
+        })
+        .catch(() => {});
+}
+
+function renderLlmModels() {
+    const container = document.getElementById('llmModelsList');
+    const empty = document.getElementById('llmModelsEmpty');
+    if (!llmModels.length) {
+        container.innerHTML = '';
+        empty.style.display = 'block';
+        return;
+    }
+    empty.style.display = 'none';
+
+    let html = '<table class="log-table"><thead><tr>' +
+        '<th>名称</th><th>模型</th><th>API 地址</th><th>超时</th><th>默认</th><th>操作</th>' +
+        '</tr></thead><tbody>';
+    llmModels.forEach(function(m) {
+        const isDefault = m.isDefault;
+        html += '<tr id="lm-row-' + m.id + '">';
+        html += '<td><strong>' + escapeHtml(m.name) + '</strong></td>';
+        html += '<td><code>' + escapeHtml(m.model || '') + '</code></td>';
+        html += '<td style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;word-break:break-all;"><code>' + escapeHtml(m.baseUrl || '') + '</code></td>';
+        html += '<td>' + (m.timeout || 600) + 's</td>';
+        html += '<td>' + (isDefault ? '✅' : '<button class="btn btn-secondary" onclick="setDefaultModel(' + m.id + ')" style="padding:2px 8px;font-size:11px;">设为默认</button>') + '</td>';
+        html += '<td>';
+        html += '<button class="btn btn-secondary" onclick="editLlmModel(' + m.id + ')" style="padding:2px 8px;font-size:11px;margin-right:4px;">编辑</button>';
+        html += '<button class="btn btn-secondary" onclick="deleteLlmModel(' + m.id + ')" style="padding:2px 8px;font-size:11px;color:#ef4444;">删除</button>';
+        html += '</td></tr>';
     });
-    const data = await res.json();
-    const status = document.getElementById('llmConfigStatus');
-    if (data.ok) {
-        status.textContent = '✅ 已保存';
-        status.style.color = '#10b981';
-        setTimeout(() => status.textContent = '', 3000);
+    html += '</tbody></table>';
+    container.innerHTML = html;
+}
+
+function resetLlmForm() {
+    document.getElementById('newModelName').value = '';
+    document.getElementById('newModelApiKey').value = '';
+    document.getElementById('newModelBaseUrl').value = 'https://api.deepseek.com';
+    document.getElementById('newModelModel').value = '';
+    document.getElementById('newModelTimeout').value = '600';
+    document.getElementById('llmFormTitle').textContent = '添加模型';
+    document.getElementById('llmSubmitBtn').textContent = '添加模型';
+    document.getElementById('llmCancelBtn').style.display = 'none';
+    document.getElementById('llmModelsStatus').textContent = '';
+    llmEditingId = null;
+}
+
+async function submitLlmModel() {
+    const nameEl = document.getElementById('newModelName');
+    const apiKeyEl = document.getElementById('newModelApiKey');
+    const baseUrlEl = document.getElementById('newModelBaseUrl');
+    const modelEl = document.getElementById('newModelModel');
+    const timeoutEl = document.getElementById('newModelTimeout');
+    const status = document.getElementById('llmModelsStatus');
+
+    const name = nameEl.value.trim();
+    if (!name) { status.textContent = '❌ 请输入模型名称'; status.style.color = '#ef4444'; return; }
+
+    const payload = {
+        name: name,
+        apiKey: apiKeyEl.value,
+        baseUrl: baseUrlEl.value || 'https://api.deepseek.com',
+        model: modelEl.value || 'deepseek-chat',
+        timeout: parseInt(timeoutEl.value) || 600,
+    };
+
+    if (llmEditingId !== null) {
+        payload.id = llmEditingId;
+        const old = llmModels.find(function(m) { return m.id === llmEditingId; });
+        if (old) payload.isDefault = old.isDefault;
     } else {
-        status.textContent = '❌ ' + (data.error || '保存失败');
+        payload.isDefault = llmModels.length === 0;
+    }
+
+    try {
+        const res = await fetch('/api/config/llm-profiles', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (data.ok) {
+            status.textContent = llmEditingId !== null ? '✅ 已更新' : '✅ 已添加';
+            status.style.color = '#10b981';
+            resetLlmForm();
+            loadLlmModels();
+            setTimeout(() => status.textContent = '', 3000);
+        } else {
+            status.textContent = '❌ ' + (data.error || '保存失败');
+            status.style.color = '#ef4444';
+        }
+    } catch (e) {
+        status.textContent = '❌ 请求失败';
         status.style.color = '#ef4444';
     }
-    return false;
 }
+
+function editLlmModel(id) {
+    const model = llmModels.find(function(m) { return m.id === id; });
+    if (!model) return;
+
+    document.getElementById('newModelName').value = model.name;
+    document.getElementById('newModelApiKey').value = model.apiKey || '';
+    document.getElementById('newModelBaseUrl').value = model.baseUrl || 'https://api.deepseek.com';
+    document.getElementById('newModelModel').value = model.model || '';
+    document.getElementById('newModelTimeout').value = model.timeout || 600;
+    document.getElementById('llmFormTitle').textContent = '编辑模型: ' + model.name;
+    document.getElementById('llmSubmitBtn').textContent = '保存修改';
+    document.getElementById('llmCancelBtn').style.display = 'inline-block';
+    llmEditingId = id;
+
+    document.querySelector('.card:last-child').scrollIntoView({ behavior: 'smooth' });
+}
+
+function cancelEditLlmModel() {
+    resetLlmForm();
+}
+
+async function deleteLlmModel(id) {
+    if (!confirm('确定删除该模型？')) return;
+    const status = document.getElementById('llmModelsStatus');
+    try {
+        const res = await fetch('/api/config/llm-profiles/' + id, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.ok) {
+            status.textContent = '✅ 已删除';
+            status.style.color = '#10b981';
+            if (llmEditingId === id) resetLlmForm();
+            loadLlmModels();
+            setTimeout(() => status.textContent = '', 3000);
+        } else {
+            status.textContent = '❌ ' + (data.error || '删除失败');
+            status.style.color = '#ef4444';
+        }
+    } catch (e) {
+        status.textContent = '❌ 请求失败';
+        status.style.color = '#ef4444';
+    }
+}
+
+async function setDefaultModel(id) {
+    const status = document.getElementById('llmModelsStatus');
+    try {
+        const res = await fetch('/api/config/llm-profiles/' + id + '/default', { method: 'POST' });
+        const data = await res.json();
+        if (data.ok) {
+            status.textContent = '✅ 默认模型已切换';
+            status.style.color = '#10b981';
+            loadLlmModels();
+            setTimeout(() => status.textContent = '', 3000);
+        } else {
+            status.textContent = '❌ ' + (data.error || '设置失败');
+            status.style.color = '#ef4444';
+        }
+    } catch (e) {
+        status.textContent = '❌ 请求失败';
+        status.style.color = '#ef4444';
+    }
+}
+
+
 
 async function saveCollectorDir() {
     const value = document.getElementById('collectorOutputDir').value.trim();

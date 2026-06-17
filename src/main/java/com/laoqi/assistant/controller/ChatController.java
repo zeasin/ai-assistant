@@ -7,6 +7,7 @@ import com.laoqi.assistant.service.ChatSessionService;
 import com.laoqi.assistant.service.ChatSessionService.SessionsData;
 import com.laoqi.assistant.config.AppConfig;
 import com.laoqi.assistant.service.ConfigService;
+import com.laoqi.assistant.service.LlmConfigResolver;
 import com.laoqi.assistant.service.LlmService;
 import com.laoqi.assistant.service.LogService;
 import com.laoqi.assistant.service.NoteAssistantService;
@@ -40,17 +41,20 @@ public class ChatController {
     private final ConfigService configService;
     private final LogService logService;
     private final AppConfig appConfig;
+    private final LlmConfigResolver llmConfigResolver;
 
     public ChatController(ChatSessionService sessionService,
                           LlmService llmService, NoteAssistantService noteAssistantService,
                           ConfigService configService,
-                          LogService logService, AppConfig appConfig) {
+                          LogService logService, AppConfig appConfig,
+                          LlmConfigResolver llmConfigResolver) {
         this.sessionService = sessionService;
         this.llmService = llmService;
         this.noteAssistantService = noteAssistantService;
         this.configService = configService;
         this.logService = logService;
         this.appConfig = appConfig;
+        this.llmConfigResolver = llmConfigResolver;
     }
 
     @GetMapping
@@ -92,6 +96,7 @@ public class ChatController {
             model.addAttribute("current", session);
         }
         model.addAttribute("ai_provider", "direct");
+        model.addAttribute("llm_models", llmConfigResolver.getAllProfiles());
         return "chat";
     }
 
@@ -122,7 +127,8 @@ public class ChatController {
     @ResponseBody
     public SseEmitter send(@RequestParam String message,
                            @RequestParam(required = false, defaultValue = "") String sessionId,
-                           @RequestParam(required = false, defaultValue = "knowledge") String mode) {
+                           @RequestParam(required = false, defaultValue = "knowledge") String mode,
+                           @RequestParam(required = false, defaultValue = "") String modelName) {
         SseEmitter emitter = new SseEmitter(300_000L);
         String finalSessionId;
         if (sessionId == null || sessionId.isEmpty()) {
@@ -152,8 +158,9 @@ public class ChatController {
                 }
                 // 用 NoteAssistantService（含工具编排能力），AI 自动判断是否使用工具
                 // NoteAssistantService 内部会自动注入历史上下文（含向量召回语义检索）
-                log.info("[chat] 使用 NoteAssistant（含工具编排 + 历史上下文注入）");
-                replyText = noteAssistantService.chat(finalSessionId, message, mode);
+                log.info("[chat] 使用 NoteAssistant（含工具编排 + 历史上下文注入, model={})",
+                        modelName.isEmpty() ? "default" : modelName);
+                replyText = noteAssistantService.chat(finalSessionId, message, mode, modelName);
 
                 log.info("[chat] 收到回复, 长度={}", replyText.length());
                 sessionService.saveMessage(finalSessionId, "assistant", replyText, mode);
@@ -210,7 +217,10 @@ public class ChatController {
 
     private void sendStatus(SseEmitter emitter, String mode, String text) {
         try {
-            Map<String, Object> data = Map.of("type", "status", "content", text, "mode", mode);
+            Map<String, Object> data = new LinkedHashMap<>();
+            data.put("type", "status");
+            data.put("content", text);
+            data.put("mode", mode);
             emitter.send(SseEmitter.event().data(mapper.writeValueAsString(data)));
         } catch (Exception e) {
             log.warn("发送状态消息失败", e);
@@ -219,7 +229,10 @@ public class ChatController {
 
     private void sendText(SseEmitter emitter, String mode, String text) {
         try {
-            Map<String, Object> data = Map.of("type", "text", "content", text, "mode", mode);
+            Map<String, Object> data = new LinkedHashMap<>();
+            data.put("type", "text");
+            data.put("content", text);
+            data.put("mode", mode);
             emitter.send(SseEmitter.event().data(mapper.writeValueAsString(data)));
         } catch (Exception e) {
             log.error("发送文本消息失败", e);
@@ -233,7 +246,9 @@ public class ChatController {
 
     private void sendDone(SseEmitter emitter, String mode) {
         try {
-            Map<String, Object> data = Map.of("type", "done", "mode", mode);
+            Map<String, Object> data = new LinkedHashMap<>();
+            data.put("type", "done");
+            data.put("mode", mode);
             emitter.send(SseEmitter.event().data(mapper.writeValueAsString(data)));
             emitter.complete();
         } catch (Exception e) {
