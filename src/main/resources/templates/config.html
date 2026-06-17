@@ -1,0 +1,491 @@
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title layout:fragment="title">配置</title>
+</head>
+<body>
+<th:block layout:fragment="content">
+
+<div class="alert" th:classappend="${!ollama_available} ? 'alert-warning' : 'alert-ok'" th:if="${!ollama_available}" style="margin-bottom:16px;">
+    <strong>⚠️ Ollama 未运行</strong> — 语义检索不可用，将回退最近 3 轮对话。
+    请确保 <code>ollama serve</code> 已启动并已拉取 <code>nomic-embed-text</code> 模型：
+    <code style="display:block;margin-top:4px;">ollama pull nomic-embed-text</code>
+</div>
+
+<div class="card">
+    <h2>⚙️ 定时任务</h2>
+    <ul class="scheduler-list">
+        <li th:each="job : ${scheduler_jobs}">
+            <span th:text="${job.desc}">任务描述</span>
+            <span class="text-muted" th:text="${job.time}">时间</span>
+        </li>
+    </ul>
+</div>
+
+<div class="card">
+    <h2>📁 笔记库根目录配置</h2>
+    <div class="text-muted mb-2">配置笔记库的根目录路径，修改后所有数据文件的相对路径都将基于此目录。</div>
+    <form id="baseDirForm" onsubmit="return saveBaseDir(event)">
+        <div class="form-group">
+            <label>笔记库根目录</label>
+            <input type="text" id="baseDirPath" placeholder="D:\projects\richie_learning_notes" style="font-family:monospace;">
+            <div class="text-muted" style="font-size:12px;margin-top:4px;">
+                支持绝对路径，如 <code>D:\notes</code> 或 <code>C:\Users\xxx\Notes</code>
+            </div>
+        </div>
+        <div class="flex" style="gap:8px;">
+            <button type="submit" class="btn btn-primary">保存根目录</button>
+            <span id="baseDirStatus" class="text-muted" style="margin-left:4px;"></span>
+        </div>
+    </form>
+</div>
+
+<div class="card">
+    <h2>🏷️ 字段标签配置</h2>
+    <div class="text-muted mb-2">自定义数据表格中英文 key 显示为中文标签。未配置的 key 保持原始英文显示。</div>
+    <div id="labels-container" style="margin-bottom:12px;"></div>
+    <div class="form-row" style="gap:8px;margin-bottom:12px;align-items:end;">
+        <div class="form-group" style="flex:1;">
+            <label style="font-size:12px;">Key</label>
+            <input type="text" id="new-label-key" placeholder="如 fans" style="width:100%;padding:8px 10px;border:1px solid #e1e3e6;border-radius:6px;font-size:13px;font-family:monospace;">
+        </div>
+        <div class="form-group" style="flex:1;">
+            <label style="font-size:12px;">标签</label>
+            <input type="text" id="new-label-value" placeholder="如 粉丝数" style="width:100%;padding:8px 10px;border:1px solid #e1e3e6;border-radius:6px;font-size:13px;">
+        </div>
+        <button class="btn btn-secondary" onclick="addLabelRow()" style="padding:8px 16px;font-size:13px;">+ 添加</button>
+    </div>
+    <div class="flex" style="gap:8px;">
+        <button class="btn btn-primary" onclick="saveLabels()">保存标签</button>
+        <span id="labelsStatus" class="text-muted" style="margin-left:4px;"></span>
+    </div>
+</div>
+
+<div class="card">
+    <h2>🔗 飞书 Webhook 配置</h2>
+    <div class="text-muted mb-2">修改后自动保存到 <code>config.json</code>，下次推送生效。</div>
+    <div class="flex" style="flex-wrap:wrap;gap:8px;">
+        <input type="text" id="webhookUrl" style="flex:1;min-width:300px;padding:10px 14px;border:1px solid #e1e3e6;border-radius:8px;font-size:14px;outline:none;background:#fff;color:#1a1b1e;" placeholder="https://open.feishu.cn/open-apis/bot/v2/hook/...">
+        <button class="btn btn-primary" onclick="saveWebhook()">保存</button>
+    </div>
+    <div id="webhookStatus" class="text-muted mt-2"></div>
+</div>
+
+<div class="card">
+    <h2>📩 飞书消息接收（API 轮询）</h2>
+    <div class="text-muted mb-2">配置飞书自建应用的凭据，AI助理将轮询指定群的未读消息并自动回复。</div>
+    <form id="feishuForm" onsubmit="return saveFeishu(event)">
+        <div class="form-group">
+            <label>App ID</label>
+            <input type="text" id="feishuAppId" placeholder="飞书自建应用的 App ID">
+        </div>
+        <div class="form-group">
+            <label>App Secret</label>
+            <input type="password" id="feishuAppSecret" placeholder="飞书自建应用的 App Secret">
+        </div>
+        <div class="form-group">
+            <label>群 Chat ID</label>
+            <div class="flex" style="gap:8px;">
+                <input type="text" id="feishuChatId" placeholder="群聊的 chat_id，点击右侧按钮自动获取" style="flex:1;">
+                <button type="button" class="btn btn-secondary" onclick="fetchChats()" id="fetchChatsBtn" style="white-space:nowrap;">获取群列表</button>
+            </div>
+            <div id="chatList" class="mt-2" style="display:none;"></div>
+            <div class="text-muted" style="font-size:12px;margin-top:4px;">先填入 App ID 和 Secret，点击"获取群列表"选择你要监听的群</div>
+        </div>
+        <div class="form-group">
+            <label>
+                <input type="checkbox" id="feishuPollingEnabled">
+                启用消息轮询（每15秒检查一次）
+            </label>
+        </div>
+        <div class="flex" style="gap:8px;">
+            <button type="submit" class="btn btn-primary">保存飞书配置</button>
+            <button type="button" class="btn btn-secondary" onclick="testFeishu()" id="testFeishuBtn">发送测试消息</button>
+            <span id="feishuStatus" class="text-muted" style="margin-left:4px;"></span>
+        </div>
+    </form>
+</div>
+
+<div class="card">
+    <h2>🔧 手动触发</h2>
+    <div class="text-muted mb-2">手动执行以下任务，立即推送飞书。</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;">
+        <button class="btn btn-secondary" onclick="triggerJob('morning')">🌅 生成综合日报</button>
+    </div>
+</div>
+
+<div class="card">
+    <h2>📥 采集器输出目录</h2>
+    <div class="text-muted mb-2">配置采集器数据保存的默认输出路径（相对于笔记库根目录）。每个采集任务可单独覆盖此设置。</div>
+    <div class="flex" style="flex-wrap:wrap;gap:8px;">
+        <input type="text" id="collectorOutputDir" style="flex:1;min-width:300px;padding:10px 14px;border:1px solid #e1e3e6;border-radius:8px;font-size:14px;outline:none;background:#fff;color:#1a1b1e;font-family:monospace;" placeholder="自媒体/data">
+        <button class="btn btn-primary" onclick="saveCollectorDir()">保存</button>
+    </div>
+    <div id="collectorDirStatus" class="text-muted mt-2"></div>
+</div>
+
+<div class="card">
+    <h2>🧠 AI 引擎</h2>
+    <div class="text-muted mb-2">AI 引擎采用 Spring AI 2.0 直连 LLM（v3.0），无需外部服务。</div>
+    <form id="llmConfigForm" onsubmit="return saveLlmConfig(event)">
+        <div id="llmConfigFields" style="display:block">
+            <div class="form-group">
+                <label>API Key</label>
+                <input type="password" id="llmApiKey" th:value="${config.llmApiKey ?: ''}" placeholder="sk-xxxxxxxxxxxx">
+                <div class="desc">LLM API 密钥</div>
+            </div>
+            <div class="form-group">
+                <label>API 地址</label>
+                <input type="text" id="llmBaseUrl" th:value="${config.llmBaseUrl ?: 'https://api.deepseek.com'}" placeholder="https://api.deepseek.com">
+                <div class="desc">兼容 OpenAI 格式的 API 地址。DeepSeek: https://api.deepseek.com，商汤: https://token.sensenova.cn/v1</div>
+            </div>
+            <div class="form-group">
+                <label>模型名</label>
+                <input type="text" id="llmModel" th:value="${config.llmModel ?: 'deepseek-v4-flash'}" placeholder="deepseek-v4-flash">
+                <div class="desc">模型名称，如 deepseek-v4-flash、sensenova-6.7-flash-lite</div>
+            </div>
+            <div class="form-group">
+                <label>超时（秒）</label>
+                <input type="number" id="llmTimeout" th:value="${config.llmTimeout ?: 600}" min="10" max="900">
+                <div class="desc">建议设置 ≥300 秒，以适应长对话和工具调用场景</div>
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary">保存</button>
+        <span id="llmConfigStatus" class="text-muted" style="margin-left:8px;"></span>
+    </form>
+</div>
+
+<style>
+.form-group { margin-bottom: 12px; }
+.form-group label {
+    display: block; font-size: 13px; font-weight: 500; color: #5c5f66; margin-bottom: 4px;
+}
+.form-group input[type="text"],
+.form-group input[type="password"] {
+    width: 100%; padding: 10px 12px; border: 1px solid #e1e3e6; border-radius: 8px;
+    font-size: 14px; outline: none; font-family: inherit; box-sizing: border-box;
+}
+.form-group input[type="checkbox"] { margin-right: 6px; }
+.form-group input:focus { border-color: #7c5cfc; }
+.form-group .toggle-label {
+    display: inline-flex; align-items: center; gap: 12px; cursor: pointer;
+    font-size: inherit; font-weight: inherit; color: inherit; margin-bottom: 0;
+}
+.toggle-label input[type="checkbox"] { display:none; }
+.toggle-slider {
+    width:44px; height:24px; background:#ccc; border-radius:12px;
+    position:relative; transition:background .2s;
+}
+.toggle-slider::after {
+    content:''; position:absolute; top:2px; left:2px;
+    width:20px; height:20px; background:#fff; border-radius:50%;
+    transition:transform .2s;
+}
+.toggle-label input:checked + .toggle-slider { background:#7c5cfc; }
+.toggle-label input:checked + .toggle-slider::after { transform:translateX(20px); }
+</style>
+
+<script>
+function triggerJob(job) {
+    const form = new FormData();
+    form.append('job', job);
+    fetch('/config/trigger', { method: 'POST', body: form })
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) toast('任务已触发', 'ok');
+            else toast('失败：' + (data.error || ''), 'error');
+        })
+        .catch(() => toast('请求失败', 'error'));
+}
+
+// Load current config on page load
+fetch('/api/config')
+    .then(r => r.json())
+    .then(cfg => {
+        const input = document.getElementById('webhookUrl');
+        if (cfg.feishuWebhookUrl) input.value = cfg.feishuWebhookUrl;
+        if (cfg.feishuAppId) document.getElementById('feishuAppId').value = cfg.feishuAppId;
+        if (cfg.feishuAppSecret) document.getElementById('feishuAppSecret').value = cfg.feishuAppSecret;
+        if (cfg.feishuChatId) document.getElementById('feishuChatId').value = cfg.feishuChatId;
+        if (cfg.feishuPollingEnabled) document.getElementById('feishuPollingEnabled').checked = true;
+        if (cfg.baseDir) document.getElementById('baseDirPath').value = cfg.baseDir;
+        if (cfg.llmApiKey) document.getElementById('llmApiKey').value = cfg.llmApiKey;
+        if (cfg.llmBaseUrl) document.getElementById('llmBaseUrl').value = cfg.llmBaseUrl;
+        if (cfg.llmModel) document.getElementById('llmModel').value = cfg.llmModel;
+        if (cfg.llmTimeout) document.getElementById('llmTimeout').value = cfg.llmTimeout;
+    })
+    .catch(() => {});
+
+async function saveBaseDir(e) {
+    e.preventDefault();
+    const form = new FormData();
+    form.append('baseDir', document.getElementById('baseDirPath').value.trim());
+    const res = await fetch('/api/config/baseDir', { method: 'POST', body: form });
+    const data = await res.json();
+    const status = document.getElementById('baseDirStatus');
+    if (data.ok) {
+        status.textContent = '✅ 已保存';
+        setTimeout(() => status.textContent = '', 3000);
+    } else {
+        status.textContent = '❌ ' + (data.error || '保存失败');
+    }
+    return false;
+}
+
+function saveWebhook() {
+    const url = document.getElementById('webhookUrl').value.trim();
+    if (!url.startsWith('https://')) {
+        document.getElementById('webhookStatus').textContent = '❌ URL 必须以 https:// 开头';
+        return;
+    }
+    const form = new FormData();
+    form.append('url', url);
+    fetch('/api/config/webhook', { method: 'POST', body: form })
+        .then(r => r.json())
+        .then(data => {
+            const status = document.getElementById('webhookStatus');
+            if (data.ok) {
+                status.textContent = '✅ 已保存';
+                setTimeout(() => status.textContent = '', 3000);
+            } else {
+                status.textContent = '❌ ' + (data.error || '保存失败');
+            }
+        })
+        .catch(() => {
+            document.getElementById('webhookStatus').textContent = '❌ 请求失败';
+        });
+}
+
+async function saveFeishu(e) {
+    e.preventDefault();
+    const form = new FormData();
+    form.append('appId', document.getElementById('feishuAppId').value.trim());
+    form.append('appSecret', document.getElementById('feishuAppSecret').value.trim());
+    form.append('chatId', document.getElementById('feishuChatId').value.trim());
+    form.append('pollingEnabled', document.getElementById('feishuPollingEnabled').checked ? 'on' : 'off');
+    const res = await fetch('/api/config/feishu', { method: 'POST', body: form });
+    const data = await res.json();
+    const status = document.getElementById('feishuStatus');
+    if (data.ok) {
+        status.textContent = '✅ 已保存';
+        setTimeout(() => status.textContent = '', 3000);
+    } else {
+        status.textContent = '❌ ' + (data.error || '保存失败');
+    }
+    return false;
+}
+
+async function fetchChats() {
+    const btn = document.getElementById('fetchChatsBtn');
+    const list = document.getElementById('chatList');
+    const appId = document.getElementById('feishuAppId').value.trim();
+    const appSecret = document.getElementById('feishuAppSecret').value.trim();
+    if (!appId || !appSecret) { toast('请先填写 App ID 和 App Secret', 'error'); return; }
+
+    btn.disabled = true; btn.textContent = '⏳ 查询中...';
+    list.style.display = 'none';
+
+    const form = new FormData();
+    form.append('appId', appId);
+    form.append('appSecret', appSecret);
+    const res = await fetch('/api/config/feishu/chats', { method: 'POST', body: form });
+    const data = await res.json();
+
+    btn.disabled = false; btn.textContent = '获取群列表';
+
+    if (!data.ok) {
+        list.innerHTML = '<div style="color:#ff6b6b;font-size:13px;">❌ ' + (data.error || '查询失败') + '</div>';
+        list.style.display = 'block';
+        return;
+    }
+
+    const chats = data.chats || [];
+    if (!chats.length) {
+        list.innerHTML = '<div class="text-muted" style="font-size:13px;">没有找到群聊，请确认应用已添加到目标群</div>';
+        list.style.display = 'block';
+        return;
+    }
+
+    let html = '<div style="font-size:13px;font-weight:500;margin-bottom:6px;">选择群聊：</div>';
+    chats.forEach(c => {
+        html += '<div class="chat-option" data-id="' + c.chat_id + '" onclick="selectChat(this)" style="padding:8px 12px;border:1px solid #e1e3e6;border-radius:6px;margin-bottom:4px;cursor:pointer;font-size:13px;">';
+        html += '<strong>' + c.name + '</strong> <span style="color:#909296;font-size:11px;">' + c.type + '</span>';
+        html += '<div style="font-size:11px;color:#7c5cfc;word-break:break-all;">' + c.chat_id + '</div>';
+        html += '</div>';
+    });
+    list.innerHTML = html;
+    list.style.display = 'block';
+}
+
+// ===== 字段标签管理 =====
+var labelData = {};
+
+function loadLabels() {
+    fetch('/api/config/labels')
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) {
+                labelData = data.labels || {};
+                renderLabels();
+            }
+        })
+        .catch(() => {});
+}
+
+function renderLabels() {
+    var container = document.getElementById('labels-container');
+    var keys = Object.keys(labelData);
+    if (keys.length === 0) {
+        container.innerHTML = '<div class="text-muted" style="font-size:13px;padding:12px 0;">暂无自定义标签，请在下方添加。</div>';
+        return;
+    }
+    var html = '<table class="log-table"><thead><tr><th style="width:40%;">Key</th><th style="width:40%;">标签</th><th style="width:20%;">操作</th></tr></thead><tbody>';
+    keys.forEach(function(k) {
+        html += '<tr>';
+        html += '<td><code>' + escapeHtml(k) + '</code></td>';
+        html += '<td><input type="text" class="label-value-input" data-key="' + escapeHtml(k) + '" value="' + escapeHtml(labelData[k] || '') + '" style="width:100%;padding:6px 8px;border:1px solid #e1e3e6;border-radius:4px;font-size:13px;"></td>';
+        html += '<td><button class="btn btn-secondary" onclick="deleteLabelRow(\'' + escapeHtml(k) + '\')" style="padding:4px 10px;font-size:12px;">删除</button></td>';
+        html += '</tr>';
+    });
+    html += '</tbody></table>';
+    container.innerHTML = html;
+}
+
+function addLabelRow() {
+    var key = document.getElementById('new-label-key').value.trim();
+    var value = document.getElementById('new-label-value').value.trim();
+    if (!key) { toast('请输入 Key', 'error'); return; }
+    labelData[key] = value || key;
+    renderLabels();
+    document.getElementById('new-label-key').value = '';
+    document.getElementById('new-label-value').value = '';
+    toast('已添加：' + key + ' → ' + (value || key), 'success');
+}
+
+function deleteLabelRow(key) {
+    delete labelData[key];
+    renderLabels();
+}
+
+function saveLabels() {
+    // 收集当前所有 input 中的值
+    document.querySelectorAll('.label-value-input').forEach(function(input) {
+        labelData[input.dataset.key] = input.value.trim();
+    });
+    fetch('/api/config/labels', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(labelData)
+    })
+    .then(r => r.json())
+    .then(data => {
+        var status = document.getElementById('labelsStatus');
+        if (data.ok) {
+            status.textContent = '✅ 已保存';
+            toast('✅ 标签已保存', 'success');
+            setTimeout(function() { status.textContent = ''; }, 3000);
+        } else {
+            status.textContent = '❌ ' + (data.error || '保存失败');
+            toast('❌ 保存失败', 'error');
+        }
+    })
+    .catch(function() {
+        document.getElementById('labelsStatus').textContent = '❌ 请求失败';
+    });
+}
+
+function escapeHtml(str) {
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Load labels on page init
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(loadLabels, 100);
+});
+
+function selectChat(el) {
+    const id = el.dataset.id;
+    document.getElementById('feishuChatId').value = id;
+    document.getElementById('chatList').style.display = 'none';
+    toast('已选择群聊，点击保存即可', 'success');
+}
+
+
+// v3.0 — 仅 LLM 直连模式
+async function saveLlmConfig(e) {
+    e.preventDefault();
+    const res = await fetch('/api/config/llm', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            apiKey: document.getElementById('llmApiKey').value,
+            baseUrl: document.getElementById('llmBaseUrl').value,
+            model: document.getElementById('llmModel').value,
+            timeout: parseInt(document.getElementById('llmTimeout').value) || 600,
+        }),
+    });
+    const data = await res.json();
+    const status = document.getElementById('llmConfigStatus');
+    if (data.ok) {
+        status.textContent = '✅ 已保存';
+        status.style.color = '#10b981';
+        setTimeout(() => status.textContent = '', 3000);
+    } else {
+        status.textContent = '❌ ' + (data.error || '保存失败');
+        status.style.color = '#ef4444';
+    }
+    return false;
+}
+
+async function saveCollectorDir() {
+    const value = document.getElementById('collectorOutputDir').value.trim();
+    const form = new FormData();
+    form.append('dir', value || '自媒体/data');
+    const res = await fetch('/api/config/collector-dir', { method: 'POST', body: form });
+    const data = await res.json();
+    const status = document.getElementById('collectorDirStatus');
+    if (data.ok) {
+        status.textContent = '✅ 已保存';
+        setTimeout(() => status.textContent = '', 3000);
+    } else {
+        status.textContent = '❌ ' + (data.error || '保存失败');
+    }
+}
+
+async function testFeishu() {
+    const btn = document.getElementById('testFeishuBtn');
+    const status = document.getElementById('feishuStatus');
+    const appId = document.getElementById('feishuAppId').value.trim();
+    const appSecret = document.getElementById('feishuAppSecret').value.trim();
+    const chatId = document.getElementById('feishuChatId').value.trim();
+    if (!appId || !appSecret || !chatId) {
+        toast('请先填完 App ID、App Secret 和 Chat ID', 'error');
+        return;
+    }
+
+    btn.disabled = true; btn.textContent = '⏳ 发送中...'; status.textContent = '';
+
+    const form = new FormData();
+    form.append('appId', appId);
+    form.append('appSecret', appSecret);
+    form.append('chatId', chatId);
+    const res = await fetch('/api/config/feishu/test', { method: 'POST', body: form });
+    const data = await res.json();
+
+    btn.disabled = false; btn.textContent = '发送测试消息';
+
+    if (data.ok) {
+        status.textContent = '✅ 测试消息已发送到群，请查看飞书！';
+        toast('✅ 测试消息发送成功！', 'success');
+    } else {
+        status.textContent = '❌ ' + (data.error || '发送失败');
+        toast('❌ ' + (data.error || '发送失败'), 'error');
+    }
+}
+</script>
+
+</th:block>
+</body>
+</html>

@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <style>
+        .ds-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .ds-tabs { display: flex; gap: 0; margin-bottom: 20px; border-bottom: 2px solid #e1e3e6; }
+        .ds-tab { padding: 10px 20px; cursor: pointer; font-size: 14px; color: #5c5f66; border-bottom: 2px solid transparent; margin-bottom: -2px; }
+        .ds-tab.active { color: #7c5cfc; border-bottom-color: #7c5cfc; font-weight: 500; }
+        .ds-tab:hover { color: #7c5cfc; }
+        .ds-panel { display: none; }
+        .ds-panel.active { display: block; }
+
+        .ds-card { background: #fff; border: 1px solid #e1e3e6; border-radius: 12px; padding: 16px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: flex-start; }
+        .ds-card .ds-info { flex: 1; }
+        .ds-card .ds-name { font-weight: 600; font-size: 15px; margin-bottom: 4px; }
+        .ds-card .ds-meta { font-size: 13px; color: #5c5f66; }
+        .ds-card .ds-actions { display: flex; gap: 8px; margin-left: 16px; }
+        .ds-card .ds-actions button { padding: 6px 12px; font-size: 12px; border-radius: 6px; border: none; cursor: pointer; }
+        .ds-card .btn-view { background: #7c5cfc; color: #fff; }
+        .ds-card .btn-view:hover { background: #6b4de6; }
+        .ds-card .btn-edit { background: #e8e8ed; color: #1a1b1e; }
+        .ds-card .btn-edit:hover { background: #d5d5dc; }
+        .ds-card .btn-del { background: #ffe0e0; color: #c92a2a; }
+        .ds-card .btn-del:hover { background: #ffc7c7; }
+
+        .badge { padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+        .badge-purple { background: #e8dff5; color: #7c5cfc; }
+        .badge-green { background: #d3f9d8; color: #2b8a3e; }
+        .badge-gray { background: #f0f0f0; color: #909296; }
+
+        .form-row { display: flex; gap: 12px; margin-bottom: 12px; }
+        .form-group { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+        .form-group label { font-size: 12px; color: #5c5f66; font-weight: 500; }
+        .form-group input, .form-group select, .form-group textarea {
+            padding: 8px 10px; border: 1px solid #e1e3e6; border-radius: 6px; font-size: 13px; outline: none; background: #fff; color: #1a1b1e;
+        }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: #7c5cfc; }
+        .form-group textarea { resize: vertical; min-height: 60px; }
+
+        .schema-fields { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+        .schema-field { display: flex; gap: 8px; align-items: center; }
+        .schema-field input { padding: 6px 8px; border: 1px solid #e1e3e6; border-radius: 4px; font-size: 12px; }
+        .schema-field .btn-remove { background: #ffe0e0; color: #c92a2a; border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 12px; }
+
+        .import-section { background: #fafafe; border: 1px solid #eef0f4; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+        .import-section h3 { font-size: 15px; margin-bottom: 12px; }
+        .upload-area { border: 2px dashed #d0d0d0; border-radius: 8px; padding: 30px; text-align: center; cursor: pointer; transition: border-color 0.2s; }
+        .upload-area:hover { border-color: #7c5cfc; }
+        .upload-area.dragover { border-color: #7c5cfc; background: #f8f5ff; }
+        .upload-area input[type="file"] { display: none; }
+
+        .mapping-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 12px; }
+        .mapping-table th { background: #f5f5f5; padding: 8px 12px; text-align: left; font-weight: 500; border-bottom: 2px solid #e1e3e6; }
+        .mapping-table td { padding: 6px 12px; border-bottom: 1px solid #f0f0f0; }
+        .mapping-table select { padding: 4px 8px; border: 1px solid #e1e3e6; border-radius: 4px; font-size: 12px; }
+
+        .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .data-table th { background: #f5f5f5; padding: 8px 12px; text-align: left; font-weight: 500; border-bottom: 2px solid #e1e3e6; white-space: nowrap; position: sticky; top: 0; }
+        .data-table td { padding: 6px 12px; border-bottom: 1px solid #f0f0f0; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .data-table tr:hover td { background: #fafafe; }
+        .data-table .col-id { width: 70px; }
+        .data-table .col-source { width: 80px; }
+        .data-table .col-actions { width: 60px; }
+
+        .empty-state { text-align: center; padding: 40px; color: #5c5f66; }
+        .search-bar { display: flex; gap: 8px; margin-bottom: 16px; }
+        .search-bar input { flex: 1; padding: 8px 12px; border: 1px solid #e1e3e6; border-radius: 6px; font-size: 13px; }
+        .search-bar input:focus { border-color: #7c5cfc; outline: none; }
+
+        .btn { padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; font-size: 13px; }
+        .btn-primary { background: #7c5cfc; color: #fff; }
+        .btn-primary:hover { background: #6b4de6; }
+        .btn-secondary { background: #e8e8ed; color: #1a1b1e; }
+        .btn-secondary:hover { background: #d5d5dc; }
+        .btn-danger { background: #ffe0e0; color: #c92a2a; }
+        .btn-danger:hover { background: #ffc7c7; }
+        .btn-sm { padding: 4px 10px; font-size: 12px; }
+
+        .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+        .data-scroll { max-height: 60vh; overflow: auto; }
+    </style>
+</head>
+<body>
+    <div layout:fragment="content">
+        <div class="ds-header">
+            <h1 style="font-size: 22px; font-weight: 600;">数据中心</h1>
+            <button class="btn btn-primary" onclick="showCreateDataset()">+ 新建数据集</button>
+        </div>
+
+        <div class="ds-tabs">
+            <div class="ds-tab active" onclick="switchTab('datasets')">数据集管理</div>
+            <div class="ds-tab" onclick="switchTab('import')">数据导入</div>
+            <div class="ds-tab" onclick="switchTab('browse')">数据浏览</div>
+            <div class="ds-tab" onclick="switchTab('collector')">采集器</div>
+            <div class="ds-tab" onclick="switchTab('help')">帮助</div>
+        </div>
+
+        <div class="ds-panel active" id="panel-datasets">
+            <div id="datasetList">
+                <div class="empty-state">加载中...</div>
+            </div>
+        </div>
+
+        <div class="ds-panel" id="panel-import">
+            <div class="import-section">
+                <h3>Excel导入</h3>
+                <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:12px;">
+                    <div class="form-group" style="flex:1;margin-bottom:0;">
+                        <label>选择数据集</label>
+                        <select id="importDatasetId"></select>
+                    </div>
+                    <label style="display:flex;align-items:center;gap:4px;cursor:pointer;white-space:nowrap;padding-bottom:8px;font-size:13px;">
+                        <input type="checkbox" id="excelUseAi"> AI处理
+                    </label>
+                </div>
+                <div class="upload-area" id="uploadArea" onclick="document.getElementById('excelFile').click()">
+                    <input type="file" id="excelFile" accept=".xlsx,.xls" onchange="handleFileSelect(this)">
+                    <div style="color:#5c5f66;">点击或拖拽Excel文件到这里</div>
+                    <div style="font-size:12px;color:#909296;margin-top:4px;">支持 .xlsx / .xls 格式</div>
+                </div>
+                <div id="previewSection" style="display:none;margin-top:16px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                        <span style="font-size:13px;color:#5c5f66;">列映射预览</span>
+                        <button class="btn btn-primary btn-sm" onclick="executeExcelImport()">确认导入</button>
+                    </div>
+                    <div id="mappingPreview"></div>
+                </div>
+            </div>
+
+            <div class="import-section">
+                <h3>JSON导入</h3>
+                <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:12px;">
+                    <div class="form-group" style="flex:1;margin-bottom:0;">
+                        <label>选择数据集</label>
+                        <select id="jsonImportDatasetId"></select>
+                    </div>
+                    <label style="display:flex;align-items:center;gap:4px;cursor:pointer;white-space:nowrap;padding-bottom:8px;font-size:13px;">
+                        <input type="checkbox" id="jsonUseAi"> AI处理
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label>JSON数据（对象或数组）</label>
+                    <textarea id="jsonData" rows="6" placeholder='[{"name": "张三", "phone": "138..."}, ...]'></textarea>
+                </div>
+                <div style="text-align:right;margin-top:8px;">
+                    <button class="btn btn-primary" onclick="importJson()">导入JSON</button>
+                </div>
+            </div>
+
+            <div class="import-section">
+                <h3>URL数据获取</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>选择数据集</label>
+                        <select id="urlImportDatasetId"></select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>目标URL</label>
+                        <input type="url" id="importUrl" placeholder="https://example.com/data">
+                    </div>
+                </div>
+                <div style="text-align:right;">
+                    <button class="btn btn-primary" onclick="importFromUrl()">AI提取数据</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="ds-panel" id="panel-browse">
+            <div class="form-row">
+                <div class="form-group" style="flex:2;">
+                    <label>选择数据集</label>
+                    <select id="browseDatasetId" onchange="loadBrowseData()"></select>
+                </div>
+            </div>
+            <div class="search-bar">
+                <input type="text" id="browseKeyword" placeholder="搜索..." onkeydown="if(event.key==='Enter')loadBrowseData()">
+                <button class="btn btn-secondary" onclick="loadBrowseData()">搜索</button>
+                <button class="btn btn-primary" onclick="showExportModal()">导出到业务</button>
+            </div>
+            <div class="data-scroll" id="browseTable"></div>
+        </div>
+
+        <div class="ds-panel" id="panel-collector">
+            <iframe src="/collector" style="width:100%;height:calc(100vh - 140px);border:none;border-radius:12px;"></iframe>
+        </div>
+
+        <div class="ds-panel" id="panel-help">
+            <div style="background:#fff;border:1px solid #e1e3e6;border-radius:12px;padding:24px;">
+                <h2 style="font-size:18px;margin-bottom:16px;">数据中心使用帮助</h2>
+
+                <h3 style="font-size:15px;margin:16px 0 8px;color:#7c5cfc;">一、数据集管理</h3>
+                <div style="font-size:13px;color:#1a1b1e;line-height:1.8;">
+                    <p><b>创建数据集：</b>点击右上角「+ 新建数据集」，填写名称、描述，并定义 Schema 字段。</p>
+                    <p><b>Schema 字段：</b>每个字段包含三个属性：</p>
+                    <ul style="margin:4px 0 4px 20px;">
+                        <li><b>字段名</b> — 英文标识符，用于程序处理（如 <code>title</code>、<code>views</code>）</li>
+                        <li><b>类型</b> — 支持 文本(string)、数字(number)、日期(date)、链接(url)</li>
+                        <li><b>显示名</b> — 中文显示名，用于界面展示（如「标题」、「阅读量」）</li>
+                    </ul>
+                    <p><b>编辑/删除：</b>在数据集卡片上点击对应按钮操作。删除会永久清除所有数据。</p>
+                </div>
+
+                <h3 style="font-size:15px;margin:16px 0 8px;color:#7c5cfc;">二、数据导入</h3>
+                <div style="font-size:13px;color:#1a1b1e;line-height:1.8;">
+                    <p><b>Excel 导入：</b></p>
+                    <ul style="margin:4px 0 4px 20px;">
+                        <li>支持 <code>.xlsx</code> 和 <code>.xls</code> 格式</li>
+                        <li>上传后会自动预览列结构，并尝试将 Excel 列名映射到 Schema 字段</li>
+                        <li>自动跳过空行和合并标题行，找到有效表头</li>
+                        <li>可在预览界面手动调整列映射后再确认导入</li>
+                    </ul>
+                    <p><b>JSON 导入：</b></p>
+                    <ul style="margin:4px 0 4px 20px;">
+                        <li>直接粘贴 JSON 数组或对象</li>
+                        <li>格式：<code>[{"字段名": "值"}, ...]</code> 或 <code>{"字段名": "值"}</code></li>
+                        <li>适用于从其他系统导出的结构化数据</li>
+                    </ul>
+                    <p><b>URL 数据获取：</b></p>
+                    <ul style="margin:4px 0 4px 20px;">
+                        <li>输入目标网页 URL，AI 会自动访问并提取结构化数据</li>
+                        <li>如果数据集定义了 Schema，AI 会按 Schema 格式提取</li>
+                    </ul>
+                </div>
+
+                <h3 style="font-size:15px;margin:16px 0 8px;color:#7c5cfc;">三、数据浏览</h3>
+                <div style="font-size:13px;color:#1a1b1e;line-height:1.8;">
+                    <p>选择数据集后，以表格形式展示所有记录。</p>
+                    <ul style="margin:4px 0 4px 20px;">
+                        <li>支持关键词搜索，在所有字段中模糊匹配</li>
+                        <li>每条记录显示 ID、来源标记、导入时间</li>
+                        <li>可逐条删除不需要的记录</li>
+                    </ul>
+                </div>
+
+                <h3 style="font-size:15px;margin:16px 0 8px;color:#7c5cfc;">四、与采集器集成</h3>
+                <div style="font-size:13px;color:#1a1b1e;line-height:1.8;">
+                    <p>采集器任务可绑定数据集，采集完成后自动导入数据：</p>
+                    <ol style="margin:4px 0 4px 20px;">
+                        <li>在数据中心创建目标数据集，记录其 ID</li>
+                        <li>在采集器中编辑任务，填写「自动保存到数据集 ID」</li>
+                        <li>任务执行成功后，采集结果会自动写入该数据集</li>
+                    </ol>
+                </div>
+
+                <h3 style="font-size:15px;margin:16px 0 8px;color:#7c5cfc;">五、存储说明</h3>
+                <div style="font-size:13px;color:#1a1b1e;line-height:1.8;">
+                    <ul style="margin:4px 0 4px 20px;">
+                        <li>所有数据存储在笔记库的 <code>数据中心/</code> 目录下</li>
+                        <li>每个数据集独立目录：<code>数据中心/{数据集ID}/</code></li>
+                        <li><code>datasets.json</code> — 数据集注册表</li>
+                        <li><code>data.json</code> — 该数据集的全部记录</li>
+                        <li><code>imports/</code> — 导入历史记录</li>
+                        <li>每条记录自动附加 <code>_id</code>、<code>_source</code>、<code>_importTime</code> 元信息</li>
+                    </ul>
+                </div>
+
+                <h3 style="font-size:15px;margin:16px 0 8px;color:#7c5cfc;">六、API 接口</h3>
+                <div style="font-size:13px;color:#1a1b1e;line-height:1.8;">
+                    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+                        <thead><tr style="background:#f5f5f5;"><th style="padding:6px 10px;text-align:left;border-bottom:1px solid #e1e3e6;">方法</th><th style="padding:6px 10px;text-align:left;border-bottom:1px solid #e1e3e6;">路径</th><th style="padding:6px 10px;text-align:left;border-bottom:1px solid #e1e3e6;">说明</th></tr></thead>
+                        <tbody>
+                            <tr><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;">GET</td><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;">/api/datacenter/datasets</td><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;">获取所有数据集列表</td></tr>
+                            <tr><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;">POST</td><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;">/api/datacenter/datasets</td><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;">创建新数据集</td></tr>
+                            <tr><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;">PUT</td><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;">/api/datacenter/datasets/{id}</td><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;">更新数据集</td></tr>
+                            <tr><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;">DELETE</td><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;">/api/datacenter/datasets/{id}</td><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;">删除数据集</td></tr>
+                            <tr><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;">GET</td><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;">/api/datacenter/datasets/{id}/records</td><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;">获取记录列表（支持 ?keyword= 搜索）</td></tr>
+                            <tr><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;">DELETE</td><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;">/api/datacenter/datasets/{id}/records/{rid}</td><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;">删除单条记录</td></tr>
+                            <tr><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;">POST</td><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;">/api/datacenter/datasets/{id}/import/excel</td><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;">Excel 导入（multipart/form-data）</td></tr>
+                            <tr><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;">POST</td><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;">/api/datacenter/datasets/{id}/import/json</td><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;">JSON 导入</td></tr>
+                            <tr><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;">POST</td><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;">/api/datacenter/datasets/{id}/import/url</td><td style="padding:4px 10px;border-bottom:1px solid #f0f0f0;">URL 数据获取（需 AI 服务）</td></tr>
+                            <tr><td style="padding:4px 10px;">POST</td><td style="padding:4px 10px;">/api/datacenter/datasets/import/excel/preview</td><td style="padding:4px 10px;">Excel 预览（不导入）</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    <!-- Export Modal -->
+    <div class="modal-overlay" id="exportModal">
+        <div class="modal" style="width:650px;">
+            <h3>导出到业务目录</h3>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>目标模块 *</label>
+                    <select id="exportModuleId"></select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>导出范围</label>
+                    <select id="exportScope">
+                        <option value="all">全部数据</option>
+                        <option value="filtered">当前筛选结果</option>
+                        <option value="selected">已选中的记录</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>AI转换提示词（可编辑）</label>
+                    <textarea id="exportPrompt" rows="6" placeholder="留空使用默认提示词...">请将以下数据转换为业务数据格式。参考现有业务数据格式样例，将待导出数据转换为相同格式。直接输出JSON数组，用 ```json 包裹。</textarea>
+                </div>
+            </div>
+            <div style="font-size:12px;color:#5c5f66;margin-bottom:12px;">
+                AI会读取目标模块目录下的现有数据文件作为格式参考，然后将选中数据转换为相同格式后保存。
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('exportModal')">取消</button>
+                <button type="button" class="btn btn-primary" id="exportBtn" onclick="executeExport()">AI转换并导出</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create/Edit Dataset Modal -->
+    <div class="modal-overlay" id="datasetModal">
+        <div class="modal" style="width:600px;">
+            <h3 id="dsModalTitle">新建数据集</h3>
+            <form id="datasetForm" onsubmit="return saveDataset(event)">
+                <input type="hidden" id="dsId">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>数据集名称 *</label>
+                        <input type="text" id="dsName" required placeholder="例如：CSDN文章数据">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>描述</label>
+                        <textarea id="dsDescription" rows="2" placeholder="数据集用途说明"></textarea>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>存储目录</label>
+                        <input type="text" id="dsOutputDir" placeholder="相对于笔记库根目录（可选）">
+                    </div>
+                </div>
+                <div style="margin-bottom:12px;">
+                    <label style="font-size:12px;color:#5c5f66;font-weight:500;">Schema字段定义</label>
+                    <div class="schema-fields" id="schemaFields"></div>
+                    <button type="button" class="btn btn-secondary btn-sm" style="margin-top:8px;" onclick="addSchemaField()">+ 添加字段</button>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('datasetModal')">取消</button>
+                    <button type="submit" class="btn btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Import Result Modal -->
+    <div class="modal-overlay" id="resultModal">
+        <div class="modal" style="width:90%;max-width:900px;max-height:85vh;display:flex;flex-direction:column;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                <h3 id="resultModalTitle" style="margin:0;">导入结果</h3>
+                <button class="btn btn-secondary" onclick="closeModal('resultModal')" style="padding:4px 12px;">✕</button>
+            </div>
+            <div id="resultModalContent" style="overflow:auto;flex:1;"></div>
+        </div>
+    </div>
+
+    <script>
+        let allDatasets = [];
+        let currentPreview = null;
+        let currentFile = null;
+
+        async function loadDatasets() {
+            try {
+                const res = await fetch('/api/datacenter/datasets');
+                const data = await res.json();
+                if (data.ok) {
+                    allDatasets = data.data || [];
+                    renderDatasetList(allDatasets);
+                    populateDatasetSelects(allDatasets);
+                }
+            } catch (e) {
+                toast('加载数据集失败: ' + e.message, 'error');
+            }
+        }
+
+        function renderDatasetList(datasets) {
+            if (!datasets || datasets.length === 0) {
+                document.getElementById('datasetList').innerHTML =
+                    '<div class="empty-state">暂无数据集<br><button class="btn btn-primary" style="margin-top:12px;" onclick="showCreateDataset()">创建第一个数据集</button></div>';
+                return;
+            }
+            const html = datasets.map(ds => `
+                <div class="ds-card">
+                    <div class="ds-info">
+                        <div class="ds-name">${esc(ds.name)}</div>
+                        <div class="ds-meta">
+                            <span class="badge badge-purple">${ds.recordCount || 0} 条记录</span>
+                            <span style="margin:0 8px;">·</span>
+                            <span>${ds.description || '无描述'}</span>
+                        </div>
+                        <div class="ds-meta" style="margin-top:4px;font-size:12px;">
+                            创建: ${ds.createdAt || '-'}
+                            ${ds.lastImportTime ? ' · 最近导入: ' + ds.lastImportTime : ''}
+                        </div>
+                    </div>
+                    <div class="ds-actions">
+                        <button class="btn-view" onclick="browseDataset('${ds.id}')">浏览</button>
+                        <button class="btn-edit" onclick="editDataset('${ds.id}')">编辑</button>
+                        <button class="btn-del" onclick="deleteDataset('${ds.id}')">删除</button>
+                    </div>
+                </div>
+            `).join('');
+            document.getElementById('datasetList').innerHTML = html;
+        }
+
+        function populateDatasetSelects(datasets) {
+            const selects = ['importDatasetId', 'jsonImportDatasetId', 'urlImportDatasetId', 'browseDatasetId'];
+            selects.forEach(id => {
+                const sel = document.getElementById(id);
+                if (!sel) return;
+                sel.innerHTML = '<option value="">选择数据集...</option>' +
+                    datasets.map(ds => `<option value="${ds.id}">${esc(ds.name)} (${ds.recordCount || 0}条)</option>`).join('');
+            });
+        }
+
+        function switchTab(tab) {
+            document.querySelectorAll('.ds-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.ds-panel').forEach(p => p.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById('panel-' + tab).classList.add('active');
+            if (tab === 'browse') loadBrowseData();
+        }
+
+        function showCreateDataset() {
+            document.getElementById('dsModalTitle').textContent = '新建数据集';
+            document.getElementById('datasetForm').reset();
+            document.getElementById('dsId').value = '';
+            document.getElementById('schemaFields').innerHTML = '';
+            addSchemaField();
+            addSchemaField();
+            addSchemaField();
+            document.getElementById('datasetModal').classList.add('active');
+        }
+
+        function addSchemaField(name, type, displayName) {
+            const container = document.getElementById('schemaFields');
+            const div = document.createElement('div');
+            div.className = 'schema-field';
+            div.innerHTML = `
+                <input type="text" placeholder="字段名" value="${esc(name || '')}" style="flex:2;" class="field-name">
+                <select class="field-type" style="flex:1;">
+                    <option value="string" ${type === 'string' ? 'selected' : ''}>文本</option>
+                    <option value="number" ${type === 'number' ? 'selected' : ''}>数字</option>
+                    <option value="date" ${type === 'date' ? 'selected' : ''}>日期</option>
+                    <option value="url" ${type === 'url' ? 'selected' : ''}>链接</option>
+                </select>
+                <input type="text" placeholder="显示名" value="${esc(displayName || '')}" style="flex:2;" class="field-display">
+                <button type="button" class="btn-remove" onclick="this.parentElement.remove()">✕</button>
+            `;
+            container.appendChild(div);
+        }
+
+        function getSchemaFields() {
+            const fields = [];
+            document.querySelectorAll('#schemaFields .schema-field').forEach(row => {
+                const name = row.querySelector('.field-name').value.trim();
+                if (name) {
+                    fields.push({
+                        name: name,
+                        type: row.querySelector('.field-type').value,
+                        displayName: row.querySelector('.field-display').value.trim() || name
+                    });
+                }
+            });
+            return fields;
+        }
+
+        async function editDataset(id) {
+            try {
+                const res = await fetch('/api/datacenter/datasets/' + id);
+                const data = await res.json();
+                if (!data.ok) { toast(data.error, 'error'); return; }
+                const ds = data.data;
+                document.getElementById('dsModalTitle').textContent = '编辑数据集';
+                document.getElementById('dsId').value = ds.id;
+                document.getElementById('dsName').value = ds.name;
+                document.getElementById('dsDescription').value = ds.description || '';
+                document.getElementById('dsOutputDir').value = ds.outputDir || '';
+                document.getElementById('schemaFields').innerHTML = '';
+                if (ds.schema && ds.schema.fields) {
+                    ds.schema.fields.forEach(f => addSchemaField(f.name, f.type, f.displayName));
+                }
+                if (!ds.schema || !ds.schema.fields || ds.schema.fields.length === 0) {
+                    addSchemaField();
+                }
+                document.getElementById('datasetModal').classList.add('active');
+            } catch (e) {
+                toast('加载数据集失败: ' + e.message, 'error');
+            }
+        }
+
+        async function saveDataset(e) {
+            e.preventDefault();
+            const id = document.getElementById('dsId').value;
+            const ds = {
+                name: document.getElementById('dsName').value,
+                description: document.getElementById('dsDescription').value || null,
+                outputDir: document.getElementById('dsOutputDir').value || null,
+                schema: { fields: getSchemaFields() }
+            };
+            try {
+                const url = id ? '/api/datacenter/datasets/' + id : '/api/datacenter/datasets';
+                const method = id ? 'PUT' : 'POST';
+                const res = await fetch(url, {
+                    method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(ds)
+                });
+                const data = await res.json();
+                if (data.ok) {
+                    toast(id ? '数据集更新成功' : '数据集创建成功', 'success');
+                    closeModal('datasetModal');
+                    loadDatasets();
+                } else {
+                    toast(data.error || '操作失败', 'error');
+                }
+            } catch (e) {
+                toast('保存失败: ' + e.message, 'error');
+            }
+        }
+
+        async function deleteDataset(id) {
+            if (!confirm('确定要删除这个数据集吗？所有数据将被永久删除。')) return;
+            try {
+                const res = await fetch('/api/datacenter/datasets/' + id, { method: 'DELETE' });
+                const data = await res.json();
+                if (data.ok) {
+                    toast('数据集已删除', 'success');
+                    loadDatasets();
+                } else {
+                    toast(data.error || '删除失败', 'error');
+                }
+            } catch (e) {
+                toast('删除失败: ' + e.message, 'error');
+            }
+        }
+
+        // --- Excel Import ---
+        const uploadArea = document.getElementById('uploadArea');
+        uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('dragover'); });
+        uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+        uploadArea.addEventListener('drop', e => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) {
+                document.getElementById('excelFile').files = e.dataTransfer.files;
+                handleFileSelect(document.getElementById('excelFile'));
+            }
+        });
+
+        async function handleFileSelect(input) {
+            const file = input.files[0];
+            if (!file) return;
+            currentFile = file;
+            const datasetId = document.getElementById('importDatasetId').value;
+            if (!datasetId) { toast('请先选择数据集', 'error'); return; }
+
+            const formData = new FormData();
+            formData.append('file', file);
+            try {
+                const res = await fetch('/api/datacenter/datasets/import/excel/preview', { method: 'POST', body: formData });
+                const data = await res.json();
+                if (data.ok) {
+                    currentPreview = data.data;
+                    renderMappingPreview(data.data, datasetId);
+                    document.getElementById('previewSection').style.display = 'block';
+                } else {
+                    toast(data.error, 'error');
+                }
+            } catch (e) {
+                toast('预览失败: ' + e.message, 'error');
+            }
+        }
+
+        async function renderMappingPreview(preview, datasetId) {
+            let schemaFields = [];
+            try {
+                const res = await fetch('/api/datacenter/datasets/' + datasetId);
+                const data = await res.json();
+                if (data.ok && data.data.schema && data.data.schema.fields) {
+                    schemaFields = data.data.schema.fields;
+                }
+            } catch (e) {}
+
+            let h = '<table class="mapping-table"><thead><tr><th>Excel列名</th><th>映射到字段</th></tr></thead><tbody>';
+            preview.headers.forEach(header => {
+                const matched = schemaFields.find(f => f.name.toLowerCase() === header.toLowerCase() || (f.displayName && f.displayName.toLowerCase() === header.toLowerCase()));
+                h += `<tr><td>${esc(header)}</td><td><select class="mapping-select" data-excel-col="${esc(header)}">`;
+                h += `<option value="${esc(header)}">${esc(header)} (保持原名)</option>`;
+                schemaFields.forEach(f => {
+                    h += `<option value="${esc(f.name)}" ${matched && matched.name === f.name ? 'selected' : ''}>${esc(f.displayName || f.name)}</option>`;
+                });
+                h += '</select></td></tr>';
+            });
+            h += '</tbody></table>';
+            h += `<div style="font-size:12px;color:#5c5f66;margin-top:8px;">共 ${preview.totalRows} 行数据，预览前 ${preview.rows.length} 行</div>`;
+            document.getElementById('mappingPreview').innerHTML = h;
+        }
+
+        async function executeExcelImport() {
+            const datasetId = document.getElementById('importDatasetId').value;
+            if (!datasetId) { toast('请选择数据集', 'error'); return; }
+            if (!currentFile) { toast('请先选择Excel文件', 'error'); return; }
+
+            const mapping = {};
+            document.querySelectorAll('.mapping-select').forEach(sel => {
+                mapping[sel.dataset.excelCol] = sel.value;
+            });
+
+            const useAi = document.getElementById('excelUseAi').checked;
+            const formData = new FormData();
+            formData.append('file', currentFile);
+            formData.append('mapping', JSON.stringify(mapping));
+            formData.append('useAi', useAi);
+
+            if (useAi) toast('AI正在处理数据，请稍候...', 'success');
+
+            try {
+                const res = await fetch('/api/datacenter/datasets/' + datasetId + '/import/excel', { method: 'POST', body: formData });
+                const data = await res.json();
+                if (data.ok) {
+                    toast(data.message, 'success');
+                    document.getElementById('previewSection').style.display = 'none';
+                    currentFile = null;
+                    currentPreview = null;
+                    document.getElementById('excelFile').value = '';
+                    loadDatasets();
+                } else {
+                    toast(data.error, 'error');
+                }
+            } catch (e) {
+                toast('导入失败: ' + e.message, 'error');
+            }
+        }
+
+        // --- JSON Import ---
+        async function importJson() {
+            const datasetId = document.getElementById('jsonImportDatasetId').value;
+            if (!datasetId) { toast('请选择数据集', 'error'); return; }
+            const raw = document.getElementById('jsonData').value.trim();
+            if (!raw) { toast('请输入JSON数据', 'error'); return; }
+
+            let parsed;
+            try { parsed = JSON.parse(raw); } catch (e) { toast('JSON格式错误: ' + e.message, 'error'); return; }
+
+            const useAi = document.getElementById('jsonUseAi').checked;
+            if (useAi) toast('AI正在处理数据，请稍候...', 'success');
+
+            try {
+                const res = await fetch('/api/datacenter/datasets/' + datasetId + '/import/json', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ data: parsed, useAi: useAi })
+                });
+                const data = await res.json();
+                if (data.ok) {
+                    toast(data.message, 'success');
+                    document.getElementById('jsonData').value = '';
+                    loadDatasets();
+                } else {
+                    toast(data.error, 'error');
+                }
+            } catch (e) {
+                toast('导入失败: ' + e.message, 'error');
+            }
+        }
+
+        // --- URL Import ---
+        async function importFromUrl() {
+            const datasetId = document.getElementById('urlImportDatasetId').value;
+            if (!datasetId) { toast('请选择数据集', 'error'); return; }
+            const url = document.getElementById('importUrl').value.trim();
+            if (!url) { toast('请输入URL', 'error'); return; }
+
+            toast('正在通过AI提取数据，请稍候...', 'success');
+            try {
+                const res = await fetch('/api/datacenter/datasets/' + datasetId + '/import/url', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: url })
+                });
+                const data = await res.json();
+                if (data.ok) {
+                    toast(data.message, 'success');
+                    document.getElementById('importUrl').value = '';
+                    loadDatasets();
+                } else {
+                    toast(data.error, 'error');
+                }
+            } catch (e) {
+                toast('URL导入失败: ' + e.message, 'error');
+            }
+        }
+
+        // --- Browse ---
+        async function loadBrowseData() {
+            const datasetId = document.getElementById('browseDatasetId').value;
+            if (!datasetId) {
+                document.getElementById('browseTable').innerHTML = '<div class="empty-state">请先选择数据集</div>';
+                return;
+            }
+            const keyword = document.getElementById('browseKeyword').value;
+            try {
+                let url = '/api/datacenter/datasets/' + datasetId + '/records';
+                if (keyword) url += '?keyword=' + encodeURIComponent(keyword);
+                const res = await fetch(url);
+                const data = await res.json();
+                if (data.ok) {
+                    renderBrowseTable(data.data, datasetId);
+                } else {
+                    toast(data.error, 'error');
+                }
+            } catch (e) {
+                toast('加载数据失败: ' + e.message, 'error');
+            }
+        }
+
+        function renderBrowseTable(records, datasetId) {
+            if (!records || records.length === 0) {
+                document.getElementById('browseTable').innerHTML = '<div class="empty-state">暂无数据</div>';
+                selectedRecordIds = [];
+                return;
+            }
+
+            selectedRecordIds = [];
+
+            const allKeys = new Set();
+            records.forEach(r => {
+                Object.keys(r).forEach(k => {
+                    if (!k.startsWith('_')) allKeys.add(k);
+                });
+            });
+            const cols = [...allKeys];
+
+            let h = `<div style="font-size:12px;color:#5c5f66;margin-bottom:8px;display:flex;align-items:center;gap:12px;">`;
+            h += `<span>共 ${records.length} 条记录</span>`;
+            h += `<label style="cursor:pointer;"><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this, '${datasetId}')"> 全选</label>`;
+            h += `<span id="selectedCount" style="color:#7c5cfc;"></span>`;
+            h += `</div>`;
+            h += '<table class="data-table"><thead><tr>';
+            h += '<th style="width:30px;"><input type="checkbox" id="selectAllHead" onchange="toggleSelectAll(this, \'' + datasetId + '\')"></th>';
+            h += '<th class="col-id">ID</th><th class="col-source">来源</th>';
+            cols.forEach(c => { h += `<th>${esc(c)}</th>`; });
+            h += '<th class="col-actions"></th>';
+            h += '</tr></thead><tbody>';
+            records.forEach(r => {
+                h += '<tr>';
+                h += `<td><input type="checkbox" class="record-cb" data-id="${esc(r._id || '')}" onchange="toggleRecordSelect()"></td>`;
+                h += `<td class="col-id" style="font-size:11px;color:#909296;">${esc(r._id || '')}</td>`;
+                h += `<td class="col-source"><span class="badge badge-gray">${esc(r._source || '')}</span></td>`;
+                cols.forEach(c => {
+                    const v = r[c];
+                    const text = v === null || v === undefined ? '' : String(v);
+                    h += `<td title="${esc(text)}">${esc(trunc(text, 60))}</td>`;
+                });
+                h += `<td><button class="btn btn-danger btn-sm" onclick="deleteRecord('${datasetId}','${r._id}')">删</button></td>`;
+                h += '</tr>';
+            });
+            h += '</tbody></table>';
+            document.getElementById('browseTable').innerHTML = h;
+        }
+
+        function toggleSelectAll(cb, datasetId) {
+            document.querySelectorAll('.record-cb').forEach(c => { c.checked = cb.checked; });
+            toggleRecordSelect();
+        }
+
+        function toggleRecordSelect() {
+            selectedRecordIds = [];
+            document.querySelectorAll('.record-cb:checked').forEach(c => {
+                selectedRecordIds.push(c.dataset.id);
+            });
+            const el = document.getElementById('selectedCount');
+            if (el) el.textContent = selectedRecordIds.length > 0 ? `已选 ${selectedRecordIds.length} 条` : '';
+        }
+
+        function browseDataset(id) {
+            document.getElementById('browseDatasetId').value = id;
+            switchTabDirect('browse');
+            loadBrowseData();
+        }
+
+        function switchTabDirect(tab) {
+            document.querySelectorAll('.ds-tab').forEach((t, i) => {
+                t.classList.toggle('active', t.textContent.includes(
+                    tab === 'datasets' ? '管理' : tab === 'import' ? '导入' : '浏览'
+                ));
+            });
+            document.querySelectorAll('.ds-panel').forEach(p => p.classList.remove('active'));
+            document.getElementById('panel-' + tab).classList.add('active');
+        }
+
+        async function showExportModal() {
+            const datasetId = document.getElementById('browseDatasetId').value;
+            if (!datasetId) { toast('请先选择数据集', 'error'); return; }
+            try {
+                const res = await fetch('/api/datacenter/modules');
+                const data = await res.json();
+                if (data.ok && data.data) {
+                    const sel = document.getElementById('exportModuleId');
+                    sel.innerHTML = '<option value="">选择目标模块...</option>' +
+                        data.data.map(m => `<option value="${m.id}">${m.name} (${m.dir})</option>`).join('');
+                }
+            } catch (e) {}
+            document.getElementById('exportModal').classList.add('active');
+        }
+
+        let selectedRecordIds = [];
+
+        async function executeExport() {
+            const datasetId = document.getElementById('browseDatasetId').value;
+            const moduleId = document.getElementById('exportModuleId').value;
+            const scope = document.getElementById('exportScope').value;
+            const prompt = document.getElementById('exportPrompt').value;
+
+            if (!datasetId) { toast('请先选择数据集', 'error'); return; }
+            if (!moduleId) { toast('请选择目标模块', 'error'); return; }
+
+            document.getElementById('exportBtn').disabled = true;
+            document.getElementById('exportBtn').textContent = 'AI转换中...';
+
+            try {
+                let recordIds = null;
+                if (scope === 'selected' && selectedRecordIds.length > 0) {
+                    recordIds = selectedRecordIds;
+                }
+
+                const body = { moduleId, recordIds, prompt: prompt || null };
+                const res = await fetch('/api/datacenter/datasets/' + datasetId + '/export', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const data = await res.json();
+                if (data.ok) {
+                    toast(data.message, 'success');
+                    closeModal('exportModal');
+                } else {
+                    toast(data.error, 'error');
+                }
+            } catch (e) {
+                toast('导出失败: ' + e.message, 'error');
+            } finally {
+                document.getElementById('exportBtn').disabled = false;
+                document.getElementById('exportBtn').textContent = 'AI转换并导出';
+            }
+        }
+
+        async function deleteRecord(datasetId, recordId) {
+            if (!confirm('确定删除这条记录？')) return;
+            try {
+                const res = await fetch('/api/datacenter/datasets/' + datasetId + '/records/' + recordId, { method: 'DELETE' });
+                const data = await res.json();
+                if (data.ok) {
+                    toast('记录已删除', 'success');
+                    loadBrowseData();
+                    loadDatasets();
+                } else {
+                    toast(data.error, 'error');
+                }
+            } catch (e) {
+                toast('删除失败: ' + e.message, 'error');
+            }
+        }
+
+        function esc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+        function trunc(s, max) { return s.length > max ? s.substring(0, max) + '...' : s; }
+        function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+        document.querySelectorAll('.modal-overlay').forEach(m => {
+            m.addEventListener('click', function(e) { if (e.target === this) this.classList.remove('active'); });
+        });
+
+        loadDatasets();
+    </script>
+    </div>
+</body>
+</html>

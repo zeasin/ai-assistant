@@ -1,0 +1,174 @@
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title layout:fragment="title">文件浏览</title>
+</head>
+<body>
+<th:block layout:fragment="content">
+
+<div class="card">
+    <div th:if="${error != null and !error.isEmpty()}" class="alert alert-error" style="background:#fff0f0;color:#c92a2a;padding:10px 16px;border-radius:8px;margin-bottom:12px;font-size:14px;border:1px solid #ffc9c9;" th:text="${error}">错误</div>
+    <div class="flex" style="justify-content:space-between;margin-bottom:16px;">
+        <h2>📂 笔记文件浏览</h2>
+        <div class="flex">
+            <button class="btn btn-primary" onclick="showNewModal()">✏️ 新建</button>
+            <a th:if="${rel != null && !rel.isEmpty()}" class="btn btn-secondary"
+               th:with="parentDir=${parent != null && !parent.isEmpty() ? '?dir=' + parent : ''}"
+               th:href="|/browse${parentDir}|">← 上级目录</a>
+        </div>
+    </div>
+
+    <th:block th:if="${#lists.size(breadcrumbs) > 0}">
+    <div class="text-muted mb-2" style="font-size:13px;">
+        / <a th:href="@{/browse}">root</a>
+        <th:block th:each="crumb, iterStat : ${breadcrumbs}">
+            / <a th:href="|/browse?dir=${breadcrumbPaths[iterStat.index]}|" th:text="${crumb}">folder</a>
+        </th:block>
+    </div>
+    </th:block>
+
+    <th:block th:if="${#lists.size(dirs) > 0 || #lists.size(files) > 0}">
+    <table class="log-table">
+        <thead>
+            <tr>
+                <th>名称</th>
+                <th>修改时间</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="d : ${dirs}">
+                <td>📁 <strong th:text="${d.name}">目录名</strong></td>
+                <td th:text="${d.modified}">时间</td>
+                <td>
+                    <a class="btn btn-secondary"
+                       th:with="dirPath=${rel != null && !rel.isEmpty() ? rel + '/' + d.name : d.name}"
+                       th:href="|/browse?dir=${dirPath}|"
+                       style="padding:4px 12px;font-size:12px;">打开</a>
+                </td>
+            </tr>
+            <tr th:each="f : ${files}">
+                <td>
+                    <span th:if="${#strings.endsWith(f.name, '.md')}">📄</span>
+                    <span th:unless="${#strings.endsWith(f.name, '.md')}">📎</span>
+                    <span th:text="${f.name}">文件名</span>
+                </td>
+                <td th:text="${f.modified}">时间</td>
+                <td>
+                    <a th:if="${#strings.endsWith(f.name, '.md')}" class="btn btn-primary"
+                       th:with="filePath=${rel != null && !rel.isEmpty() ? rel + '/' + f.name : f.name}"
+                       th:href="|/view?path=${filePath}|"
+                       style="padding:4px 12px;font-size:12px;">查看</a>
+                    <button th:if="${#strings.endsWith(f.name, '.md')}" class="btn btn-secondary"
+                            th:data-path="${rel != null && !rel.isEmpty() ? rel + '/' + f.name : f.name}"
+                            onclick="deleteFile(this.getAttribute('data-path'))"
+                            style="padding:4px 12px;font-size:12px;margin-left:4px;">删除</button>
+                    <span th:unless="${#strings.endsWith(f.name, '.md')}" class="text-muted">—</span>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    </th:block>
+    <th:block th:unless="${#lists.size(dirs) > 0 || #lists.size(files) > 0}">
+    <div class="text-muted">空目录</div>
+    </th:block>
+</div>
+
+<div class="modal-overlay" id="newModal" style="display:none;" onclick="if(event.target===this)hideNewModal()">
+    <div class="modal">
+        <div class="flex" style="justify-content:space-between;margin-bottom:12px;">
+            <h3 style="margin:0;">✏️ 新建 Markdown 文件</h3>
+            <button class="btn btn-secondary" onclick="hideNewModal()" style="padding:4px 10px;">✕</button>
+        </div>
+        <form id="newForm" onsubmit="return submitNew(event)">
+            <input type="hidden" name="dir" th:value="${rel}">
+            <div class="form-group">
+                <label>文件名</label>
+                <input type="text" id="filename" placeholder="文件名（无需 .md）" required>
+            </div>
+            <div class="form-group">
+                <label>内容 (Markdown)</label>
+                <textarea id="content" rows="12" placeholder="在此输入 Markdown 内容…"></textarea>
+            </div>
+            <div class="flex" style="justify-content:flex-end;gap:8px;margin-top:12px;">
+                <button type="button" class="btn btn-secondary" onclick="hideNewModal()">取消</button>
+                <button type="submit" class="btn btn-primary">创建</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.modal-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.4); z-index: 100;
+    display: flex; align-items: center; justify-content: center;
+}
+.modal {
+    background: #fff; border-radius: 12px; padding: 24px;
+    width: 600px; max-width: 90vw; max-height: 80vh; overflow-y: auto;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+}
+.form-group { margin-bottom: 12px; }
+.form-group label {
+    display: block; font-size: 13px; font-weight: 500; color: #5c5f66; margin-bottom: 4px;
+}
+.form-group input, .form-group textarea {
+    width: 100%; padding: 10px 12px; border: 1px solid #e1e3e6; border-radius: 8px;
+    font-size: 14px; outline: none; font-family: inherit; box-sizing: border-box;
+}
+.form-group input:focus, .form-group textarea:focus { border-color: #7c5cfc; }
+.form-group textarea { resize: vertical; font-family: "SF Mono", "Fira Code", monospace; font-size: 13px; }
+</style>
+
+<script>
+function showNewModal() {
+    document.getElementById('newModal').style.display = 'flex';
+    document.getElementById('filename').focus();
+}
+function hideNewModal() {
+    document.getElementById('newModal').style.display = 'none';
+}
+async function submitNew(e) {
+    e.preventDefault();
+    const filename = document.getElementById('filename').value.trim();
+    const content = document.getElementById('content').value;
+    if (!filename) { toast('请输入文件名', 'error'); return; }
+
+    const form = new FormData();
+    form.set('dir', [[${rel}]]);
+    form.set('filename', filename);
+    form.set('content', content);
+
+    const res = await fetch('/browse/new', { method: 'POST', body: form });
+    const data = await res.json();
+    if (data.ok) {
+        toast('创建成功！', 'success');
+        hideNewModal();
+        setTimeout(() => location.reload(), 300);
+    } else {
+        toast('创建失败：' + (data.error || '未知错误'), 'error');
+    }
+    return false;
+}
+async function deleteFile(path) {
+    if (!confirm('确定要删除这个文件吗？')) return;
+    const res = await fetch('/browse/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'path=' + encodeURIComponent(path),
+    });
+    const data = await res.json();
+    if (data.ok) {
+        toast('已删除', 'success');
+        location.reload();
+    } else {
+        toast('删除失败：' + (data.error || '未知错误'), 'error');
+    }
+}
+</script>
+
+</th:block>
+</body>
+</html>

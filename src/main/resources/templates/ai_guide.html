@@ -1,0 +1,449 @@
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title layout:fragment="title">AI 指南</title>
+    <style>
+        .tab-bar {
+            display: flex; gap: 0; border-bottom: 1px solid #e1e3e6; margin-bottom: 16px;
+        }
+        .tab-btn {
+            padding: 10px 20px; border: none; background: none; cursor: pointer;
+            font-size: 14px; color: #5c5f66; border-bottom: 2px solid transparent;
+            transition: all .15s; font-family: inherit;
+        }
+        .tab-btn:hover { color: #1a1b1e; background: #f5f5f7; }
+        .tab-btn.active { color: #7c5cfc; border-bottom-color: #7c5cfc; font-weight: 500; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .editor-area {
+            width: 100%; min-height: 60vh; padding: 14px;
+            border: 1px solid #e1e3e6; border-radius: 8px;
+            font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+            font-size: 13px; line-height: 1.6; resize: vertical;
+            outline: none; background: #fafafe;
+        }
+        .editor-area:focus { border-color: #7c5cfc; background: #fff; }
+
+        .preview-area {
+            border: 1px solid #e1e3e6; border-radius: 8px;
+            padding: 20px; min-height: 200px; background: #fff;
+            line-height: 1.8; font-size: 15px;
+        }
+        .preview-area h1 { font-size: 24px; border-bottom: 2px solid #7c5cfc; padding-bottom: 6px; margin: 20px 0 12px; }
+        .preview-area h2 { font-size: 20px; margin: 18px 0 10px; }
+        .preview-area h3 { font-size: 17px; margin: 14px 0 8px; }
+        .preview-area code {
+            background: #f0edff; padding: 2px 6px; border-radius: 4px;
+            font-size: 13px; color: #5c3dcf;
+        }
+        .preview-area pre {
+            background: #1e1e2e; color: #cdd6f4; padding: 14px 18px;
+            border-radius: 8px; overflow-x: auto; margin: 10px 0;
+        }
+        .preview-area pre code { background: none; color: inherit; padding: 0; }
+        .preview-area table {
+            border-collapse: collapse; width: 100%; margin: 10px 0;
+        }
+        .preview-area th, .preview-area td {
+            padding: 8px 12px; border: 1px solid #e1e3e6; text-align: left;
+        }
+        .preview-area th { background: #f8f7ff; font-weight: 600; }
+        .preview-area blockquote {
+            border-left: 4px solid #7c5cfc; padding: 8px 14px;
+            background: #f8f7ff; margin: 10px 0; border-radius: 0 8px 8px 0;
+        }
+        .preview-area ul, .preview-area ol { padding-left: 24px; }
+        .preview-area hr { border: none; border-top: 1px solid #e1e3e6; margin: 20px 0; }
+
+        .memory-file-list { list-style: none; }
+        .memory-file-item {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 10px 14px; border: 1px solid #e1e3e6; border-radius: 8px;
+            margin-bottom: 6px; transition: all .15s;
+        }
+        .memory-file-item:hover { border-color: #7c5cfc; background: #fafafe; }
+        .memory-file-name {
+            font-size: 14px; font-weight: 500; cursor: pointer;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .memory-file-name:hover { color: #7c5cfc; }
+        .memory-type-badge {
+            font-size: 11px; padding: 2px 8px; border-radius: 4px;
+            font-weight: 400; color: #fff;
+        }
+        .badge-user { background: #7c5cfc; }
+        .badge-feedback { background: #e8590c; }
+        .badge-project { background: #1971c2; }
+        .badge-reference { background: #2b8a3e; }
+        .badge-other { background: #909296; }
+
+        .toolbar {
+            display: flex; gap: 8px; align-items: center; margin-bottom: 10px;
+        }
+        .path-hint {
+            font-size: 12px; color: #909296; margin-left: auto;
+            word-break: break-all;
+        }
+        .status-text {
+            font-size: 12px; color: #909296; margin-left: 8px; transition: all .3s;
+        }
+        .status-text.success { color: #2b8a3e; }
+        .status-text.error { color: #e03131; }
+
+        .empty-state {
+            text-align: center; padding: 40px 20px; color: #909296;
+        }
+        .empty-state .icon { font-size: 40px; margin-bottom: 10px; }
+
+        .modal-editor {
+            width: 100%; min-height: 40vh; padding: 12px;
+            border: 1px solid #e1e3e6; border-radius: 8px;
+            font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+            font-size: 13px; line-height: 1.6; resize: vertical;
+            outline: none; box-sizing: border-box;
+        }
+        .modal-editor:focus { border-color: #7c5cfc; }
+
+        .btn-sm {
+            padding: 6px 14px; font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+<th:block layout:fragment="content">
+
+<div class="card">
+    <h2>AI 指南</h2>
+    <div class="text-muted mb-2">管理 AI 的行为指南——AGENTS.md 和 AI 记忆。</div>
+
+    <div class="tab-bar">
+        <button class="tab-btn active" onclick="switchTab('agents')">AGENTS.md</button>
+        <button class="tab-btn" onclick="switchTab('memory')">AI 记忆</button>
+    </div>
+
+    <!-- Tab: AGENTS.md -->
+    <div id="tab-agents" class="tab-content active">
+        <div class="toolbar">
+            <button class="btn btn-primary" onclick="saveAgents()">保存</button>
+            <button class="btn btn-secondary" onclick="toggleAgentsPreview()">预览</button>
+            <span id="agentsStatus" class="status-text"></span>
+            <span id="agentsPath" class="path-hint"></span>
+        </div>
+        <textarea id="agentsEditor" class="editor-area" placeholder="AGENTS.md 内容..."></textarea>
+        <div id="agentsPreview" class="preview-area" style="display:none;"></div>
+    </div>
+
+    <!-- Tab: AI 记忆 -->
+    <div id="tab-memory" class="tab-content">
+        <div class="toolbar">
+            <button class="btn btn-primary btn-sm" onclick="showMemoryNew()">+ 新建记忆</button>
+            <button class="btn btn-secondary btn-sm" onclick="showMemoryEditor('MEMORY.md')">编辑索引</button>
+            <span id="memoryStatus" class="status-text"></span>
+            <span id="memoryPath" class="path-hint"></span>
+        </div>
+        <div id="memoryList"></div>
+    </div>
+</div>
+
+<!-- Memory Edit Modal -->
+<div class="modal-overlay" id="memoryModal">
+    <div class="modal" style="width: 800px;">
+        <h3 id="memoryModalTitle">✏️ 编辑记忆</h3>
+        <input type="hidden" id="memoryEditName">
+        <div class="form-group" style="margin-bottom:12px;">
+            <label style="font-size:12px;color:#5c5f66;font-weight:500;">文件名</label>
+            <input type="text" id="memoryFileName" style="width:100%;padding:8px 10px;border:1px solid #e1e3e6;border-radius:6px;font-size:13px;outline:none;" placeholder="xxx.md">
+        </div>
+        <textarea id="memoryEditor" class="modal-editor" placeholder="记忆内容 (Markdown)..."></textarea>
+        <div class="modal-actions">
+            <button class="btn btn-secondary" onclick="closeMemoryModal()">取消</button>
+            <button class="btn btn-danger" id="memoryDeleteBtn" style="display:none;" onclick="deleteMemory()">删除</button>
+            <button class="btn btn-primary" onclick="saveMemory()">保存</button>
+        </div>
+    </div>
+</div>
+
+<script>
+var showingPreview = false;
+
+function switchTab(tab) {
+    document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+    document.querySelectorAll('.tab-content').forEach(function(c) { c.classList.remove('active'); });
+    var idx = tab === 'agents' ? 0 : 1;
+    document.querySelectorAll('.tab-btn')[idx].classList.add('active');
+    document.getElementById('tab-' + tab).classList.add('active');
+    if (tab === 'memory') loadMemoryList();
+}
+
+// ---- AGENTS.md ----
+
+function loadAgents() {
+    fetch('/api/ai-guide/agents')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.ok) {
+                document.getElementById('agentsEditor').value = data.content || '';
+                if (data.path) {
+                    document.getElementById('agentsPath').textContent = data.path;
+                }
+            } else {
+                setStatus('agentsStatus', '加载失败: ' + (data.error || ''), 'error');
+            }
+        })
+        .catch(function() {
+            setStatus('agentsStatus', '加载失败', 'error');
+        });
+}
+
+function saveAgents() {
+    var btn = document.querySelector('#tab-agents .btn-primary');
+    btn.disabled = true;
+    btn.textContent = '⏳ 保存...';
+
+    var content = document.getElementById('agentsEditor').value;
+    fetch('/api/ai-guide/agents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: content })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.ok) {
+            setStatus('agentsStatus', '✅ 已保存', 'success');
+            toast('✅ AGENTS.md 已保存', 'success');
+        } else {
+            setStatus('agentsStatus', '❌ ' + (data.error || '保存失败'), 'error');
+            toast('❌ 保存失败', 'error');
+        }
+    })
+    .catch(function() {
+        setStatus('agentsStatus', '❌ 请求失败', 'error');
+    })
+    .finally(function() {
+        btn.disabled = false;
+        btn.textContent = '保存';
+    });
+}
+
+function toggleAgentsPreview() {
+    showingPreview = !showingPreview;
+    var preview = document.getElementById('agentsPreview');
+    if (showingPreview) {
+        var content = document.getElementById('agentsEditor').value;
+        preview.innerHTML = marked.parse(content);
+        preview.style.display = 'block';
+    } else {
+        preview.style.display = 'none';
+    }
+}
+
+// ---- AI 记忆 ----
+
+function loadMemoryList() {
+    var container = document.getElementById('memoryList');
+    container.innerHTML = '<div style="text-align:center;padding:20px;color:#909296;">⏳ 加载中...</div>';
+
+    fetch('/api/ai-guide/memory')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (!data.ok) {
+                container.innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><div>' + (data.error || '加载失败') + '</div></div>';
+                return;
+            }
+            if (data.path) {
+                document.getElementById('memoryPath').textContent = data.path;
+            }
+            renderMemoryList(data.files || []);
+        })
+        .catch(function() {
+            container.innerHTML = '<div class="empty-state"><div class="icon">❌</div><div>加载失败</div></div>';
+        });
+}
+
+function renderMemoryList(files) {
+    var container = document.getElementById('memoryList');
+    if (files.length === 0) {
+        container.innerHTML = '<div class="empty-state"><div class="icon">📁</div><div>暂无记忆文件</div><div style="margin-top:8px;font-size:13px;color:#909296;">点击「+ 新建记忆」创建第一条</div></div>';
+        return;
+    }
+
+    var html = '<ul class="memory-file-list">';
+    files.forEach(function(f) {
+        var name = f.name;
+        var type = guessMemoryType(name);
+        var badgeClass = 'badge-' + type;
+        var displayName = name.replace(/\.md$/, '');
+        var isIndex = name === 'MEMORY.md';
+
+        html += '<li class="memory-file-item">';
+        html += '<span class="memory-file-name" onclick="showMemoryEditor(\'' + escapeJs(name) + '\')">';
+        html += '<span class="memory-type-badge ' + badgeClass + '">' + type + '</span>';
+        html += escapeHtml(displayName);
+        if (isIndex) html += ' <span style="font-size:11px;color:#909296;">(索引)</span>';
+        html += '</span>';
+        html += '<span style="display:flex;gap:4px;">';
+        html += '<button class="btn btn-secondary btn-sm" onclick="showMemoryEditor(\'' + escapeJs(name) + '\')">编辑</button>';
+        if (!isIndex) {
+            html += '<button class="btn btn-danger btn-sm" onclick="deleteMemoryConfirm(\'' + escapeJs(name) + '\')">删除</button>';
+        }
+        html += '</span>';
+        html += '</li>';
+    });
+    html += '</ul>';
+    container.innerHTML = html;
+}
+
+function guessMemoryType(name) {
+    if (name === 'MEMORY.md') return 'other';
+    var lower = name.toLowerCase();
+    if (lower.includes('user') || lower.includes('角色')) return 'user';
+    if (lower.includes('feedback') || lower.includes('反馈')) return 'feedback';
+    if (lower.includes('project') || lower.includes('项目')) return 'project';
+    if (lower.includes('reference') || lower.includes('参考')) return 'reference';
+    return 'other';
+}
+
+function showMemoryEditor(name) {
+    document.getElementById('memoryModalTitle').textContent = '✏️ 编辑: ' + name;
+    document.getElementById('memoryEditName').value = name;
+    document.getElementById('memoryFileName').value = name;
+    document.getElementById('memoryEditor').value = '⏳ 加载中...';
+
+    var deleteBtn = document.getElementById('memoryDeleteBtn');
+    deleteBtn.style.display = (name === 'MEMORY.md') ? 'none' : 'inline-block';
+
+    fetch('/api/ai-guide/memory/' + encodeURIComponent(name))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.ok) {
+                document.getElementById('memoryEditor').value = data.content || '';
+            } else {
+                document.getElementById('memoryEditor').value = '';
+                toast('加载失败: ' + (data.error || ''), 'error');
+            }
+        })
+        .catch(function() {
+            document.getElementById('memoryEditor').value = '';
+            toast('加载失败', 'error');
+        });
+
+    document.getElementById('memoryModal').classList.add('active');
+}
+
+function showMemoryNew() {
+    document.getElementById('memoryModalTitle').textContent = '➕ 新建记忆';
+    document.getElementById('memoryEditName').value = '';
+    document.getElementById('memoryFileName').value = '';
+    document.getElementById('memoryEditor').value = '---\nname: \ndescription: \nmetadata:\n  type: \n---\n\n';
+    document.getElementById('memoryDeleteBtn').style.display = 'none';
+    document.getElementById('memoryModal').classList.add('active');
+}
+
+function closeMemoryModal() {
+    document.getElementById('memoryModal').classList.remove('active');
+}
+
+function saveMemory() {
+    var btn = document.querySelector('#memoryModal .btn-primary');
+    btn.disabled = true;
+    btn.textContent = '⏳ 保存...';
+
+    var name = document.getElementById('memoryFileName').value.trim();
+    var content = document.getElementById('memoryEditor').value;
+    var origName = document.getElementById('memoryEditName').value;
+
+    if (!name) {
+        toast('文件名不能为空', 'error');
+        btn.disabled = false;
+        btn.textContent = '保存';
+        return;
+    }
+
+    // If name changed, delete old file first
+    var deleteFirst = (origName && origName !== name)
+        ? fetch('/api/ai-guide/memory/' + encodeURIComponent(origName), { method: 'DELETE' })
+        : Promise.resolve();
+
+    deleteFirst
+        .then(function() {
+            return fetch('/api/ai-guide/memory', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: name, content: content })
+            });
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.ok) {
+                toast('✅ 已保存', 'success');
+                closeMemoryModal();
+                loadMemoryList();
+            } else {
+                toast('❌ ' + (data.error || '保存失败'), 'error');
+            }
+        })
+        .catch(function() {
+            toast('❌ 请求失败', 'error');
+        })
+        .finally(function() {
+            btn.disabled = false;
+            btn.textContent = '保存';
+        });
+}
+
+function deleteMemoryConfirm(name) {
+    if (!confirm('确定删除 ' + name + '？')) return;
+    fetch('/api/ai-guide/memory/' + encodeURIComponent(name), { method: 'DELETE' })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.ok) {
+                toast('🗑️ 已删除', 'success');
+                loadMemoryList();
+                closeMemoryModal();
+            } else {
+                toast('❌ ' + (data.error || '删除失败'), 'error');
+            }
+        })
+        .catch(function() {
+            toast('❌ 请求失败', 'error');
+        });
+}
+
+function deleteMemory() {
+    var name = document.getElementById('memoryEditName').value;
+    if (!name) return;
+    deleteMemoryConfirm(name);
+}
+
+// ---- utils ----
+
+function setStatus(id, text, type) {
+    var el = document.getElementById(id);
+    el.textContent = text;
+    el.className = 'status-text' + (type ? ' ' + type : '');
+    if (type === 'success' || type === 'error') {
+        setTimeout(function() {
+            el.textContent = '';
+            el.className = 'status-text';
+        }, 3000);
+    }
+}
+
+function escapeHtml(str) {
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function escapeJs(str) {
+    return String(str).replace(/'/g, "\\'").replace(/"/g, '\\"');
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadAgents();
+});
+</script>
+
+</th:block>
+</body>
+</html>

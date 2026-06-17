@@ -1,0 +1,63 @@
+server:
+  port: 6790
+  address: 0.0.0.0
+
+spring:
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+  thymeleaf:
+    prefix: classpath:/templates/
+    suffix: .html
+    mode: HTML
+    cache: true
+    encoding: UTF-8
+  jackson:
+    default-property-inclusion: non_null
+    time-zone: Asia/Shanghai
+  datasource:
+    url: jdbc:sqlite:${ASSISTANT_CONFIG_DIR:.}/memory.db
+    driver-class-name: org.sqlite.JDBC
+  ai:
+    openai:
+      # 仅用于满足 starter 启动校验，实际 API Key / Model 由 config.json 动态管理
+      api-key: ${OPENAI_API_KEY:${DEEPSEEK_API_KEY:dummy}}
+    ollama:
+      base-url: http://127.0.0.1:11434
+      embedding:
+        options:
+          model: nomic-embed-text
+
+    retry:
+      max-attempts: 3
+      backoff:
+        initial-interval: 2s
+
+app:
+  config-dir: ${ASSISTANT_CONFIG_DIR:.}
+  timezone: Asia/Shanghai
+  max-history-chars: 6000
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      id-type: auto
+
+logging:
+  level:
+    root: INFO
+    com.laoqi.assistant.service.SchedulerService: DEBUG
+    com.laoqi.assistant.service.ConfigService: DEBUG
+    com.laoqi.assistant.service.FeishuService: DEBUG
+
+  pattern:
+    console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: ${user.dir}/app.log
+  logback:
+    rollingpolicy:
+      max-file-size: 10MB
+      max-history: 7
