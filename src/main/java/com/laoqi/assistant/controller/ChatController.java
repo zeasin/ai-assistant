@@ -147,7 +147,6 @@ public class ChatController {
 
         chatExecutor.execute(() -> {
             try {
-                // 先发送 sessionId，让前端记住
                 emitter.send(SseEmitter.event().data(mapper.writeValueAsString(
                         Map.of("type", "session", "sessionId", finalSessionId))));
 
@@ -155,19 +154,29 @@ public class ChatController {
 
                 sessionService.saveMessage(finalSessionId, "user", message, mode);
 
-                String replyText;
                 if (!llmService.isAvailable()) {
                     throw new IllegalStateException("LLM API Key 未配置，请在配置页填写");
                 }
-                // 用 NoteAssistantService（含工具编排能力），AI 自动判断是否使用工具
-                // NoteAssistantService 内部会自动注入历史上下文（含向量召回语义检索）
+
                 log.info("[chat] 使用 NoteAssistant（含工具编排 + 历史上下文注入, model={})",
                         modelName.isEmpty() ? "default" : modelName);
-                replyText = noteAssistantService.chat(finalSessionId, message, mode, modelName);
+
+                StringBuilder replyBuffer = new StringBuilder();
+                String replyText = noteAssistantService.streamChat(finalSessionId, message, mode, modelName, chunk -> {
+                    replyBuffer.append(chunk);
+                    Map<String, Object> data = new LinkedHashMap<>();
+                    data.put("type", "text");
+                    data.put("content", chunk);
+                    data.put("mode", mode);
+                    try {
+                        emitter.send(SseEmitter.event().data(mapper.writeValueAsString(data)));
+                    } catch (Exception e) {
+                        log.warn("发送流式数据失败", e);
+                    }
+                });
 
                 log.info("[chat] 收到回复, 长度={}", replyText.length());
                 sessionService.saveMessage(finalSessionId, "assistant", replyText, mode);
-                sendText(emitter, mode, replyText);
                 sendDone(emitter, mode);
 
             } catch (Exception e) {

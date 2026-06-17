@@ -153,6 +153,11 @@
 .chat-status {
     font-size: 12px; color: #888; line-height: 1.5;
     padding: 6px 0; font-style: italic;
+liao'    height: 0; opacity: 0; overflow: hidden;
+    transition: all 0.2s;
+}
+.chat-status.visible {
+    height: auto; opacity: 1; padding: 6px 0;
 }
 .chat-toggle {
     font-size: 11px; color: #7c5cfc; cursor: pointer; user-select: none;
@@ -232,7 +237,7 @@ async function sendMessage() {
     const aiMsgId = 'ai-' + Date.now();
     box.innerHTML += `<div class="chat-msg ai" id="${aiMsgId}">
         <div class="label" id="ai-label-${aiMsgId}">🤖 AI 助理</div>
-        <div class="chat-status" id="status-${aiMsgId}" style="display:none;">⏳ 处理中...</div>
+        <div class="chat-status" id="status-${aiMsgId}">⏳ 处理中...</div>
         <div class="text" id="reply-${aiMsgId}"></div>
     </div>`;
     box.scrollTop = box.scrollHeight;
@@ -284,18 +289,20 @@ async function sendMessage() {
                         } else {
                             document.getElementById('status-' + aiMsgId).textContent = '⏳ 处理中...';
                         }
-                        document.getElementById('status-' + aiMsgId).style.display = 'block';
+                        document.getElementById('status-' + aiMsgId).classList.add('visible');
                     } else if (data.type === 'reasoning') {
                         document.getElementById('status-' + aiMsgId).textContent = '🧠 思考中...';
+                        document.getElementById('status-' + aiMsgId).classList.add('visible');
                     } else if (data.type === 'text') {
                         replyText += data.content;
-                        document.getElementById('reply-' + aiMsgId).innerHTML = escapeHtml(replyText);
-                        document.getElementById('status-' + aiMsgId).style.display = 'none';
+                        const displayText = replyText.replace(/\n{3,}/g, '\n\n');
+                        document.getElementById('reply-' + aiMsgId).innerHTML = escapeHtml(displayText);
+                        document.getElementById('status-' + aiMsgId).classList.remove('visible');
                     } else if (data.type === 'error') {
-                        document.getElementById('status-' + aiMsgId).style.display = 'none';
+                        document.getElementById('status-' + aiMsgId).classList.remove('visible');
                         document.getElementById('reply-' + aiMsgId).innerHTML = '<span style="color:#ff6b6b;">❌ ' + escapeHtml(data.content) + '</span>';
                     } else if (data.type === 'done') {
-                        document.getElementById('status-' + aiMsgId).style.display = 'none';
+                        document.getElementById('status-' + aiMsgId).classList.remove('visible');
                         // 回复已由后端自动保存，刷新侧边栏以更新标题
                         loadSessionList();
                     }
