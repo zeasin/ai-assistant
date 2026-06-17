@@ -1,6 +1,6 @@
 # AI助理版本升级方案：Java接管Rules、Skills、AGENTS.md与Memory
 
-> ✅ *此升级方案已全部完成。当前 v3.0 实现了所有目标：Spring AI 2.0 直连 LLM、@Tool 替代手写 ReAct、零外部服务依赖。详见 README.md*
+> ✅ *此升级方案已全部完成。当前 v0.3.0 实现了所有目标：Spring AI 2.0 直连 LLM、@Tool 替代手写 ReAct、零外部服务依赖。详见 README.md*
 
 ## 一、总体架构
 

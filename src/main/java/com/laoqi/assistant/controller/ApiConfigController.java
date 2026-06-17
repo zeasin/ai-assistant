@@ -140,7 +140,7 @@ public class ApiConfigController {
     @PostMapping("/api/config/ai-provider")
     public Map<String, Object> updateAiProvider(@RequestParam String provider) {
         if (!"direct".equals(provider)) {
-            return Map.of("ok", false, "error", "v3.0 仅支持 direct 模式（opencode 已移除）");
+            return Map.of("ok", false, "error", "v0.3.0 仅支持 direct 模式（opencode 已移除）");
         }
         Config cfg = configService.load();
         cfg.setAiProvider(provider);

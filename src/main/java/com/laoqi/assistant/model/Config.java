@@ -19,7 +19,7 @@ public class Config {
     
     private String logFile;
     private List<Map<String, Object>> modules;
-    // aiProvider 废弃 v3.0 — 始终直连 LLM，仅保留 getter 兼容旧配置
+    // aiProvider 废弃 v0.3.0 — 始终直连 LLM，仅保留 getter 兼容旧配置
     private String llmApiKey = "";
     private String llmBaseUrl = "https://api.deepseek.com";
     private String llmModel = "deepseek-chat";
@@ -55,7 +55,7 @@ public class Config {
     public List<Map<String, Object>> getModules() { return modules; }
     public void setModules(List<Map<String, Object>> modules) { this.modules = modules; }
     public String getAiProvider() { return "direct"; }
-    public void setAiProvider(String aiProvider) { /* 废弃 v3.0 */ }
+    public void setAiProvider(String aiProvider) { /* 废弃 v0.3.0 */ }
     public String getLlmApiKey() { return llmApiKey; }
     public void setLlmApiKey(String llmApiKey) { this.llmApiKey = llmApiKey; }
     public String getLlmBaseUrl() { return llmBaseUrl; }

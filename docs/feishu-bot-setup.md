@@ -1,6 +1,6 @@
 # 飞书机器人配置指南
 
-> ⚠️ *本文档描述 v2.0 架构，已过时。当前 v3.0 使用 Spring AI 2.0 直接调用 LLM，不再依赖 opencode serve。详见 README.md*
+> ⚠️ *本文档描述 v2.0 架构，已过时。当前 v0.3.0 使用 Spring AI 2.0 直接调用 LLM，不再依赖 opencode serve。详见 README.md*
 
 本文档介绍如何配置飞书机器人，实现 AI 对话功能。
 
@@ -72,7 +72,7 @@
 
 ```bash
 mvn package -q
-java -jar target/ai-assistant-2.0.0.jar
+java -jar target/ai-assistant-0.3.0.jar
 ```
 
 ### 2. 检查日志

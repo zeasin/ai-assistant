@@ -1,4 +1,4 @@
-# AI 助理 v3.0
+# AI 助理 v0.3.0
 
 > **自带 AI 大脑，零外部依赖。**
 
@@ -101,7 +101,7 @@
 mvn package -q
 
 # 2. 启动（一条命令）
-java -jar target/ai-assistant-3.0.0.jar
+java -jar target/ai-assistant-0.3.0.jar
 
 # 3. 打开浏览器
 # http://localhost:6790
@@ -586,13 +586,13 @@ spring:
 
 | 版本 | AI 引擎 | 外部依赖 | 关键变化 |
 |------|---------|---------|---------|
-| **v3.0**（当前） | Spring AI 2.0（DeepSeekChatModel 作为 OpenAI 兼容客户端） | **零依赖** | `@Tool` 工具编排、语义检索、数据中心、采集器、多模态 |
+| **v0.3.0**（当前） | Spring AI 2.0（DeepSeekChatModel 作为 OpenAI 兼容客户端） | **零依赖** | `@Tool` 工具编排、语义检索、数据中心、采集器、多模态 |
 | v2.x | opencode serve（外部进程） | 需要 2 个 opencode 进程 | 基础 AI 对话、飞书集成 |
 | v1.x | 裸 HTTP 调用 | — | 手动 JSON 拼接 |
 
-### v3.0 vs v2.x 关键对比
+### v0.3.0 vs v2.x 关键对比
 
-| 对比维度 | v2.x | v3.0 |
+| 对比维度 | v2.x | v0.3.0 |
 |---------|------|------|
 | 外部 AI 服务 | 需要 opencode serve x2 | **零依赖** |
 | 工具编排 | opencode 内置 tool-use | **`@Tool` 注解 + ToolCallingAdvisor** |
