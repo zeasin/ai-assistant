@@ -62,26 +62,23 @@ public class ChatController {
         var data = sessionService.load();
         model.addAttribute("sessions", data.sessions);
 
-        if (!id.isEmpty()) {
-            ChatSession session = sessionService.getSession(id);
+        // 确定当前选中的会话 ID
+        String currentId;
+        if (!id.isEmpty() && !"new".equals(id)) {
+            currentId = id;
+        } else {
+            currentId = data.current != null ? data.current : "";
+        }
+        model.addAttribute("current_id", currentId);
+        model.addAttribute("current_mode", mode);
+
+        // 加载当前会话（含消息列表）
+        if (!currentId.isEmpty()) {
+            ChatSession session = sessionService.getSession(currentId);
             if (session != null) {
                 model.addAttribute("sessionId", session.getId());
                 model.addAttribute("sessionTitle", session.getTitle());
-                model.addAttribute("current_id", session.getId());
-            } else {
-                model.addAttribute("current_id", "");
-            }
-            model.addAttribute("current_mode", mode);
-        } else {
-            String currentId = data.current != null ? data.current : "";
-            model.addAttribute("current_id", currentId);
-            model.addAttribute("current_mode", mode);
-            if (!currentId.isEmpty()) {
-                ChatSession session = sessionService.getSession(currentId);
-                if (session != null) {
-                    model.addAttribute("sessionId", session.getId());
-                    model.addAttribute("sessionTitle", session.getTitle());
-                }
+                model.addAttribute("current", session);
             }
         }
         model.addAttribute("ai_provider", "direct");
@@ -118,7 +115,7 @@ public class ChatController {
                            @RequestParam(required = false, defaultValue = "knowledge") String mode) {
         SseEmitter emitter = new SseEmitter(300_000L);
         String finalSessionId = (sessionId == null || sessionId.isEmpty()) ?
-                sessionService.createSession("对话", mode).getId() : sessionId;
+                sessionService.createSession("新对话", mode).getId() : sessionId;
 
         chatExecutor.execute(() -> {
             try {
