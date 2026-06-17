@@ -105,7 +105,7 @@
         <h2>📜 最近排查记录</h2>
         <div th:if="${#lists.size(records) > 0}">
             <div th:each="r : ${records}" class="record-item" th:onclick="'showRecord(' + ${rStat.index} + ')'">
-                <div class="time" th:text="${r.time}"></div>
+                <div class="time" th:text="${r.startTime != null and !r.startTime.isEmpty()} ? ${r.startTime} : ${r.time}"></div>
                 <div class="msg-preview">
                     <span class="label msg">📩</span>
                     <span class="text" th:text="${#strings.abbreviate(r.message, 120)}"></span>
@@ -114,7 +114,10 @@
                     <span class="label" th:classappend="${r.success} ? 'resp' : 'fail'" th:text="${r.success} ? '✅' : '❌'"></span>
                     <span class="text" th:text="${#strings.abbreviate(r.response, 200)}"></span>
                 </div>
-                <div style="font-size:11px;color:#909296;text-align:right;" th:text="'⏱ ' + ${r.elapsed}"></div>
+                <div style="font-size:11px;color:#909296;text-align:right;display:flex;justify-content:space-between;">
+                    <span th:if="${r.aiEngine != null and !r.aiEngine.isEmpty()}" th:text="'⚙️ ' + ${r.aiEngine}"></span>
+                    <span th:text="${'⏱ ' + r.elapsed + (r.duration != null and r.duration > 0 ? ' (' + r.duration + 's)' : '')}"></span>
+                </div>
             </div>
         </div>
         <div th:if="${#lists.size(records) == 0}" class="record-empty">暂无排查记录</div>
@@ -184,7 +187,7 @@
         <h2>📋 全部排查记录</h2>
         <div th:if="${#lists.size(records) > 0}">
             <div th:each="r : ${records}" class="record-item" th:onclick="'showRecord(' + ${rStat.index} + ')'">
-                <div class="time" th:text="${r.time}"></div>
+                <div class="time" th:text="${r.startTime != null and !r.startTime.isEmpty()} ? ${r.startTime} : ${r.time}"></div>
                 <div class="msg-preview">
                     <span class="label msg">📩</span>
                     <span class="text" th:text="${#strings.abbreviate(r.message, 120)}"></span>
@@ -193,7 +196,10 @@
                     <span class="label" th:classappend="${r.success} ? 'resp' : 'fail'" th:text="${r.success} ? '✅' : '❌'"></span>
                     <span class="text" th:text="${#strings.abbreviate(r.response, 200)}"></span>
                 </div>
-                <div style="font-size:11px;color:#909296;text-align:right;" th:text="'⏱ ' + ${r.elapsed}"></div>
+                <div style="font-size:11px;color:#909296;text-align:right;display:flex;justify-content:space-between;">
+                    <span th:if="${r.aiEngine != null and !r.aiEngine.isEmpty()}" th:text="'⚙️ ' + ${r.aiEngine}"></span>
+                    <span th:text="${'⏱ ' + r.elapsed + (r.duration != null and r.duration > 0 ? ' (' + r.duration + 's)' : '')}"></span>
+                </div>
             </div>
         </div>
         <div th:if="${#lists.size(records) == 0}" class="record-empty">暂无排查记录</div>
@@ -252,6 +258,7 @@
                 <div class="section ai" id="modalResp"></div>
             </div>
             <div class="elapsed" id="modalElapsed"></div>
+            <div style="margin-top:12px;display:flex;gap:16px;font-size:12px;color:#5c5f66;" id="modalMeta"></div>
         </div>
     </div>
 </div>
@@ -282,6 +289,12 @@ function showRecord(i) {
     document.getElementById('modalMsg').textContent = r.message;
     document.getElementById('modalResp').innerHTML = marked.parse(r.response);
     document.getElementById('modalElapsed').textContent = '⏱ ' + (r.elapsed || '');
+    let meta = '';
+    if (r.startTime) meta += '🕐 开始: ' + r.startTime;
+    if (r.endTime) meta += ' | 🏁 结束: ' + r.endTime;
+    if (r.duration) meta += ' | ⏳ ' + r.duration + 's';
+    if (r.aiEngine) meta += ' | ⚙️ ' + r.aiEngine;
+    document.getElementById('modalMeta').textContent = meta;
     document.getElementById('modal').classList.add('active');
 }
 

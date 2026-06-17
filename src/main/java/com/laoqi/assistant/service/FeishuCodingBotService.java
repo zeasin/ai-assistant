@@ -231,6 +231,9 @@ public class FeishuCodingBotService {
 
     private void processCodingRequest(String userMsg, String chatId, String chatType, String messageId) {
         String projectDir = "";
+        String startTime = java.time.LocalDateTime.now()
+                .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        Long recordId = null;
         try {
             sendImmediateReply(chatId, chatType, messageId);
             Config config = configService.load();
@@ -243,29 +246,59 @@ public class FeishuCodingBotService {
             }
 
             log.info("[编程AI] 开始排查: chatId={}, msgId={}, dir={}", chatId, messageId, projectDir);
+            recordId = saveRecord(userMsg, "🔄 正在排查中...", "处理中", false, "feishu", projectDir);
+            long startMs = System.currentTimeMillis();
             CodePiService.CodePiResult result = codePiService.analyze(userMsg, projectDir, timeout);
+            long endMs = System.currentTimeMillis();
             log.info("[编程AI] 排查完成: result={}, elapsed={}, output_len={}",
                     result.isSuccess() ? "成功" : "失败", result.getElapsedStr(),
                     result.isSuccess() ? result.getOutput().length() : 0);
             codingLog("排查", String.format("耗时 %s | %s | dir=%s", result.getElapsedStr(),
                     result.isSuccess() ? "成功" : "失败", projectDir));
 
-            String source = "feishu";
+            String endTime = java.time.LocalDateTime.now()
+                    .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            CodingRecordEntity entity = recordId != null ? getRecordById(recordId) : null;
+
             if (result.isSuccess()) {
                 String output = result.getOutput();
                 if (output.length() > 8000) output = output.substring(0, 8000) + "\n\n...（截断）";
                 String cardBody = CodePiService.mdToFeishuCard("**排查结果如下：**\n" + output);
                 sendCardReply(chatId, chatType, messageId, cardBody, "编程AI ⏱" + result.getElapsedStr());
-                saveRecord(userMsg, output, result.getElapsedStr(), true, source, projectDir);
+                if (entity != null) {
+                    entity.setEndTime(endTime);
+                    entity.setDuration((int) ((endMs - startMs) / 1000));
+                    entity.setResponse(output);
+                    entity.setSuccess(true);
+                    entity.setElapsed(result.getElapsedStr());
+                    updateRecord(entity);
+                }
             } else {
                 String err = result.getError() != null ? result.getError() : "未知错误";
                 sendReply(chatId, chatType, messageId, "⚠️ 排查失败（" + result.getElapsedStr() + "）：" + err);
-                saveRecord(userMsg, "失败: " + err, result.getElapsedStr(), false, source, projectDir);
+                if (entity != null) {
+                    entity.setEndTime(endTime);
+                    entity.setDuration((int) ((endMs - startMs) / 1000));
+                    entity.setResponse("失败: " + err);
+                    entity.setSuccess(false);
+                    entity.setElapsed(result.getElapsedStr());
+                    updateRecord(entity);
+                }
             }
         } catch (Exception e) {
             log.error("[编程AI] 排查异常: {}", e.getMessage(), e);
             sendReply(chatId, chatType, messageId, "❌ 排查异常: " + e.getMessage());
-            saveRecord(userMsg, "异常: " + e.getMessage(), "0s", false, "feishu", projectDir);
+            if (recordId != null) {
+                CodingRecordEntity entity = getRecordById(recordId);
+                if (entity != null) {
+                    entity.setEndTime(java.time.LocalDateTime.now()
+                            .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                    entity.setResponse("异常: " + e.getMessage());
+                    entity.setSuccess(false);
+                    entity.setElapsed("失败");
+                    updateRecord(entity);
+                }
+            }
         }
     }
 
@@ -484,8 +517,11 @@ public class FeishuCodingBotService {
 
     public Long saveRecord(String message, String response, String elapsed, boolean success, String source, String projectDir) {
         try {
+            String now = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
             CodingRecordEntity entity = new CodingRecordEntity();
-            entity.setTime(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+            entity.setTime(now);
+            entity.setStartTime(now);
+            entity.setAiEngine("pi");
             entity.setMessage(message.length() > 1000 ? message.substring(0, 1000) : message);
             entity.setResponse(response.length() > 5000 ? response.substring(0, 5000) : response);
             entity.setElapsed(elapsed);

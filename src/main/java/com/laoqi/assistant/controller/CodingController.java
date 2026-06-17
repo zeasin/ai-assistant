@@ -103,14 +103,20 @@ public class CodingController {
         debugExecutor.execute(() -> {
             try {
                 log.info("[编程AI] 后台排查开始: recordId={}", finalRecordId);
+                long startMs = System.currentTimeMillis();
                 CodePiService.CodePiResult result = codePiService.analyze(message, finalProjectDir, 1800);
+                long endMs = System.currentTimeMillis();
 
                 log.info("[编程AI] 后台排查完成: recordId={}, success={}, elapsed={}",
                         finalRecordId, result.isSuccess(), result.getElapsedStr());
 
-                // 3. 更新记录
+                // 3. 更新记录（含结束时间、用时秒数）
                 CodingRecordEntity entity = codingBotService.getRecordById(finalRecordId);
                 if (entity != null) {
+                    String endTime = java.time.LocalDateTime.now()
+                            .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+                    entity.setEndTime(endTime);
+                    entity.setDuration((int) ((endMs - startMs) / 1000));
                     if (result.isSuccess()) {
                         String output = result.getOutput();
                         if (output.length() > 5000) output = output.substring(0, 5000) + "\n\n...（截断）";
@@ -123,7 +129,8 @@ public class CodingController {
                     }
                     entity.setElapsed(result.getElapsedStr());
                     codingBotService.updateRecord(entity);
-                    log.info("[编程AI] 记录已更新: id={}, success={}", finalRecordId, entity.getSuccess());
+                    log.info("[编程AI] 记录已更新: id={}, success={}, duration={}s",
+                            finalRecordId, entity.getSuccess(), entity.getDuration());
                 }
 
                 logService.add("编程AI调试", result.isSuccess() ? "成功" : "失败",
@@ -133,6 +140,8 @@ public class CodingController {
                 log.error("[编程AI] 后台排查异常: recordId={}, err={}", finalRecordId, e.getMessage(), e);
                 CodingRecordEntity entity = codingBotService.getRecordById(finalRecordId);
                 if (entity != null) {
+                    entity.setEndTime(java.time.LocalDateTime.now()
+                            .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                     entity.setResponse("异常: " + e.getMessage());
                     entity.setSuccess(false);
                     entity.setElapsed("失败");
@@ -160,6 +169,8 @@ public class CodingController {
         result.put("response", entity.getResponse());
         result.put("elapsed", processing ? "" : entity.getElapsed());
         result.put("startTime", entity.getTime());
+        result.put("duration", processing ? null : entity.getDuration());
+        result.put("aiEngine", entity.getAiEngine());
         return result;
     }
 

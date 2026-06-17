@@ -10,6 +10,10 @@ public class CodingRecordEntity {
     @TableId(type = IdType.AUTO)
     private Long id;
     private String time;
+    private String startTime;
+    private String endTime;
+    private Integer duration; // 秒
+    private String aiEngine;
     private String message;
     private String response;
     private String elapsed;
@@ -21,6 +25,14 @@ public class CodingRecordEntity {
     public void setId(Long id) { this.id = id; }
     public String getTime() { return time; }
     public void setTime(String time) { this.time = time; }
+    public String getStartTime() { return startTime; }
+    public void setStartTime(String startTime) { this.startTime = startTime; }
+    public String getEndTime() { return endTime; }
+    public void setEndTime(String endTime) { this.endTime = endTime; }
+    public Integer getDuration() { return duration; }
+    public void setDuration(Integer duration) { this.duration = duration; }
+    public String getAiEngine() { return aiEngine; }
+    public void setAiEngine(String aiEngine) { this.aiEngine = aiEngine; }
     public String getMessage() { return message; }
     public void setMessage(String message) { this.message = message; }
     public String getResponse() { return response; }

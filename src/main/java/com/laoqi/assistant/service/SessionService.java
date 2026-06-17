@@ -121,6 +121,10 @@ public class SessionService {
                 CREATE TABLE IF NOT EXISTS coding_records (
                     id           INTEGER PRIMARY KEY AUTOINCREMENT,
                     time         TEXT NOT NULL,
+                    start_time   TEXT NOT NULL DEFAULT '',
+                    end_time     TEXT NOT NULL DEFAULT '',
+                    duration     INTEGER NOT NULL DEFAULT 0,
+                    ai_engine    TEXT NOT NULL DEFAULT 'pi',
                     message      TEXT NOT NULL,
                     response     TEXT NOT NULL DEFAULT '',
                     elapsed      TEXT NOT NULL DEFAULT '',
@@ -131,6 +135,11 @@ public class SessionService {
                 """);
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_coding_records_time ON coding_records(id DESC)");
             log.info("Table coding_records initialized");
+            // 迁移：补充新字段（兼容旧数据库）
+            try { stmt.execute("ALTER TABLE coding_records ADD COLUMN start_time TEXT NOT NULL DEFAULT ''"); } catch (Exception ignored) {}
+            try { stmt.execute("ALTER TABLE coding_records ADD COLUMN end_time TEXT NOT NULL DEFAULT ''"); } catch (Exception ignored) {}
+            try { stmt.execute("ALTER TABLE coding_records ADD COLUMN duration INTEGER NOT NULL DEFAULT 0"); } catch (Exception ignored) {}
+            try { stmt.execute("ALTER TABLE coding_records ADD COLUMN ai_engine TEXT NOT NULL DEFAULT 'pi'"); } catch (Exception ignored) {}
         } catch (SQLException e) {
             throw new RuntimeException("Failed to create new tables", e);
         }
