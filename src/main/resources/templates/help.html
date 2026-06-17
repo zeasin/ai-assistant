@@ -6,102 +6,161 @@
 </head>
 <body>
 <th:block layout:fragment="content">
-<div class="container py-4">
+<div class="help-layout">
 
-    <h1 class="mb-4">📖 AI 助理 v3.0 帮助</h1>
+    <div class="help-hero">
+        <h1>AI 助理 v3.0 帮助</h1>
+        <p class="text-muted" style="font-size:15px;">快速上手 · 功能指南 · 常见问题</p>
+    </div>
 
-    <section class="card mb-4">
-        <h2>🚀 快速开始</h2>
-        <p>AI 助理 v3.0 基于 <strong>Spring AI 2.0</strong>，直接调用 LLM API（如 DeepSeek），不再需要外部编排服务。</p>
+    <div class="help-grid">
+        <section class="help-card">
+            <div class="help-icon">🚀</div>
+            <h2>快速开始</h2>
+            <p>AI 助理 v3.0 基于 <strong>Spring AI 2.0</strong>，直接调用 LLM API，无需外部编排服务。</p>
+            <h3>前置依赖</h3>
+            <table class="table">
+                <tr><th>依赖</th><th>说明</th><th>必须</th></tr>
+                <tr><td>Java 17+</td><td>运行时</td><td>✅</td></tr>
+                <tr><td>LLM API Key</td><td>DeepSeek 等兼容 API</td><td>✅</td></tr>
+                <tr><td>Ollama</td><td>语义检索加速</td><td>🔘 可选</td></tr>
+            </table>
+            <h3>启动步骤</h3>
+            <pre># 配置 API Key（/config 页面或环境变量）
+# export DEEPSEEK_API_KEY=sk-xxxxx
 
-        <h3>✅ 前置依赖</h3>
-        <table class="table" style="width:auto;">
-            <tr><th>依赖</th><th>说明</th><th>是否必须</th></tr>
-            <tr><td>Java 17+</td><td>运行时</td><td>✅ 必须</td></tr>
-            <tr><td>Ollama</td><td>语义检索加速（可选）</td><td>🔘 可选</td></tr>
-            <tr><td>LLM API Key</td><td>DeepSeek 或其他兼容 API</td><td>✅ 必须</td></tr>
-        </table>
-
-        <h3>⚡ 启动步骤</h3>
-        <pre style="background:#1e1e2e;color:#cdd6f4;padding:16px;border-radius:8px;font-size:13px;line-height:1.6;overflow-x:auto;"># 1. 配置 LLM API Key（在 Web 界面 /config 页面设置，或设环境变量）
-#    DEEPSEEK_API_KEY=sk-xxxxx
-
-# 2. 启动应用
+# 启动应用
 java -jar target/ai-assistant-3.0.0.jar
 
-# 3. 访问 http://localhost:6790</pre>
+# 访问 http://localhost:6790</pre>
+            <p class="text-muted">先去 <a href="/config">/config</a> 配置笔记库根目录和 API Key。</p>
+        </section>
 
-        <p class="text-muted">🅰️ 启动后先去 <a href="/config">/config</a> 页面配置笔记库根目录和 LLM API Key。</p>
-    </section>
+        <section class="help-card">
+            <div class="help-icon">💬</div>
+            <h2>对话模块</h2>
+            <ul>
+                <li><strong>知识库对话</strong> — 结合笔记库历史和语义检索回答问题</li>
+                <li><strong>创作式对话</strong> — 开启新会话，AI 无历史上下文</li>
+                <li><strong>笔记操作</strong> — 让 AI 读/写笔记库文件</li>
+            </ul>
+        </section>
 
-    <section class="card mb-4">
-        <h2>💬 对话模块</h2>
-        <ul>
-            <li><strong>知识库对话</strong>（默认）：结合笔记库历史和语义检索回答问题</li>
-            <li><strong>创作式对话</strong>：开启新会话，AI 无历史上下文</li>
-            <li><strong>笔记操作</strong>：直接让 AI 读/写笔记库文件，如"帮我记录一条 BUG"</li>
-        </ul>
-    </section>
+        <section class="help-card">
+            <div class="help-icon">📊</div>
+            <h2>业务数据</h2>
+            <p>在笔记库中设置模块，每个模块可配置 JSON/CSV 数据文件，AI 自动分析给出洞察。</p>
+        </section>
 
-    <section class="card mb-4">
-        <h2>📊 模块（业务数据）</h2>
-        <p>在笔记库中设置模块，每个模块可配置数据文件（JSON/CSV），AI 自动分析数据给出洞察。</p>
-    </section>
+        <section class="help-card">
+            <div class="help-icon">📸</div>
+            <h2>图片识别</h2>
+            <p>利用 LLM 多模态能力分析图片。支持 PNG / JPG / GIF / WebP / BMP。</p>
+        </section>
 
-    <section class="card mb-4">
-        <h2>📸 图片识别</h2>
-        <p>利用 LLM 的多模态（Vision）能力分析笔记库中的图片。支持 PNG/JPG/GIF/WebP/BMP。</p>
-    </section>
+        <section class="help-card">
+            <div class="help-icon">☀️</div>
+            <h2>日报系统</h2>
+            <ul>
+                <li><strong>工作日 09:00</strong> — 自动生成综合日报</li>
+                <li><strong>工作日 18:00</strong> — 下班提醒推送飞书</li>
+                <li>日报存储在 <code>AI/综合日报/</code></li>
+            </ul>
+        </section>
 
-    <section class="card mb-4">
-        <h2>☀️ 日报系统</h2>
-        <ul>
-            <li><strong>工作日 09:00</strong>：自动生成综合日报（基于工作笔记 + 语义记忆）</li>
-            <li><strong>工作日 18:00</strong>：下班提醒推送到飞书</li>
-            <li>日报存储在 <code>AI/综合日报/</code> 目录</li>
-        </ul>
-    </section>
+        <section class="help-card">
+            <div class="help-icon">📡</div>
+            <h2>数据采集</h2>
+            <p>定时从指定 URL 采集数据，AI 分析提取为结构化 JSON，存入数据中心。</p>
+        </section>
 
-    <section class="card mb-4">
-        <h2>📡 采集器（数据收集）</h2>
-        <p>定时从指定 URL 采集数据，AI 分析提取为结构化 JSON，存入数据中心。</p>
-    </section>
+        <section class="help-card">
+            <div class="help-icon">🔧</div>
+            <h2>配置项</h2>
+            <p>所有配置在 <a href="/config">/config</a> 页面管理。</p>
+            <table class="table">
+                <tr><th>配置项</th><th>说明</th></tr>
+                <tr><td>笔记库根目录</td><td>所有业务数据的存放根目录</td></tr>
+                <tr><td>API Key</td><td>LLM API 密钥</td></tr>
+                <tr><td>飞书集成</td><td>Webhook URL 和应用凭证</td></tr>
+            </table>
+        </section>
 
-    <section class="card mb-4">
-        <h2>🔧 配置</h2>
-        <p>所有配置在 <a href="/config">/config</a> 页面管理，无需手动编辑文件。</p>
-        <table class="table">
-            <tr><th>配置项</th><th>说明</th></tr>
-            <tr><td>笔记库根目录</td><td>所有笔记、业务数据、日报等文件的存放目录</td></tr>
-            <tr><td>API Key</td><td>LLM API 密钥（DeepSeek 等）</td></tr>
-            <tr><td>飞书集成</td><td>Webhook URL 和应用凭证，用于消息推送</td></tr>
-            <tr><td>模块配置</td><td>业务数据模块的目录和文件定义</td></tr>
-        </table>
-    </section>
+        <section class="help-card">
+            <div class="help-icon">🆘</div>
+            <h2>常见问题</h2>
+            <table class="table">
+                <tr><th>问题</th><th>原因</th><th>解决</th></tr>
+                <tr><td>AI 回复"API Key 未配置"</td><td>未配置 API Key</td><td>在 /config 填写</td></tr>
+                <tr><td>AI 回复为空</td><td>超时或网络问题</td><td>检查网络，超时设为 600s</td></tr>
+                <tr><td>语义检索不可用</td><td>Ollama 未启动</td><td><code>ollama run nomic-embed-text</code></td></tr>
+            </table>
+        </section>
 
-    <section class="card mb-4">
-        <h2>🆘 常见问题</h2>
-        <table class="table">
-            <tr><th>问题</th><th>原因</th><th>解决</th></tr>
-            <tr><td>AI 回复"API Key 未配置"</td><td>未在 /config 填写 API Key</td><td>在配置页填写 LLM API Key</td></tr>
-            <tr><td>AI 回复为空</td><td>LLM 返回内容为空或超时</td><td>检查 API Key 和网络，超时可设为 600s</td></tr>
-            <tr><td>语义检索不可用</td><td>Ollama 未启动</td><td>启动 <code>ollama run nomic-embed-text</code></td></tr>
-        </table>
-    </section>
-
-    <section class="card mb-4">
-        <h2>🏗️ 技术架构</h2>
-        <ul>
-            <li><strong>Spring Boot 4.1</strong> + <strong>Spring AI 2.0</strong> + Java 17</li>
-            <li><strong>AI 引擎</strong>：Spring AI ChatClient 直连 LLM（DeepSeek API）</li>
-            <li><strong>工具编排</strong>：<code>@Tool</code> 注解 + ToolCallingAdvisor 自动管理多轮工具调用</li>
-            <li><strong>语义检索</strong>：Spring AI OllamaEmbeddingModel (nomic-embed-text)</li>
-            <li><strong>数据存储</strong>：SQLite (MyBatis-Plus) + JSON 文件</li>
-            <li><strong>前端</strong>：Thymeleaf 模板</li>
-        </ul>
-    </section>
+        <section class="help-card">
+            <div class="help-icon">🏗️</div>
+            <h2>技术架构</h2>
+            <ul>
+                <li><strong>Spring Boot 4.1</strong> + Spring AI 2.0 + Java 17</li>
+                <li><strong>AI 引擎</strong>：ChatClient 直连 LLM</li>
+                <li><strong>工具编排</strong>：<code>@Tool</code> + ToolCallingAdvisor</li>
+                <li><strong>语义检索</strong>：Ollama + nomic-embed-text</li>
+                <li><strong>存储</strong>：SQLite (MyBatis-Plus) + JSON</li>
+            </ul>
+        </section>
+    </div>
 
 </div>
-</th:block>
+
+<style>
+.help-layout {
+    max-width: 960px; margin: 0 auto; padding: 32px 24px;
+}
+.help-hero {
+    text-align: center; margin-bottom: 40px;
+}
+.help-hero h1 {
+    font-size: 28px; margin: 0 0 8px;
+}
+.help-grid {
+    display: flex; flex-direction: column; gap: 16px;
+}
+.help-card {
+    background: #fff; border: 1px solid #e1e3e6; border-radius: 12px;
+    padding: 20px; break-inside: avoid;
+}
+.help-card h2 {
+    font-size: 16px; margin: 0 0 10px; display: flex; align-items: center; gap: 6px;
+}
+.help-card h3 {
+    font-size: 13px; margin: 14px 0 6px; color: #5c5f66;
+}
+.help-card p, .help-card li {
+    font-size: 13px; line-height: 1.6; color: #333;
+}
+.help-card ul {
+    padding-left: 16px; margin: 6px 0;
+}
+.help-card ul li {
+    margin-bottom: 4px;
+}
+.help-card .table {
+    width: 100%; font-size: 12px; margin: 6px 0;
+}
+.help-card .table th {
+    background: #f5f5f7; white-space: nowrap;
+}
+.help-card .table td, .help-card .table th {
+    padding: 5px 8px;
+}
+.help-card pre {
+    background: #1e1e2e; color: #cdd6f4; padding: 12px; border-radius: 8px;
+    font-size: 12px; line-height: 1.6; overflow-x: auto; margin: 8px 0;
+}
+.help-icon {
+    font-size: 24px; margin-bottom: 4px;
+}
+
+</style>
 </body>
 </html>
