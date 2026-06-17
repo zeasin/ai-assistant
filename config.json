@@ -61,5 +61,11 @@
       "自媒体账号_码农老齐" : [ "账号ID", "平台", "名称", "粉丝", "总访问", "文章数", "更新日期", "粉丝更新日期" ]
     }
   },
+  "codingFeishuAppId" : "cli_aaa4a47442f8dbdd",
+  "codingFeishuAppSecret" : "7VJP46EnZD21fMlmrL698gqwWQqaWbU8",
+  "codingFeishuChatId" : "oc_c4c544141ccce40d9d5b4ba6160150c3",
+  "codingProjectDir" : "D:\\projects\\qihang-erp-pro",
+  "codingPiEnabled" : true,
+  "codingPiTimeout" : 300,
   "aiProvider" : "direct"
 }

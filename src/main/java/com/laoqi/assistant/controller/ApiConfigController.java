@@ -65,6 +65,26 @@ public class ApiConfigController {
         }
     }
 
+    @PostMapping("/api/config/coding")
+    public Map<String, Object> updateCoding(
+            @RequestParam(required = false, defaultValue = "") String appId,
+            @RequestParam(required = false, defaultValue = "") String appSecret,
+            @RequestParam(required = false, defaultValue = "") String chatId,
+            @RequestParam(required = false, defaultValue = "") String projectDir,
+            @RequestParam(required = false, defaultValue = "off") String enabled,
+            @RequestParam(required = false, defaultValue = "300") int timeout) {
+        Config cfg = configService.load();
+        cfg.setCodingFeishuAppId(appId);
+        cfg.setCodingFeishuAppSecret(appSecret);
+        cfg.setCodingFeishuChatId(chatId);
+        cfg.setCodingProjectDir(projectDir);
+        cfg.setCodingPiEnabled("on".equals(enabled));
+        cfg.setCodingPiTimeout(timeout > 0 ? timeout : 300);
+        configService.save(cfg);
+        logService.add("配置更新", "成功", "编程AI配置已更新");
+        return Map.of("ok", true);
+    }
+
     @PostMapping("/api/config/feishu")
     public Map<String, Object> updateFeishu(
             @RequestParam(required = false, defaultValue = "") String appId,

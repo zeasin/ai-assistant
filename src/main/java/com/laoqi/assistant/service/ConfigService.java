@@ -40,8 +40,26 @@ public class ConfigService {
         if (config.getLlmTimeout() <= 0) {
             config.setLlmTimeout(600);
         } else if (config.getLlmTimeout() <= 180) {
-            // 升级旧版默认值（180秒→600秒），日报生成大上下文需要更长时间
             config.setLlmTimeout(600);
+        }
+        // 编程AI 默认值
+        if (config.isCodingPiEnabled() == null) {
+            config.setCodingPiEnabled(false);
+        }
+        if (config.getCodingPiTimeout() == null || config.getCodingPiTimeout() <= 0) {
+            config.setCodingPiTimeout(300);
+        }
+        if (config.getCodingFeishuAppId() == null) {
+            config.setCodingFeishuAppId("");
+        }
+        if (config.getCodingFeishuAppSecret() == null) {
+            config.setCodingFeishuAppSecret("");
+        }
+        if (config.getCodingFeishuChatId() == null) {
+            config.setCodingFeishuChatId("");
+        }
+        if (config.getCodingProjectDir() == null) {
+            config.setCodingProjectDir("");
         }
     }
 

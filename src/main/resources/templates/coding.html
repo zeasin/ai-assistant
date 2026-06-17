@@ -1,0 +1,346 @@
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title layout:fragment="title">编程AI</title>
+    <style>
+        .coding-tabs { display:flex; gap:2px; margin-bottom:16px; background:#e8e8ed; border-radius:8px; padding:2px; }
+        .coding-tab { flex:1; padding:10px; text-align:center; border:none; background:transparent; border-radius:6px; font-size:14px; cursor:pointer; color:#5c5f66; transition:all .15s; }
+        .coding-tab:hover { color:#1a1b1e; }
+        .coding-tab.active { background:#fff; color:#7c5cfc; font-weight:600; box-shadow:0 1px 3px rgba(0,0,0,.1); }
+        .coding-panel { display:none; }
+        .coding-panel.active { display:block; }
+        .status-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin-bottom:16px; }
+        .status-card { background:#fff; border:1px solid #e1e3e6; border-radius:10px; padding:16px; text-align:center; }
+        .status-card .label { font-size:12px; color:#5c5f66; margin-bottom:6px; }
+        .status-card .value { font-size:20px; font-weight:600; }
+        .status-card .value.ok { color:#2b8a3e; }
+        .status-card .value.no { color:#e03131; }
+        .cfg-form { max-width:600px; }
+        .cfg-form .form-group { margin-bottom:16px; }
+        .cfg-form .form-group label { display:block; font-size:13px; font-weight:500; color:#5c5f66; margin-bottom:4px; }
+        .cfg-form .form-group input,.cfg-form .form-group select { width:100%; padding:10px 12px; border:1px solid #e1e3e6; border-radius:8px; font-size:14px; outline:none; box-sizing:border-box; }
+        .cfg-form .form-group input:focus,.cfg-form .form-group select:focus { border-color:#7c5cfc; }
+        .cfg-form .form-group .desc { font-size:12px; color:#909296; margin-top:4px; }
+        .record-item { padding:14px 16px; background:#f8f9fa; border-radius:8px; margin-bottom:10px; cursor:pointer; transition:background .15s; }
+        .record-item:hover { background:#eef2ff; }
+        .record-item .time { font-size:11px; color:#909296; margin-bottom:4px; }
+        .record-item .msg-preview { display:flex; gap:8px; align-items:flex-start; margin-bottom:2px; }
+        .record-item .msg-preview .label { font-size:11px; padding:2px 8px; border-radius:4px; white-space:nowrap; flex-shrink:0; margin-top:1px; }
+        .record-item .msg-preview .label.msg { background:#f3e8ff; color:#7b1fa2; }
+        .record-item .msg-preview .label.resp { background:#d3f9d8; color:#2b8a3e; }
+        .record-item .msg-preview .label.fail { background:#ffe0e0; color:#c92a2a; }
+        .record-item .msg-preview .text { font-size:13px; color:#1a1b1e; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+        .record-empty { text-align:center; color:#909296; padding:40px 0; font-size:14px; }
+        .help-section { max-width:700px; }
+        .help-section h3 { font-size:15px; margin:20px 0 10px; color:#1a1b1e; }
+        .help-section p,.help-section li { font-size:14px; line-height:1.8; color:#5c5f66; }
+        .help-section ul { padding-left:20px; }
+        .help-section .step { display:flex; gap:14px; margin-bottom:12px; padding:12px 16px; background:#f8f9fa; border-radius:8px; }
+        .help-section .step .num { width:28px; height:28px; background:#7c5cfc; color:#fff; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:600; flex-shrink:0; }
+        .help-section .step .content { flex:1; }
+        .help-section .step .content p { margin:0; }
+        .help-section blockquote { border-left:3px solid #7c5cfc; padding:10px 16px; margin:12px 0; background:#f8f9fa; border-radius:0 6px 6px 0; font-size:14px; color:#555; }
+        .help-section code { background:#f0edff; padding:2px 6px; border-radius:4px; font-size:13px; color:#5c3dcf; }
+        .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:100; justify-content:center; align-items:center; }
+        .modal-overlay.active { display:flex; }
+        .modal-box { background:#fff; border-radius:12px; max-width:720px; width:90%; max-height:80vh; display:flex; flex-direction:column; box-shadow:0 8px 30px rgba(0,0,0,.2); }
+        .modal-header { display:flex; justify-content:space-between; align-items:center; padding:16px 20px; border-bottom:1px solid #eee; }
+        .modal-header h3 { font-size:16px; }
+        .modal-close { background:none; border:none; font-size:22px; cursor:pointer; color:#999; padding:0 4px; }
+        .modal-close:hover { color:#333; }
+        .modal-body { padding:20px; overflow-y:auto; }
+        .modal-body .section { padding:12px 16px; border-radius:8px; margin-bottom:16px; white-space:pre-wrap; word-break:break-word; font-size:14px; line-height:1.7; }
+        .modal-body .section.user { background:#f3e8ff; }
+        .modal-body .section.ai { background:#e0f7fa; }
+        .modal-body .elapsed { font-size:12px; color:#909296; text-align:right; }
+    </style>
+</head>
+<body>
+<th:block layout:fragment="content">
+
+<div class="coding-tabs">
+    <button class="coding-tab active" onclick="switchTab('dashboard')">📊 概览</button>
+    <button class="coding-tab" onclick="switchTab('config')">⚙️ 配置</button>
+    <button class="coding-tab" onclick="switchTab('records')">📋 排查历史</button>
+    <button class="coding-tab" onclick="switchTab('help')">❓ 帮助</button>
+</div>
+
+<!-- 概览 -->
+<div class="coding-panel active" id="panel-dashboard">
+    <div class="card">
+        <h2>📡 状态</h2>
+        <div class="status-grid">
+            <div class="status-card">
+                <div class="label">编程机器人</div>
+                <div class="value" th:classappend="${connected} ? 'ok' : 'no'" th:text="${connected} ? '已连接' : '未连接'"></div>
+            </div>
+            <div class="status-card">
+                <div class="label">飞书 App</div>
+                <div class="value" th:classappend="${config.codingFeishuAppId != null and !config.codingFeishuAppId.isEmpty()} ? 'ok' : 'no'" th:text="${config.codingFeishuAppId != null and !config.codingFeishuAppId.isEmpty()} ? '已配置' : '未配置'"></div>
+            </div>
+            <div class="status-card">
+                <div class="label">项目目录</div>
+                <div class="value" th:classappend="${config.codingProjectDir != null and !config.codingProjectDir.isEmpty()} ? 'ok' : 'no'" th:text="${config.codingProjectDir != null and !config.codingProjectDir.isEmpty()} ? '已配置' : '未配置'" style="font-size:14px;"></div>
+            </div>
+            <div class="status-card">
+                <div class="label">Pi CLI</div>
+                <div class="value ok">就绪</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>💬 使用方式</h2>
+        <p style="font-size:14px;line-height:1.8;">
+            1️⃣ 在飞书群 <strong>@编程机器人</strong> 发送 bug 描述<br>
+            2️⃣ 机器人自动调用 <strong>Pi CLI</strong> 排查代码<br>
+            3️⃣ 排查结果以 <strong>卡片消息</strong> 回复到群中<br><br>
+            <span style="background:#f0edff;color:#5c3dcf;padding:2px 8px;border-radius:4px;font-size:12px;">示例</span>
+            <code style="background:#f5f5f5;padding:2px 6px;border-radius:4px;">登录页面报错 500，帮忙看看</code>
+        </p>
+    </div>
+
+    <div class="card">
+        <h2>📜 最近排查记录</h2>
+        <div th:if="${#lists.size(records) > 0}">
+            <div th:each="r : ${records}" class="record-item" th:onclick="'showRecord(' + ${rStat.index} + ')'">
+                <div class="time" th:text="${r.time}"></div>
+                <div class="msg-preview">
+                    <span class="label msg">📩</span>
+                    <span class="text" th:text="${#strings.abbreviate(r.message, 120)}"></span>
+                </div>
+                <div class="msg-preview">
+                    <span class="label" th:classappend="${r.success} ? 'resp' : 'fail'" th:text="${r.success} ? '✅' : '❌'"></span>
+                    <span class="text" th:text="${#strings.abbreviate(r.response, 200)}"></span>
+                </div>
+                <div style="font-size:11px;color:#909296;text-align:right;" th:text="'⏱ ' + ${r.elapsed}"></div>
+            </div>
+        </div>
+        <div th:if="${#lists.size(records) == 0}" class="record-empty">暂无排查记录</div>
+    </div>
+</div>
+
+<!-- 配置 -->
+<div class="coding-panel" id="panel-config">
+    <div class="card cfg-form">
+        <h2>⚙️ 编程AI 配置</h2>
+        <div class="text-muted mb-2">此配置独立于知识库机器人，用于编程 AI 专用的飞书应用。</div>
+        <div style="margin-bottom:16px;">
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;font-weight:500;">
+                <input type="checkbox" id="codingEnabled" th:checked="${config.codingPiEnabled}" style="width:18px;height:18px;cursor:pointer;">
+                启用编程机器人
+            </label>
+        </div>
+        <div class="form-group">
+            <label>App ID（应用 ID）</label>
+            <input type="text" id="codingAppId" th:value="${config.codingFeishuAppId}" placeholder="cli_xxxxxxxxxxxx">
+            <div class="desc">飞书开放平台应用的 App ID</div>
+        </div>
+        <div class="form-group">
+            <label>App Secret（应用密钥）</label>
+            <input type="password" id="codingAppSecret" th:value="${config.codingFeishuAppSecret}" placeholder="输入应用密钥">
+            <div class="desc">飞书开放平台应用的 App Secret</div>
+        </div>
+        <div class="form-group">
+            <label>群 Chat ID</label>
+            <input type="text" id="codingChatId" th:value="${config.codingFeishuChatId}" placeholder="oc_xxxxxxxxxxxx">
+            <div class="desc">飞书群聊的 chat_id</div>
+        </div>
+        <div class="form-group">
+            <label>项目目录</label>
+            <input type="text" id="codingProjectDir" th:value="${config.codingProjectDir}" placeholder="D:\projects\your-project" style="font-family:monospace;">
+            <div class="desc">pi CLI 排查代码时的工作目录（绝对路径）</div>
+        </div>
+        <div class="form-group">
+            <label>Pi CLI 超时（秒）</label>
+            <input type="number" id="codingTimeout" th:value="${config.codingPiTimeout != null ? config.codingPiTimeout : 300}" min="30" max="600">
+            <div class="desc">复杂问题可适当调大，建议 120-300 秒</div>
+        </div>
+        <div class="flex" style="gap:8px;margin-top:8px;">
+            <button class="btn btn-primary" onclick="saveCodingConfig()">💾 保存配置</button>
+            <button class="btn btn-secondary" onclick="testCoding()" id="testCodingBtn">📡 发送测试消息</button>
+            <span id="codingStatus" class="text-muted"></span>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>🔍 手动调试</h2>
+        <div class="text-muted mb-2">不经过飞书，直接调试 pi CLI 排查能力。</div>
+        <div style="margin-bottom:8px;">
+            <textarea id="debugMessage" rows="3" style="width:100%;padding:10px 12px;border:1px solid #e1e3e6;border-radius:8px;font-size:14px;outline:none;font-family:inherit;resize:vertical;box-sizing:border-box;" placeholder="输入要排查的问题描述..."></textarea>
+        </div>
+        <div class="flex" style="gap:8px;">
+            <button class="btn btn-secondary" onclick="runDebug()">▶ 执行排查</button>
+            <span id="debugStatus" class="text-muted"></span>
+        </div>
+        <div id="debugResult" style="display:none;margin-top:12px;padding:12px 16px;background:#1e1e2e;color:#cdd6f4;border-radius:8px;font-size:13px;line-height:1.6;white-space:pre-wrap;max-height:400px;overflow-y:auto;font-family:'SF Mono','Fira Code',monospace;"></div>
+    </div>
+</div>
+
+<!-- 排查历史 -->
+<div class="coding-panel" id="panel-records">
+    <div class="card">
+        <h2>📋 全部排查记录</h2>
+        <div th:if="${#lists.size(records) > 0}">
+            <div th:each="r : ${records}" class="record-item" th:onclick="'showRecord(' + ${rStat.index} + ')'">
+                <div class="time" th:text="${r.time}"></div>
+                <div class="msg-preview">
+                    <span class="label msg">📩</span>
+                    <span class="text" th:text="${#strings.abbreviate(r.message, 120)}"></span>
+                </div>
+                <div class="msg-preview">
+                    <span class="label" th:classappend="${r.success} ? 'resp' : 'fail'" th:text="${r.success} ? '✅' : '❌'"></span>
+                    <span class="text" th:text="${#strings.abbreviate(r.response, 200)}"></span>
+                </div>
+                <div style="font-size:11px;color:#909296;text-align:right;" th:text="'⏱ ' + ${r.elapsed}"></div>
+            </div>
+        </div>
+        <div th:if="${#lists.size(records) == 0}" class="record-empty">暂无排查记录</div>
+    </div>
+</div>
+
+<!-- 帮助 -->
+<div class="coding-panel" id="panel-help">
+    <div class="card help-section">
+        <h2>📖 关于编程AI</h2>
+        <p>编程AI 是一个基于 <strong>飞书机器人</strong> + <strong>Pi CLI</strong> 的代码自动排查工具。你只需在飞书群中 @编程机器人 描述 bug，机器人自动调用 Pi CLI 分析项目代码，定位问题并给出修复建议。</p>
+    </div>
+
+    <div class="card help-section">
+        <h2>🚀 快速开始</h2>
+        <div class="step"><div class="num">1</div><div class="content"><strong>创建飞书应用</strong><p>打开飞书开放平台 → 创建企业自建应用。将 App ID 和 App Secret 填入配置页。</p></div></div>
+        <div class="step"><div class="num">2</div><div class="content"><strong>配置应用权限</strong><p>在应用详情 → 权限管理 → 添加 <code>im:message</code> 和 <code>im:resource</code> 权限，发布后由管理员审批。</p></div></div>
+        <div class="step"><div class="num">3</div><div class="content"><strong>配置事件订阅</strong><p>在应用详情 → 事件订阅 → 添加 <code>im.message.receive_v1</code> 事件，推送方式选择 <strong>WebSocket</strong>。</p></div></div>
+        <div class="step"><div class="num">4</div><div class="content"><strong>启用机器人并发布</strong><p>在应用详情 → 机器人 → 启用机器人能力。发布后将机器人拉入目标群。</p></div></div>
+        <div class="step"><div class="num">5</div><div class="content"><strong>配置群 ID</strong><p>在配置页填入群 ID（chat_id），格式 <code>oc_xxxxxxxxxxxx</code>。</p></div></div>
+        <div class="step"><div class="num">6</div><div class="content"><strong>启动服务</strong><p>重启 AI 助理，编程机器人 WebSocket 自动连接。即可在飞书群中 @编程机器人 开始排查代码。</p></div></div>
+    </div>
+
+    <div class="card help-section">
+        <h2>💬 使用示例</h2>
+        <blockquote>@编程机器人 登录页面报错 500，帮忙看看</blockquote>
+        <blockquote>@编程机器人 订单列表查询超时，可能是什么原因？</blockquote>
+        <blockquote>@编程机器人 用户注册后收不到验证码邮件</blockquote>
+    </div>
+
+    <div class="card help-section">
+        <h2>❓ 常见问题</h2>
+        <h3>Q: 机器人没有回复？</h3>
+        <ol><li>确认 App ID/Secret 是否正确</li><li>确认已添加 <code>im:message</code> 权限并已发布</li><li>确认已添加 <code>im.message.receive_v1</code> 事件（WebSocket）</li><li>确认机器人已在群成员列表中</li></ol>
+        <h3>Q: 如何修改项目目录？</h3>
+        <p>在配置页面「项目目录」输入框中直接修改，保存后重启生效。</p>
+        <h3>Q: 排查结果太长被截断了？</h3>
+        <p>飞书卡片消息限制 8000 字符，超出部分会被自动截断。可优化问题描述范围。</p>
+    </div>
+</div>
+
+<!-- 弹窗 -->
+<div class="modal-overlay" id="modal" onclick="closeModal(event)">
+    <div class="modal-box" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <h3>💬 排查详情</h3>
+            <button class="modal-close" onclick="hideModal()">×</button>
+        </div>
+        <div class="modal-body">
+            <div style="margin-bottom:16px;">
+                <div style="font-size:12px;color:#909296;margin-bottom:4px;">📩 用户消息</div>
+                <div class="section user" id="modalMsg"></div>
+            </div>
+            <div style="margin-bottom:8px;">
+                <div style="font-size:12px;color:#909296;margin-bottom:4px;">✅ AI 回复</div>
+                <div class="section ai" id="modalResp"></div>
+            </div>
+            <div class="elapsed" id="modalElapsed"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+let records = [];
+
+async function loadRecords() {
+    try {
+        const res = await fetch('/coding/records?limit=50');
+        const data = await res.json();
+        if (data.ok) records = data.records;
+    } catch (e) { records = []; }
+}
+
+document.addEventListener('DOMContentLoaded', loadRecords);
+
+function switchTab(name) {
+    document.querySelectorAll('.coding-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.coding-panel').forEach(p => p.classList.remove('active'));
+    document.querySelector('.coding-tab[onclick*="' + name + '"]').classList.add('active');
+    document.getElementById('panel-' + name).classList.add('active');
+}
+
+function showRecord(i) {
+    const r = records[i];
+    if (!r) return;
+    document.getElementById('modalMsg').textContent = r.message;
+    document.getElementById('modalResp').innerHTML = marked.parse(r.response);
+    document.getElementById('modalElapsed').textContent = '⏱ ' + (r.elapsed || '');
+    document.getElementById('modal').classList.add('active');
+}
+
+function hideModal() { document.getElementById('modal').classList.remove('active'); }
+function closeModal(e) { if (e.target === e.currentTarget) hideModal(); }
+
+async function saveCodingConfig() {
+    const form = new FormData();
+    form.append('appId', document.getElementById('codingAppId').value.trim());
+    form.append('appSecret', document.getElementById('codingAppSecret').value.trim());
+    form.append('chatId', document.getElementById('codingChatId').value.trim());
+    form.append('projectDir', document.getElementById('codingProjectDir').value.trim());
+    form.append('enabled', document.getElementById('codingEnabled').checked ? 'on' : 'off');
+    form.append('timeout', parseInt(document.getElementById('codingTimeout').value) || 300);
+    const res = await fetch('/api/config/coding', { method: 'POST', body: form });
+    const data = await res.json();
+    const status = document.getElementById('codingStatus');
+    if (data.ok) { status.textContent = '✅ 已保存（重启生效）'; setTimeout(() => status.textContent = '', 4000); }
+    else { status.textContent = '❌ ' + (data.error || '保存失败'); }
+}
+
+async function testCoding() {
+    const btn = document.getElementById('testCodingBtn');
+    btn.disabled = true; btn.textContent = '⏳ 发送中...';
+    const res = await fetch('/coding/test', { method: 'POST' });
+    const data = await res.json();
+    btn.disabled = false; btn.textContent = '📡 发送测试消息';
+    const status = document.getElementById('codingStatus');
+    if (data.ok) { status.textContent = '✅ ' + (data.message || '已发送'); }
+    else { status.textContent = '❌ ' + (data.error || '发送失败'); }
+}
+
+async function runDebug() {
+    const msg = document.getElementById('debugMessage').value.trim();
+    if (!msg) { toast('请输入问题描述', 'error'); return; }
+    const btn = event.target;
+    btn.disabled = true; btn.textContent = '⏳ 执行中...';
+    document.getElementById('debugResult').style.display = 'none';
+    document.getElementById('debugStatus').textContent = '⏳ pi CLI 排查中...';
+    try {
+        const res = await fetch('/coding/debug', {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ message: msg })
+        });
+        const data = await res.json();
+        if (data.ok) {
+            document.getElementById('debugResult').textContent = data.result;
+            document.getElementById('debugResult').style.display = 'block';
+            document.getElementById('debugStatus').textContent = '✅ 完成（' + (data.elapsed || '') + '）';
+        } else {
+            document.getElementById('debugStatus').textContent = '❌ ' + (data.error || '失败');
+        }
+    } catch (e) {
+        document.getElementById('debugStatus').textContent = '❌ ' + e.message;
+    }
+    btn.disabled = false; btn.textContent = '▶ 执行排查';
+}
+</script>
+
+</th:block>
+</body>
+</html>
