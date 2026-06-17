@@ -30,17 +30,16 @@
     </div>
 
     <div class="chat-main">
-        <div style="padding:8px 16px;background:#f8f9fa;border-bottom:1px solid #e1e3e6;display:flex;align-items:center;gap:8px;font-size:12px;color:#666;">
+        <div class="chat-header">
             <span>AI 引擎：</span>
             <span th:if="${ai_provider == 'direct'}" style="background:#e6f7e6;color:#1a7a1a;padding:2px 8px;border-radius:4px;font-weight:600;">🧠 LLM 直连</span>
             <span th:unless="${ai_provider == 'direct'}" style="background:#e8f0fe;color:#1a73e8;padding:2px 8px;border-radius:4px;font-weight:600;">🔄 Opencode</span>
-
         </div>
-        <div style="flex:1;display:flex;flex-direction:column;margin:0;">
-            <div class="chat-box" id="chatBox">
-                <th:block th:if="${current != null and current.messages != null and #lists.size(current.messages) > 0}">
-                    <th:block th:each="m : ${current.messages}">
-                    <div class="chat-msg" th:classappend="${m.role}">
+
+        <div class="chat-box" id="chatBox">
+            <th:block th:if="${current != null and current.messages != null and #lists.size(current.messages) > 0}">
+                <th:block th:each="m : ${current.messages}">
+                <div class="chat-msg" th:classappend="${m.role}">
 <div class="header">
     <div class="avatar" th:if="${m.role == 'user'}" th:text="'👤'">👤</div>
                             <div class="label" th:text="${m.role == 'user' ? '你' : (m.mode == 'coding' ? '💻 编程AI' : '🤖 AI 助理')}">AI 助理</div>
@@ -48,34 +47,33 @@
                         <div class="bubble"><div class="text" th:attr="data-content=${m.content}"></div></div>
                     </div>
                     </th:block>
-                </th:block>
-                <th:block th:unless="${current != null and current.messages != null and #lists.size(current.messages) > 0}">
-                <div class="chat-msg ai">
-                    <div class="header">
-                        <div class="label" th:text="${current_mode == 'coding' ? '💻 编程AI' : '🤖 AI 助理'}">AI 助理</div>
-                    </div>
-                    <div class="bubble"><div class="text" id="welcomeMsg">你好！有什么我可以帮你的？我可以读取你的笔记库来回答关于项目、客户、计划等方面的问题。</div></div>
+            </th:block>
+            <th:block th:unless="${current != null and current.messages != null and #lists.size(current.messages) > 0}">
+            <div class="chat-msg ai">
+                <div class="header">
+                    <div class="label" th:text="${current_mode == 'coding' ? '💻 编程AI' : '🤖 AI 助理'}">AI 助理</div>
                 </div>
-                </th:block>
+                <div class="bubble"><div class="text" id="welcomeMsg">你好！有什么我可以帮你的？我可以读取你的笔记库来回答关于项目、客户、计划等方面的问题。</div></div>
             </div>
+            </th:block>
+        </div>
 
-            <div class="chat-input" style="border-top:1px solid #e1e3e6;padding-top:12px;margin-top:12px;flex-wrap:wrap;gap:8px;">
-                <div style="display:flex;gap:8px;width:100%;">
-                    <input type="text" id="chatInput" placeholder="输入你的问题..."
-                           onkeydown="if(event.key==='Enter') sendMessage()" style="flex:1;">
-                    <select id="modelSelector" style="padding:10px 12px;border:1px solid #e1e3e6;border-radius:8px;background:#fff;font-size:13px;outline:none;max-width:180px;">
-                        <th:block th:if="${#lists.size(llm_models) > 0}">
-                            <th:block th:each="m : ${llm_models}">
-                                <option th:value="${m.name}" th:selected="${m.name == default_model}" th:text="${m.name}">模型</option>
-                            </th:block>
-                        </th:block>
-                        <th:block th:unless="${#lists.size(llm_models) > 0}">
-                            <option value="">默认模型</option>
-                        </th:block>
-                    </select>
-                    <button class="btn btn-primary" id="chatBtn" onclick="sendMessage()">发送</button>
-                </div>
+        <div class="chat-input">
+            <div class="input-wrapper">
+                <input type="text" id="chatInput" placeholder="给 AI助理 发送消息..."
+                       onkeydown="if(event.key==='Enter') sendMessage()">
+                <button class="btn-send" id="chatBtn" onclick="sendMessage()" title="发送">↑</button>
             </div>
+            <select id="modelSelector">
+                <th:block th:if="${#lists.size(llm_models) > 0}">
+                    <th:block th:each="m : ${llm_models}">
+                        <option th:value="${m.name}" th:selected="${m.name == default_model}" th:text="${m.name}">模型</option>
+                    </th:block>
+                </th:block>
+                <th:block th:unless="${#lists.size(llm_models) > 0}">
+                    <option value="">默认模型</option>
+                </th:block>
+            </select>
         </div>
     </div>
 </div>
@@ -120,7 +118,12 @@
     font-size: 13px; color: #909296; text-align: center; padding: 24px 16px;
 }
 .chat-main {
-    flex: 1; display: flex; flex-direction: column; overflow: hidden;
+    flex: 1; display: flex; flex-direction: column; overflow: hidden; height: 100%;
+}
+.chat-header {
+    padding: 8px 16px; background: #f8f9fa; border-bottom: 1px solid #e1e3e6;
+    display: flex; align-items: center; gap: 8px; font-size: 12px; color: #666;
+    flex-shrink: 0;
 }
 .chat-mode-bar {
     background: #fff; border-bottom: 1px solid #e1e3e6;
@@ -142,6 +145,8 @@
 }
 .chat-box {
     flex: 1; overflow-y: auto; padding: 16px; min-height: 0;
+    border: none !important; border-radius: 0 !important;
+    max-height: none !important; margin-bottom: 0 !important;
 }
 .chat-box .chat-msg { margin-bottom: 16px; max-width: 90%; }
 .chat-box .chat-msg.user { margin-left: auto; background: transparent; border: none; }
@@ -190,12 +195,39 @@ liao'    height: 0; opacity: 0; overflow: hidden;
     margin: 2px 0 4px; display: inline-block;
 }
 .chat-toggle:hover { text-decoration: underline; }
-.chat-input { display: flex; gap: 8px; padding: 0 16px 16px; }
-.chat-input input {
-    flex: 1; padding: 10px 14px; border: 1px solid #e1e3e6; border-radius: 8px;
-    background: #fff; color: #1a1b1e; font-size: 14px; outline: none;
+.chat-input { padding: 12px 16px !important; background: #fff !important; border-top: 1px solid #e1e3e6 !important; flex-shrink: 0 !important; display: flex !important; align-items: center !important; gap: 12px !important; }
+.chat-input .input-wrapper {
+    flex: 1; display: flex; align-items: center; gap: 8px;
+    padding: 6px; border: 1px solid #e1e3e6; border-radius: 24px;
+    background: #f8f9fa;
 }
-.chat-input input:focus { border-color: #7c5cfc; }
+.chat-input .input-btn {
+    padding: 6px 14px; border: none; border-radius: 14px;
+    background: transparent; color: #666; font-size: 12px; cursor: pointer;
+    transition: all .2s; white-space: nowrap;
+}
+.chat-input .input-btn:hover { background: #e8e8ec; }
+.chat-input .input-btn.active { background: #e6f4ff; color: #1a73e8; }
+.chat-input input {
+    flex: 1; padding: 10px 14px; border: none; border-radius: 16px;
+    background: transparent; color: #1a1b1e; font-size: 14px; outline: none;
+}
+.chat-input input::placeholder { color: #909296; }
+.chat-input input:focus { background: #fff; }
+.chat-input .btn-send {
+    width: 36px; height: 36px; border: none; border-radius: 50%;
+    background: #7c5cfc; color: #fff; font-size: 16px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all .2s; flex-shrink: 0;
+}
+.chat-input .btn-send:hover { background: #6a4cf5; }
+.chat-input .btn-send:disabled { background: #ccc; cursor: not-allowed; }
+.chat-input select {
+    padding: 8px 12px; border: 1px solid #e1e3e6; border-radius: 8px;
+    background: #fff; font-size: 13px; outline: none; max-width: 180px;
+    flex-shrink: 0;
+}
+.chat-input select:focus { border-color: #7c5cfc; }
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -250,7 +282,7 @@ async function sendMessage() {
     if (!msg) return;
 
     input.value = '';
-    btn.disabled = true; btn.textContent = '⏳ 思考中...';
+    btn.disabled = true; btn.innerHTML = '⏳';
     replyText = '';
 
     const isNewSession = !currentSessionId;
@@ -345,7 +377,7 @@ async function sendMessage() {
         document.getElementById('reply-' + aiMsgId).innerHTML = '<span style="color:#ff6b6b;">❌ 网络错误</span>';
     }
 
-    btn.disabled = false; btn.textContent = '发送';
+    btn.disabled = false; btn.innerHTML = '↑';
 }
 
 function switchSession(id) {
