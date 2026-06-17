@@ -1,82 +1,61 @@
-# AI 助理 (AI Assistant)
+# AI 助理 v3.0
 
-> **用你的数据，做你的 AI 助理。**
+> **自带 AI 大脑，零外部依赖。**
 
-一个开源的个人 AI 助理——不做业务，只做连接。连接你的数据（笔记库）和 AI 大脑（OpenCode），通过 IM（飞书当前 / 钉钉、企业微信即将支持）推送结果，让 AI 基于你的数据做你想让它做的事。
+一个完全自包含的 AI 助理应用——基于 Spring AI 2.0，原生集成 LLM 推理、工具编排、语义检索。不再需要任何外部 AI 编排服务，你的数据就在你的笔记库里。
 
 ---
 
 ## 🌟 核心定位
 
-| 你 | 我（AI 助理） | AI 大脑        |
-|----|--------------|--------------|
-| 提供数据（笔记库、业务数据） | 数据接入 + 统一接口 + 任务调度 | OpenCode（当前）/ ClaudeCode（即将支持） |
-| 定义规则（Prompt / 配置） | 规则组装 + 上下文管理 | 推理 + 生成 + 决策 |
-| 接收结果（IM + Web UI） | 结果分发 + 多端推送 |              |
+| 你 | AI 助理 |
+|----|---------|
+| 提供数据（笔记库 → JSON / Markdown） | 直接理解、分析、操作你的数据 |
+| 定义规则（Prompt / 配置页） | Spring AI 2.0 原生推理 + `@Tool` 工具编排 |
+| 接收结果（Web UI / 飞书） | 多端推送，定时任务 |
 
-**一句话**：AI 助理是你和 AI 大脑之间的「桥梁」——数据是你的，规则是你的，AI 只是执行者。
+**一句话**：AI 助理就是大脑本身，不是桥梁。
 
 ---
 
 ## ✨ 为什么需要它
 
-| 痛点 | 传统方案 | AI 助理 |
+| 痛点 | 传统方案 | AI 助理 v3.0 |
 |------|---------|-------------|
 | **数据隐私** | SaaS 把数据传到云端 | 数据在你自己的笔记库，不出域 |
-| **规则绑定** | 每个工具一套规则，不可复用 | 规则可配置、可导出、可分享 |
-| **场景单一** | 一个工具只做一件事 | 一个框架，无限场景（日报、会议、CRM、运营...） |
-| **黑盒操作** | 不知道 AI 怎么想的 | 代码开源，逻辑透明，可修改 |
-
-
-
-## 💡 使用场景
-
-**核心流程：飞书对话 → AI 大脑分析 → 获取结果**
-
-```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│   你        │     │  AI 大脑    │     │   结果      │
-│  飞书对话   │────▶│  分析处理   │────▶│  返回飞书   │
-└─────────────┘     └─────────────┘     └─────────────┘
-                          │
-                          ▼
-                   ┌─────────────┐
-                   │  笔记库     │
-                   │  查询/写入  │
-                   └─────────────┘
-```
-
-**典型场景：**
-
-| 场景 | 你发送 | AI 大脑做什么 | 结果返回 |
-|------|--------|--------------|---------|
-| **查数据** | "帮我查一下张三的跟进记录" | 读取笔记库 → 搜索 → 总结 | 飞书推送张三的跟进历史 |
-| **记数据** | "记录：今天拜访了 ABC 公司，意向度 80%" | 解析自然语言 → 写入 JSON | 飞书确认"已记录" |
-| **更新数据** | "把张三的阶段改为已签约" | 找到记录 → 更新字段 → 保存 | 飞书确认"已更新" |
-| **生成报告** | "生成本周周报" | 汇总一周数据 → AI 撰写 | 飞书推送周报 + 保存到笔记库 |
-| **智能提醒** | 定时触发 | 分析数据 → 识别需跟进项 | 飞书推送提醒 |
-
-**一句话总结：**
-> 你只用飞书聊天，AI 大脑帮你查数据、记数据、更新数据、生成报告——所有数据都存在你的笔记库，AI 只是执行者。
+| **架构笨重** | 需要额外启动 AI 编排服务 | 零外部服务，`java -jar` 即可 |
+| **响应慢** | HTTP 中转多次 | Java 直调 LLM API，最低延迟 |
+| **场景单一** | 一个工具只做一件事 | 一个框架，无限场景（日报、CRM、运营...） |
 
 ---
 
-## 📂 数据来源说明
+## 💡 使用场景
 
-> **核心原则：除了配置和日志，所有数据都来自你的笔记库。**
+```
+┌────────────────────────────────────────────┐
+│            AI 助理 (Spring Boot 4.1)       │
+│  ┌─────────┐  ┌──────────┐  ┌───────────┐ │
+│  │ Chat    │  │ @Tool    │  │ Embedding  │ │
+│  │ Client  │◄─┤ 编排     │◄─┤ Model     │ │
+│  │ DeepSeek│  │ NoteTools│  │ Ollama    │ │
+│  └────┬────┘  └────┬─────┘  └─────┬─────┘ │
+│       │            │              │        │
+│       └───────┬────┘              │        │
+│               │                   │        │
+│         ┌─────▼─────────┐        │        │
+│         │ 你的笔记库     │◄───────┘        │
+│         │ JSON / Markdown│                 │
+│         └───────────────┘                  │
+└────────────────────────────────────────────┘
+```
 
-| 数据类型 | 存储位置 | 说明 |
-|---------|---------|------|
-| **业务数据** | 笔记库（用户指定目录） | 客户数据、运营数据、项目数据等，全部来自用户自己的笔记库 |
-| **聊天历史** | SQLite（`memory.db`） | Web + 飞书对话记录存储在 SQLite，首次启动自动从 JSON 迁移 |
-| **配置信息** | 配置目录（`config.json`） | 飞书凭据、路径配置等，仅包含连接信息，不含业务数据 |
-| **操作日志** | 配置目录（`assistant_log.json`） | 仅记录操作时间、类型，不含业务数据 |
-
-**这意味着：**
-- ✅ 你的业务数据**永远留在你的笔记库**，程序不会复制、上传或迁移
-- ✅ 聊天记录迁移到 SQLite，查询更快、按 mode/session 过滤更灵活
-- ✅ 即使删除程序，你的笔记库数据**毫发无损**，仍在笔记库中
-- ✅ 换一台机器，只需重新配置笔记库路径和拷贝 `memory.db`，数据**无需重新迁移**
+| 场景 | 你发送 | AI 做什么 | 结果 |
+|------|--------|----------|------|
+| **查数据** | "查张三的跟进记录" | 读笔记库 JSON → 搜索 → 总结 | 回复 |
+| **记数据** | "记录：拜访 ABC 公司" | 解析自然语言 → 写入 JSON | 确认 |
+| **更新数据** | "张三改为已签约" | 找到记录 → 更新 → 保存 | 确认 |
+| **生成报告** | "生成本周周报" | 汇总数据 → @Tool 读文件 → AI 撰写 | 推送+保存 |
+| **图片分析** | "分析这张截图" | 多模态识别 → 解读 → 总结 | 回复 |
 
 ---
 
@@ -88,251 +67,117 @@
 |------|------|------|
 | JDK | 17+ | |
 | Maven | 3.8+ | |
-| AI 大脑 | OpenCode（当前） | 两个 serve 实例：14096（知识库）/ 14099（编程） |
-| Ollama | 可选 | 用于语义检索加速，安装后自动启用 |
+| Ollama | **可选** | 语义检索加速 (nomic-embed-text) |
+| LLM API Key | DeepSeek 或其他兼容 API | 配置页 / 环境变量 |
 
-### 一键启动
+### 启动
 
 ```bash
-# 1. 启动 AI 大脑（当前支持 OpenCode，即将支持 ClaudeCode）
-opencode serve --port 14096
-
-# 2. 编译
+# 1. 编译
 mvn package -q
 
-# 3. 启动
-java -jar target/ai-assistant-2.0.0.jar
+# 2. 启动
+java -jar target/ai-assistant-3.0.0.jar
 
-# 4. 访问
-# Web UI: http://localhost:6790
-# Health: http://localhost:6790/health
+# 3. 访问 http://localhost:6790
+# 4. 进入 /config 配置 LLM API Key + 笔记库根目录
 ```
 
-> 💡 **小白用户提示**：如果觉得命令行麻烦，关注后续发布的「一键安装包」版本。
+> 💡 **零外部服务**：不需要启动任何 opencode/claude-code 进程。
 
-### 首次配置
+### 环境变量（可选，优先级高于 Web 配置）
 
-访问 `http://localhost:6790/config`，设置：
-
-1. **笔记库根目录** — 你的个人数据存放位置
-2. **数据目录** — 客户数据、运营数据等子目录
-3. **IM 通道**（可选）— 飞书（当前）/ 钉钉、企业微信（即将支持）
-4. **AI 规则** — 定义你的 Prompt 模板
-
----
-
-## 📦 当前能力
-
-| 能力 | 说明 |
-|------|------|
-| **AI 对话** | Web 聊天界面 + 飞书消息，SSE 流式输出，无限等待 |
-| **双模式 AI** | 默认走知识库（笔记库），`/code ` 前缀触发编程 AI，互不干扰 |
-| **飞书集成** | WebSocket 长连接实时接收消息，私聊/群聊均支持，自动按模式保存聊天上下文 |
-| **聊天记录持久化** | SQLite 存储，MyBatis-Plus 操作，自动从旧 JSON 迁移 |
-| **数据看板** | 客户看板、运营看板，JSON 文件驱动，动态表格 |
-| **数据编辑器** | 通用 JSON 数据在线编辑（增删改查） |
-| **定时任务** | 日报、周报、提醒（可自定义） |
-| **配置管理** | Web UI 配置所有参数，无需改代码 |
-| **提示词管理** | 独立页面动态编辑 AI 提示词，支持重置默认 |
-| **笔记库浏览** | 文件/目录树浏览 |
-
----
-
-## 📌 版本说明
-
-| 版本 | 目标用户 | 特点 |
-|------|---------|------|
-| **开源版**（当前） | 开发者 / 技术用户 | 灵活、可定制、自己部署 |
-| **商业版**（规划中） | 普通白领 | 开箱即用、零配置、场景模板 |
-
-> 💡 开源版适合喜欢折腾的技术用户，商业版未来推出，适合想要"拿来就用"的普通用户。
-
-```
-                        ┌─────────────────────────────────────────┐
-                        │              AI 助理                      │
-                        │         Spring Boot + Java 17            │
-                        ├─────────────────────────────────────────┤
-                        │                                         │
-  ┌──────────────┐     │  ┌──────────┐  ┌──────────┐  ┌────────┐ │
-  │  数据源      │────►│  │ Controller│◄─►│ Service  │◄─►│ Model  │ │
-  │  (笔记库)    │     │  │  15个    │  │  15个    │  │        │ │
-  ├──────────────┤     │  └────┬─────┘  └────┬─────┘  └────────┘ │
-  │  飞书（当前） │────►│       │             │                   │
-  ├──────────────┤     │       │             ▼                   │
-  │  邮件/日历   │────►│       │   ┌──────────────────────┐      │
-  │  (未来扩展)  │     │       │   │  数据库 Service 层    │      │
-  │              │     │       │   │  (service.db)        │      │
-  │              │     │       │   │  仿 IService 模式    │      │
-  │              │     │       │   └──────────┬───────────┘      │
-  │              │     │       │              │                  │
-  └──────────────┘     │       │     ┌────────▼────────┐         │
-                        │       │     │  MyBatis-Plus   │         │
-                        │       │     │  Mapper 接口    │         │
-                        │       │     └────────┬────────┘         │
-                        │       │              │                  │
-                        │       │     ┌────────▼────────┐         │
-                        │       │     │  SQLite          │         │
-                        │       │     │  (memory.db)     │         │
-                        │       │     │  聊天记录        │         │
-                        │       │     └─────────────────┘         │
-                        │       │                                  │
-                        │  ┌────▼────────────────────────────┐    │
-                        │  │   统一数据接口层                  │    │
-                        │  │   /api/data/*                   │    │
-                        │  │   JSON 文件 CRUD                │    │
-                        │  └───────────┬─────────────────────┘    │
-                        │              │                           │
-                        │              ▼                           │
-                        │  ┌────────────────────────┐              │
-                        │  │   规则组装层            │              │
-                        │  │   Prompt 模板 + 上下文   │              │
-                        │  └───────────┬────────────┘              │
-                        │              │                           │
-                        └──────────────┼───────────────────────────┘
-                                       │
-                          ┌────────────┼────────────┐
-                          │            │            │
-                   ┌──────▼─────┐ ┌───▼────┐ ┌────▼─────┐
-                   │ AI 大脑    │ │ IM 通道 │ │  Web UI  │
-                   │ OpenCode   │ │ 推送   │ │  6790    │
-                   │ (当前)     │ │        │ │          │
-                   │ ClaudeCode │ │        │ │          │
-                   │ (即将支持) │ │        │ │          │
-                   └────────────┘ └────────┘ └──────────┘
-```
-
-### 核心设计原则
-
-1. **数据优先存笔记库** — 知识数据优先存笔记库，Java 程序非必要不保存数据。聊天记录属于操作日志而非知识，不混入笔记库以免污染知识库准确性，SQLite 是合理归宿。
-2. **数据分层** — 聊天记录存 SQLite（操作日志），业务数据存笔记库 JSON（知识）
-3. **规则可配** — 所有业务逻辑通过配置文件定义，无硬编码
-4. **接口统一** — `/api/data/*` 提供通用的 JSON 数据 CRUD
-5. **AI 可换** — AI 大脑通过接口层接入，可替换为任何 LLM
-6. **IM 可换** — IM 通道通过接口层接入，支持飞书（当前）/ 钉钉、企业微信（即将支持）
-7. **前端轻量** — Thymeleaf + 原生 JS，无前端框架依赖
-
----
-
-## 🔌 扩展指南
-
-### 添加新的数据源
-
-只需实现一个 `Service` + 一个 `Controller`：
-
-```java
-// 1. 数据服务
-@Service
-public class DingTalkService {
-    public List<Map<String, Object>> loadData() { ... }
-}
-
-// 2. API 接口
-@RestController
-@RequestMapping("/api/dingtalk")
-public class DingTalkController {
-    @GetMapping("/data")
-    public ResponseEntity<?> getData() { ... }
-}
-```
-
-### 添加新的场景
-
-只需在 `SchedulerService` 中添加定时任务：
-
-```java
-@Scheduled(cron = "0 0 9 * * MON-FRI")
-public void dailyMeetingSummary() {
-    // 读取会议数据 → 组装 Prompt → 调用 AI → 推送结果
-}
-```
-
-### 自定义 AI 规则
-
-在 `config.json` 中配置：
-
-```json
-{
-  "aiRules": {
-    "dailyReport": {
-      "prompt": "根据以下数据生成日报...",
-      "sources": ["客户数据", "项目数据"],
-      "format": "markdown"
-    }
-  }
-}
+```bash
+export DEEPSEEK_API_KEY=sk-xxxxx
+export LLM_BASE_URL=https://api.deepseek.com
+export LLM_MODEL=deepseek-chat
 ```
 
 ---
 
-## 📂 项目结构
+## 📂 数据存储
 
-```
-ai-assistant/
-├── src/main/java/com/laoqi/assistant/
-│   ├── AssistantApplication.java        # 启动入口
-│   ├── entity/                          # MyBatis-Plus 实体
-│   │   ├── ChatSessionEntity.java       # Web 聊天会话
-│   │   ├── ChatMessageEntity.java       # Web 聊天消息
-│   │   ├── FeishuSessionEntity.java     # 飞书会话
-│   │   └── FeishuMessageEntity.java     # 飞书消息
-│   ├── mapper/                          # MyBatis-Plus Mapper
-│   ├── service/
-│   │   ├── db/                          # 数据库 Service 层
-│   │   │   ├── ChatSessionDbService.java
-│   │   │   ├── ChatMessageDbService.java
-│   │   │   ├── FeishuSessionDbService.java
-│   │   │   └── FeishuMessageDbService.java
-│   │   ├── OpenCodeService.java         # AI 服务客户端 (opencode serve)
-│   │   ├── ChatSessionService.java      # Web 对话管理
-│   │   ├── FeishuChatSessionService.java # 飞书对话管理
-│   │   ├── FeishuService.java           # 飞书消息推送
-│   │   ├── FeishuLongConnectionService.java # 飞书长连接
-│   │   ├── ReportService.java           # 日报生成 (基于 opencode)
-│   │   ├── SchedulerService.java        # 定时任务
-│   │   ├── ConfigService.java           # 配置管理
-│   │   ├── MediaDataCollectorService.java # CSDN/知乎数据采集
-│   │   └── ...
-│   ├── controller/                      # 18 个控制器
-│   ├── model/                           # 数据模型 (POJO)
-│   └── util/                            # 工具类
-├── src/main/resources/
-│   ├── templates/                       # 16 个 Thymeleaf 模板
-│   └── application.yml                  # Spring Boot 配置
-├── config.json                          # 运行时配置
-└── pom.xml
-```
+> **核心原则：除了配置和日志，所有数据都来自你的笔记库。**
+
+| 数据类型 | 存储位置 | 说明 |
+|---------|---------|------|
+| **业务数据** | 笔记库（用户指定目录） | JSON / Markdown，全部在用户自己的文件系统中 |
+| **聊天历史** | SQLite (`memory.db`) | 操作日志级别，不混入知识库 |
+| **配置信息** | 配置目录 (`config.json`) | 笔记库路径、LLM 配置、飞书凭据等 |
+| **操作日志** | 配置目录 (`assistant_log.json`) | 仅操作时间、类型，不含业务数据 |
 
 ---
 
-## 📊 技术栈
+## 🔧 技术栈
 
 | 类别 | 技术 |
 |------|------|
-| **后端** | Java 17 + Spring Boot 3.3.13 |
+| **后端** | Java 17 + Spring Boot 4.1.0 |
+| **AI 框架** | Spring AI 2.0.0 (ChatClient + `@Tool` + ToolCallingAdvisor) |
+| **LLM** | DeepSeek API (兼容 OpenAI 格式) |
+| **嵌入模型** | Spring AI Ollama (nomic-embed-text，可选) |
 | **ORM** | MyBatis-Plus 3.5.16 |
-| **数据库** | SQLite（聊天记录）+ JSON 文件（业务数据） |
-| **前端** | Thymeleaf + 原生 JS（无框架） |
-| **AI 大脑** | OpenCode（当前） |
-| **IM 集成** | 飞书 OpenAPI + WebSocket（当前）/ 钉钉、企业微信（即将支持） |
-| **语义检索** | LangChain4j + Ollama（可选） |
+| **数据库** | SQLite (聊天记录) + JSON/Markdown (业务数据) |
+| **前端** | Thymeleaf + 原生 JS |
+| **IM 集成** | 飞书 Webhook + WebSocket |
 
 ---
 
-## 🤝 贡献指南
+## ✨ v3.0 新架构
 
-欢迎贡献！你可以：
+v2.x 依赖两个 `opencode serve` 进程完成 AI 推理和编排，v3.0 完全去掉了这一切：
 
-- 📝 **分享规则模板** — 日报模板、周报模板、会议总结模板...
-- 🔌 **添加数据源适配器** — 钉钉、企业微信、邮件、日历...
-- 🎨 **改进 UI/UX** — 前端页面优化
-- 🐛 **报告 Bug** — 提交 Issue
-
----
-
-## 📄 许可证
-
-MIT License — 自由使用、修改、分发。
+| 对比 | v2.x | v3.0 |
+|------|------|------|
+| 外部 AI 服务 | 需要 opencode serve x2 | **零依赖** |
+| 工具编排 | opencode 的 tool-use | **`@Tool` 注解 + ToolCallingAdvisor** |
+| LLM 调用 | 裸 HTTP 拼接 JSON | **ChatClient 流式 API** |
+| 嵌入模型 | LangChain4j Ollama | **Spring AI OllamaEmbeddingModel** |
+| 启动步骤 | 3 步（先启 opencode） | **1 步（java -jar）** |
+| 代码质量 | 手写 ReAct 300 行 | **声明式 40 行** |
 
 ---
 
-> **你的数据，你的规则，你的 AI 助理。**
+## 🏗️ 项目结构
+
+```
+src/main/java/com/laoqi/assistant/
+├── AssistantApplication.java        # 启动入口
+├── config/
+│   ├── AppConfig.java               # @ConfigurationProperties(prefix="app")
+│   └── PortHealthChecker.java       # Ollama 健康检测（仅语义检索用）
+├── controller/                      # 控制器层
+├── service/
+│   ├── LlmService.java              # Spring AI ChatClient 封装
+│   ├── NoteAssistantService.java    # ChatClient + @Tool 工具编排
+│   ├── NoteTools.java               # @Tool 注解声明式工具
+│   ├── SessionService.java          # 统一会话管理 + 语义检索
+│   ├── OllamaEmbeddingService.java  # Spring AI Ollama 嵌入
+│   ├── ConfigService.java           # 配置管理
+│   ├── ReportService.java           # 日报生成
+│   ├── FeishuService.java           # 飞书消息推送
+│   ├── FeishuLongConnectionService.java # 飞书长连接
+│   └── ...
+├── entity/                          # MyBatis-Plus 实体
+├── mapper/                          # MyBatis-Plus Mapper
+├── model/                           # POJO 模型
+├── collector/                       # 数据采集
+└── util/                            # 工具类
+
+src/main/resources/
+├── application.yml                  # Spring Boot 配置
+└── templates/                       # Thymeleaf 页面模板
+```
+
+---
+
+## 📊 版本
+
+| 版本 | 状态 | AI 引擎 | 外部依赖 |
+|------|------|---------|---------|
+| **v3.0** | **当前** | Spring AI 2.0 (DeepSeek) | 零依赖 |
+| v2.x | 旧版 | opencode serve | 需启动两个外部进程 |
+
+---
+
+> **自带 AI 大脑，不连任何外部服务。**

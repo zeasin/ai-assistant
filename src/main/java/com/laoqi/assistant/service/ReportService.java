@@ -23,7 +23,6 @@ public class ReportService {
     private final AppConfig appConfig;
     private final FeishuService feishuService;
     private final LogService logService;
-    private final OpenCodeService openCodeService;
     private final LlmService llmService;
     private final ConfigService configService;
 
@@ -33,13 +32,12 @@ public class ReportService {
 
     public ReportService(AppConfig appConfig,
                           FeishuService feishuService,
-                          LogService logService, OpenCodeService openCodeService,
+                          LogService logService,
                           LlmService llmService,
                           ConfigService configService) {
         this.appConfig = appConfig;
         this.feishuService = feishuService;
         this.logService = logService;
-        this.openCodeService = openCodeService;
         this.llmService = llmService;
         this.configService = configService;
     }
@@ -93,37 +91,20 @@ public class ReportService {
             prompt = prompt.replace("{date}", TimeUtil.todayStr());
             prompt = prompt.replace("{weekday}", TimeUtil.weekdayCn(TimeUtil.now()));
 
-            var config = configService.load();
-            boolean useDirectLlm = "direct".equals(config.getAiProvider());
-
             String report;
-            if (useDirectLlm) {
-                if (!llmService.isAvailable()) {
-                    result.error = "LLM API Key 未配置";
-                    latestReport = "";
-                    latestError = result.error;
-                    return result;
-                }
-                // 收集笔记库上下文，让 LLM 有内容可分析
-                String context = collectNoteContext();
-                String fullPrompt = prompt;
-                if (context != null && !context.isEmpty()) {
-                    fullPrompt += "\n\n以下是我的工作笔记和记忆文件内容，请基于这些内容生成日报：\n\n" + context;
-                }
-                report = llmService.chat("你是一个日报生成助手，根据工作笔记生成综合日报。请用中文回复。", fullPrompt);
-            } else {
-                if (!openCodeService.isHealthy()) {
-                    result.error = "opencode serve 未启动";
-                    latestReport = "";
-                    latestError = result.error;
-                    return result;
-                }
-                String sessionId = openCodeService.findIdleSession();
-                if (sessionId == null) {
-                    sessionId = openCodeService.createSession("综合日报");
-                }
-                report = openCodeService.sendMessage(sessionId, prompt);
+            if (!llmService.isAvailable()) {
+                result.error = "LLM API Key 未配置";
+                latestReport = "";
+                latestError = result.error;
+                return result;
             }
+            // 收集笔记库上下文
+            String context = collectNoteContext();
+            String fullPrompt = prompt;
+            if (context != null && !context.isEmpty()) {
+                fullPrompt += "\n\n以下是我的工作笔记和记忆文件内容，请基于这些内容生成日报：\n\n" + context;
+            }
+            report = llmService.chat("你是一个日报生成助手，根据工作笔记生成综合日报。请用中文回复。", fullPrompt);
 
             if (report != null && !report.isEmpty()) {
                 result.report = report;

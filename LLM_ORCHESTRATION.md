@@ -92,7 +92,7 @@ String answer = model.generate(
 
 ### 为什么需要
 
-现有 `assistant-v2` 的 `SessionService` 已经在 SQLite 里管理会话历史了。你有两个选择：
+现有 `assistant-v3` 的 `SessionService` 已经在 SQLite 里管理会话历史了。你有两个选择：
 
 | 方案 | 做法 | 适合 |
 |------|------|------|

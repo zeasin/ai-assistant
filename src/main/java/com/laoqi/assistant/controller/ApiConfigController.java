@@ -130,13 +130,13 @@ public class ApiConfigController {
 
     @PostMapping("/api/config/ai-provider")
     public Map<String, Object> updateAiProvider(@RequestParam String provider) {
-        if (!"opencode".equals(provider) && !"direct".equals(provider)) {
-            return Map.of("ok", false, "error", "无效的 provider: " + provider + "，仅支持 opencode / direct");
+        if (!"direct".equals(provider)) {
+            return Map.of("ok", false, "error", "v3.0 仅支持 direct 模式（opencode 已移除）");
         }
         Config cfg = configService.load();
         cfg.setAiProvider(provider);
         configService.save(cfg);
-        logService.add("配置更新", "成功", "AI 引擎切换为: " + provider);
+        logService.add("配置更新", "成功", "AI 引擎已固定为 direct");
         return Map.of("ok", true, "provider", provider);
     }
 

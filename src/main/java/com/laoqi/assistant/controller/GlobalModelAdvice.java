@@ -1,7 +1,6 @@
 package com.laoqi.assistant.controller;
 
 import com.laoqi.assistant.config.AppConfig;
-import com.laoqi.assistant.config.PortHealthChecker;
 import com.laoqi.assistant.model.ModuleDefinition;
 import com.laoqi.assistant.service.ConfigService;
 import com.laoqi.assistant.service.ModuleService;
@@ -32,16 +31,6 @@ public class GlobalModelAdvice {
     @ModelAttribute("requestURI")
     public String requestURI(HttpServletRequest request) {
         return request.getRequestURI();
-    }
-
-    @ModelAttribute("notesRunning")
-    public boolean notesRunning() {
-        return PortHealthChecker.notesRunning;
-    }
-
-    @ModelAttribute("notesPort")
-    public int notesPort() {
-        return appConfig.getNotesPort();
     }
 
     @ModelAttribute("keyLabels")

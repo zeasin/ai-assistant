@@ -7,6 +7,7 @@ import com.laoqi.assistant.model.ChatSession;
 import com.laoqi.assistant.model.ChatSession.ChatMessage;
 import com.laoqi.assistant.service.db.MessageDbService;
 import com.laoqi.assistant.service.db.SessionDbService;
+import com.laoqi.assistant.util.TimeUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -52,6 +53,20 @@ public class ChatSessionService {
         return data;
     }
 
+    public ChatSession createSession(String title, String mode) {
+        String id = java.util.UUID.randomUUID().toString().substring(0, 8);
+        SessionEntity se = new SessionEntity();
+        String now = TimeUtil.nowStr();
+        se.setId(id);
+        se.setSource("web");
+        se.setTitle(title);
+        se.setMode(mode);
+        se.setCreatedAt(now);
+        se.setUpdatedAt(now);
+        sessionDbService.save(se);
+        return toModel(se);
+    }
+
     public void save(SessionsData data) {
         messageDbService.getBaseMapper().delete(
                 new QueryWrapper<MessageEntity>().eq("source", "web"));
@@ -91,6 +106,16 @@ public class ChatSessionService {
 
     public void deleteSession(String sessionId) {
         sessionService.deleteSession(sessionId);
+    }
+
+    public void clearSession(String mode) {
+        List<SessionEntity> sessions = sessionDbService.list(
+                new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<SessionEntity>()
+                        .eq("source", "web")
+                        .eq("mode", mode));
+        for (SessionEntity se : sessions) {
+            sessionService.deleteSession(se.getId());
+        }
     }
 
     public ChatSession getSession(String sessionId) {

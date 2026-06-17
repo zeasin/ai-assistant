@@ -30,7 +30,6 @@ public class FeishuLongConnectionService {
     private static final Logger log = LoggerFactory.getLogger(FeishuLongConnectionService.class);
 
     private final ConfigService configService;
-    private final OpenCodeService openCodeService;
     private final LlmService llmService;
     private final NoteAssistantService noteAssistantService;
     private final LogService logService;
@@ -42,14 +41,12 @@ public class FeishuLongConnectionService {
     private final Set<String> processedMessages = ConcurrentHashMap.newKeySet();
 
     public FeishuLongConnectionService(ConfigService configService,
-                                        OpenCodeService openCodeService,
                                         LlmService llmService,
                                         NoteAssistantService noteAssistantService,
                                         LogService logService,
                                         FeishuChatSessionService feishuChatSessionService,
                                         AppConfig appConfig) {
         this.configService = configService;
-        this.openCodeService = openCodeService;
         this.llmService = llmService;
         this.noteAssistantService = noteAssistantService;
         this.logService = logService;
@@ -222,66 +219,17 @@ public class FeishuLongConnectionService {
     private String processMessage(String text, String userKey) {
         try {
             log.info("[飞书长连接] 处理普通消息");
-            var config = configService.load();
-            boolean useDirectLlm = "direct".equals(config.getAiProvider());
-
-            if (useDirectLlm) {
-                log.info("[飞书长连接] 使用 LLM 直连模式");
-                if (!llmService.isAvailable()) {
-                    return "⚠️ LLM API Key 未配置，请在配置页填写";
-                }
-                // 判断是否需要工具编排
-                if (noteAssistantService.needsOrchestration(text)) {
-                    log.info("[飞书长连接] 需要工具编排，转 NoteAssistant");
-                    return processNoteAssistant(text, userKey);
-                }
-                return processNormalMessageDirect(text, userKey);
+            if (!llmService.isAvailable()) {
+                return "⚠️ LLM API Key 未配置，请在配置页填写";
             }
-
-            // 旧模式：走 opencode
-            if (!openCodeService.isHealthy()) {
-                log.warn("[飞书长连接] AI 服务(14096)未启动");
-                return "⚠️ AI 服务未启动，请先启动 14096 端口的 opencode 服务";
-            }
-            return processNormalMessage(text, userKey);
+            // 用 NoteAssistantService（含工具编排），AI 自动决定是否使用工具
+            return processNoteAssistant(text, userKey);
 
         } catch (Exception e) {
             log.error("[飞书长连接] 处理消息失败: {}", e.getMessage(), e);
             logService.add("飞书消息", "处理失败", e.getMessage());
             return "❌ 处理失败: " + e.getMessage();
         }
-    }
-
-    private String processNormalMessage(String text, String userKey) {
-        // 旧模式：走 opencode
-        feishuChatSessionService.saveMessage(userKey, "user", text, "knowledge");
-        Exception lastError = null;
-        for (int attempt = 0; attempt < 2; attempt++) {
-            try {
-                String sessionId = openCodeService.createSession("飞书-" + userKey);
-                String context = feishuChatSessionService.buildHistoryContext(userKey, "knowledge", text);
-                StringBuilder fullText = new StringBuilder();
-                if (context != null) {
-                    log.info("[飞书长连接] 恢复知识库历史上下文");
-                    fullText.append(context).append("\n\n---\n\n");
-                }
-                fullText.append("用户最新消息:\n").append(text);
-
-                log.info("[飞书长连接] 发送给 AI: {}", fullText);
-                String reply = openCodeService.sendMessage(sessionId, fullText.toString());
-                log.info("[飞书长连接] AI 回复长度: {}", reply != null ? reply.length() : 0);
-
-                feishuChatSessionService.saveMessage(userKey, "assistant", reply, "knowledge");
-                return reply;
-
-            } catch (Exception e) {
-                log.warn("[飞书长连接] 处理普通消息失败(第{}次): {}", attempt + 1, e.getMessage());
-                lastError = e;
-            }
-        }
-        log.error("[飞书长连接] 处理普通消息失败", lastError);
-        logService.add("飞书消息", "处理失败", lastError.getMessage());
-        return "❌ 处理失败: " + lastError.getMessage();
     }
 
     private String processNoteAssistant(String text, String userKey) {

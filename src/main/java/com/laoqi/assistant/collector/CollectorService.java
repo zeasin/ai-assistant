@@ -8,7 +8,6 @@ import com.laoqi.assistant.collector.model.CollectorTask;
 import com.laoqi.assistant.service.ConfigService;
 import com.laoqi.assistant.service.LlmService;
 import com.laoqi.assistant.service.LogService;
-import com.laoqi.assistant.service.OpenCodeService;
 import com.laoqi.assistant.datacenter.DataSetService;
 import com.laoqi.assistant.util.FileUtil;
 import com.laoqi.assistant.util.TimeUtil;
@@ -33,7 +32,6 @@ public class CollectorService {
     private static final int MAX_LOG_ENTRIES = 100;
     private static final int MAX_RESULT_ENTRIES = 50;
 
-    private final OpenCodeService openCodeService;
     private final LlmService llmService;
     private final LogService logService;
     private final ConfigService configService;
@@ -43,19 +41,15 @@ public class CollectorService {
     private final Map<String, List<CollectorLog>> taskLogs = new ConcurrentHashMap<>();
     private final Map<String, List<CollectorResult>> taskResults = new ConcurrentHashMap<>();
 
-    public CollectorService(OpenCodeService openCodeService, LlmService llmService,
+    public CollectorService(LlmService llmService,
                            LogService logService, ConfigService configService,
                            DataSetService dataSetService) {
-        this.openCodeService = openCodeService;
         this.llmService = llmService;
         this.logService = logService;
         this.configService = configService;
         this.dataSetService = dataSetService;
     }
 
-    private boolean isDirectMode() {
-        return "direct".equals(configService.load().getAiProvider());
-    }
 
     @PostConstruct
     public void init() {
@@ -351,21 +345,10 @@ public class CollectorService {
             }
 
             String rawResponse;
-            if (isDirectMode()) {
-                if (!llmService.isAvailable()) {
-                    throw new RuntimeException("LLM API Key 未配置");
-                }
-                rawResponse = llmService.chat("你是一个数据采集助手。请严格按要求的格式输出JSON数据。", prompt);
-            } else {
-                if (!openCodeService.isHealthy()) {
-                    throw new RuntimeException("opencode serve is not running");
-                }
-                String sessionId = openCodeService.findIdleSession();
-                if (sessionId == null) {
-                    sessionId = openCodeService.createSession(task.getName());
-                }
-                rawResponse = openCodeService.sendMessage(sessionId, prompt);
+            if (!llmService.isAvailable()) {
+                throw new RuntimeException("LLM API Key 未配置");
             }
+            rawResponse = llmService.chat("你是一个数据采集助手。请严格按要求的格式输出JSON数据。", prompt);
 
             String parsedData = parseResponse(rawResponse);
 
@@ -419,21 +402,10 @@ public class CollectorService {
             }
 
             String rawResponse;
-            if (isDirectMode()) {
-                if (!llmService.isAvailable()) {
-                    throw new RuntimeException("LLM API Key 未配置");
-                }
-                rawResponse = llmService.chat("你是一个数据采集助手。请严格按要求的格式输出JSON数据。", prompt);
-            } else {
-                if (!openCodeService.isHealthy()) {
-                    throw new RuntimeException("opencode serve is not running");
-                }
-                String sessionId = openCodeService.findIdleSession();
-                if (sessionId == null) {
-                    sessionId = openCodeService.createSession(task.getName());
-                }
-                rawResponse = openCodeService.sendMessage(sessionId, prompt);
+            if (!llmService.isAvailable()) {
+                throw new RuntimeException("LLM API Key 未配置");
             }
+            rawResponse = llmService.chat("你是一个数据采集助手。请严格按要求的格式输出JSON数据。", prompt);
 
             String parsedData = parseResponse(rawResponse);
 

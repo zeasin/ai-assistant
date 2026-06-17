@@ -4,11 +4,9 @@ import com.laoqi.assistant.config.AppConfig;
 import com.laoqi.assistant.service.ConfigService;
 import com.laoqi.assistant.service.LlmService;
 import com.laoqi.assistant.service.LogService;
-import com.laoqi.assistant.service.OpenCodeService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -28,22 +26,15 @@ public class ImageRecognitionController {
 
     private final AppConfig appConfig;
     private final ConfigService configService;
-    private final OpenCodeService openCodeService;
     private final LlmService llmService;
     private final LogService logService;
 
     public ImageRecognitionController(AppConfig appConfig, ConfigService configService,
-                                       OpenCodeService openCodeService, LlmService llmService,
-                                       LogService logService) {
+                                       LlmService llmService, LogService logService) {
         this.appConfig = appConfig;
         this.configService = configService;
-        this.openCodeService = openCodeService;
         this.llmService = llmService;
         this.logService = logService;
-    }
-
-    private boolean isDirectMode() {
-        return "direct".equals(configService.load().getAiProvider());
     }
 
     @GetMapping
@@ -143,19 +134,10 @@ public class ImageRecognitionController {
             String userPrompt = (prompt == null || prompt.trim().isEmpty())
                     ? "请详细分析这张图片的内容" : prompt;
 
-            String reply;
-            if (isDirectMode()) {
-                if (!llmService.isAvailable()) {
-                    return Map.of("ok", false, "error", "LLM API Key 未配置");
-                }
-                reply = llmService.chatWithImage("你是一个图片分析助手，请用中文回答。", userPrompt, base64Image, imageType);
-            } else {
-                if (!openCodeService.isHealthy()) {
-                    return Map.of("ok", false, "error", "AI 服务未启动");
-                }
-                String sessionId = openCodeService.createSession("img-" + System.currentTimeMillis());
-                reply = openCodeService.sendMessageWithImage(sessionId, userPrompt, base64Image, imageType);
+            if (!llmService.isAvailable()) {
+                return Map.of("ok", false, "error", "LLM API Key 未配置");
             }
+            String reply = llmService.chatWithImage("你是一个图片分析助手，请用中文回答。", userPrompt, base64Image, imageType);
 
             String imageUrl = "data:" + imageType + ";base64," + base64Image;
             String result = (reply != null && !reply.isEmpty()) ? reply : "(AI 未返回结果)";
@@ -185,19 +167,10 @@ public class ImageRecognitionController {
             String imageType = guessImageType(file.getFileName().toString().toLowerCase());
             String base64Image = Base64.getEncoder().encodeToString(imageBytes);
 
-            String reply;
-            if (isDirectMode()) {
-                if (!llmService.isAvailable()) {
-                    return Map.of("ok", false, "error", "LLM API Key 未配置");
-                }
-                reply = llmService.chatWithImage("你是一个图片分析助手，请用中文回答。", prompt, base64Image, imageType);
-            } else {
-                if (!openCodeService.isHealthy()) {
-                    return Map.of("ok", false, "error", "AI 服务未启动");
-                }
-                String sessionId = openCodeService.createSession("img-" + System.currentTimeMillis());
-                reply = openCodeService.sendMessageWithImage(sessionId, prompt, base64Image, imageType);
+            if (!llmService.isAvailable()) {
+                return Map.of("ok", false, "error", "LLM API Key 未配置");
             }
+            String reply = llmService.chatWithImage("你是一个图片分析助手，请用中文回答。", prompt, base64Image, imageType);
 
             String imageUrl = "/image-recognition/thumb?path=" + java.net.URLEncoder.encode(filePath, "UTF-8");
             String result = (reply != null && !reply.isEmpty()) ? reply : "(AI 未返回结果)";

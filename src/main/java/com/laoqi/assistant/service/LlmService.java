@@ -1,39 +1,58 @@
 package com.laoqi.assistant.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.SystemMessage;
+import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.deepseek.api.DeepSeekApi;
+import org.springframework.ai.deepseek.DeepSeekChatModel;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.stereotype.Service;
+import org.springframework.util.MimeTypeUtils;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.List;
+import java.util.Map;
 
 /**
- * 直连 LLM API（兼容 OpenAI 格式），不走 opencode serve。
- * 支持任意兼容 OpenAI Chat Completions 接口的提供商：
- * DeepSeek、商汤日日新、阿里通义、百度千帆、智谱、OpenAI 等。
- * 配置读取统一委托给 LlmConfigResolver，消除与 NoteAssistantService 的重复。
+ * 直连 LLM API — v3.0 基于 Spring AI 2.0 ChatClient。
+ *
+ * █████████████████████████████████████████████████████████████
+ * 底层使用 Spring AI 的 DeepSeekChatModel / DeepSeekApi，
+ * 但它是**通用的 OpenAI 兼容客户端**，并非只支持 DeepSeek。
+ *
+ * 任何提供 OpenAI 兼容 API 的厂商均可使用：
+ *   - DeepSeek     → https://api.deepseek.com
+ *   - 商汤 SenseNova → https://token.sensenova.cn/v1
+ *   - 智谱 GLM     → https://open.bigmodel.cn/api/paas/v4
+ *   等等
+ *
+ * 在 /config 页面配置 baseUrl + apiKey + model 即可切换。
+ * █████████████████████████████████████████████████████████████
+ *
+ * 方法签名与之前一致（chat/chatWithImage/isAvailable），调用方无需改动。
+ * config 来源统一委托给 LlmConfigResolver。
  */
 @Service
 public class LlmService {
 
     private static final Logger log = LoggerFactory.getLogger(LlmService.class);
-    private static final ObjectMapper mapper = new ObjectMapper();
 
     private final LlmConfigResolver configResolver;
-    private final HttpClient httpClient;
+    private final Object configLock = new Object();
+
+    // 懒初始化，config 变更时重建
+    private volatile ChatClient chatClient;
+    private volatile String cachedConfigKey = "";
 
     public LlmService(LlmConfigResolver configResolver) {
         this.configResolver = configResolver;
-        this.httpClient = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(15))
-                .version(HttpClient.Version.HTTP_1_1)
-                .build();
     }
+
+    // ========== 公共 API（保持签名不变） ==========
 
     /**
      * 检查 LLM 直连是否可用（API Key 已配置）
@@ -43,157 +62,121 @@ public class LlmService {
     }
 
     /**
-     * 同步调用 LLM，返回完整回复文本
+     * 同步调用 LLM（system + user），返回完整回复文本
      */
-    public String chat(String systemPrompt, String userMessage) throws Exception {
-        List<Map<String, String>> messages = new ArrayList<>();
-        if (systemPrompt != null && !systemPrompt.isEmpty()) {
-            messages.add(Map.of("role", "system", "content", systemPrompt));
-        }
-        messages.add(Map.of("role", "user", "content", userMessage));
-
-        return chat(messages);
-    }
-
-    /**
-     * 同步调用 LLM，返回完整回复文本
-     */
-    public String chat(List<Map<String, String>> messages) throws Exception {
-        String apiKey = configResolver.resolveApiKey();
-        if (apiKey == null || apiKey.isEmpty()) {
+    public String chat(String systemPrompt, String userMessage) {
+        ChatClient client = getOrCreateClient();
+        if (client == null) {
             throw new IllegalStateException("LLM API Key 未配置，请在配置页填写，或设置环境变量 LLM_API_KEY / DEEPSEEK_API_KEY");
         }
-
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("model", configResolver.resolveModel());
-        body.put("messages", messages);
-        body.put("temperature", 0.7);
-        body.put("stream", false);
-
-        String jsonBody = mapper.writeValueAsString(body);
-
-        String baseUrl = configResolver.resolveBaseUrl();
-        // 确保不以 / 结尾
-        if (baseUrl.endsWith("/")) {
-            baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
-        }
-        String apiUrl = baseUrl + "/chat/completions";
-        log.debug("[llm] 请求 URL: {}", apiUrl);
-
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(apiUrl))
-                .header("Content-Type", "application/json")
-                .header("Authorization", "Bearer " + apiKey)
-                .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
-                .timeout(Duration.ofSeconds(configResolver.resolveTimeout()))
-                .build();
-
-        long start = System.currentTimeMillis();
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        long elapsed = System.currentTimeMillis() - start;
-
-        if (response.statusCode() != 200) {
-            log.error("LLM API 错误: status={} body={}", response.statusCode(), response.body());
-            throw new RuntimeException("LLM API 返回错误 " + response.statusCode() + ": " + response.body());
-        }
-
-        @SuppressWarnings("unchecked")
-        Map<String, Object> json = mapper.readValue(response.body(), Map.class);
-        @SuppressWarnings("unchecked")
-        List<Map<String, Object>> choices = (List<Map<String, Object>>) json.get("choices");
-
-        if (choices == null || choices.isEmpty()) {
-            log.warn("LLM 返回空 choices: {}", response.body());
-            return "";
-        }
-
-        @SuppressWarnings("unchecked")
-        Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
-        String content = message != null ? (String) message.get("content") : "";
-
-        // Token 统计
-        Map<String, Object> usage = (Map<String, Object>) json.get("usage");
-        if (usage != null) {
-            log.info("[llm] 模型={} 耗时={}ms token={}",
-                    configResolver.resolveModel(), elapsed, usage);
-        } else {
-            log.info("[llm] 模型={} 耗时={}ms", configResolver.resolveModel(), elapsed);
-        }
-
-        return content != null ? content : "";
+        return client.prompt()
+                .system(systemPrompt != null ? systemPrompt : "")
+                .user(userMessage)
+                .call()
+                .content();
     }
 
     /**
-     * 同步调用 LLM（图片识别），支持 OpenAI/Dify 兼容的 vision API 格式。
-     * content 以多模态数组发送：text + image_url
+     * 同步调用 LLM（多轮消息列表），返回完整回复文本
      */
-    public String chatWithImage(String systemPrompt, String userMessage, String base64Image, String imageType) throws Exception {
-        String apiKey = configResolver.resolveApiKey();
-        if (apiKey == null || apiKey.isEmpty()) {
+    public String chat(List<Map<String, String>> messages) {
+        ChatClient client = getOrCreateClient();
+        if (client == null) {
             throw new IllegalStateException("LLM API Key 未配置，请在配置页填写");
         }
 
-        // 构建多模态 content 数组
-        List<Object> contentParts = new ArrayList<>();
-        contentParts.add(Map.of("type", "text", "text", userMessage));
-
-        String dataUrl = "data:" + (imageType != null ? imageType : "image/jpeg") + ";base64," + base64Image;
-        contentParts.add(Map.of("type", "image_url", "image_url", Map.of("url", dataUrl)));
-
-        // 构建 messages
-        List<Map<String, Object>> messages = new ArrayList<>();
-        if (systemPrompt != null && !systemPrompt.isEmpty()) {
-            messages.add(Map.of("role", "system", "content", systemPrompt));
+        List<Message> springMessages = new ArrayList<>();
+        for (Map<String, String> msg : messages) {
+            String role = msg.getOrDefault("role", "user");
+            String content = msg.getOrDefault("content", "");
+            switch (role) {
+                case "system" -> springMessages.add(new SystemMessage(content));
+                case "user" -> springMessages.add(new UserMessage(content));
+                case "assistant" -> springMessages.add(new org.springframework.ai.chat.messages.AssistantMessage(content));
+                default -> springMessages.add(new UserMessage(content));
+            }
         }
-        messages.add(Map.of("role", "user", "content", contentParts));
 
-        // 构建请求体
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("model", configResolver.resolveModel());
-        body.put("messages", messages);
-        body.put("temperature", 0.7);
-        body.put("stream", false);
+        return client.prompt()
+                .messages(springMessages)
+                .call()
+                .content();
+    }
 
-        String jsonBody = mapper.writeValueAsString(body);
+    /**
+     * 同步调用 LLM（图片识别），支持多模态 vision API
+     */
+    public String chatWithImage(String systemPrompt, String userMessage, String base64Image, String imageType) {
+        ChatClient client = getOrCreateClient();
+        if (client == null) {
+            throw new IllegalStateException("LLM API Key 未配置，请在配置页填写");
+        }
 
+        String mediaType = (imageType != null && !imageType.isEmpty()) ? imageType : "image/jpeg";
+        byte[] imageBytes = Base64.getDecoder().decode(base64Image);
+
+        return client.prompt()
+                .system(systemPrompt != null ? systemPrompt : "")
+                .user(u -> u.text(userMessage)
+                        .media(MimeTypeUtils.parseMimeType(mediaType),
+                                new ByteArrayResource(imageBytes)))
+                .call()
+                .content();
+    }
+
+    // ========== 内部方法（ChatClient 懒初始化 + 自动重建） ==========
+
+    private ChatClient getOrCreateClient() {
+        if (!isAvailable()) return null;
+
+        String currentKey = buildConfigKey();
+        if (chatClient == null || !currentKey.equals(cachedConfigKey)) {
+            synchronized (configLock) {
+                String keyAfterLock = buildConfigKey();
+                if (chatClient == null || !keyAfterLock.equals(cachedConfigKey)) {
+                    chatClient = createChatClient();
+                    cachedConfigKey = keyAfterLock;
+                    log.info("ChatClient 已重建 (model={})", configResolver.resolveModel());
+                }
+            }
+        }
+        return chatClient;
+    }
+
+    private String buildConfigKey() {
+        return configResolver.resolveBaseUrl() + "|"
+                + configResolver.resolveModel() + "|"
+                + configResolver.resolveApiKey().hashCode();
+    }
+
+    private ChatClient createChatClient() {
+        String apiKey = configResolver.resolveApiKey();
         String baseUrl = configResolver.resolveBaseUrl();
+        String model = configResolver.resolveModel();
+
         if (baseUrl.endsWith("/")) {
             baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
         }
-        String apiUrl = baseUrl + "/chat/completions";
 
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(apiUrl))
-                .header("Content-Type", "application/json")
-                .header("Authorization", "Bearer " + apiKey)
-                .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
-                .timeout(Duration.ofSeconds(configResolver.resolveTimeout()))
+        // Spring AI DeepSeekChatModel — 底层是 OpenAI 兼容格式
+        // 任何 OpenAI 兼容 API（DeepSeek/商汤/智谱等）只需改 baseUrl + model 即可
+        DeepSeekApi deepSeekApi = DeepSeekApi.builder()
+                .baseUrl(baseUrl)
+                .apiKey(apiKey)
                 .build();
 
-        long start = System.currentTimeMillis();
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        long elapsed = System.currentTimeMillis() - start;
+        org.springframework.ai.deepseek.DeepSeekChatOptions options =
+                org.springframework.ai.deepseek.DeepSeekChatOptions.builder()
+                        .model(model)
+                        .build();
 
-        if (response.statusCode() != 200) {
-            log.error("LLM API 错误(图片识别): status={} body={}", response.statusCode(), response.body());
-            throw new RuntimeException("LLM API 返回错误 " + response.statusCode() + ": " + response.body());
-        }
+        DeepSeekChatModel chatModel = DeepSeekChatModel.builder()
+                .deepSeekApi(deepSeekApi)
+                .options(options)
+                .build();
 
-        @SuppressWarnings("unchecked")
-        Map<String, Object> json = mapper.readValue(response.body(), Map.class);
-        @SuppressWarnings("unchecked")
-        List<Map<String, Object>> choices = (List<Map<String, Object>>) json.get("choices");
-
-        if (choices == null || choices.isEmpty()) {
-            return "";
-        }
-
-        @SuppressWarnings("unchecked")
-        Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
-        String content = message != null ? (String) message.get("content") : "";
-
-        log.info("[llm] 图片识别完成 模型={} 耗时={}ms", configResolver.resolveModel(), elapsed);
-
-        return content != null ? content : "";
+        return ChatClient.builder(chatModel)
+                .defaultSystem("你是一个有用的AI助手。")
+                .build();
     }
 }

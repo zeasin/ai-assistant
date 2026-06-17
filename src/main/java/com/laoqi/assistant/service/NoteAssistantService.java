@@ -1,242 +1,131 @@
 package com.laoqi.assistant.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.deepseek.api.DeepSeekApi;
+import org.springframework.ai.deepseek.DeepSeekChatModel;
 import org.springframework.stereotype.Service;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-
 /**
- * 笔记库 AI 编排服务。
- * 直接调用 OpenAI 兼容 API（DeepSeek/商汤）的 tool_calls 功能，实现 ReAct 循环。
- * AI 通过 listDir / readFile / writeFile 三个工具自主探索并写入笔记库。
+ * 笔记库 AI 编排服务 — Spring AI 2.0 版。
+ *
+ * 通过 ChatClient + @Tool 注解实现工具编排，替代了之前 300 行的手动 ReAct 循环。
+ * AI 自动通过 ToolCallingAdvisor 判断是否调用工具，无需 Java 代码手动路由。
+ *
+ * ██████████████████████████████████████████████████████
+ * 底层使用 Spring AI DeepSeekChatModel 作为
+ * 通用 OpenAI 兼容客户端（提供商无关）。
+ *
+ * baseUrl / model 通过 /config 页面配置即可切换：
+ *   DeepSeek     → https://api.deepseek.com
+ *   商汤 SenseNova → https://token.sensenova.cn/v1
+ * ██████████████████████████████████████████████████████
+ *
+ * needsOrchestration() 保持兼容（始终返回 true，让 AI 自己判断）。
  */
 @Service
 public class NoteAssistantService {
 
     private static final Logger log = LoggerFactory.getLogger(NoteAssistantService.class);
-    private static final ObjectMapper mapper = new ObjectMapper();
 
     private final LlmConfigResolver configResolver;
     private final NoteTools noteTools;
-    private final HttpClient httpClient;
+    private final Object configLock = new Object();
 
-    // 每个会话的消息历史
-    private final Map<String, List<Map<String, Object>>> sessionHistories = new ConcurrentHashMap<>();
-
-    // 工具定义（OpenAI tools 格式 JSON）
-    private static final String TOOLS_JSON = """
-        [{
-          "type": "function",
-          "function": {
-            "name": "listDir",
-            "description": "列出笔记库指定目录下的所有文件和子目录",
-            "parameters": {
-              "type": "object",
-              "properties": {
-                "path": { "type": "string", "description": "目录路径，相对于笔记库根目录" }
-              },
-              "required": ["path"]
-            }
-          }
-        },{
-          "type": "function",
-          "function": {
-            "name": "readFile",
-            "description": "读取笔记库中指定文件的内容",
-            "parameters": {
-              "type": "object",
-              "properties": {
-                "path": { "type": "string", "description": "文件路径，相对于笔记库根目录" }
-              },
-              "required": ["path"]
-            }
-          }
-        },{
-          "type": "function",
-          "function": {
-            "name": "writeFile",
-            "description": "将数据写入笔记库指定文件。如果文件已存在，需要先读取原有内容，合并后再写入",
-            "parameters": {
-              "type": "object",
-              "properties": {
-                "path": { "type": "string", "description": "文件路径，相对于笔记库根目录" },
-                "content": { "type": "string", "description": "要写入的完整文件内容" }
-              },
-              "required": ["path", "content"]
-            }
-          }
-        },{
-          "type": "function",
-          "function": {
-            "name": "searchFiles",
-            "description": "在笔记库中搜索文件名包含指定关键词的文件和目录（仅搜索文件名，不搜索文件内容）",
-            "parameters": {
-              "type": "object",
-              "properties": {
-                "keyword": { "type": "string", "description": "搜索关键词，如 BUG、客户、日报" }
-              },
-              "required": ["keyword"]
-            }
-          }
-        }]
-        """;
-
-    private static final int MAX_TOOL_ROUNDS = 25;
+    // 懒初始化 ChatClient，配置变更时自动重建
+    private volatile ChatClient chatClient;
+    private volatile String cachedConfigKey = "";
 
     public NoteAssistantService(LlmConfigResolver configResolver, NoteTools noteTools) {
         this.configResolver = configResolver;
         this.noteTools = noteTools;
-        this.httpClient = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(15))
-                .version(HttpClient.Version.HTTP_1_1)
-                .build();
     }
 
     public boolean isAvailable() {
         return configResolver.isAvailable();
     }
 
-    // ========== 公开 API ==========
-
     /**
-     * 判断是否需要工具编排
+     * 判断是否需要工具编排。
+     * 在 Spring AI 2.0 中，AI 通过 ToolCallingAdvisor 自动判断是否使用工具，
+     * 不再需要 Java 代码手动路由。此方法保留兼容性，始终返回 true。
      */
     public boolean needsOrchestration(String userMessage) {
-        if (userMessage == null) return false;
-        String msg = userMessage.toLowerCase();
-        return msg.contains("记录") || msg.contains("保存") || msg.contains("写入")
-                || msg.contains("记一条") || msg.contains("添加") || msg.contains("新增")
-                || msg.contains("创建") || msg.contains("写一条");
+        return true;
     }
 
     /**
-     * 执行 AI 编排（ReAct 循环）
+     * 执行 AI 编排 — 使用 ChatClient + @Tool。
+     * AI 自动决定是否调用工具（读文件/写文件/搜索等），无需手写 ReAct 循环。
      */
     public String chat(String sessionId, String userMessage) throws Exception {
         if (!isAvailable()) {
             throw new IllegalStateException("LLM API Key 未配置，请在配置页填写");
         }
 
-        String apiKey = configResolver.resolveApiKey();
-        String baseUrl = configResolver.resolveBaseUrl();
-        String model = configResolver.resolveModel();
-        int timeout = configResolver.resolveTimeout();
-        if (baseUrl.endsWith("/")) baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
+        ChatClient client = getOrCreateClient();
+        if (client == null) {
+            throw new IllegalStateException("ChatClient 初始化失败");
+        }
 
-        @SuppressWarnings("unchecked")
-        List<Map<String, Object>> tools = mapper.readValue(TOOLS_JSON, List.class);
+        log.info("[编排] 用户: {} (session={})", userMessage, sessionId);
 
-        // 获取或创建会话历史
-        List<Map<String, Object>> messages = sessionHistories.computeIfAbsent(sessionId, k -> {
-            List<Map<String, Object>> history = new ArrayList<>();
-            history.add(Map.of("role", "system", "content", SYSTEM_PROMPT));
-            return history;
-        });
+        String reply = client.prompt()
+                .system(SYSTEM_PROMPT)
+                .user(userMessage)
+                .call()
+                .content();
 
-        // 添加用户消息
-        messages.add(Map.of("role", "user", "content", userMessage));
+        log.info("[编排] 回复长度: {}", reply != null ? reply.length() : 0);
+        return reply != null ? reply : "（AI 未返回回复）";
+    }
 
-        // ReAct 循环
-        for (int round = 0; round < MAX_TOOL_ROUNDS; round++) {
-            Map<String, Object> response = callLlm(apiKey, baseUrl, model, timeout, messages, tools);
+    // ========== 内部方法（ChatClient 懒初始化 + 自动重建） ==========
 
-            @SuppressWarnings("unchecked")
-            Map<String, Object> choice = ((List<Map<String, Object>>) response.get("choices")).get(0);
-            @SuppressWarnings("unchecked")
-            Map<String, Object> responseMessage = (Map<String, Object>) choice.get("message");
+    private ChatClient getOrCreateClient() {
+        if (!isAvailable()) return null;
 
-            String content = (String) responseMessage.get("content");
-
-            @SuppressWarnings("unchecked")
-            List<Map<String, Object>> toolCalls = (List<Map<String, Object>>) responseMessage.get("tool_calls");
-
-            if (toolCalls != null && !toolCalls.isEmpty()) {
-                messages.add(responseMessage);
-
-                for (Map<String, Object> toolCall : toolCalls) {
-                    @SuppressWarnings("unchecked")
-                    Map<String, Object> func = (Map<String, Object>) toolCall.get("function");
-                    String toolName = (String) func.get("name");
-                    String toolArgs = (String) func.get("arguments");
-                    String toolCallId = (String) toolCall.get("id");
-
-                    log.info("[编排] 第{}轮 执行工具: {}({})", round + 1, toolName, toolArgs);
-                    String result = executeTool(toolName, toolArgs);
-                    log.info("[编排] 结果: {}...", result.substring(0, Math.min(100, result.length())));
-
-                    Map<String, Object> toolResult = new LinkedHashMap<>();
-                    toolResult.put("role", "tool");
-                    toolResult.put("tool_call_id", toolCallId);
-                    toolResult.put("content", result);
-                    messages.add(toolResult);
+        String currentKey = buildConfigKey();
+        if (chatClient == null || !currentKey.equals(cachedConfigKey)) {
+            synchronized (configLock) {
+                String keyAfterLock = buildConfigKey();
+                if (chatClient == null || !keyAfterLock.equals(cachedConfigKey)) {
+                    chatClient = createChatClient();
+                    cachedConfigKey = keyAfterLock;
+                    log.info("NoteAssistant ChatClient 已重建 (model={})", configResolver.resolveModel());
                 }
-            } else {
-                String reply = content != null ? content : "（AI 未返回文本）";
-                messages.add(responseMessage);
-                return reply;
             }
         }
-
-        return "❌ 处理超时，工具调用次数过多，请简化问题";
+        return chatClient;
     }
 
-    // ========== 内部方法 ==========
+    private String buildConfigKey() {
+        return configResolver.resolveBaseUrl() + "|"
+                + configResolver.resolveModel() + "|"
+                + configResolver.resolveApiKey().hashCode();
+    }
 
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> callLlm(String apiKey, String baseUrl, String model, int timeout,
-                                         List<Map<String, Object>> messages,
-                                         List<Map<String, Object>> tools) throws Exception {
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("model", model);
-        body.put("messages", messages);
-        body.put("tools", tools);
-        body.put("temperature", 0.3);
-        body.put("stream", false);
+    private ChatClient createChatClient() {
+        String apiKey = configResolver.resolveApiKey();
+        String baseUrl = configResolver.resolveBaseUrl();
 
-        String jsonBody = mapper.writeValueAsString(body);
+        if (baseUrl.endsWith("/")) {
+            baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
+        }
 
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(baseUrl + "/chat/completions"))
-                .header("Content-Type", "application/json")
-                .header("Authorization", "Bearer " + apiKey)
-                .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
-                .timeout(Duration.ofSeconds(timeout))
+        DeepSeekApi deepSeekApi = DeepSeekApi.builder()
+                .baseUrl(baseUrl)
+                .apiKey(apiKey)
                 .build();
 
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        DeepSeekChatModel chatModel = DeepSeekChatModel.builder()
+                .deepSeekApi(deepSeekApi)
+                .build();
 
-        if (response.statusCode() != 200) {
-            log.error("LLM API 错误: status={} body={}", response.statusCode(), response.body());
-            throw new RuntimeException("LLM API 返回错误 " + response.statusCode() + ": " + response.body());
-        }
-
-        return mapper.readValue(response.body(), Map.class);
-    }
-
-    private String executeTool(String toolName, String toolArgs) {
-        try {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> args = mapper.readValue(toolArgs, Map.class);
-
-            return switch (toolName) {
-                case "listDir" -> noteTools.listDir((String) args.getOrDefault("path", ""));
-                case "readFile" -> noteTools.readFile((String) args.get("path"));
-                case "writeFile" -> noteTools.writeFile((String) args.get("path"), (String) args.get("content"));
-                case "searchFiles" -> noteTools.searchFiles((String) args.get("keyword"));
-                default -> "未知工具: " + toolName;
-            };
-        } catch (Exception e) {
-            log.error("[编排] 工具执行失败: {} args={}", e.getMessage(), toolArgs);
-            return "执行失败: " + e.getMessage();
-        }
+        return ChatClient.builder(chatModel)
+                .defaultTools(noteTools)
+                .build();
     }
 
     private static final String SYSTEM_PROMPT = """

@@ -4,7 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.laoqi.assistant.datacenter.model.*;
 import com.laoqi.assistant.service.LlmService;
-import com.laoqi.assistant.service.OpenCodeService;
+
 import com.laoqi.assistant.service.ModuleService;
 import com.laoqi.assistant.service.ConfigService;
 import com.laoqi.assistant.model.ModuleDefinition;
@@ -30,45 +30,27 @@ public class DataSetController {
 
     private final DataSetService dataSetService;
     private final DataSetImportService importService;
-    private final OpenCodeService openCodeService;
     private final LlmService llmService;
     private final ModuleService moduleService;
     private final ConfigService configService;
 
     public DataSetController(DataSetService dataSetService,
                              DataSetImportService importService,
-                             OpenCodeService openCodeService,
                              LlmService llmService,
                              ModuleService moduleService,
                              ConfigService configService) {
         this.dataSetService = dataSetService;
         this.importService = importService;
-        this.openCodeService = openCodeService;
         this.llmService = llmService;
         this.moduleService = moduleService;
         this.configService = configService;
     }
 
-    private boolean isDirectMode() {
-        return "direct".equals(configService.load().getAiProvider());
-    }
-
     private String doAiChat(String systemPrompt, String userMessage) throws Exception {
-        if (isDirectMode()) {
-            if (!llmService.isAvailable()) {
-                throw new IllegalStateException("LLM API Key 未配置");
-            }
-            return llmService.chat(systemPrompt, userMessage);
-        } else {
-            if (!openCodeService.isHealthy()) {
-                throw new IllegalStateException("AI服务未运行");
-            }
-            String sessionId = openCodeService.findIdleSession();
-            if (sessionId == null) {
-                sessionId = openCodeService.createSession("数据中心");
-            }
-            return openCodeService.sendMessage(sessionId, userMessage);
+        if (!llmService.isAvailable()) {
+            throw new IllegalStateException("LLM API Key 未配置");
         }
+        return llmService.chat(systemPrompt, userMessage);
     }
 
     @GetMapping("/datasets")

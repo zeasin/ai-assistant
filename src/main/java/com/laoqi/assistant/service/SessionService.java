@@ -10,7 +10,6 @@ import com.laoqi.assistant.service.db.MessageDbService;
 import com.laoqi.assistant.service.db.SessionDbService;
 import com.laoqi.assistant.service.db.TurnEmbeddingDbService;
 import com.laoqi.assistant.util.TimeUtil;
-import dev.langchain4j.data.embedding.Embedding;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -230,10 +229,10 @@ public class SessionService {
             String turnText = lastUser.getContent() + "\n" + lastAssistant.getContent();
             int nextTurn = turnEmbeddingDbService.maxTurnOrder(sessionId) + 1;
 
-            Embedding embedding = ollamaEmbeddingService.embed(turnText).orElse(null);
-            if (embedding == null) return;
+            float[] vector = ollamaEmbeddingService.embed(turnText);
+            if (vector == null) return;
 
-            byte[] blob = floatArrayToByteArray(embedding.vector());
+            byte[] blob = floatArrayToByteArray(vector);
 
             TurnEmbeddingEntity te = new TurnEmbeddingEntity();
             te.setSessionId(sessionId);
@@ -273,7 +272,7 @@ public class SessionService {
             return ctx;
         }
 
-        Embedding queryEmb = ollamaEmbeddingService.embed(currentQuery).orElse(null);
+        float[] queryEmb = ollamaEmbeddingService.embed(currentQuery);
         if (queryEmb == null) {
             String ctx = buildSimpleContext(filtered);
             log.info("[ctx] 嵌入失败，回退全部历史（{} 条消息）", filtered.size());
@@ -296,14 +295,14 @@ public class SessionService {
         return ctx;
     }
 
-    private String searchGlobalContext(Embedding queryEmb, String currentSessionId, String query) {
+    private String searchGlobalContext(float[] queryEmb, String currentSessionId, String query) {
         List<TurnEmbeddingEntity> allEmbeddings = turnEmbeddingDbService.list();
         if (allEmbeddings.isEmpty()) return null;
 
         List<ScoredTurn> scored = new ArrayList<>();
         for (TurnEmbeddingEntity te : allEmbeddings) {
             float[] vec = byteArrayToFloatArray(Base64.getDecoder().decode(te.getEmbedding()));
-            float score = cosineSimilarity(queryEmb.vector(), vec);
+            float score = cosineSimilarity(queryEmb, vec);
             scored.add(new ScoredTurn(te.getSessionId(), te.getTurnOrder(), score));
         }
 

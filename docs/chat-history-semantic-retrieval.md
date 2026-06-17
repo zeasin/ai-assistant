@@ -1,5 +1,7 @@
 # Chat History Semantic Retrieval / 长期记忆
 
+> ⚠️ *本文档描述 v2.0 架构，已过时。当前 v3.0 使用 Spring AI 2.0 直接调用 LLM，不再依赖 opencode serve。详见 README.md*
+
 > 用 LangChain4j + Ollama 本地 embedding 实现跨会话语义检索，让 AI 能从所有历史对话中找到相关内容。
 >
 > **✅ 已实现 (2026-06-16)** — 见 `SessionService`、`OllamaEmbeddingService` 及相关文件。

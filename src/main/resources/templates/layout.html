@@ -320,8 +320,8 @@
     </style>
 </head>
 <body>
-    <div th:if="${!notesRunning}" class="port-banner">
-        <span>⚠️ AI 服务 (端口 <span th:text="${notesPort}">14096</span>) 未启动</span>
+    <div th:if="${!ollamaAvailable}" class="port-banner">
+        <span>⚠️ Ollama 未启动，语义检索不可用</span>
         <button class="port-close" onclick="this.parentElement.remove()">✕</button>
     </div>
 

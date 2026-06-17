@@ -10,7 +10,6 @@ import com.laoqi.assistant.service.ConfigService;
 import com.laoqi.assistant.service.LlmService;
 import com.laoqi.assistant.service.LogService;
 import com.laoqi.assistant.service.NoteAssistantService;
-import com.laoqi.assistant.service.OpenCodeService;
 import com.laoqi.assistant.util.TimeUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,19 +35,17 @@ public class ChatController {
     });
 
     private final ChatSessionService sessionService;
-    private final OpenCodeService openCodeService;
     private final LlmService llmService;
     private final NoteAssistantService noteAssistantService;
     private final ConfigService configService;
     private final LogService logService;
     private final AppConfig appConfig;
 
-    public ChatController(ChatSessionService sessionService, OpenCodeService openCodeService,
+    public ChatController(ChatSessionService sessionService,
                           LlmService llmService, NoteAssistantService noteAssistantService,
                           ConfigService configService,
                           LogService logService, AppConfig appConfig) {
         this.sessionService = sessionService;
-        this.openCodeService = openCodeService;
         this.llmService = llmService;
         this.noteAssistantService = noteAssistantService;
         this.configService = configService;
@@ -58,148 +55,100 @@ public class ChatController {
 
     @GetMapping
     public String chatPage(@RequestParam(required = false, defaultValue = "") String id,
-                            Model model) {
-        SessionsData data = sessionService.load();
-        String effectiveMode = "knowledge";
-
-        // 处理 new 的情况 - 创建新会话后重定向到真实 ID
-        if ("new".equals(id)) {
-            String newSessionId = TimeUtil.sessionId();
-            String now = TimeUtil.nowStr();
-            ChatSession newSession = new ChatSession();
-            newSession.setId(newSessionId);
-            newSession.setTitle("新对话");
-            newSession.setMode(effectiveMode);
-            newSession.setCreated(now);
-            newSession.setUpdated(now);
-            newSession.setMessages(new ArrayList<>());
-            data.sessions.add(0, newSession);
-            data.current = newSessionId;
-            sessionService.save(data);
-            return "redirect:/chat?id=" + newSessionId;
-        }
-
-        ChatSession current = null;
-        String currentId = "";
+                           @RequestParam(required = false, defaultValue = "knowledge") String mode,
+                           Model model) {
+        model.addAttribute("chatMode", mode);
+        // 加载会话列表，避免模板中 #lists.size(sessions) 因 null 报错
+        var data = sessionService.load();
+        model.addAttribute("sessions", data.sessions);
 
         if (!id.isEmpty()) {
-            // id 不为空，查找对应会话
-            currentId = id;
-            for (ChatSession s : data.sessions) {
-                if (s.getId().equals(currentId)) {
-                    current = s;
-                    effectiveMode = s.getMode() != null ? s.getMode() : "knowledge";
-                    break;
-                }
-            }
-            // 如果没找到对应的会话，创建一个新会话后重定向
-            if (current == null) {
-                String newSessionId = TimeUtil.sessionId();
-                String now = TimeUtil.nowStr();
-                ChatSession newSession = new ChatSession();
-                newSession.setId(newSessionId);
-                newSession.setTitle("新对话");
-                newSession.setMode(effectiveMode);
-                newSession.setCreated(now);
-                newSession.setUpdated(now);
-                newSession.setMessages(new ArrayList<>());
-                data.sessions.add(0, newSession);
-                data.current = newSessionId;
-                sessionService.save(data);
-                return "redirect:/chat?id=" + newSessionId;
-            }
-        } else {
-            // id 为空，检查是否有已有会话
-            if (!data.sessions.isEmpty()) {
-                String targetId = data.current;
-                if (targetId != null) {
-                    for (ChatSession s : data.sessions) {
-                        if (s.getId().equals(targetId)) {
-                            return "redirect:/chat?id=" + targetId;
-                        }
-                    }
-                }
-                return "redirect:/chat?id=" + data.sessions.get(0).getId();
+            ChatSession session = sessionService.getSession(id);
+            if (session != null) {
+                model.addAttribute("sessionId", session.getId());
+                model.addAttribute("sessionTitle", session.getTitle());
+                model.addAttribute("current_id", session.getId());
             } else {
-                // 没有会话，创建第一个新会话后重定向
-                String newSessionId = TimeUtil.sessionId();
-                String now = TimeUtil.nowStr();
-                ChatSession newSession = new ChatSession();
-                newSession.setId(newSessionId);
-                newSession.setTitle("新对话");
-                newSession.setMode(effectiveMode);
-                newSession.setCreated(now);
-                newSession.setUpdated(now);
-                newSession.setMessages(new ArrayList<>());
-                data.sessions.add(newSession);
-                data.current = newSessionId;
-                sessionService.save(data);
-                return "redirect:/chat?id=" + newSessionId;
+                model.addAttribute("current_id", "");
+            }
+            model.addAttribute("current_mode", mode);
+        } else {
+            String currentId = data.current != null ? data.current : "";
+            model.addAttribute("current_id", currentId);
+            model.addAttribute("current_mode", mode);
+            if (!currentId.isEmpty()) {
+                ChatSession session = sessionService.getSession(currentId);
+                if (session != null) {
+                    model.addAttribute("sessionId", session.getId());
+                    model.addAttribute("sessionTitle", session.getTitle());
+                }
             }
         }
-
-        model.addAttribute("sessions", data.sessions);
-        model.addAttribute("current", current);
-        model.addAttribute("current_id", currentId);
-        model.addAttribute("current_mode", effectiveMode);
-        model.addAttribute("ai_provider", configService.load().getAiProvider());
+        model.addAttribute("ai_provider", "direct");
         return "chat";
     }
 
-    @PostMapping
-    public SseEmitter chat(@RequestParam String message,
-                            @RequestParam(name = "session_id") String sessionId) {
-        log.info("收到对话请求: message={}, sessionId={}", message, sessionId);
-        SseEmitter emitter = new SseEmitter(0L);
+    @GetMapping("/history")
+    @ResponseBody
+    public SessionsData history(@RequestParam(defaultValue = "knowledge") String mode) {
+        return sessionService.load();
+    }
 
-        emitter.onCompletion(() -> log.info("[chat] SSE 连接完成"));
-        emitter.onError((ex) -> log.error("[chat] SSE 连接错误", ex));
+    @GetMapping("/session/{id}")
+    @ResponseBody
+    public ChatSession getSession(@PathVariable String id) {
+        return sessionService.getSession(id);
+    }
 
-        String mode = "knowledge";
-        sessionService.saveMessage(sessionId, "user", message, mode);
+    @DeleteMapping("/session/{id}")
+    @ResponseBody
+    public Map<String, Object> deleteSession(@PathVariable String id) {
+        try {
+            sessionService.deleteSession(id);
+            return Map.of("ok", true);
+        } catch (Exception e) {
+            return Map.of("ok", false, "error", e.getMessage());
+        }
+    }
 
-        // 判断使用哪种 AI 模式
-        var config = configService.load();
-        boolean useDirectLlm = "direct".equals(config.getAiProvider());
+    @PostMapping("/send")
+    @ResponseBody
+    public SseEmitter send(@RequestParam String message,
+                           @RequestParam(required = false, defaultValue = "") String sessionId,
+                           @RequestParam(required = false, defaultValue = "knowledge") String mode) {
+        SseEmitter emitter = new SseEmitter(300_000L);
+        String finalSessionId = (sessionId == null || sessionId.isEmpty()) ?
+                sessionService.createSession("对话", mode).getId() : sessionId;
 
         chatExecutor.execute(() -> {
             try {
-                sendStatus(emitter, mode, useDirectLlm ? "🧠 LLM 直连思考中..." : "⏳ 正在思考...");
+                // 先发送 sessionId，让前端记住
+                emitter.send(SseEmitter.event().data(mapper.writeValueAsString(
+                        Map.of("type", "session", "sessionId", finalSessionId))));
 
-                String context = sessionService.buildHistoryContext(sessionId, mode, message);
+                sendStatus(emitter, mode, "正在处理...");
 
+                sessionService.saveMessage(finalSessionId, "user", message, mode);
+
+                // 构建上下文：历史 + 语义检索
+                String context = sessionService.buildHistoryContext(finalSessionId, mode, message);
                 StringBuilder fullText = new StringBuilder();
                 if (context != null) {
-                    log.info("[chat] 恢复对话历史上下文, sessionId={}, mode={}", sessionId, mode);
                     fullText.append(context).append("\n\n---\n\n");
                 }
                 fullText.append("用户最新消息:\n").append(message);
                 String fullMessage = fullText.toString();
 
                 String replyText;
-                if (useDirectLlm) {
-                    // 新模式：Java 直连 LLM
-                    log.info("[chat] 使用 LLM 直连模式");
-                    if (!llmService.isAvailable()) {
-                        throw new IllegalStateException("LLM API Key 未配置，请在配置页填写");
-                    }
-                    // 判断是否需要工具编排（记笔记等）
-                    if (noteAssistantService.needsOrchestration(message)) {
-                        log.info("[chat] 需要工具编排，转 NoteAssistant");
-                        replyText = noteAssistantService.chat(sessionId, message);
-                    } else {
-                        replyText = llmService.chat("你是一个知识库助手，基于笔记库上下文回答问题。请用中文回答。", fullMessage);
-                    }
-                } else {
-                    // 旧模式：走 opencode serve
-                    log.info("[chat] 使用 opencode 模式");
-                    String opencodeSessionId = openCodeService.createSession("chat-" + sessionId);
-                    String reply = openCodeService.sendMessage(opencodeSessionId, fullMessage);
-                    replyText = (reply != null && !reply.isEmpty()) ? reply : "(AI 未返回回复)";
+                if (!llmService.isAvailable()) {
+                    throw new IllegalStateException("LLM API Key 未配置，请在配置页填写");
                 }
+                // 用 NoteAssistantService（含工具编排能力），AI 自动判断是否使用工具
+                log.info("[chat] 使用 NoteAssistant（含工具编排）");
+                replyText = noteAssistantService.chat(finalSessionId, message);
 
                 log.info("[chat] 收到回复, 长度={}", replyText.length());
-                sessionService.saveMessage(sessionId, "assistant", replyText, mode);
+                sessionService.saveMessage(finalSessionId, "assistant", replyText, mode);
                 sendText(emitter, mode, replyText);
                 sendDone(emitter, mode);
 
@@ -220,6 +169,36 @@ public class ChatController {
 
         return emitter;
     }
+
+    @PostMapping("/clear")
+    @ResponseBody
+    public Map<String, Object> clearHistory(@RequestParam(defaultValue = "knowledge") String mode) {
+        sessionService.clearSession(mode);
+        return Map.of("ok", true);
+    }
+
+    @GetMapping("/export/{id}")
+    @ResponseBody
+    public Map<String, Object> exportSession(@PathVariable String id) {
+        try {
+            ChatSession session = sessionService.getSession(id);
+            if (session == null) return Map.of("ok", false, "error", "会话不存在");
+            String title = session.getTitle() != null ? session.getTitle() : "对话导出";
+            String date = TimeUtil.todayStr();
+            StringBuilder sb = new StringBuilder();
+            sb.append("---\ntitle: ").append(title).append("\ndate: ").append(date).append("\n---\n\n");
+            for (ChatMessage msg : session.getMessages()) {
+                sb.append("**").append("user".equals(msg.getRole()) ? "👤 用户" : "🤖 AI").append("**\n");
+                sb.append(msg.getContent()).append("\n\n");
+            }
+            return Map.of("ok", true, "title", title, "content", sb.toString(), "path",
+                    "对话/" + title + "/" + date + ".md");
+        } catch (Exception e) {
+            return Map.of("ok", false, "error", e.getMessage());
+        }
+    }
+
+    // ========== SSE 辅助方法 ==========
 
     private void sendStatus(SseEmitter emitter, String mode, String text) {
         try {
@@ -252,24 +231,24 @@ public class ChatController {
         } catch (Exception e) {
             log.error("发送完成消息失败", e);
             try {
-                emitter.completeWithError(e);
+                emitter.complete();
             } catch (Exception ex) {
                 log.error("无法完成发射器", ex);
             }
         }
     }
 
-    private void sendError(SseEmitter emitter, String message) {
+    private void sendError(SseEmitter emitter, String error) {
         try {
-            Map<String, Object> data = Map.of("type", "error", "content", message);
+            Map<String, Object> data = Map.of("type", "error", "content", error);
             emitter.send(SseEmitter.event().data(mapper.writeValueAsString(data)));
             emitter.complete();
         } catch (Exception e) {
-            log.error("发送错误信息失败", e);
+            log.error("发送错误消息失败", e);
             try {
-                emitter.completeWithError(e);
+                emitter.completeWithError(new RuntimeException(error));
             } catch (Exception ex) {
-                log.error("无法完成发射器", ex);
+                log.error("无法完成错误发送", ex);
             }
         }
     }

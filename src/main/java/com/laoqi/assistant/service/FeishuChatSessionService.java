@@ -41,8 +41,6 @@ public class FeishuChatSessionService {
         public String userKey;
         public String chatId;
         public String chatType;
-        public String openCodeSessionId;
-        public String openCodeCodeSessionId;
         public String created;
         public String updated;
         public List<ChatMessage> messages = new ArrayList<>();
@@ -69,8 +67,6 @@ public class FeishuChatSessionService {
             se.setTitle("");
             se.setChatId(session.chatId);
             se.setChatType(session.chatType);
-            se.setOpenCodeSessionId(session.openCodeSessionId);
-            se.setOpenCodeCodeSessionId(session.openCodeCodeSessionId);
             se.setCreatedAt(session.created);
             se.setUpdatedAt(session.updated);
             sessionDbService.save(se);
@@ -109,22 +105,6 @@ public class FeishuChatSessionService {
         sessionService.saveMessage(userKey, role, content, mode, "feishu");
     }
 
-    public void setOpenCodeSessionId(String userKey, String sessionId) {
-        SessionEntity update = new SessionEntity();
-        update.setId(userKey);
-        update.setOpenCodeSessionId(sessionId);
-        update.setUpdatedAt(TimeUtil.nowStr());
-        sessionDbService.updateById(update);
-    }
-
-    public void setOpenCodeCodeSessionId(String userKey, String sessionId) {
-        SessionEntity update = new SessionEntity();
-        update.setId(userKey);
-        update.setOpenCodeCodeSessionId(sessionId);
-        update.setUpdatedAt(TimeUtil.nowStr());
-        sessionDbService.updateById(update);
-    }
-
     public String buildHistoryContext(String userKey, String mode) {
         return sessionService.buildHistoryContext(userKey, mode, null);
     }
@@ -145,8 +125,6 @@ public class FeishuChatSessionService {
         session.userKey = se.getId();
         session.chatId = se.getChatId() != null ? se.getChatId() : "";
         session.chatType = se.getChatType() != null ? se.getChatType() : "p2p";
-        session.openCodeSessionId = se.getOpenCodeSessionId();
-        session.openCodeCodeSessionId = se.getOpenCodeCodeSessionId();
         session.created = se.getCreatedAt();
         session.updated = se.getUpdatedAt();
 

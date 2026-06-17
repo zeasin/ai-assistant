@@ -1,357 +1,102 @@
-<html xmlns:th="http://www.thymeleaf.org"
-      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
-      layout:decorate="~{layout}">
-<head>
-    <title layout:fragment="title">帮助</title>
-</head>
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="layout :: layout(~{::title}, ~{::#content})">
+<head><title>帮助 - AI 助理 v3.0</title></head>
 <body>
-<th:block layout:fragment="content">
+<div id="content" class="container py-4">
 
-<div class="card">
-    <h2>📖 AI 助理 (ai-assistant)</h2>
-    <p class="text-muted" style="line-height:1.7;">
-        一站式个人工作台，集成 AI 综合日报、对话问答、笔记管理、数据采集等功能。
-        所有 AI 能力基于本地笔记库和 <strong>opencode serve</strong>，不依赖任何第三方云服务。
-    </p>
-</div>
+    <h1 class="mb-4">📖 AI 助理 v3.0 帮助</h1>
 
-<div class="card">
-    <h2>🚀 快速启动</h2>
-    <h3 style="font-size:15px;margin:16px 0 8px;">环境要求</h3>
-    <table class="log-table">
-        <thead><tr><th>依赖</th><th>版本</th><th>用途</th></tr></thead>
-        <tbody>
-            <tr><td>Java</td><td>≥17</td><td>Web 服务运行环境</td></tr>
-            <tr><td>opencode</td><td>latest</td><td>AI 引擎（必须启动两个实例）</td></tr>
-        </tbody>
-    </table>
-    <h3 style="font-size:15px;margin:16px 0 8px;">启动步骤</h3>
-    <pre style="background:#1e1e2e;color:#cdd6f4;padding:16px;border-radius:8px;font-size:13px;line-height:1.6;overflow-x:auto;"># 1. 启动 opencode serve 服务（必须）
-opencode serve --port 14096
+    <section class="card mb-4">
+        <h2>🚀 快速开始</h2>
+        <p>AI 助理 v3.0 基于 <strong>Spring AI 2.0</strong>，直接调用 LLM API（如 DeepSeek），不再需要外部编排服务。</p>
 
-# 2. 编译项目
-mvn package -q
+        <h3>✅ 前置依赖</h3>
+        <table class="table" style="width:auto;">
+            <tr><th>依赖</th><th>说明</th><th>是否必须</th></tr>
+            <tr><td>Java 17+</td><td>运行时</td><td>✅ 必须</td></tr>
+            <tr><td>Ollama</td><td>语义检索加速（可选）</td><td>🔘 可选</td></tr>
+            <tr><td>LLM API Key</td><td>DeepSeek 或其他兼容 API</td><td>✅ 必须</td></tr>
+        </table>
 
-# 3. 启动应用
-java -jar target/ai-assistant-2.0.0.jar
+        <h3>⚡ 启动步骤</h3>
+        <pre style="background:#1e1e2e;color:#cdd6f4;padding:16px;border-radius:8px;font-size:13px;line-height:1.6;overflow-x:auto;"># 1. 配置 LLM API Key（在 Web 界面 /config 页面设置，或设环境变量）
+#    DEEPSEEK_API_KEY=sk-xxxxx
 
-# 访问地址
-# - Web UI: http://localhost:6790
-# - 健康检查: http://localhost:6790/health</pre>
-</div>
+# 2. 启动应用
+java -jar target/ai-assistant-3.0.0.jar
 
-<div class="card">
-    <h2>🧠 AI 引擎（opencode serve）</h2>
-    <p class="text-muted" style="line-height:1.7;">
-        系统依赖 <strong>opencode serve</strong> 实例提供 AI 能力：
-    </p>
-    <table class="log-table">
-        <thead><tr><th>服务</th><th>端口</th><th>用途</th></tr></thead>
-        <tbody>
-            <tr><td><strong>AI 服务</strong></td><td>14096</td><td>综合日报、智能问答、数据采集、AI分析</td></tr>
-        </tbody>
-    </table>
-    <p class="text-muted" style="line-height:1.7;margin-top:8px;">
-        启动后可在顶部导航栏看到连接状态指示器。绿色表示正常。
-    </p>
-</div>
+# 3. 访问 http://localhost:6790</pre>
 
-<div class="card">
-    <h2>📋 页面功能总览</h2>
-    <table class="log-table">
-        <thead><tr><th>功能</th><th>路由</th><th>说明</th></tr></thead>
-        <tbody>
-            <tr><td><strong>综合日报</strong></td><td><code>/</code></td><td>AI 每日综合报告，含 TODO、学习、生活、AI 建议，可配置提示词</td></tr>
-            <tr><td><strong>AI 对话</strong></td><td><code>/chat</code></td><td>与 AI 对话，AI 读取笔记库回答问题，支持流式响应和会话管理</td></tr>
-            <tr><td><strong>笔记浏览</strong></td><td><code>/browse</code></td><td>文件浏览器，支持查看/新建/删除 Markdown 文件</td></tr>
-            <tr><td><strong>模块系统</strong></td><td><code>/module/{id}</code></td><td>可配置的数据模块，支持数据管理、文档浏览、AI 分析、提示词配置</td></tr>
-            <tr><td><strong>数据编辑器</strong></td><td><code>/data-editor</code></td><td>通用 JSON 数据编辑器，支持增删改查任意数据文件</td></tr>
-            <tr><td><strong>任务看板</strong></td><td><code>/tasks</code></td><td>任务管理，支持增删改、优先级、完成状态</td></tr>
-            <tr><td><strong>定时提醒</strong></td><td><code>/reminders</code></td><td>定时提醒管理，支持每天/每周/每月/每年循环</td></tr>
-            <tr><td><strong>采集器</strong></td><td><code>/collector</code></td><td>数据采集任务管理，支持定时采集和手动触发</td></tr>
-            <tr><td><strong>AI 指南</strong></td><td><code>/ai-guide</code></td><td>管理 AGENTS.md 和 AI 记忆文件</td></tr>
-            <tr><td><strong>系统配置</strong></td><td><code>/config</code></td><td>笔记库根目录、飞书 Webhook/API、定时任务、字段标签</td></tr>
-            <tr><td><strong>操作日志</strong></td><td><code>/log</code></td><td>查看最近 100 条操作记录</td></tr>
-            <tr><td><strong>帮助页面</strong></td><td><code>/help</code></td><td>当前页面</td></tr>
-        </tbody>
-    </table>
-</div>
+        <p class="text-muted">🅰️ 启动后先去 <a href="/config">/config</a> 页面配置笔记库根目录和 LLM API Key。</p>
+    </section>
 
-<div class="card">
-    <h2>⚙️ 首次使用配置</h2>
-    <p class="text-muted" style="line-height:1.7;">
-        首次启动后，请先前往 <a href="/config">配置页</a> 完成以下设置：
-    </p>
-    <ol class="text-muted" style="line-height:1.7;padding-left:20px;">
-        <li><strong>笔记库根目录</strong> — 设置笔记库的绝对路径（如 <code>D:\notes</code>），所有数据文件都基于此目录</li>
-        <li><strong>飞书 Webhook</strong> — 可选，配置后可接收推送通知</li>
-        <li><strong>字段标签</strong> — 可选，自定义数据表格中英文 key 显示为中文标签</li>
-    </ol>
-    <p class="text-muted" style="line-height:1.7;">
-        配置完成后，前往 <a href="/ai-guide">AI 指南</a> 设置 AGENTS.md 来定义 AI 的行为规则。
-    </p>
-</div>
+    <section class="card mb-4">
+        <h2>💬 对话模块</h2>
+        <ul>
+            <li><strong>知识库对话</strong>（默认）：结合笔记库历史和语义检索回答问题</li>
+            <li><strong>创作式对话</strong>：开启新会话，AI 无历史上下文</li>
+            <li><strong>笔记操作</strong>：直接让 AI 读/写笔记库文件，如"帮我记录一条 BUG"</li>
+        </ul>
+    </section>
 
-<div class="card">
-    <h2>⏰ 定时任务</h2>
-    <p class="text-muted" style="line-height:1.7;">
-        系统内置 Spring @Scheduled 驱动以下定时任务（时区：Asia/Shanghai）：
-    </p>
-    <table class="log-table">
-        <thead><tr><th>任务</th><th>时间</th><th>说明</th></tr></thead>
-        <tbody>
-            <tr><td><strong>综合日报生成</strong></td><td>每天 09:00</td><td>AI 读取笔记库生成日报，推送飞书并保存到 <code>AI/综合日报/</code></td></tr>
-        </tbody>
-    </table>
-    <p class="text-muted" style="line-height:1.7;margin-top:8px;">
-        可在 <a href="/config">配置页</a> 手动触发执行。动态提醒可在 <a href="/reminders">提醒页</a> 配置。
-    </p>
-</div>
+    <section class="card mb-4">
+        <h2>📊 模块（业务数据）</h2>
+        <p>在笔记库中设置模块，每个模块可配置数据文件（JSON/CSV），AI 自动分析数据给出洞察。</p>
+    </section>
 
-<div class="card">
-    <h2>📊 综合日报</h2>
-    <p class="text-muted" style="line-height:1.7;">
-        首页展示 AI 综合日报，数据源为笔记库中的记忆文件，涵盖：TODO、学习方向、生活提醒、AI 建议。
-        日报文件保存在 <code>{笔记库根目录}/AI/综合日报/{日期}.md</code>，可由定时任务自动生成，也支持手动触发。
-    </p>
-    <p class="text-muted" style="line-height:1.7;margin-top:8px;">
-        提示词可通过首页右上角 ⚙️ 按钮配置，存储在 <code>AI/prompts/综合日报提示词.md</code>。
-    </p>
-</div>
+    <section class="card mb-4">
+        <h2>📸 图片识别</h2>
+        <p>利用 LLM 的多模态（Vision）能力分析笔记库中的图片。支持 PNG/JPG/GIF/WebP/BMP。</p>
+    </section>
 
-<div class="card">
-    <h2>💬 AI 对话</h2>
-    <p class="text-muted" style="line-height:1.7;">
-        与 AI 助理对话，它会读取整个笔记库来回答问题。支持流式响应、实时状态显示、历史会话管理。
-    </p>
-        <h3 style="margin-top:20px;font-size:14px;">核心特性</h3>
-    <ul class="text-muted" style="line-height:1.7;padding-left:20px;margin-top:8px;">
-        <li><strong>流式响应</strong> — 回答逐字显示，无需等待全部生成完毕</li>
-        <li><strong>实时状态</strong> — AI 读取笔记时显示 📖 文件名，知道它在做什么</li>
-        <li><strong>历史会话</strong> — 左侧边栏保存所有对话记录，可切换、可删除</li>
-    </ul>
-</div>
+    <section class="card mb-4">
+        <h2>☀️ 日报系统</h2>
+        <ul>
+            <li><strong>工作日 09:00</strong>：自动生成综合日报（基于工作笔记 + 语义记忆）</li>
+            <li><strong>工作日 18:00</strong>：下班提醒推送到飞书</li>
+            <li>日报存储在 <code>AI/综合日报/</code> 目录</li>
+        </ul>
+    </section>
 
-<div class="card">
-    <h2>📦 模块系统</h2>
-    <p class="text-muted" style="line-height:1.7;">
-        模块系统是管理各类数据的核心功能。每个模块包含：
-    </p>
-    <ul class="text-muted" style="line-height:1.7;padding-left:20px;margin-top:8px;">
-        <li><strong>数据管理</strong> — 以表格形式展示和编辑 JSON 数据</li>
-        <li><strong>文档浏览</strong> — 浏览模块目录下的 Markdown 文件</li>
-        <li><strong>AI 分析</strong> — 基于模块数据进行 AI 分析，生成分析报告</li>
-        <li><strong>提示词配置</strong> — 每个模块可独立配置 AI 分析的提示词</li>
-    </ul>
-    <p class="text-muted" style="line-height:1.7;margin-top:8px;">
-        模块通过 <code>/module/{id}</code> 访问，配置在 <a href="/config">配置页</a> 中的 modules 字段定义。
-    </p>
-</div>
+    <section class="card mb-4">
+        <h2>📡 采集器（数据收集）</h2>
+        <p>定时从指定 URL 采集数据，AI 分析提取为结构化 JSON，存入数据中心。</p>
+    </section>
 
-<div class="card">
-    <h2>🔧 数据采集器</h2>
-    <p class="text-muted" style="line-height:1.7;">
-        数据采集器支持从外部数据源自动采集数据。每个采集任务包含：
-    </p>
-    <ul class="text-muted" style="line-height:1.7;padding-left:20px;margin-top:8px;">
-        <li><strong>采集任务</strong> — 定义采集目标和参数</li>
-        <li><strong>提示词模板</strong> — AI 采集任务使用的提示词，存储在 <code>AI/collector/prompts/</code></li>
-        <li><strong>定时执行</strong> — 支持 cron 表达式定时采集</li>
-        <li><strong>手动触发</strong> — 支持立即执行采集任务</li>
-    </ul>
-</div>
+    <section class="card mb-4">
+        <h2>🔧 配置</h2>
+        <p>所有配置在 <a href="/config">/config</a> 页面管理，无需手动编辑文件。</p>
+        <table class="table">
+            <tr><th>配置项</th><th>说明</th></tr>
+            <tr><td>笔记库根目录</td><td>所有笔记、业务数据、日报等文件的存放目录</td></tr>
+            <tr><td>API Key</td><td>LLM API 密钥（DeepSeek 等）</td></tr>
+            <tr><td>飞书集成</td><td>Webhook URL 和应用凭证，用于消息推送</td></tr>
+            <tr><td>模块配置</td><td>业务数据模块的目录和文件定义</td></tr>
+        </table>
+    </section>
 
-<div class="card">
-    <h2>📂 数据编辑器</h2>
-    <p class="text-muted" style="line-height:1.7;">
-        通用 JSON 数据编辑器，支持对模块数据进行增删改查操作。
-        编辑器自动发现并展示数据文件，以表格形式展示，支持列设置、排序、搜索。
-    </p>
-</div>
+    <section class="card mb-4">
+        <h2>🆘 常见问题</h2>
+        <table class="table">
+            <tr><th>问题</th><th>原因</th><th>解决</th></tr>
+            <tr><td>AI 回复"API Key 未配置"</td><td>未在 /config 填写 API Key</td><td>在配置页填写 LLM API Key</td></tr>
+            <tr><td>AI 回复为空</td><td>LLM 返回内容为空或超时</td><td>检查 API Key 和网络，超时可设为 600s</td></tr>
+            <tr><td>语义检索不可用</td><td>Ollama 未启动</td><td>启动 <code>ollama run nomic-embed-text</code></td></tr>
+        </table>
+    </section>
 
-<div class="card">
-    <h2>⏰ 定时提醒</h2>
-    <p class="text-muted" style="line-height:1.7;">
-        定时提醒功能支持创建和管理各种循环提醒任务，到时间自动推送消息到飞书。
-    </p>
-    <ul class="text-muted" style="line-height:1.7;padding-left:20px;margin-top:8px;">
-        <li><strong>每天</strong> — 每天固定时间提醒，如下班日报提醒</li>
-        <li><strong>每周</strong> — 每周特定星期几提醒</li>
-        <li><strong>每月</strong> — 每月特定几号提醒</li>
-        <li><strong>每年</strong> — 每年特定日期提醒</li>
-        <li><strong>一次</strong> — 指定日期提醒一次</li>
-    </ul>
-    <p class="text-muted" style="line-height:1.7;margin-top:8px;">
-        支持启用/禁用、编辑、删除等操作。提醒触发后会推送到配置的飞书群。
-        默认会创建"下班日报提醒"（每天 18:00）。
-    </p>
-</div>
-
-<div class="card">
-    <h2>📂 笔记管理</h2>
-    <p class="text-muted" style="line-height:1.7;">
-        内置文件浏览器，无需 Obsidian 即可管理笔记库中的 Markdown 文件：
-    </p>
-    <ul class="text-muted" style="line-height:1.7;padding-left:20px;">
-        <li><strong>浏览</strong> — 按目录树逐层浏览所有文件</li>
-        <li><strong>查看</strong> — Markdown 渲染为美观的 HTML</li>
-        <li><strong>复制</strong> — 查看页有「📋 复制文章」按钮，可直接粘贴到公众号编辑器</li>
-        <li><strong>新建</strong> — 在当前目录创建 Markdown 文件</li>
-        <li><strong>删除</strong> — 删除 .md 文件</li>
-    </ul>
-</div>
-
-<div class="card">
-    <h2>🤖 AI 指南</h2>
-    <p class="text-muted" style="line-height:1.7;">
-        管理 AI 的行为指南和记忆文件：
-    </p>
-    <ul class="text-muted" style="line-height:1.7;padding-left:20px;margin-top:8px;">
-        <li><strong>AGENTS.md</strong> — 定义 AI 的行为规则、数据录入规则等</li>
-        <li><strong>AI 记忆</strong> — AI 的长期记忆文件，存储在 <code>AI/记忆/</code> 目录</li>
-    </ul>
-</div>
-
-<div class="card">
-    <h2>📩 飞书集成</h2>
-    <p class="text-muted" style="line-height:1.7;">
-        支持三种飞书集成方式，可根据需要组合使用。所有配置均在 <a href="/config">配置页</a> 中设置。
-    </p>
-
-    <h3 style="margin-top:20px;">🔗 方式一：Webhook 推送（接收通知）</h3>
-    <p class="text-muted" style="line-height:1.7;">
-        配置 Webhook URL 后，AI 综合日报、提醒等自动推送到飞书群。<br>
-        仅需群机器人权限，配置最简单。
-    </p>
-    <ol class="text-muted" style="line-height:1.7;padding-left:20px;">
-        <li>打开飞书，进入目标群聊的「设置」→「群机器人」→「添加机器人」</li>
-        <li>搜索并添加「自定义机器人（Webhook）」</li>
-        <li>复制机器人 Webhook 地址，格式：<code>https://open.feishu.cn/open-apis/bot/v2/hook/xxxxxxxx</code></li>
-        <li>进入本系统 <a href="/config">配置页</a>，在「飞书 Webhook 配置」中粘贴地址并保存</li>
-        <li>点击「手动触发」区域的按钮测试推送是否正常</li>
-    </ol>
-
-    <h3 style="margin-top:24px;">📡 方式二：消息轮询（API 方式接收消息）</h3>
-    <p class="text-muted" style="line-height:1.7;">
-        通过飞书 API 定时轮询指定群的未读消息，AI 自动回复。<br>
-        需创建飞书自建应用，配置复杂但功能完整。
-    </p>
-
-    <h4 style="margin-top:16px;margin-bottom:8px;font-size:14px;">第一步：创建飞书自建应用</h4>
-    <ol class="text-muted" style="line-height:1.7;padding-left:20px;">
-        <li>打开 <a href="https://open.feishu.cn/app" target="_blank">飞书开发者后台</a>，点击「创建企业自建应用」</li>
-        <li>填写应用名称（如：AI 助理）、描述，创建完成后进入应用详情</li>
-    </ol>
-
-    <h4 style="margin-top:16px;margin-bottom:8px;font-size:14px;">第二步：获取 App ID 和 App Secret</h4>
-    <ol class="text-muted" style="line-height:1.7;padding-left:20px;" start="3">
-        <li>在应用详情页左侧菜单点击「凭证与基础信息」</li>
-        <li>复制 <strong>App ID</strong> 和 <strong>App Secret</strong>（App Secret 首次需点击「显示」或重置）</li>
-    </ol>
-
-    <h4 style="margin-top:16px;margin-bottom:8px;font-size:14px;">第三步：配置权限</h4>
-    <ol class="text-muted" style="line-height:1.7;padding-left:20px;" start="5">
-        <li>在左侧菜单点击「权限管理」</li>
-        <li>开启以下权限（必选）：
-            <ul style="margin-top:4px;">
-                <li><code>im:message</code> — 获取单聊、群组消息</li>
-                <li><code>im:chat</code> — 获取群列表信息</li>
-            </ul>
-        </li>
-        <li>点击「批量开通」并确认</li>
-    </ol>
-
-    <h4 style="margin-top:16px;margin-bottom:8px;font-size:14px;">第四步：发布应用</h4>
-    <ol class="text-muted" style="line-height:1.7;padding-left:20px;" start="8">
-        <li>在左侧菜单点击「版本管理与发布」</li>
-        <li>创建版本，填写版本号（如 1.0.0）、更新说明，点击「保存」</li>
-        <li>点击「申请发布」，选择审核方式</li>
-        <li>联系飞书管理员审批通过</li>
-    </ol>
-
-    <h4 style="margin-top:16px;margin-bottom:8px;font-size:14px;">第五步：将应用添加到群聊</h4>
-    <ol class="text-muted" style="line-height:1.7;padding-left:20px;" start="12">
-        <li>打开要监听的飞书群，进入「设置」→「群机器人」→「添加机器人」</li>
-        <li>搜索并添加刚才创建的自建应用</li>
-    </ol>
-
-    <h4 style="margin-top:16px;margin-bottom:8px;font-size:14px;">第六步：在系统中配置</h4>
-    <ol class="text-muted" style="line-height:1.7;padding-left:20px;" start="14">
-        <li>进入本系统 <a href="/config">配置页</a>，在「飞书消息接收（API 轮询）」区域</li>
-        <li>填入 <strong>App ID</strong> 和 <strong>App Secret</strong></li>
-        <li>点击「获取群列表」按钮，选择要监听的群（自动填入 Chat ID）</li>
-        <li>勾选「启用消息轮询」</li>
-        <li>点击「保存飞书配置」</li>
-        <li>点击「发送测试消息」验证配置是否正确</li>
-    </ol>
-
-    <h3 style="margin-top:24px;">🔌 方式三：长连接 WebSocket（推荐，替代轮询）</h3>
-    <p class="text-muted" style="line-height:1.7;">
-        通过飞书 WebSocket 长连接实时接收消息，比轮询延迟更低、资源消耗更小。
-        配置步骤与方式二完全相同（共用 App ID/App Secret），区别在于：
-    </p>
-    <ul class="text-muted" style="line-height:1.7;padding-left:20px;">
-        <li>在「权限管理」中额外开启 <code>im:resource</code> 权限（接收消息资源）</li>
-        <li>启用「消息轮询」后，系统自动使用长连接代替轮询</li>
-        <li>无需额外配置，应用启动后自动连接飞书 WebSocket 网关</li>
-    </ul>
+    <section class="card mb-4">
+        <h2>🏗️ 技术架构</h2>
+        <ul>
+            <li><strong>Spring Boot 4.1</strong> + <strong>Spring AI 2.0</strong> + Java 17</li>
+            <li><strong>AI 引擎</strong>：Spring AI ChatClient 直连 LLM（DeepSeek API）</li>
+            <li><strong>工具编排</strong>：<code>@Tool</code> 注解 + ToolCallingAdvisor 自动管理多轮工具调用</li>
+            <li><strong>语义检索</strong>：Spring AI OllamaEmbeddingModel (nomic-embed-text)</li>
+            <li><strong>数据存储</strong>：SQLite (MyBatis-Plus) + JSON 文件</li>
+            <li><strong>前端</strong>：Thymeleaf 模板</li>
+        </ul>
+    </section>
 
 </div>
-
-<div class="card">
-    <h2>🔧 故障排查</h2>
-    <table class="log-table">
-        <thead><tr><th>问题</th><th>原因</th><th>解决</th></tr></thead>
-        <tbody>
-            <tr><td>页面提示"未配置笔记库根目录"</td><td>未在设置页配置笔记库路径</td><td>前往 <a href="/config">配置页</a> 设置「笔记库根目录」</td></tr>
-            <tr><td>AI 对话/日报/分析无响应</td><td>opencode serve 未启动</td><td>确保已启动 <code>opencode serve --port 14096</code></td></tr>
-            <tr><td>顶部导航栏显示服务红色</td><td>opencode serve 端口未连接</td><td>检查 14096 端口是否正常启动</td></tr>
-            <tr><td>飞书推送失败</td><td>Webhook URL 错误或网络问题</td><td>在 <a href="/config">配置页</a> 检查并更新 Webhook 地址</td></tr>
-            <tr><td>获取飞书 token 失败</td><td>App ID 或 App Secret 错误</td><td>去飞书开发者后台复制正确的凭据</td></tr>
-            <tr><td>客户端访问页面白屏</td><td>端口被占用或服务未启动</td><td>检查 6790 端口是否被占用；查看后台日志</td></tr>
-        </tbody>
-    </table>
-</div>
-
-<div class="card">
-    <h2>🗂️ 数据文件</h2>
-    <p class="text-muted" style="line-height:1.7;">
-        所有数据以 JSON 文件形式存储在笔记库根目录下，无数据库依赖。
-        以下路径均为相对于笔记库根目录：
-    </p>
-    <table class="log-table">
-        <thead><tr><th>文件</th><th>读写</th><th>说明</th></tr></thead>
-        <tbody>
-            <tr><td><code>{config-dir}/config.json</code></td><td>读写</td><td>应用配置（飞书、笔记库路径、模块定义等）</td></tr>
-            <tr><td><code>{config-dir}/assistant_log.json</code></td><td>读写</td><td>操作日志（最多保留 100 条）</td></tr>
-            <tr><td><code>{config-dir}/memory.db</code></td><td>读写</td><td>SQLite 数据库（对话记录）</td></tr>
-            <tr><td><code>AI/综合日报/</code></td><td>读写</td><td>AI 生成的综合日报文件（按日期命名）</td></tr>
-            <tr><td><code>AI/任务/</code></td><td>读写</td><td>任务数据</td></tr>
-            <tr><td><code>AI/提醒/reminders.json</code></td><td>读写</td><td>定时提醒数据</td></tr>
-            <tr><td><code>AI/prompts/</code></td><td>读写</td><td>提示词文件（综合日报提示词等）</td></tr>
-            <tr><td><code>AI/记忆/</code></td><td>读写</td><td>AI 记忆文件</td></tr>
-            <tr><td><code>AI/collector/</code></td><td>读写</td><td>采集器配置和提示词</td></tr>
-            <tr><td><code>代办.md</code></td><td>读写</td><td>每日循环和临时提醒</td></tr>
-        </tbody>
-    </table>
-</div>
-
-<div class="card">
-    <h2>🏗️ 技术架构</h2>
-    <table class="log-table">
-        <thead><tr><th>组件</th><th>技术</th></tr></thead>
-        <tbody>
-            <tr><td>Web 框架</td><td>Spring Boot 3.3.13</td></tr>
-            <tr><td>模板引擎</td><td>Thymeleaf + Layout Dialect</td></tr>
-            <tr><td>定时任务</td><td>Spring @Scheduled</td></tr>
-            <tr><td>AI 引擎</td><td>opencode serve（外部进程）</td></tr>
-            <tr><td>消息推送</td><td>飞书 Webhook / Bot API</td></tr>
-            <tr><td>数据持久化</td><td>SQLite（聊天记录）+ JSON 文件（业务数据）</td></tr>
-            <tr><td>运行环境</td><td>Java ≥17 + Maven</td></tr>
-        </tbody>
-    </table>
-</div>
-
-</th:block>
 </body>
 </html>

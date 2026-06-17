@@ -170,16 +170,6 @@ function getAIModeName(mode) {
     return '🤖 AI 助理';
 }
 
-async function saveMessage(role, content, mode) {
-    if (!currentSessionId) return;
-    const form = new FormData();
-    form.append('session_id', currentSessionId);
-    form.append('role', role);
-    form.append('content', content);
-    form.append('mode', mode);
-    await fetch('/chat/session/save', { method: 'POST', body: form });
-}
-
 async function sendMessage() {
     const input = document.getElementById('chatInput');
     const box = document.getElementById('chatBox');
@@ -191,8 +181,8 @@ async function sendMessage() {
     btn.disabled = true; btn.textContent = '⏳ 思考中...';
     replyText = '';
 
+    // 消息由后端自动保存，前端无需调用 saveMessage
     const userMode = 'knowledge';
-    await saveMessage('user', msg, userMode);
     box.innerHTML += `<div class="chat-msg user"><div class="label">你</div><div class="text">${escapeHtml(msg)}</div></div>`;
     box.scrollTop = box.scrollHeight;
 
@@ -210,7 +200,7 @@ async function sendMessage() {
     form.append('session_id', currentSessionId);
 
     try {
-        const res = await fetch('/chat', { method: 'POST', body: form });
+        const res = await fetch('/chat/send', { method: 'POST', body: form });
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
@@ -227,6 +217,10 @@ async function sendMessage() {
                 if (!part.startsWith('data:')) continue;
                 try {
                     const data = JSON.parse(part.replace(/^data:\s*/, ''));
+                    // 处理 sessionId 事件（首次发送时建立 session）
+                    if (data.type === 'session' && data.sessionId) {
+                        currentSessionId = data.sessionId;
+                    }
                     // 如果有 mode 信息，更新我们的变量
                     if (data.mode) {
                         aiMode = data.mode;
@@ -256,8 +250,7 @@ async function sendMessage() {
                         document.getElementById('reply-' + aiMsgId).innerHTML = '<span style="color:#ff6b6b;">❌ ' + escapeHtml(data.content) + '</span>';
                     } else if (data.type === 'done') {
                         document.getElementById('status-' + aiMsgId).style.display = 'none';
-                        // 使用从后端获取的 aiMode 来保存回复
-                        await saveMessage('assistant', replyText, aiMode);
+                        // 回复已由后端自动保存
                     }
                 } catch (e) { /* skip malformed events */ }
             }
@@ -281,9 +274,7 @@ function newSession() {
 
 async function deleteSession(id) {
     if (!confirm('确定删除该对话？')) return;
-    const form = new FormData();
-    form.append('session_id', id);
-    const res = await fetch('/chat/session/delete', { method: 'POST', body: form });
+    const res = await fetch('/chat/session/' + id, { method: 'DELETE' });
     const data = await res.json();
     if (data.ok) {
         window.location.href = '/chat';
