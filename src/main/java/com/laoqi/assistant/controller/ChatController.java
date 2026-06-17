@@ -127,22 +127,14 @@ public class ChatController {
 
                 sessionService.saveMessage(finalSessionId, "user", message, mode);
 
-                // 构建上下文：历史 + 语义检索
-                String context = sessionService.buildHistoryContext(finalSessionId, mode, message);
-                StringBuilder fullText = new StringBuilder();
-                if (context != null) {
-                    fullText.append(context).append("\n\n---\n\n");
-                }
-                fullText.append("用户最新消息:\n").append(message);
-                String fullMessage = fullText.toString();
-
                 String replyText;
                 if (!llmService.isAvailable()) {
                     throw new IllegalStateException("LLM API Key 未配置，请在配置页填写");
                 }
                 // 用 NoteAssistantService（含工具编排能力），AI 自动判断是否使用工具
-                log.info("[chat] 使用 NoteAssistant（含工具编排）");
-                replyText = noteAssistantService.chat(finalSessionId, message);
+                // NoteAssistantService 内部会自动注入历史上下文（含向量召回语义检索）
+                log.info("[chat] 使用 NoteAssistant（含工具编排 + 历史上下文注入）");
+                replyText = noteAssistantService.chat(finalSessionId, message, mode);
 
                 log.info("[chat] 收到回复, 长度={}", replyText.length());
                 sessionService.saveMessage(finalSessionId, "assistant", replyText, mode);

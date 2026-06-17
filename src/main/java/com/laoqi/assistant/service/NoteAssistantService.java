@@ -31,15 +31,17 @@ public class NoteAssistantService {
 
     private final LlmConfigResolver configResolver;
     private final NoteTools noteTools;
+    private final SessionService sessionService;
     private final Object configLock = new Object();
 
     // 懒初始化 ChatClient，配置变更时自动重建
     private volatile ChatClient chatClient;
     private volatile String cachedConfigKey = "";
 
-    public NoteAssistantService(LlmConfigResolver configResolver, NoteTools noteTools) {
+    public NoteAssistantService(LlmConfigResolver configResolver, NoteTools noteTools, SessionService sessionService) {
         this.configResolver = configResolver;
         this.noteTools = noteTools;
+        this.sessionService = sessionService;
     }
 
     public boolean isAvailable() {
@@ -58,8 +60,9 @@ public class NoteAssistantService {
     /**
      * 执行 AI 编排 — 使用 ChatClient + @Tool。
      * AI 自动决定是否调用工具（读文件/写文件/搜索等），无需手写 ReAct 循环。
+     * 自动注入历史对话上下文（含向量召回语义检索）。
      */
-    public String chat(String sessionId, String userMessage) throws Exception {
+    public String chat(String sessionId, String userMessage, String mode) throws Exception {
         if (!isAvailable()) {
             throw new IllegalStateException("LLM API Key 未配置，请在配置页填写");
         }
@@ -69,16 +72,34 @@ public class NoteAssistantService {
             throw new IllegalStateException("ChatClient 初始化失败");
         }
 
+        // 构建历史上下文（含向量召回语义检索）
+        String context = sessionService.buildHistoryContext(sessionId, mode, userMessage);
+        String fullMessage;
+        if (context != null) {
+            fullMessage = context + "\n\n---\n\n用户最新消息:\n" + userMessage;
+            log.info("[编排] 注入了历史上下文（含语义检索），总消息长度={}", fullMessage.length());
+        } else {
+            fullMessage = userMessage;
+            log.info("[编排] 无历史上下文，仅当前消息");
+        }
+
         log.info("[编排] 用户: {} (session={})", userMessage, sessionId);
 
         String reply = client.prompt()
                 .system(SYSTEM_PROMPT)
-                .user(userMessage)
+                .user(fullMessage)
                 .call()
                 .content();
 
         log.info("[编排] 回复长度: {}", reply != null ? reply.length() : 0);
         return reply != null ? reply : "（AI 未返回回复）";
+    }
+
+    /**
+     * 兼容旧签名，不注入历史上下文（仅用于内部工具调用场景）。
+     */
+    public String chat(String sessionId, String userMessage) throws Exception {
+        return chat(sessionId, userMessage, "knowledge");
     }
 
     // ========== 内部方法（ChatClient 懒初始化 + 自动重建） ==========
