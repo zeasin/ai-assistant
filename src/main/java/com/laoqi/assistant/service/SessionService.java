@@ -117,6 +117,20 @@ public class SessionService {
                 )
                 """);
             log.info("New tables (sessions, messages, turn_embeddings, llm_profiles) initialized");
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS coding_records (
+                    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                    time         TEXT NOT NULL,
+                    message      TEXT NOT NULL,
+                    response     TEXT NOT NULL DEFAULT '',
+                    elapsed      TEXT NOT NULL DEFAULT '',
+                    success      INTEGER NOT NULL DEFAULT 0,
+                    source       TEXT NOT NULL DEFAULT 'feishu',
+                    project_dir  TEXT NOT NULL DEFAULT ''
+                )
+                """);
+            stmt.execute("CREATE INDEX IF NOT EXISTS idx_coding_records_time ON coding_records(id DESC)");
+            log.info("Table coding_records initialized");
         } catch (SQLException e) {
             throw new RuntimeException("Failed to create new tables", e);
         }

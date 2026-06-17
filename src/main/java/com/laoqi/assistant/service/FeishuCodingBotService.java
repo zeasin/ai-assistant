@@ -3,7 +3,9 @@ package com.laoqi.assistant.service;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import com.laoqi.assistant.config.AppConfig;
+import com.laoqi.assistant.entity.CodingRecordEntity;
 import com.laoqi.assistant.model.Config;
+import com.laoqi.assistant.service.db.CodingRecordDbService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -13,6 +15,8 @@ import jakarta.annotation.PreDestroy;
 import java.io.*;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.*;
 
@@ -29,14 +33,13 @@ public class FeishuCodingBotService {
     private final ConfigService configService;
     private final CodePiService codePiService;
     private final LogService logService;
+    private final CodingRecordDbService recordDbService;
+    @SuppressWarnings("unused")
     private final AppConfig appConfig;
 
     private com.lark.oapi.ws.Client wsClient;
     private com.lark.oapi.Client client;
     private final Set<String> processedMessages = ConcurrentHashMap.newKeySet();
-
-    // 排查记录（内存中保留最近200条）
-    private final List<CodingRecord> records = new CopyOnWriteArrayList<>();
 
     private final ExecutorService messageExecutor = Executors.newFixedThreadPool(2, r -> {
         Thread t = new Thread(r, "coding-msg");
@@ -52,10 +55,12 @@ public class FeishuCodingBotService {
     public FeishuCodingBotService(ConfigService configService,
                                   CodePiService codePiService,
                                   LogService logService,
+                                  CodingRecordDbService recordDbService,
                                   AppConfig appConfig) {
         this.configService = configService;
         this.codePiService = codePiService;
         this.logService = logService;
+        this.recordDbService = recordDbService;
         this.appConfig = appConfig;
     }
 
@@ -210,8 +215,11 @@ public class FeishuCodingBotService {
 
             String userMsg = (imagePath != null ? "(截图: " + imagePath + ")\n" : "") + text;
 
-            log.info("[编程AI] 收到消息: {}... | chatId={}",
-                    userMsg.substring(0, Math.min(60, userMsg.length())), chatId);
+            log.info("[编程AI] 收到消息: {}... | chatId={} | chatType={} | msgId={}",
+                    userMsg.length() > 60 ? userMsg.substring(0, 60) + "..." : userMsg,
+                    chatId, chatType, messageId);
+            log.debug("[编程AI] 原始消息: msgType={} | content={}",
+                    msgType, content.length() > 200 ? content.substring(0, 200) + "..." : content);
 
             String fChatId = chatId, fChatType = chatType, fMsgId = messageId, fMsg = userMsg;
             messageExecutor.execute(() -> processCodingRequest(fMsg, fChatId, fChatType, fMsgId));
@@ -222,10 +230,11 @@ public class FeishuCodingBotService {
     }
 
     private void processCodingRequest(String userMsg, String chatId, String chatType, String messageId) {
+        String projectDir = "";
         try {
             sendImmediateReply(chatId, chatType, messageId);
             Config config = configService.load();
-            String projectDir = config.getCodingProjectDir();
+            projectDir = config.getCodingProjectDir();
             int timeout = config.getCodingPiTimeout() != null ? config.getCodingPiTimeout() : 300;
 
             if (projectDir == null || projectDir.trim().isEmpty()) {
@@ -233,25 +242,30 @@ public class FeishuCodingBotService {
                 return;
             }
 
+            log.info("[编程AI] 开始排查: chatId={}, msgId={}, dir={}", chatId, messageId, projectDir);
             CodePiService.CodePiResult result = codePiService.analyze(userMsg, projectDir, timeout);
-            codingLog("排查", String.format("耗时 %s | %s", result.getElapsedStr(),
-                    result.isSuccess() ? "成功" : "失败"));
+            log.info("[编程AI] 排查完成: result={}, elapsed={}, output_len={}",
+                    result.isSuccess() ? "成功" : "失败", result.getElapsedStr(),
+                    result.isSuccess() ? result.getOutput().length() : 0);
+            codingLog("排查", String.format("耗时 %s | %s | dir=%s", result.getElapsedStr(),
+                    result.isSuccess() ? "成功" : "失败", projectDir));
 
+            String source = "feishu";
             if (result.isSuccess()) {
                 String output = result.getOutput();
                 if (output.length() > 8000) output = output.substring(0, 8000) + "\n\n...（截断）";
                 String cardBody = CodePiService.mdToFeishuCard("**排查结果如下：**\n" + output);
                 sendCardReply(chatId, chatType, messageId, cardBody, "编程AI ⏱" + result.getElapsedStr());
-                saveRecord(userMsg, output, result.getElapsedStr(), true);
+                saveRecord(userMsg, output, result.getElapsedStr(), true, source, projectDir);
             } else {
                 String err = result.getError() != null ? result.getError() : "未知错误";
                 sendReply(chatId, chatType, messageId, "⚠️ 排查失败（" + result.getElapsedStr() + "）：" + err);
-                saveRecord(userMsg, "失败: " + err, result.getElapsedStr(), false);
+                saveRecord(userMsg, "失败: " + err, result.getElapsedStr(), false, source, projectDir);
             }
         } catch (Exception e) {
             log.error("[编程AI] 排查异常: {}", e.getMessage(), e);
             sendReply(chatId, chatType, messageId, "❌ 排查异常: " + e.getMessage());
-            saveRecord(userMsg, "异常: " + e.getMessage(), "0s", false);
+            saveRecord(userMsg, "异常: " + e.getMessage(), "0s", false, "feishu", projectDir);
         }
     }
 
@@ -332,6 +346,19 @@ public class FeishuCodingBotService {
         } catch (Exception e) {
             log.warn("[编程AI] 卡片发送失败，降级为文本: {}", e.getMessage());
             sendReply(chatId, chatType, messageId, md);
+        }
+    }
+
+    public void sendTestMessage(String chatId, String text) throws Exception {
+        String content = "{\"text\":\"" + escapeJson(text) + "\"}";
+        var req = com.lark.oapi.service.im.v1.model.CreateMessageReq.newBuilder()
+                .receiveIdType(com.lark.oapi.service.im.v1.enums.ReceiveIdTypeEnum.CHAT_ID.getValue())
+                .createMessageReqBody(com.lark.oapi.service.im.v1.model.CreateMessageReqBody.newBuilder()
+                        .receiveId(chatId).msgType("text").content(content).build())
+                .build();
+        var resp = client.im().message().create(req);
+        if (resp.getCode() != 0) {
+            throw new RuntimeException("飞书API错误: " + resp.getCode() + " " + resp.getMsg());
         }
     }
 
@@ -451,46 +478,43 @@ public class FeishuCodingBotService {
     // ===== 记录管理 =====
 
     public void codingLog(String action, String detail) {
+        log.info("[编程AI] {} | {}", action, detail);
         logService.add("编程AI", action, detail);
     }
 
-    private void saveRecord(String message, String response, String elapsed, boolean success) {
-        records.add(0, new CodingRecord(
-                java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")),
-                message, response, elapsed, success));
-        if (records.size() > 200) {
-            records.subList(200, records.size()).clear();
+    public void saveRecord(String message, String response, String elapsed, boolean success, String source, String projectDir) {
+        try {
+            CodingRecordEntity entity = new CodingRecordEntity();
+            entity.setTime(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+            entity.setMessage(message.length() > 1000 ? message.substring(0, 1000) : message);
+            entity.setResponse(response.length() > 5000 ? response.substring(0, 5000) : response);
+            entity.setElapsed(elapsed);
+            entity.setSuccess(success);
+            entity.setSource(source);
+            entity.setProjectDir(projectDir != null && projectDir.length() > 200 ? projectDir.substring(0, 200) : projectDir);
+            recordDbService.save(entity);
+            log.debug("[编程AI] 记录已保存: source={}, success={}, elapsed={}", source, success, elapsed);
+        } catch (Exception e) {
+            log.error("[编程AI] 保存记录失败: {}", e.getMessage());
         }
     }
 
-    public List<CodingRecord> getRecentRecords(int limit) {
-        return records.subList(0, Math.min(limit, records.size()));
-    }
-
-    public List<CodingRecord> getAllRecords() {
-        return new ArrayList<>(records);
-    }
-
-    public static class CodingRecord {
-        private final String time;
-        private final String message;
-        private final String response;
-        private final String elapsed;
-        private final boolean success;
-
-        public CodingRecord(String time, String message, String response, String elapsed, boolean success) {
-            this.time = time;
-            this.message = message;
-            this.response = response;
-            this.elapsed = elapsed;
-            this.success = success;
+    public List<CodingRecordEntity> getRecentRecords(int limit) {
+        try {
+            return recordDbService.findRecent(limit);
+        } catch (Exception e) {
+            log.warn("[编程AI] 查询记录失败: {}", e.getMessage());
+            return List.of();
         }
+    }
 
-        public String getTime() { return time; }
-        public String getMessage() { return message; }
-        public String getResponse() { return response; }
-        public String getElapsed() { return elapsed; }
-        public boolean isSuccess() { return success; }
+    public List<CodingRecordEntity> getAllRecords() {
+        try {
+            return recordDbService.list();
+        } catch (Exception e) {
+            log.warn("[编程AI] 查询全部记录失败: {}", e.getMessage());
+            return List.of();
+        }
     }
 
     // ===== 工具方法 =====

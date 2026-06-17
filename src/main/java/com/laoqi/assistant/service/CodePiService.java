@@ -108,10 +108,20 @@ public class CodePiService {
         }
 
         // 4. 构建命令
-        ProcessBuilder pb = new ProcessBuilder(
-                piPath, "-p", prompt, "--no-session",
-                "--tools", "read,bash,grep,find,ls"
-        );
+        // Windows 上 pi 是 Node.js 脚本，需要用 cmd /c 执行
+        boolean isWin = System.getProperty("os.name").toLowerCase().contains("win");
+        ProcessBuilder pb;
+        if (isWin) {
+            pb = new ProcessBuilder(
+                    "cmd", "/c", "pi", "-p", prompt, "--no-session",
+                    "--tools", "read,bash,grep,find,ls"
+            );
+        } else {
+            pb = new ProcessBuilder(
+                    piPath, "-p", prompt, "--no-session",
+                    "--tools", "read,bash,grep,find,ls"
+            );
+        }
         pb.directory(projectFile);
         pb.environment().put("PI_OFFLINE", "1");
         pb.environment().put("TERM", "dumb");
@@ -229,12 +239,34 @@ public class CodePiService {
 
     /**
      * 查找 pi 可执行文件路径
+     * 在 Windows 上优先返回 .cmd 包装器，因为 pi 是 Node.js 脚本
      */
     private String findPiExecutable() {
-        // 1. 从 PATH 查找
-        String pathCmd = System.getProperty("os.name").toLowerCase().contains("win") ? "where pi" : "which pi";
+        // 1. Windows 上直接查找 .cmd 文件
+        if (System.getProperty("os.name").toLowerCase().contains("win")) {
+            String appData = System.getenv("APPDATA");
+            if (appData != null) {
+                File piCmd = new File(appData, "npm/pi.cmd");
+                if (piCmd.exists()) return piCmd.getAbsolutePath();
+            }
+            String userProfile = System.getenv("USERPROFILE");
+            if (userProfile != null) {
+                File piCmd2 = new File(userProfile, "AppData/Roaming/npm/pi.cmd");
+                if (piCmd2.exists()) return piCmd2.getAbsolutePath();
+            }
+
+            // 如果没找到 .cmd，就用 npm 路径下的 pi 并包裹 cmd /c
+            if (appData != null) {
+                File piScript = new File(appData, "npm/pi");
+                if (piScript.exists()) return "pi"; // 由调用方处理 cmd /c
+            }
+
+            return "pi";
+        }
+
+        // macOS/Linux: 正常查找
         try {
-            Process which = Runtime.getRuntime().exec(pathCmd);
+            Process which = Runtime.getRuntime().exec("which pi");
             if (which.waitFor(3, TimeUnit.SECONDS) && which.exitValue() == 0) {
                 try (BufferedReader reader = new BufferedReader(
                         new InputStreamReader(which.getInputStream(), StandardCharsets.UTF_8))) {
@@ -246,29 +278,8 @@ public class CodePiService {
             }
         } catch (Exception ignored) {
         }
-
-        // 2. Windows 上检查 npm 全局安装位置
-        if (System.getProperty("os.name").toLowerCase().contains("win")) {
-            String appData = System.getenv("APPDATA");
-            if (appData != null) {
-                File piExe = new File(appData, "npm/node_modules/@earendil-works/pi-coding-agent/bin/pi.exe");
-                if (piExe.exists()) return piExe.getAbsolutePath();
-
-                // 也可能是 .cmd 文件
-                File piCmd = new File(appData, "npm/pi.cmd");
-                if (piCmd.exists()) return piCmd.getAbsolutePath();
-            }
-
-            // 3. 从 %USERPROFILE%\AppData\Local\pipx 查找
-            String userProfile = System.getenv("USERPROFILE");
-            if (userProfile != null) {
-                File piExe2 = new File(userProfile,
-                        "AppData/Roaming/npm/node_modules/@earendil-works/pi-coding-agent/bin/pi.exe");
-                if (piExe2.exists()) return piExe2.getAbsolutePath();
-            }
-        } else {
-            // macOS/Linux: 检查常见位置
-            String[] candidates = {
+        // 检查常见位置
+        String[] candidates = {
                     "/usr/local/bin/pi",
                     "/usr/bin/pi",
                     "/opt/homebrew/bin/pi",
@@ -279,9 +290,6 @@ public class CodePiService {
                 File f = new File(c);
                 if (f.exists() && f.canExecute()) return c;
             }
-        }
-
-        // 4. 直接尝试 "pi" 命令
         return "pi";
     }
 
