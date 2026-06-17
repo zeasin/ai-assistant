@@ -123,5 +123,77 @@ public class LlmService {
         return content != null ? content : "";
     }
 
+    /**
+     * 同步调用 LLM（图片识别），支持 OpenAI/Dify 兼容的 vision API 格式。
+     * content 以多模态数组发送：text + image_url
+     */
+    public String chatWithImage(String systemPrompt, String userMessage, String base64Image, String imageType) throws Exception {
+        String apiKey = configResolver.resolveApiKey();
+        if (apiKey == null || apiKey.isEmpty()) {
+            throw new IllegalStateException("LLM API Key 未配置，请在配置页填写");
+        }
 
+        // 构建多模态 content 数组
+        List<Object> contentParts = new ArrayList<>();
+        contentParts.add(Map.of("type", "text", "text", userMessage));
+
+        String dataUrl = "data:" + (imageType != null ? imageType : "image/jpeg") + ";base64," + base64Image;
+        contentParts.add(Map.of("type", "image_url", "image_url", Map.of("url", dataUrl)));
+
+        // 构建 messages
+        List<Map<String, Object>> messages = new ArrayList<>();
+        if (systemPrompt != null && !systemPrompt.isEmpty()) {
+            messages.add(Map.of("role", "system", "content", systemPrompt));
+        }
+        messages.add(Map.of("role", "user", "content", contentParts));
+
+        // 构建请求体
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("model", configResolver.resolveModel());
+        body.put("messages", messages);
+        body.put("temperature", 0.7);
+        body.put("stream", false);
+
+        String jsonBody = mapper.writeValueAsString(body);
+
+        String baseUrl = configResolver.resolveBaseUrl();
+        if (baseUrl.endsWith("/")) {
+            baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
+        }
+        String apiUrl = baseUrl + "/chat/completions";
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(apiUrl))
+                .header("Content-Type", "application/json")
+                .header("Authorization", "Bearer " + apiKey)
+                .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
+                .timeout(Duration.ofSeconds(configResolver.resolveTimeout()))
+                .build();
+
+        long start = System.currentTimeMillis();
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        long elapsed = System.currentTimeMillis() - start;
+
+        if (response.statusCode() != 200) {
+            log.error("LLM API 错误(图片识别): status={} body={}", response.statusCode(), response.body());
+            throw new RuntimeException("LLM API 返回错误 " + response.statusCode() + ": " + response.body());
+        }
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> json = mapper.readValue(response.body(), Map.class);
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> choices = (List<Map<String, Object>>) json.get("choices");
+
+        if (choices == null || choices.isEmpty()) {
+            return "";
+        }
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
+        String content = message != null ? (String) message.get("content") : "";
+
+        log.info("[llm] 图片识别完成 模型={} 耗时={}ms", configResolver.resolveModel(), elapsed);
+
+        return content != null ? content : "";
+    }
 }

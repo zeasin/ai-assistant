@@ -3,6 +3,7 @@ package com.laoqi.assistant.datacenter;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.laoqi.assistant.datacenter.model.*;
+import com.laoqi.assistant.service.LlmService;
 import com.laoqi.assistant.service.OpenCodeService;
 import com.laoqi.assistant.service.ModuleService;
 import com.laoqi.assistant.service.ConfigService;
@@ -30,19 +31,44 @@ public class DataSetController {
     private final DataSetService dataSetService;
     private final DataSetImportService importService;
     private final OpenCodeService openCodeService;
+    private final LlmService llmService;
     private final ModuleService moduleService;
     private final ConfigService configService;
 
     public DataSetController(DataSetService dataSetService,
                              DataSetImportService importService,
                              OpenCodeService openCodeService,
+                             LlmService llmService,
                              ModuleService moduleService,
                              ConfigService configService) {
         this.dataSetService = dataSetService;
         this.importService = importService;
         this.openCodeService = openCodeService;
+        this.llmService = llmService;
         this.moduleService = moduleService;
         this.configService = configService;
+    }
+
+    private boolean isDirectMode() {
+        return "direct".equals(configService.load().getAiProvider());
+    }
+
+    private String doAiChat(String systemPrompt, String userMessage) throws Exception {
+        if (isDirectMode()) {
+            if (!llmService.isAvailable()) {
+                throw new IllegalStateException("LLM API Key 未配置");
+            }
+            return llmService.chat(systemPrompt, userMessage);
+        } else {
+            if (!openCodeService.isHealthy()) {
+                throw new IllegalStateException("AI服务未运行");
+            }
+            String sessionId = openCodeService.findIdleSession();
+            if (sessionId == null) {
+                sessionId = openCodeService.createSession("数据中心");
+            }
+            return openCodeService.sendMessage(sessionId, userMessage);
+        }
     }
 
     @GetMapping("/datasets")
@@ -138,10 +164,11 @@ public class DataSetController {
             }
 
             if (useAi && !records.isEmpty()) {
-                if (!openCodeService.isHealthy()) {
-                    return ResponseEntity.ok(Map.of("ok", false, "error", "AI服务未运行"));
+                try {
+                    records = normalizeWithAi(records, ds);
+                } catch (Exception e) {
+                    return ResponseEntity.ok(Map.of("ok", false, "error", "AI 标准化失败: " + e.getMessage()));
                 }
-                records = normalizeWithAi(records, ds);
             }
 
             int count = dataSetService.addRecords(id, records, "excel");
@@ -190,10 +217,11 @@ public class DataSetController {
             }
 
             if (useAi && !records.isEmpty()) {
-                if (!openCodeService.isHealthy()) {
-                    return ResponseEntity.ok(Map.of("ok", false, "error", "AI服务未运行"));
+                try {
+                    records = normalizeWithAi(records, ds);
+                } catch (Exception e) {
+                    return ResponseEntity.ok(Map.of("ok", false, "error", "AI 标准化失败: " + e.getMessage()));
                 }
-                records = normalizeWithAi(records, ds);
             }
 
             int count = dataSetService.addRecords(id, records, "manual");
@@ -218,10 +246,6 @@ public class DataSetController {
                 return ResponseEntity.ok(Map.of("ok", false, "error", "URL不能为空"));
             }
 
-            if (!openCodeService.isHealthy()) {
-                return ResponseEntity.ok(Map.of("ok", false, "error", "AI服务未运行，请先启动 opencode serve"));
-            }
-
             String prompt = "请访问以下URL，提取页面中的结构化数据。\n" +
                     "URL: " + url + "\n\n" +
                     "**重要：不要保存到文件，不要写入任何文件。只在回复中直接输出JSON数据。**\n\n" +
@@ -242,12 +266,7 @@ public class DataSetController {
                 prompt += "\n示例格式：[{\"title\":\"文章标题\",\"views\":123}, ...]";
             }
 
-            String sessionId = openCodeService.findIdleSession();
-            if (sessionId == null) {
-                sessionId = openCodeService.createSession("URL数据获取");
-            }
-
-            String rawResponse = openCodeService.sendMessage(sessionId, prompt);
+            String rawResponse = doAiChat("你是一个数据采集助手。请严格按要求的格式输出JSON数据。", prompt);
             String parsedData = extractJsonFromResponse(rawResponse);
 
             Object jsonData = mapper.readValue(parsedData, Object.class);
@@ -356,16 +375,7 @@ public class DataSetController {
 
             String prompt = buildExportPrompt(records, ds, mod, sampleData, customPrompt);
 
-            if (!openCodeService.isHealthy()) {
-                return ResponseEntity.ok(Map.of("ok", false, "error", "AI服务未运行"));
-            }
-
-            String sessionId = openCodeService.findIdleSession();
-            if (sessionId == null) {
-                sessionId = openCodeService.createSession("数据导出");
-            }
-
-            String rawResponse = openCodeService.sendMessage(sessionId, prompt);
+            String rawResponse = doAiChat("你是一个数据格式转换助手。严格按照现有格式和JSON结构输出。", prompt);
             String jsonData = extractJsonFromResponse(rawResponse);
 
             Object parsed = mapper.readValue(jsonData, Object.class);
@@ -490,12 +500,7 @@ public class DataSetController {
 
         prompt.append("直接输出标准化后的JSON数组，用 ```json 包裹，不要输出其他说明文字。");
 
-        String sessionId = openCodeService.findIdleSession();
-        if (sessionId == null) {
-            sessionId = openCodeService.createSession("数据标准化");
-        }
-
-        String rawResponse = openCodeService.sendMessage(sessionId, prompt.toString());
+        String rawResponse = doAiChat("你是一个数据标准化助手。严格按照要求的格式输出JSON数组。", prompt.toString());
         String jsonData = extractJsonFromResponse(rawResponse);
 
         Object parsed = mapper.readValue(jsonData, Object.class);

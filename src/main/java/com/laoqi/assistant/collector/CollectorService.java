@@ -6,6 +6,7 @@ import com.laoqi.assistant.collector.model.CollectorLog;
 import com.laoqi.assistant.collector.model.CollectorResult;
 import com.laoqi.assistant.collector.model.CollectorTask;
 import com.laoqi.assistant.service.ConfigService;
+import com.laoqi.assistant.service.LlmService;
 import com.laoqi.assistant.service.LogService;
 import com.laoqi.assistant.service.OpenCodeService;
 import com.laoqi.assistant.datacenter.DataSetService;
@@ -33,6 +34,7 @@ public class CollectorService {
     private static final int MAX_RESULT_ENTRIES = 50;
 
     private final OpenCodeService openCodeService;
+    private final LlmService llmService;
     private final LogService logService;
     private final ConfigService configService;
     private final DataSetService dataSetService;
@@ -41,13 +43,18 @@ public class CollectorService {
     private final Map<String, List<CollectorLog>> taskLogs = new ConcurrentHashMap<>();
     private final Map<String, List<CollectorResult>> taskResults = new ConcurrentHashMap<>();
 
-    public CollectorService(OpenCodeService openCodeService,
+    public CollectorService(OpenCodeService openCodeService, LlmService llmService,
                            LogService logService, ConfigService configService,
                            DataSetService dataSetService) {
         this.openCodeService = openCodeService;
+        this.llmService = llmService;
         this.logService = logService;
         this.configService = configService;
         this.dataSetService = dataSetService;
+    }
+
+    private boolean isDirectMode() {
+        return "direct".equals(configService.load().getAiProvider());
     }
 
     @PostConstruct
@@ -331,10 +338,6 @@ public class CollectorService {
         CollectorLog logEntry = createLogEntry(task);
 
         try {
-            if (!openCodeService.isHealthy()) {
-                throw new RuntimeException("opencode serve is not running");
-            }
-
             String template = getPromptTemplate(task.getPromptKey());
             if (template == null) {
                 throw new RuntimeException("Prompt template not found: " + task.getPromptKey());
@@ -347,11 +350,23 @@ public class CollectorService {
                 }
             }
 
-            String sessionId = openCodeService.findIdleSession();
-            if (sessionId == null) {
-                sessionId = openCodeService.createSession(task.getName());
+            String rawResponse;
+            if (isDirectMode()) {
+                if (!llmService.isAvailable()) {
+                    throw new RuntimeException("LLM API Key 未配置");
+                }
+                rawResponse = llmService.chat("你是一个数据采集助手。请严格按要求的格式输出JSON数据。", prompt);
+            } else {
+                if (!openCodeService.isHealthy()) {
+                    throw new RuntimeException("opencode serve is not running");
+                }
+                String sessionId = openCodeService.findIdleSession();
+                if (sessionId == null) {
+                    sessionId = openCodeService.createSession(task.getName());
+                }
+                rawResponse = openCodeService.sendMessage(sessionId, prompt);
             }
-            String rawResponse = openCodeService.sendMessage(sessionId, prompt);
+
             String parsedData = parseResponse(rawResponse);
 
             CollectorResult result = buildResult(task, rawResponse, parsedData);
@@ -372,9 +387,6 @@ public class CollectorService {
         CollectorLog logEntry = createLogEntry(task);
 
         try {
-            if (!openCodeService.isHealthy()) {
-                throw new RuntimeException("opencode serve is not running");
-            }
             if (task.getUrl() == null || task.getUrl().isBlank()) {
                 throw new RuntimeException("URL未配置");
             }
@@ -406,11 +418,23 @@ public class CollectorService {
                 }
             }
 
-            String sessionId = openCodeService.findIdleSession();
-            if (sessionId == null) {
-                sessionId = openCodeService.createSession(task.getName());
+            String rawResponse;
+            if (isDirectMode()) {
+                if (!llmService.isAvailable()) {
+                    throw new RuntimeException("LLM API Key 未配置");
+                }
+                rawResponse = llmService.chat("你是一个数据采集助手。请严格按要求的格式输出JSON数据。", prompt);
+            } else {
+                if (!openCodeService.isHealthy()) {
+                    throw new RuntimeException("opencode serve is not running");
+                }
+                String sessionId = openCodeService.findIdleSession();
+                if (sessionId == null) {
+                    sessionId = openCodeService.createSession(task.getName());
+                }
+                rawResponse = openCodeService.sendMessage(sessionId, prompt);
             }
-            String rawResponse = openCodeService.sendMessage(sessionId, prompt);
+
             String parsedData = parseResponse(rawResponse);
 
             CollectorResult result = buildResult(task, rawResponse, parsedData);

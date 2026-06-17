@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.laoqi.assistant.config.AppConfig;
 import com.laoqi.assistant.model.ModuleDefinition;
 import com.laoqi.assistant.service.ConfigService;
+import com.laoqi.assistant.service.LlmService;
 import com.laoqi.assistant.service.ModuleDataService;
 import com.laoqi.assistant.service.ModuleService;
 import com.laoqi.assistant.service.OpenCodeService;
@@ -42,15 +43,18 @@ public class ModuleController {
     private final ModuleService moduleService;
     private final ModuleDataService moduleDataService;
     private final OpenCodeService openCodeService;
+    private final LlmService llmService;
     private final AppConfig appConfig;
     private final ConfigService configService;
 
     public ModuleController(ModuleService moduleService, ModuleDataService moduleDataService,
-                            OpenCodeService openCodeService, AppConfig appConfig,
+                            OpenCodeService openCodeService, LlmService llmService,
+                            AppConfig appConfig,
                             ConfigService configService) {
         this.moduleService = moduleService;
         this.moduleDataService = moduleDataService;
         this.openCodeService = openCodeService;
+        this.llmService = llmService;
         this.appConfig = appConfig;
         this.configService = configService;
     }
@@ -319,11 +323,6 @@ public class ModuleController {
     }
 
     private String doAiAnalyze(ModuleDefinition mod) {
-        if (!openCodeService.isHealthy()) {
-            return "⚠️ opencode serve 未启动，无法进行 AI 分析。请确保 opencode serve --port "
-                    + appConfig.getNotesPort() + " 已运行。";
-        }
-
         String prompt = moduleService.readPrompt(mod);
 
         Path dataDir = moduleService.getModuleDataDir(mod);
@@ -342,8 +341,20 @@ public class ModuleController {
         fullPrompt.append("\n\n请根据以上数据进行分析，给出具体的洞察、趋势和建议。");
 
         try {
-            String sessionId = openCodeService.createSession(mod.getName() + "分析");
-            String result = openCodeService.sendMessage(sessionId, fullPrompt.toString());
+            String result;
+            if ("direct".equals(configService.load().getAiProvider())) {
+                if (!llmService.isAvailable()) {
+                    return "⚠️ LLM API Key 未配置，请在配置页填写";
+                }
+                result = llmService.chat("你是一个数据分析助手，请给出具体的洞察、趋势和建议。用中文回复。", fullPrompt.toString());
+            } else {
+                if (!openCodeService.isHealthy()) {
+                    return "⚠️ opencode serve 未启动，无法进行 AI 分析。请确保 opencode serve --port "
+                            + appConfig.getNotesPort() + " 已运行。";
+                }
+                String sessionId = openCodeService.createSession(mod.getName() + "分析");
+                result = openCodeService.sendMessage(sessionId, fullPrompt.toString());
+            }
 
             Path dir = moduleService.getModuleDir(mod);
             Path analysisDir = dir.resolve("AI分析");

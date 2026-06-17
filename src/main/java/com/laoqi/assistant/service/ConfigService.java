@@ -40,7 +40,10 @@ public class ConfigService {
             config.setLlmModel("deepseek-chat");
         }
         if (config.getLlmTimeout() <= 0) {
-            config.setLlmTimeout(60);
+            config.setLlmTimeout(600);
+        } else if (config.getLlmTimeout() <= 180) {
+            // 升级旧版默认值（180秒→600秒），日报生成大上下文需要更长时间
+            config.setLlmTimeout(600);
         }
     }
 

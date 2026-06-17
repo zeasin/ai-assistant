@@ -1,7 +1,9 @@
 package com.laoqi.assistant.controller;
 
+import com.laoqi.assistant.service.LlmService;
 import com.laoqi.assistant.service.OpenCodeService;
 import com.laoqi.assistant.service.LogService;
+import com.laoqi.assistant.service.ConfigService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -24,22 +26,42 @@ public class AiProxyController {
     });
 
     private final OpenCodeService openCodeService;
+    private final LlmService llmService;
+    private final ConfigService configService;
     private final LogService logService;
 
-    public AiProxyController(OpenCodeService openCodeService, LogService logService) {
+    public AiProxyController(OpenCodeService openCodeService, LlmService llmService,
+                             ConfigService configService, LogService logService) {
         this.openCodeService = openCodeService;
+        this.llmService = llmService;
+        this.configService = configService;
         this.logService = logService;
+    }
+
+    private boolean isDirectMode() {
+        return "direct".equals(configService.load().getAiProvider());
+    }
+
+    private String doAiChat(String message) throws Exception {
+        if (isDirectMode()) {
+            if (!llmService.isAvailable()) {
+                return "⚠️ LLM API Key 未配置，请在配置页填写";
+            }
+            return llmService.chat("你是一个助手，帮助用户填写页面内容。请用中文回复。", message);
+        } else {
+            if (!openCodeService.isHealthy()) {
+                return "⚠️ opencode serve 未启动";
+            }
+            String sessionId = openCodeService.createSession("页面录入");
+            return openCodeService.sendMessage(sessionId, message);
+        }
     }
 
     @PostMapping("/api/ai/send")
     @ResponseBody
     public Map<String, Object> send(@RequestParam String message) {
         try {
-            if (!openCodeService.isHealthy()) {
-                return Map.of("ok", false, "error", "opencode serve 未启动");
-            }
-            String sessionId = openCodeService.createSession("页面录入");
-            String reply = openCodeService.sendMessage(sessionId, message);
+            String reply = doAiChat(message);
             logService.add("AI录入", "完成", message);
             return Map.of("ok", true, "reply", reply);
         } catch (Exception e) {
@@ -51,14 +73,9 @@ public class AiProxyController {
     @ResponseBody
     public Map<String, Object> sendAsync(@RequestParam String message) {
         try {
-            if (!openCodeService.isHealthy()) {
-                return Map.of("ok", false, "error", "opencode serve 未启动");
-            }
-
             asyncExecutor.execute(() -> {
                 try {
-                    String sessionId = openCodeService.createSession("页面录入");
-                    String reply = openCodeService.sendMessage(sessionId, message);
+                    String reply = doAiChat(message);
                     log.info("[AI录入-异步] 处理完成: message={}, reply={}", message, reply);
                     logService.add("AI录入", "完成", message + " => " + reply);
                 } catch (Exception e) {

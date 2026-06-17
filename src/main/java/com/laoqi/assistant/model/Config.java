@@ -23,7 +23,7 @@ public class Config {
     private String llmApiKey = "";
     private String llmBaseUrl = "https://api.deepseek.com";
     private String llmModel = "deepseek-chat";
-    private int llmTimeout = 60;
+    private int llmTimeout = 600;
     private Map<String, Map<String, List<String>>> columnSettings = new HashMap<>();
 
     public Config() {}
