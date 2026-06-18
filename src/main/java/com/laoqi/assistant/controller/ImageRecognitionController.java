@@ -49,7 +49,21 @@ public class ImageRecognitionController {
     }
 
     @GetMapping
-    public String page(Model model) {
+    public String page(@RequestParam(required = false) Long kbId, Model model) {
+        // 无 kbId 时重定向到带 kbId 的 URL
+        if (kbId == null) {
+            KnowledgeBaseEntity first = kbService.getFirst();
+            if (first == null) return "redirect:/config";
+            return "redirect:/image-recognition?kbId=" + first.getId();
+        }
+
+        KnowledgeBaseEntity kb = kbService.getById(kbId);
+        if (kb == null) return "redirect:/config";
+
+        model.addAttribute("currentKb", kb);
+        model.addAttribute("currentKbId", kb.getId());
+        model.addAttribute("currentKbName", kb.getName());
+
         List<LlmProfileEntity> allProfiles = llmConfigResolver.getAllProfiles();
         List<LlmProfileEntity> visionModels = allProfiles.stream()
                 .filter(p -> p.isMultimodal())

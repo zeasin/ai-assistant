@@ -332,9 +332,8 @@
     <nav class="nav">
         <div class="nav-inner">
         <span class="title">AI 助理</span>
-        <a th:classappend="${requestURI == '/' ? 'active' : ''}" href="/">首页</a>
-        <a th:classappend="${requestURI == '/chat' ? 'active' : ''}" href="/chat">对话</a>
-        <a th:classappend="${requestURI == '/image-recognition' ? 'active' : ''}" href="/image-recognition">识图</a>
+        <a th:classappend="${requestURI == '/chat' or requestURI == '/'} ? 'active' : ''" href="/chat">对话</a>
+        <a th:classappend="${#strings.startsWith(requestURI, '/image-recognition')} ? 'active' : ''" href="/image-recognition">识图</a>
 
         <a th:each="kb : ${kbList}"
            th:href="@{/kb/{id}(id=${kb.id})}"

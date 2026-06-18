@@ -74,7 +74,7 @@
         <div style="display:flex;gap:8px;align-items:center;">
             <span style="font-size:13px;color:#5c5f66;font-weight:500;">📂 知识库</span>
             <select id="kbSelector" style="padding:8px 12px;border:1px solid #e1e3e6;border-radius:8px;font-size:13px;background:#fff;outline:none;min-width:140px;">
-                <option th:each="kb : ${kbList}" th:value="${kb.id}" th:text="${kb.name}" th:selected="${kbStat.first}">知识库</option>
+                <option th:each="kb : ${kbList}" th:value="${kb.id}" th:text="${kb.name}" th:selected="${kb.id == currentKbId}">知识库</option>
             </select>
         </div>
     </div>
@@ -652,6 +652,12 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('savePathBrowser').style.display = 'none';
     });
     document.getElementById('kbSelector').addEventListener('change', function() {
+        var newKbId = this.value;
+        if (history.pushState) {
+            var url = new URL(window.location.href);
+            url.searchParams.set('kbId', newKbId);
+            history.replaceState(null, '', url);
+        }
         allImages = [];
         selectedImage = null;
         currentBrowseDir = '';
