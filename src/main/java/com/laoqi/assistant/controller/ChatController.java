@@ -5,6 +5,7 @@ import com.laoqi.assistant.entity.KnowledgeBaseEntity;
 import com.laoqi.assistant.entity.LlmProfileEntity;
 import com.laoqi.assistant.entity.MessageEntity;
 import com.laoqi.assistant.entity.SessionEntity;
+import com.laoqi.assistant.model.TaskData.TaskItem;
 import com.laoqi.assistant.service.*;
 import com.laoqi.assistant.service.db.MessageDbService;
 import com.laoqi.assistant.service.db.SessionDbService;
@@ -42,6 +43,7 @@ public class ChatController {
     private final NoteAssistantService noteAssistantService;
     private final LlmConfigResolver llmConfigResolver;
     private final LogService logService;
+    private final TaskService taskService;
 
     public ChatController(KnowledgeBaseService kbService,
                           SessionDbService sessionDbService,
@@ -50,7 +52,8 @@ public class ChatController {
                           LlmService llmService,
                           NoteAssistantService noteAssistantService,
                           LlmConfigResolver llmConfigResolver,
-                          LogService logService) {
+                          LogService logService,
+                          TaskService taskService) {
         this.kbService = kbService;
         this.sessionDbService = sessionDbService;
         this.messageDbService = messageDbService;
@@ -59,19 +62,21 @@ public class ChatController {
         this.noteAssistantService = noteAssistantService;
         this.llmConfigResolver = llmConfigResolver;
         this.logService = logService;
+        this.taskService = taskService;
     }
 
     // ========== 页面路由 ==========
 
     @GetMapping
     public String chatPage(@RequestParam(required = false) Long kbId, Model model) {
-        // 确定当前 KB
-        KnowledgeBaseEntity kb;
-        if (kbId != null) {
-            kb = kbService.getById(kbId);
-        } else {
-            kb = kbService.getFirst();
+        // 无 kbId 时重定向到带 kbId 的 URL
+        if (kbId == null) {
+            KnowledgeBaseEntity first = kbService.getFirst();
+            if (first == null) return "redirect:/config";
+            return "redirect:/chat?kbId=" + first.getId();
         }
+
+        KnowledgeBaseEntity kb = kbService.getById(kbId);
         if (kb == null) return "redirect:/config";
 
         model.addAttribute("currentKb", kb);
@@ -92,6 +97,32 @@ public class ChatController {
         model.addAttribute("defaultModel", defaultProfile != null ? defaultProfile.getName() : "");
 
         model.addAttribute("aiProvider", "direct");
+
+        // 加载当前 KB 的待办任务
+        try {
+            String kbNotesDir = kb.getNotesDir();
+            if (kbNotesDir != null && !kbNotesDir.isEmpty()) {
+                List<TaskItem> activeTasks = taskService.getAllTasks(kbNotesDir).stream()
+                        .filter(t -> !"done".equals(t.status))
+                        .collect(Collectors.toList());
+                model.addAttribute("todoHigh", activeTasks.stream().filter(t -> "high".equals(t.priority)).collect(Collectors.toList()));
+                model.addAttribute("todoMid", activeTasks.stream().filter(t -> "mid".equals(t.priority)).collect(Collectors.toList()));
+                model.addAttribute("todoLow", activeTasks.stream().filter(t -> "low".equals(t.priority)).collect(Collectors.toList()));
+                model.addAttribute("todoTotal", activeTasks.size());
+            } else {
+                model.addAttribute("todoHigh", List.of());
+                model.addAttribute("todoMid", List.of());
+                model.addAttribute("todoLow", List.of());
+                model.addAttribute("todoTotal", 0);
+            }
+        } catch (Exception e) {
+            log.warn("加载待办任务失败", e);
+            model.addAttribute("todoHigh", List.of());
+            model.addAttribute("todoMid", List.of());
+            model.addAttribute("todoLow", List.of());
+            model.addAttribute("todoTotal", 0);
+        }
+
         return "chat";
     }
 

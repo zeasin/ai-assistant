@@ -7,6 +7,35 @@
 <body>
 <th:block layout:fragment="content">
 
+<!-- 待办悬浮面板 -->
+<div class="todo-float" id="todoPanel">
+    <h3>
+        ⚡ 今日待办
+        <span class="todo-count" th:text="${todoTotal + ' 项'}">0 项</span>
+    </h3>
+    <th:block th:if="${#lists.size(todoHigh) > 0}">
+    <div class="todo-group">
+        <div class="group-label" style="color:#e03131;">🔴 高优先级</div>
+        <div th:each="item : ${todoHigh}" class="todo-item" style="border-left-color:#e03131;" th:text="${item.title}"></div>
+    </div>
+    </th:block>
+    <th:block th:if="${#lists.size(todoMid) > 0}">
+    <div class="todo-group">
+        <div class="group-label" style="color:#e8590c;">🟡 中优先级</div>
+        <div th:each="item : ${todoMid}" class="todo-item" style="border-left-color:#e8590c;" th:text="${item.title}"></div>
+    </div>
+    </th:block>
+    <th:block th:if="${#lists.size(todoLow) > 0}">
+    <div class="todo-group">
+        <div class="group-label" style="color:#2b8a3e;">🟢 低优先级</div>
+        <div th:each="item : ${todoLow}" class="todo-item" style="border-left-color:#2b8a3e;" th:text="${item.title}"></div>
+    </div>
+    </th:block>
+    <th:block th:if="${todoTotal == 0}">
+    <div class="todo-empty">✅ 暂无未完成待办</div>
+    </th:block>
+</div>
+
 <div id="chatApp" class="chat-app"
      th:data-kb-id="${kbId}" th:data-kb-name="${kbName}">
 

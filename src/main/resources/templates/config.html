@@ -13,6 +13,57 @@
     <code style="display:block;margin-top:4px;">ollama pull nomic-embed-text</code>
 </div>
 
+<div class="status-bar" style="margin-bottom:16px;">
+    <div class="status-item">
+        <div class="label">大模型服务</div>
+        <div th:if="${#lists.size(llm_models) > 0}">
+            <div class="value" style="font-size:16px;color:#2b8a3e;">● 已配置</div>
+            <div class="text-muted" style="font-size:11px;margin-top:2px;" th:text="${llm_models[0].name} + ' · ' + ${llm_models[0].model}">DeepSeek · deepseek-chat</div>
+        </div>
+        <div th:unless="${#lists.size(llm_models) > 0}">
+            <div class="value" style="font-size:16px;color:#e03131;">● 未配置</div>
+            <div class="text-muted" style="font-size:11px;margin-top:2px;">请在下方的 AI 模型卡片中配置</div>
+        </div>
+    </div>
+    <div class="status-item">
+        <div class="label">语义检索</div>
+        <div class="value" style="font-size:16px;" th:classappend="${ollama_available} ? 'status-up' : 'status-down'" th:text="${ollama_available} ? '● 运行中' : '● 未连接'">● 未连接</div>
+        <div class="text-muted" style="font-size:11px;margin-top:2px;" th:text="${ollama_provider}">硅基流动 · BAAI/bge-m3</div>
+    </div>
+    <div class="status-item">
+        <div class="label">知识库</div>
+        <div class="value" style="font-size:16px;" th:text="${#lists.size(kbList)} + ' 个'">0 个</div>
+        <div class="text-muted" style="font-size:11px;margin-top:2px;">点下方知识库管理查看详情</div>
+    </div>
+    <div class="status-item">
+        <div class="label">模块总数</div>
+        <div class="value" style="font-size:16px;" th:text="${#lists.size(modules)}">0</div>
+        <div class="text-muted" style="font-size:11px;margin-top:2px;">所有知识库的模块合计</div>
+    </div>
+</div>
+
+<div class="card">
+    <h2>📊 AI 综合日报</h2>
+    <div class="text-muted mb-2">日报属于各个知识库，请前往具体知识库的概览页查看和生成。</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <a th:each="kb : ${kbList}" th:href="@{/kb/{id}(id=${kb.id})}" class="btn btn-secondary" th:text="'📂 ' + ${kb.name} + ' 日报'">工作日报</a>
+    </div>
+</div>
+
+<div class="card">
+    <h2>ℹ️ 系统信息</h2>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;font-size:13px;">
+        <div><span class="text-muted">版本：</span>v1.0</div>
+        <div><span class="text-muted">知识库：</span><span th:text="${#lists.size(kbList)}">0</span> 个</div>
+        <div><span class="text-muted">模块总数：</span><span th:text="${#lists.size(modules)}">0</span> 个</div>
+        <div th:if="${#lists.size(llm_models) > 0}"><span class="text-muted">当前模型：</span><span th:text="${llm_models[0].name}">DeepSeek</span></div>
+        <div><span class="text-muted">语义检索：</span>
+            <span th:if="${ollama_available}" style="color:#2b8a3e;">● 在线</span>
+            <span th:unless="${ollama_available}" style="color:#e03131;">● 离线</span>
+        </div>
+    </div>
+</div>
+
 <div class="card">
     <h2>⚙️ 定时任务</h2>
     <ul class="scheduler-list">
