@@ -208,6 +208,13 @@ public class SessionService {
         return se;
     }
 
+    public void clearAllEmbeddings() {
+        turnEmbeddingDbService.getBaseMapper().delete(
+                new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<TurnEmbeddingEntity>()
+                        .isNotNull("id"));
+        log.info("已清空所有向量数据（向量模型变更）");
+    }
+
     public void deleteSession(String sessionId) {
         turnEmbeddingDbService.getBaseMapper().delete(
                 new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<TurnEmbeddingEntity>()

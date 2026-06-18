@@ -10,6 +10,7 @@ import com.laoqi.assistant.service.LogService;
 import com.laoqi.assistant.service.LlmConfigResolver;
 import com.laoqi.assistant.service.ModuleService;
 import com.laoqi.assistant.service.OllamaEmbeddingService;
+import com.laoqi.assistant.service.SessionService;
 import com.laoqi.assistant.service.db.LlmProfileDbService;
 import org.springframework.web.bind.annotation.*;
 
@@ -26,13 +27,15 @@ public class ApiConfigController {
     private final LlmProfileDbService llmProfileDbService;
     private final LlmConfigResolver llmConfigResolver;
     private final ModuleService moduleService;
+    private final SessionService sessionService;
 
     public ApiConfigController(ConfigService configService, FeishuService feishuService,
                                 LogService logService,
                                 OllamaEmbeddingService ollamaEmbeddingService,
                                 LlmProfileDbService llmProfileDbService,
                                 LlmConfigResolver llmConfigResolver,
-                                ModuleService moduleService) {
+                                ModuleService moduleService,
+                                SessionService sessionService) {
         this.configService = configService;
         this.feishuService = feishuService;
         this.logService = logService;
@@ -40,6 +43,7 @@ public class ApiConfigController {
         this.llmProfileDbService = llmProfileDbService;
         this.llmConfigResolver = llmConfigResolver;
         this.moduleService = moduleService;
+        this.sessionService = sessionService;
     }
 
     @GetMapping("/api/config")
@@ -334,13 +338,30 @@ public class ApiConfigController {
         String apiKey = body.getOrDefault("apiKey", "");
         String provider = body.getOrDefault("provider", "");
         Config config = configService.load();
+        String oldModel = config.getEmbeddingModel();
+        String oldApiKey = config.getEmbeddingApiKey();
+        String oldKey = oldModel + "|" + oldApiKey;
+        String newKey = model + "|" + apiKey;
+        boolean modelChanged = !oldKey.isEmpty() && !oldKey.equals(newKey);
+
         config.setEmbeddingModel(model);
         config.setEmbeddingBaseUrl(baseUrl);
         config.setEmbeddingApiKey(apiKey);
         config.setEmbeddingProvider(provider);
         configService.save(config);
-        logService.add("配置更新", "成功", "语义向量模型已配置: " + model);
+
+        if (modelChanged) {
+            logService.add("配置更新", "注意", "向量模型已变更，清空旧向量数据");
+        }
+
         ollamaEmbeddingService.reloadConfig();
+
+        // 向量模型变更后清空旧向量，避免新旧向量混用
+        if (modelChanged) {
+            sessionService.clearAllEmbeddings();
+        }
+
+        logService.add("配置更新", "成功", "语义向量模型已配置: " + model);
         return Map.of("ok", true);
     }
 

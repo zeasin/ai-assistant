@@ -5,10 +5,10 @@
   "feishuAppSecret" : "IVsBQADPxkx62MnksTdxObxIWiCG6LZs",
   "feishuChatId" : "oc_83c41f86a177d021d2838372b2a11fea",
   "feishuPollingEnabled" : true,
-  "embeddingModel" : "BAAI/bge-m3",
-  "embeddingBaseUrl" : "https://api.siliconflow.cn/v1",
-  "embeddingApiKey" : "sk-jkahyxrsmcxjskdbjogfbszamkdhdfntoxchkkqicomwdowq",
-  "embeddingProvider" : "硅基流动",
+  "embeddingModel" : "nomic-embed-text",
+  "embeddingBaseUrl" : "http://127.0.0.1:11434",
+  "embeddingApiKey" : "",
+  "embeddingProvider" : "Ollama",
   "logFile" : "assistant_log.json",
   "columnSettings" : {
     "customer" : {

@@ -30,7 +30,7 @@ public class OllamaEmbeddingService {
     private EmbeddingModel embeddingModel;
     private boolean available;
     private String providerLabel = "";
-
+    private String currentModelKey = "";  // 用于检测模型是否变更
     public OllamaEmbeddingService(AppConfig appConfig, LogService logService,
                                    ConfigService configService) {
         this.appConfig = appConfig;
@@ -52,6 +52,10 @@ public class OllamaEmbeddingService {
 
         if (model == null || model.isEmpty()) model = appConfig.getOllamaModel();
         if (baseUrl == null || baseUrl.isEmpty()) baseUrl = appConfig.getOllamaBaseUrl();
+
+        // 仅记录当前模型 key，实际清空由 ApiConfigController 在保存前处理
+        String newKey = model + "|" + apiKey;
+        this.currentModelKey = newKey;
 
         this.providerLabel = providerConfig != null && !providerConfig.isEmpty()
                 ? providerConfig + " · " + model
