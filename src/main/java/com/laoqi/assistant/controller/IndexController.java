@@ -2,6 +2,7 @@ package com.laoqi.assistant.controller;
 
 import com.laoqi.assistant.entity.LlmProfileEntity;
 import com.laoqi.assistant.model.TaskData.TaskItem;
+import com.laoqi.assistant.service.ConfigService;
 import com.laoqi.assistant.service.LlmConfigResolver;
 import com.laoqi.assistant.service.LogService;
 import com.laoqi.assistant.service.ReportService;
@@ -26,13 +27,16 @@ public class IndexController {
     private final ReportService reportService;
     private final TaskService taskService;
     private final LogService logService;
+    private final ConfigService configService;
     private final LlmConfigResolver llmConfigResolver;
 
     public IndexController(ReportService reportService, TaskService taskService,
-                            LogService logService, LlmConfigResolver llmConfigResolver) {
+                            LogService logService, ConfigService configService,
+                            LlmConfigResolver llmConfigResolver) {
         this.reportService = reportService;
         this.taskService = taskService;
         this.logService = logService;
+        this.configService = configService;
         this.llmConfigResolver = llmConfigResolver;
     }
 
@@ -74,6 +78,14 @@ public class IndexController {
             model.addAttribute("llmModel", defaultLlm.getModel());
         } else {
             model.addAttribute("llmConfigured", false);
+        }
+
+        try {
+            String notesDir = configService.getNotesDir();
+            model.addAttribute("notesDirConfigured", true);
+            model.addAttribute("notesDir", notesDir);
+        } catch (Exception e) {
+            model.addAttribute("notesDirConfigured", false);
         }
 
         return "index";
