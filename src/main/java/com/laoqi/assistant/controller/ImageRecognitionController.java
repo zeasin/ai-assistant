@@ -22,7 +22,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 @Controller
-@RequestMapping("/image-recognition")
+@RequestMapping("/image")
 public class ImageRecognitionController {
 
     private static final Logger log = LoggerFactory.getLogger(ImageRecognitionController.class);
@@ -54,7 +54,7 @@ public class ImageRecognitionController {
         if (kbId == null) {
             KnowledgeBaseEntity first = kbService.getFirst();
             if (first == null) return "redirect:/config";
-            return "redirect:/image-recognition?kbId=" + first.getId();
+            return "redirect:/image?kbId=" + first.getId();
         }
 
         KnowledgeBaseEntity kb = kbService.getById(kbId);
@@ -69,7 +69,7 @@ public class ImageRecognitionController {
                 .filter(p -> p.isMultimodal())
                 .collect(Collectors.toList());
         model.addAttribute("visionModels", visionModels);
-        return "image_recognition";
+        return "image";
     }
 
     /** 列出指定 KB 当前目录下的图片文件（仅当前层，不递归） */
@@ -283,7 +283,7 @@ public class ImageRecognitionController {
             String reply = llmService.chatWithImage(systemPrompt, prompt, base64Image, imageType, modelName);
 
             long elapsed = System.currentTimeMillis() - startMs;
-            String imageUrl = "/image-recognition/thumb?path=" + java.net.URLEncoder.encode(filePath, "UTF-8")
+            String imageUrl = "/image/thumb?path=" + java.net.URLEncoder.encode(filePath, "UTF-8")
                     + "&kbId=" + kbId;
             String result = (reply != null && !reply.isEmpty()) ? reply : "(AI 未返回结果)";
 

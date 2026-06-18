@@ -300,7 +300,7 @@ async function uploadAndRecognize() {
     fd.append('prompt', document.getElementById('uploadPrompt').value);
     fd.append('modelName', modelName);
     try {
-        var resp = await fetch('/image-recognition/recognize-sync', { method: 'POST', body: fd });
+        var resp = await fetch('/image/recognize-sync', { method: 'POST', body: fd });
         var data = await resp.json();
         if (data.ok) showResult(data.image_url, data.result);
         else toast('识别失败: ' + (data.error || '未知错误'), 'error');
@@ -312,7 +312,7 @@ async function loadImages() {
     var grid = document.getElementById('imageGrid');
     grid.innerHTML = '<div class="sr-loading">⌛ 加载中...</div>';
     try {
-        var url = '/image-recognition/api/images?kbId=' + getKbId() + '&dir=' + encodeURIComponent(currentBrowseDir);
+        var url = '/image/api/images?kbId=' + getKbId() + '&dir=' + encodeURIComponent(currentBrowseDir);
         var resp = await fetch(url);
         var data = await resp.json();
         if (data.ok) { allImages = data.images; renderImages(allImages); }
@@ -331,7 +331,7 @@ function renderImages(images) {
         card.onclick = function(path) { return function() { selectImage(path, this); }; }(img.path);
         var thumb = document.createElement('img');
         thumb.className = 'thumb';
-        thumb.src = '/image-recognition/thumb?path=' + encodeURIComponent(img.path) + '&kbId=' + getKbId();
+        thumb.src = '/image/thumb?path=' + encodeURIComponent(img.path) + '&kbId=' + getKbId();
         thumb.loading = 'lazy';
         thumb.onerror = function() { this.style.display = 'none'; };
         card.appendChild(thumb);
@@ -378,7 +378,7 @@ async function browseDir(dir) {
 async function loadDirTree() {
     var container = document.getElementById('dirTree');
     try {
-        var resp = await fetch('/image-recognition/api/dir-tree?kbId=' + getKbId());
+        var resp = await fetch('/image/api/dir-tree?kbId=' + getKbId());
         var data = await resp.json();
         if (data.ok && data.tree && data.tree.length > 0) {
             container.innerHTML = '';
@@ -464,7 +464,7 @@ async function recognizeFile() {
     var btn = document.getElementById('browseBtn');
     btn.disabled = true; btn.textContent = '⏳ 识别中...';
     try {
-        var resp = await fetch('/image-recognition/recognize-file', {
+        var resp = await fetch('/image/recognize-file', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({path: selectedImage, prompt: document.getElementById('browsePrompt').value, modelName: modelName, kbId: getKbId()})
@@ -555,7 +555,7 @@ async function browseSaveDir(dir) {
     });
     try {
         var kbId = parseInt(document.getElementById('saveKbSelector').value);
-        var resp = await fetch('/image-recognition/subdirs?kbId=' + kbId + '&dir=' + encodeURIComponent(dir));
+        var resp = await fetch('/image/subdirs?kbId=' + kbId + '&dir=' + encodeURIComponent(dir));
         var data = await resp.json();
         var list = document.getElementById('saveDirList');
         list.innerHTML = '';
@@ -587,7 +587,7 @@ async function confirmSave() {
     var fullPath = subdir ? subdir + '/' + filename : filename;
     var kbId = parseInt(document.getElementById('saveKbSelector').value);
     try {
-        var resp = await fetch('/image-recognition/save', {
+        var resp = await fetch('/image/save', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({path: fullPath, content: currentResultMd, kbId: kbId})

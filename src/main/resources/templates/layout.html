@@ -333,7 +333,7 @@
         <div class="nav-inner">
         <span class="title">AI 助理</span>
         <a th:classappend="${requestURI == '/chat' or requestURI == '/'} ? 'active' : ''" href="/chat">对话</a>
-        <a th:classappend="${#strings.startsWith(requestURI, '/image-recognition')} ? 'active' : ''" href="/image-recognition">识图</a>
+        <a th:classappend="${#strings.startsWith(requestURI, '/image')} ? 'active' : ''" href="/image">识图</a>
 
         <a th:each="kb : ${kbList}"
            th:href="@{/kb/{id}(id=${kb.id})}"
@@ -351,6 +351,22 @@
         <th:block layout:fragment="content" />
     </div>
     <script>
+        (function() {
+            var params = new URLSearchParams(window.location.search);
+            var kbId = params.get('kbId');
+            if (!kbId) {
+                var m = location.pathname.match(/^\/kb\/(\d+)/);
+                if (m) kbId = m[1];
+            }
+            if (kbId) {
+                document.querySelectorAll('.nav-inner a').forEach(function(a) {
+                    var href = a.getAttribute('href');
+                    if (href === '/chat' || href === '/image') {
+                        a.href = href + '?kbId=' + kbId;
+                    }
+                });
+            }
+        })();
         if (window.self !== window.top) {
             document.querySelector('.nav').style.display = 'none';
             document.querySelector('.container').style.padding = '0';
