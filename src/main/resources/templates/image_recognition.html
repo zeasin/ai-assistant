@@ -147,27 +147,45 @@
     </div>
 </div>
 
-<!-- 全屏识别结果弹窗 -->
+<!-- 行内识别结果（关闭弹窗后依然保留） -->
+<div id="resultArea" style="display:none;">
+    <div class="sr-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+            <h3 style="margin:0;">📸 识别结果</h3>
+            <div style="display:flex;gap:8px;align-items:center;">
+                <span id="saveStatus" style="font-size:13px;color:#2b8a3e;"></span>
+                <button class="btn btn-secondary" id="fullscreenBtn" style="font-size:13px;padding:6px 14px;">🔍 全屏查看</button>
+                <button class="btn btn-primary" id="saveBtn" style="font-size:13px;padding:6px 14px;">💾 保存到笔记库</button>
+            </div>
+        </div>
+        <div style="text-align:center;margin-bottom:14px;">
+            <img id="resultImg" style="max-width:100%;max-height:400px;object-fit:contain;border-radius:8px;border:1px solid #e1e3e6;" />
+        </div>
+        <div id="resultText" class="sr-result-text" style="max-height:500px;overflow-y:auto;"></div>
+    </div>
+</div>
+
+<!-- 全屏查看弹窗 -->
 <div class="modal-overlay" id="resultModal">
     <div class="modal" style="width:1000px;max-width:95vw;padding:0;overflow:hidden;animation:fadeIn .2s ease;">
         <!-- 顶部栏 -->
         <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid #e1e3e6;">
             <div style="display:flex;align-items:center;gap:10px;">
                 <span style="font-size:18px;">📸</span>
-                <span style="font-size:16px;font-weight:600;color:#1a1b1e;">识别结果</span>
-                <span id="saveStatus" style="font-size:13px;color:#2b8a3e;"></span>
+                <span style="font-size:16px;font-weight:600;color:#1a1b1e;">全屏查看</span>
+                <span id="modalSaveStatus" style="font-size:13px;color:#2b8a3e;"></span>
             </div>
             <div style="display:flex;align-items:center;gap:8px;">
-                <button class="btn btn-primary" id="saveBtn" style="font-size:13px;padding:7px 16px;">💾 保存到笔记库</button>
+                <button class="btn btn-primary" id="modalSaveBtn" style="font-size:13px;padding:7px 16px;">💾 保存到笔记库</button>
                 <button onclick="closeResultModal()" style="background:none;border:none;font-size:28px;cursor:pointer;color:#5c5f66;padding:0 4px;line-height:1;">&times;</button>
             </div>
         </div>
         <!-- 内容区：上图下文 -->
         <div style="padding:16px 24px;max-height:85vh;overflow-y:auto;">
             <div style="text-align:center;margin-bottom:20px;">
-                <img id="resultImg" style="max-width:100%;max-height:60vh;object-fit:contain;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,0.1);" />
+                <img id="modalResultImg" style="max-width:100%;max-height:60vh;object-fit:contain;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,0.1);" />
             </div>
-            <div id="resultText" class="sr-result-text" style="line-height:1.7;"></div>
+            <div id="modalResultText" class="sr-result-text" style="line-height:1.7;"></div>
         </div>
     </div>
 </div>
@@ -460,8 +478,13 @@ async function recognizeFile() {
 
 function showResult(imageUrl, resultMd) {
     currentResultMd = resultMd;
+    // 更新行内区域
+    document.getElementById('resultArea').style.display = 'block';
     document.getElementById('resultImg').src = imageUrl;
-    document.getElementById('resultText').innerHTML = marked.parse(resultMd);
+    document.getElementById('modalResultImg').src = imageUrl;
+    var html = marked.parse(resultMd);
+    document.getElementById('resultText').innerHTML = html;
+    document.getElementById('modalResultText').innerHTML = html;
     // 渲染 LaTeX 公式（$...$ 内联，$$...$$ 块级）
     if (window.__katexLoaded || typeof renderMathInElement !== 'undefined') {
         try {
@@ -472,11 +495,21 @@ function showResult(imageUrl, resultMd) {
                 ],
                 throwOnError: false
             });
+            renderMathInElement(document.getElementById('modalResultText'), {
+                delimiters: [
+                    {left: '$$', right: '$$', display: true},
+                    {left: '$', right: '$', display: false}
+                ],
+                throwOnError: false
+            });
         } catch(e) { /* KaTeX not yet loaded, skip */ }
     }
     document.getElementById('saveStatus').textContent = '';
+    document.getElementById('modalSaveStatus').textContent = '';
     document.getElementById('saveBtn').disabled = false;
+    document.getElementById('modalSaveBtn').disabled = false;
     document.getElementById('resultModal').classList.add('active');
+    document.getElementById('resultArea').scrollIntoView({behavior: 'smooth', block: 'start'});
 }
 
 function closeResultModal() {
@@ -562,7 +595,8 @@ async function confirmSave() {
         var data = await resp.json();
         if (data.ok) {
             toast('✅ 已保存: ' + data.path);
-            document.getElementById('saveStatus').textContent = '✅ 已保存到笔记库';
+            document.getElementById('saveStatus').textContent = '✅ 已保存: ' + data.path;
+            document.getElementById('modalSaveStatus').textContent = '✅ 已保存: ' + data.path;
             closeSaveModal();
         } else { toast('保存失败: ' + (data.error || ''), 'error'); }
     } catch(e) { toast('保存失败', 'error'); }
@@ -593,6 +627,10 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('uploadBtn').addEventListener('click', uploadAndRecognize);
     document.getElementById('browseBtn').addEventListener('click', recognizeFile);
     document.getElementById('saveBtn').addEventListener('click', showSaveModal);
+    document.getElementById('modalSaveBtn').addEventListener('click', showSaveModal);
+    document.getElementById('fullscreenBtn').addEventListener('click', function() {
+        document.getElementById('resultModal').classList.add('active');
+    });
     document.getElementById('refreshBtn').addEventListener('click', loadImages);
     document.getElementById('searchInput').addEventListener('input', filterImages);
     document.getElementById('browseSaveBtn').addEventListener('click', togglePathBrowser);
