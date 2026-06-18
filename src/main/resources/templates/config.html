@@ -157,11 +157,13 @@
                 <label style="font-size:12px;">超时(秒)</label>
                 <input type="number" id="newModelTimeout" value="600" min="10" max="900" style="width:100%;padding:8px 10px;border:1px solid #e1e3e6;border-radius:6px;font-size:13px;">
             </div>
-            <div class="form-group" style="flex:0 0 auto;display:flex;align-items:center;padding-top:18px;">
-                <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;white-space:nowrap;">
-                    <input type="checkbox" id="newModelVision" style="width:16px;height:16px;cursor:pointer;">
-                    支持多模态（识图）
-                </label>
+            <div class="form-group" style="flex:0 0 130px;">
+                <label style="font-size:12px;">模型类型</label>
+                <select id="newModelType" style="width:100%;padding:8px 10px;border:1px solid #e1e3e6;border-radius:6px;font-size:13px;outline:none;background:#fff;">
+                    <option value="text">文本模型</option>
+                    <option value="multimodal">多模态</option>
+                    <option value="embedding">向量模型</option>
+                </select>
             </div>
         </div>
         <div class="flex" style="gap:8px;margin-top:8px;">
@@ -169,6 +171,33 @@
             <button class="btn btn-secondary" id="llmCancelBtn" onclick="cancelEditLlmModel()" style="display:none;">取消</button>
             <span id="llmModelsStatus" class="text-muted" style="margin-left:4px;"></span>
         </div>
+    </div>
+</div>
+
+<div class="card">
+    <h2>🔤 语义向量模型</h2>
+    <div class="text-muted mb-2">配置用于语义检索的向量模型。填入 API Key 则使用 API 模式（如硅基流动），留空则使用 Ollama 本地模式。保存后立即生效。</div>
+    <div class="form-row" style="gap:8px;flex-wrap:wrap;">
+        <div class="form-group" style="flex:1;min-width:160px;">
+            <label style="font-size:12px;">API 地址</label>
+            <input type="text" id="embeddingBaseUrl" value="http://127.0.0.1:11434" style="width:100%;padding:8px 10px;border:1px solid #e1e3e6;border-radius:6px;font-size:13px;font-family:monospace;">
+        </div>
+        <div class="form-group" style="flex:0 0 200px;">
+            <label style="font-size:12px;">模型名</label>
+            <input type="text" id="embeddingModel" value="nomic-embed-text" style="width:100%;padding:8px 10px;border:1px solid #e1e3e6;border-radius:6px;font-size:13px;font-family:monospace;">
+        </div>
+        <div class="form-group" style="flex:1;min-width:200px;">
+            <label style="font-size:12px;">API Key <span class="text-muted" style="font-weight:400;">(留空=Ollama)</span></label>
+            <input type="password" id="embeddingApiKey" value="" placeholder="sk-..." style="width:100%;padding:8px 10px;border:1px solid #e1e3e6;border-radius:6px;font-size:13px;font-family:monospace;">
+        </div>
+        <div class="form-group" style="flex:0 0 160px;">
+            <label style="font-size:12px;">供应商名称</label>
+            <input type="text" id="embeddingProvider" value="" placeholder="如 硅基流动" style="width:100%;padding:8px 10px;border:1px solid #e1e3e6;border-radius:6px;font-size:13px;font-family:monospace;">
+        </div>
+    </div>
+    <div class="flex" style="gap:8px;">
+        <button class="btn btn-primary" onclick="saveEmbeddingModel()">保存</button>
+        <span id="embeddingModelStatus" class="text-muted" style="margin-left:4px;"></span>
     </div>
 </div>
 
@@ -415,6 +444,7 @@ function escapeHtml(str) {
 document.addEventListener('DOMContentLoaded', function() {
     setTimeout(loadLabels, 100);
     setTimeout(loadLlmModels, 200);
+    setTimeout(loadEmbeddingModel, 300);
 });
 
 function selectChat(el) {
@@ -453,17 +483,20 @@ function renderLlmModels() {
     empty.style.display = 'none';
 
     let html = '<table class="log-table"><thead><tr>' +
-        '<th>名称</th><th>模型</th><th>API 地址</th><th>超时</th><th>多模态</th><th>默认</th><th>操作</th>' +
+        '<th>名称</th><th>模型</th><th>API 地址</th><th>超时</th><th>类型</th><th>默认</th><th>操作</th>' +
         '</tr></thead><tbody>';
     llmModels.forEach(function(m) {
         const isDefault = m.isDefault;
-        const vision = m.visionSupport;
+        const typeMap = {'text': '文本模型', 'multimodal': '多模态', 'embedding': '向量模型'};
+        const typeLabel = typeMap[m.modelType] || typeMap['text'];
+        const typeBadge = {'text': '#7c5cfc', 'multimodal': '#10b981', 'embedding': '#f59e0b'};
+        const badgeColor = typeBadge[m.modelType] || '#909296';
         html += '<tr id="lm-row-' + m.id + '">';
         html += '<td><strong>' + escapeHtml(m.name) + '</strong></td>';
         html += '<td><code>' + escapeHtml(m.model || '') + '</code></td>';
         html += '<td style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;word-break:break-all;"><code>' + escapeHtml(m.baseUrl || '') + '</code></td>';
         html += '<td>' + (m.timeout || 600) + 's</td>';
-        html += '<td>' + (vision ? '✅' : '—') + '</td>';
+        html += '<td><span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;color:#fff;background:' + badgeColor + ';">' + typeLabel + '</span></td>';
         html += '<td>' + (isDefault ? '✅ 默认' : '—') + '</td>';
         html += '<td>';
         html += '<button class="btn btn-secondary" onclick="editLlmModel(' + m.id + ')" style="padding:2px 8px;font-size:11px;margin-right:4px;">编辑</button>';
@@ -483,7 +516,7 @@ function resetLlmForm() {
     document.getElementById('newModelBaseUrl').value = 'https://api.deepseek.com';
     document.getElementById('newModelModel').value = '';
     document.getElementById('newModelTimeout').value = '600';
-    document.getElementById('newModelVision').checked = false;
+    document.getElementById('newModelType').value = 'text';
     document.getElementById('llmFormTitle').textContent = '添加模型';
     document.getElementById('llmSubmitBtn').textContent = '添加模型';
     document.getElementById('llmCancelBtn').style.display = 'none';
@@ -509,7 +542,7 @@ async function submitLlmModel() {
         baseUrl: baseUrlEl.value || 'https://api.deepseek.com',
         model: modelEl.value || 'deepseek-chat',
         timeout: parseInt(timeoutEl.value) || 600,
-        visionSupport: visionEl.checked,
+        modelType: document.getElementById('newModelType').value || 'text',
     };
 
     if (llmEditingId !== null) {
@@ -552,7 +585,7 @@ function editLlmModel(id) {
     document.getElementById('newModelBaseUrl').value = model.baseUrl || 'https://api.deepseek.com';
     document.getElementById('newModelModel').value = model.model || '';
     document.getElementById('newModelTimeout').value = model.timeout || 600;
-    document.getElementById('newModelVision').checked = model.visionSupport === true;
+    document.getElementById('newModelType').value = model.modelType || 'text';
     document.getElementById('llmFormTitle').textContent = '编辑模型: ' + model.name;
     document.getElementById('llmSubmitBtn').textContent = '保存修改';
     document.getElementById('llmCancelBtn').style.display = 'inline-block';
@@ -608,6 +641,50 @@ async function setDefaultModel(id) {
 }
 
 
+
+// ===== 语义向量模型管理 =====
+
+function loadEmbeddingModel() {
+    fetch('/api/config/embedding-model')
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) {
+                if (data.model) document.getElementById('embeddingModel').value = data.model;
+                if (data.baseUrl) document.getElementById('embeddingBaseUrl').value = data.baseUrl;
+                if (data.apiKey) document.getElementById('embeddingApiKey').value = data.apiKey;
+                if (data.provider) document.getElementById('embeddingProvider').value = data.provider;
+            }
+        })
+        .catch(() => {});
+}
+
+async function saveEmbeddingModel() {
+    const model = document.getElementById('embeddingModel').value.trim() || 'nomic-embed-text';
+    const baseUrl = document.getElementById('embeddingBaseUrl').value.trim() || 'http://127.0.0.1:11434';
+    const apiKey = document.getElementById('embeddingApiKey').value.trim();
+    const provider = document.getElementById('embeddingProvider').value.trim();
+    const status = document.getElementById('embeddingModelStatus');
+    try {
+        const res = await fetch('/api/config/embedding-model', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({model: model, baseUrl: baseUrl, apiKey: apiKey, provider: provider}),
+        });
+        const data = await res.json();
+        if (data.ok) {
+            status.textContent = '✅ 已保存';
+            status.style.color = '#10b981';
+            setTimeout(() => status.textContent = '', 3000);
+            toast('✅ 语义向量模型已更新', 'success');
+        } else {
+            status.textContent = '❌ ' + (data.error || '保存失败');
+            status.style.color = '#ef4444';
+        }
+    } catch (e) {
+        status.textContent = '❌ 请求失败';
+        status.style.color = '#ef4444';
+    }
+}
 
 async function saveCollectorDir() {
     const value = document.getElementById('collectorOutputDir').value.trim();

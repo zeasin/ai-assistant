@@ -229,6 +229,19 @@ public class ApiConfigController {
         }
         profile.setName(profile.getName().trim());
 
+        // 向后兼容：modelType 为空时从 visionSupport 推断
+        if (profile.getModelType() == null || profile.getModelType().isEmpty()) {
+            if (Boolean.TRUE.equals(profile.getVisionSupport())) {
+                profile.setModelType(LlmProfileEntity.TYPE_MULTIMODAL);
+            } else {
+                profile.setModelType(LlmProfileEntity.TYPE_TEXT);
+            }
+        }
+        // 同步 visionSupport 向后兼容
+        if (LlmProfileEntity.TYPE_MULTIMODAL.equals(profile.getModelType())) {
+            profile.setVisionSupport(true);
+        }
+
         // Check for duplicate name
         LlmProfileEntity existing = llmProfileDbService.findByName(profile.getName());
         if (profile.getId() != null) {
@@ -306,5 +319,35 @@ public class ApiConfigController {
                 llmProfileDbService.updateById(p);
             }
         }
+    }
+
+    @PostMapping("/api/config/embedding-model")
+    public Map<String, Object> saveEmbeddingModel(@RequestBody Map<String, String> body) {
+        String model = body.getOrDefault("model", "");
+        String baseUrl = body.getOrDefault("baseUrl", "");
+        String apiKey = body.getOrDefault("apiKey", "");
+        String provider = body.getOrDefault("provider", "");
+        Config config = configService.load();
+        config.setEmbeddingModel(model);
+        config.setEmbeddingBaseUrl(baseUrl);
+        config.setEmbeddingApiKey(apiKey);
+        config.setEmbeddingProvider(provider);
+        configService.save(config);
+        logService.add("配置更新", "成功", "语义向量模型已配置: " + model);
+        ollamaEmbeddingService.reloadConfig();
+        return Map.of("ok", true);
+    }
+
+    @GetMapping("/api/config/embedding-model")
+    public Map<String, Object> getEmbeddingModel() {
+        Config config = configService.load();
+        Map<String, Object> result = new HashMap<>();
+        result.put("ok", true);
+        result.put("model", config.getEmbeddingModel());
+        result.put("baseUrl", config.getEmbeddingBaseUrl());
+        result.put("apiKey", config.getEmbeddingApiKey());
+        result.put("provider", config.getEmbeddingProvider());
+        result.put("providerLabel", ollamaEmbeddingService.getProviderLabel());
+        return result;
     }
 }

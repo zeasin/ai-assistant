@@ -47,7 +47,7 @@ public class ImageRecognitionController {
     public String page(Model model) {
         List<LlmProfileEntity> allProfiles = llmConfigResolver.getAllProfiles();
         List<LlmProfileEntity> visionModels = allProfiles.stream()
-                .filter(p -> Boolean.TRUE.equals(p.getVisionSupport()))
+                .filter(p -> p.isMultimodal())
                 .collect(Collectors.toList());
         model.addAttribute("visionModels", visionModels);
         return "image_recognition";

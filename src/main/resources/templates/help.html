@@ -28,7 +28,7 @@
                     <tr><th>依赖</th><th>说明</th><th>必须</th></tr>
                     <tr><td>Java 17+</td><td>运行时环境</td><td class="yes">✅</td></tr>
                     <tr><td>LLM API Key</td><td>DeepSeek 等兼容 API</td><td class="yes">✅</td></tr>
-                    <tr><td>Ollama</td><td>语义检索 + 上下文压缩（nomic-embed-text + qwen2.5:1.5b）</td><td class="no">🔘 可选（强烈推荐）</td></tr>
+                    <tr><td>语义检索</td><td>向量嵌入（支持 Ollama 本地 / 硅基流动等 API）</td><td class="no">🔘 可选</td></tr>
                 </table>
                 <h3>启动步骤</h3>
                 <pre># 1. 配置 API Key（/config 页面或环境变量 DEEPSEEK_API_KEY）
@@ -96,7 +96,12 @@ java -jar target/ai-assistant-0.4.0.jar
                     <li><code>searchFiles(keyword)</code> — 按文件名搜索（最多 20 条）</li>
                 </ul>
                 <h3>语义检索 / 长期记忆</h3>
-                <p>需要启动 Ollama（<code>ollama run nomic-embed-text</code>）。AI 回复后自动生成 768 维向量并跨会话检索相似轮次（余弦相似度阈值 0.5），为当前对话提供相关历史背景。最多从 5 轮最相关的历史中提取上下文。Ollama 不可用时回退最近 3 轮对话。</p>
+                <p>配置页「语义向量模型」卡片配置嵌入模型。支持两种模式：</p>
+                <ul>
+                    <li><strong>Ollama 本地</strong> — 不填 API Key，使用本地 Ollama（推荐 <code>nomic-embed-text</code>）</li>
+                    <li><strong>API 模式</strong> — 填入 API Key，支持阿里云百炼、硅基流动等 OpenAI 兼容服务</li>
+                </ul>
+                <p>AI 回复后自动生成向量并跨会话检索相似轮次（余弦相似度阈值 0.5），为当前对话提供相关历史背景。最多从 5 轮最相关的历史中提取上下文。向量模型不可用时回退最近 3 轮对话。</p>
 
 
                 <h3>对话管理</h3>
@@ -360,7 +365,7 @@ java -jar target/ai-assistant-0.4.0.jar
                     <tr><td>框架</td><td>Spring Boot 4.1.0 + Spring AI 2.0.0 + Java 17</td></tr>
                     <tr><td>AI 引擎</td><td>ChatClient 直连 LLM（OpenAI 兼容协议）</td></tr>
                     <tr><td>工具编排</td><td>@Tool 注解 + ToolCallingAdvisor（自动路由）</td></tr>
-                    <tr><td>语义检索</td><td>Ollama + nomic-embed-text（768 维向量）</td></tr>
+                    <tr><td>语义检索</td><td>Ollama（nomic-embed-text 等）或 API（BAAI/bge-m3 等）</td></tr>
                     <tr><td>会话存储</td><td>SQLite（MyBatis-Plus）— sessions / messages / turn_embeddings</td></tr>
                     <tr><td>业务存储</td><td>JSON / Markdown 文件（笔记库目录下）</td></tr>
                     <tr><td>前端</td><td>Thymeleaf 模板</td></tr>
@@ -381,7 +386,7 @@ java -jar target/ai-assistant-0.4.0.jar
                     <tr><td>AI 回复"API Key 未配置"</td><td>未在 /config 填写 API Key</td><td>配置页填写 LLM API Key</td></tr>
                     <tr><td>AI 回复为空</td><td>LLM 超时或返回空</td><td>检查网络，超时设为 600s</td></tr>
                     <tr><td>"未配置笔记库根目录"</td><td>未配置笔记库路径</td><td>在 /config 页面设置</td></tr>
-                    <tr><td>语义检索不可用</td><td>Ollama 未启动</td><td><code>ollama run nomic-embed-text</code></td></tr>
+                    <tr><td>语义检索不可用</td><td>向量模型未配置或服务未启动</td><td>/config 页面配置语义向量模型</td></tr>
                     <tr><td>飞书消息收不到</td><td>Webhook URL 未配置或无效</td><td>在 /config 配置并测试</td></tr>
                     <tr><td>对话消息未保存</td><td>参数名不匹配</td><td>确保使用 v0.4.0 最新代码</td></tr>
                 </table>

@@ -113,9 +113,18 @@ public class SessionService {
                     model           TEXT NOT NULL DEFAULT 'deepseek-chat',
                     timeout         INTEGER NOT NULL DEFAULT 600,
                     is_default      INTEGER NOT NULL DEFAULT 0,
-                    vision_support  INTEGER NOT NULL DEFAULT 0
+                    vision_support  INTEGER NOT NULL DEFAULT 0,
+                    model_type      TEXT NOT NULL DEFAULT 'text'
                 )
                 """);
+            // 迁移：为旧数据填充 model_type
+            try {
+                stmt.execute("ALTER TABLE llm_profiles ADD COLUMN model_type TEXT NOT NULL DEFAULT 'text'");
+            } catch (Exception ignored) {
+                // column already exists
+            }
+            stmt.execute("UPDATE llm_profiles SET model_type = 'multimodal' WHERE vision_support = 1 AND model_type = 'text'");
+            stmt.execute("UPDATE llm_profiles SET model_type = 'text' WHERE vision_support = 0 AND model_type = 'text'");
             log.info("New tables (sessions, messages, turn_embeddings, llm_profiles) initialized");
             stmt.execute("""
                 CREATE TABLE IF NOT EXISTS coding_records (

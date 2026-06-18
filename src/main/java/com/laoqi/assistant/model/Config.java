@@ -26,6 +26,12 @@ public class Config {
     private int llmTimeout = 600;
     private Map<String, Map<String, List<String>>> columnSettings = new HashMap<>();
 
+    // 语义向量模型配置（直接存 config.json，不经过 llm_profiles）
+    private String embeddingModel = "nomic-embed-text";
+    private String embeddingBaseUrl = "http://127.0.0.1:11434";
+    private String embeddingApiKey = "";
+    private String embeddingProvider = "";
+
     // 编程AI 配置
     private String codingFeishuAppId = "";
     private String codingFeishuAppSecret = "";
@@ -74,6 +80,15 @@ public class Config {
     public void setLlmTimeout(int llmTimeout) { this.llmTimeout = llmTimeout; }
     public Map<String, Map<String, List<String>>> getColumnSettings() { return columnSettings; }
     public void setColumnSettings(Map<String, Map<String, List<String>>> columnSettings) { this.columnSettings = columnSettings; }
+
+    public String getEmbeddingModel() { return embeddingModel; }
+    public void setEmbeddingModel(String v) { this.embeddingModel = v; }
+    public String getEmbeddingBaseUrl() { return embeddingBaseUrl; }
+    public void setEmbeddingBaseUrl(String v) { this.embeddingBaseUrl = v; }
+    public String getEmbeddingApiKey() { return embeddingApiKey; }
+    public void setEmbeddingApiKey(String v) { this.embeddingApiKey = v; }
+    public String getEmbeddingProvider() { return embeddingProvider; }
+    public void setEmbeddingProvider(String v) { this.embeddingProvider = v; }
 
     public String getCodingFeishuAppId() { return codingFeishuAppId; }
     public void setCodingFeishuAppId(String v) { this.codingFeishuAppId = v; }

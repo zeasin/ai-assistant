@@ -6,6 +6,10 @@
   "feishuAppSecret" : "IVsBQADPxkx62MnksTdxObxIWiCG6LZs",
   "feishuChatId" : "oc_83c41f86a177d021d2838372b2a11fea",
   "feishuPollingEnabled" : true,
+  "embeddingModel" : "BAAI/bge-m3",
+  "embeddingBaseUrl" : "https://api.siliconflow.cn/v1",
+  "embeddingApiKey" : "sk-jkahyxrsmcxjskdbjogfbszamkdhdfntoxchkkqicomwdowq",
+  "embeddingProvider" : "硅基流动",
   "logFile" : "assistant_log.json",
   "modules" : [ {
     "id" : "projects",
@@ -43,10 +47,6 @@
     "prompt" : "你是一个工作效能分析师。分析以下工作记录，从以下几个维度给出洞察：\n\n1. 工作概况：本周/本月重点工作事项\n2. 进度追踪：各事项完成情况\n3. 时间分配：各项工作投入比例\n4. 问题与风险：遇到的阻碍和需要协调的事项\n5. 优化建议：提高效率、调整优先级的建议",
     "dataFiles" : [ ]
   } ],
-  "llmApiKey" : "sk-08506bc9525249e7b78a62558e1447a8",
-  "llmBaseUrl" : "https://api.deepseek.com",
-  "llmModel" : "deepseek-v4-flash",
-  "llmTimeout" : 600,
   "columnSettings" : {
     "customer" : {
       "客户数据_customers" : [ "id", "name", "stage", "source", "product", "company", "createdAt", "notes" ],

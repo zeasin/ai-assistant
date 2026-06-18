@@ -1,5 +1,6 @@
 package com.laoqi.assistant.controller;
 
+import com.laoqi.assistant.entity.LlmProfileEntity;
 import com.laoqi.assistant.service.*;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -36,8 +37,11 @@ public class ConfigController {
                 Map.of("id", "morning_report", "time", "每天 09:00", "desc", "生成综合日报")
         ));
         model.addAttribute("ollama_available", ollamaEmbeddingService.isAvailable());
+        model.addAttribute("ollama_provider", ollamaEmbeddingService.getProviderLabel());
         model.addAttribute("config", configService.load());
-        model.addAttribute("llm_models", llmConfigResolver.getAllProfiles());
+        List<LlmProfileEntity> allProfiles = llmConfigResolver.getAllProfiles();
+        model.addAttribute("llm_models", allProfiles);
+
         return "config";
     }
 

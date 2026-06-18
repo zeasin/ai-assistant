@@ -13,6 +13,8 @@ import com.laoqi.assistant.service.LlmService;
 import com.laoqi.assistant.service.LogService;
 import com.laoqi.assistant.service.NoteAssistantService;
 import com.laoqi.assistant.util.TimeUtil;
+import java.util.List;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Controller;
@@ -97,7 +99,12 @@ public class ChatController {
             model.addAttribute("current", session);
         }
         model.addAttribute("ai_provider", "direct");
-        model.addAttribute("llm_models", llmConfigResolver.getAllProfiles());
+        // 聊天页面只显示文本模型和多模态模型，不显示向量模型
+        List<LlmProfileEntity> chatModels = llmConfigResolver.getAllProfiles()
+                .stream()
+                .filter(p -> !LlmProfileEntity.TYPE_EMBEDDING.equals(p.getModelType()))
+                .collect(Collectors.toList());
+        model.addAttribute("chat_models", chatModels);
         LlmProfileEntity defaultProfile = llmConfigResolver.getDefaultProfile();
         model.addAttribute("default_model", defaultProfile != null ? defaultProfile.getName() : "");
         return "chat";

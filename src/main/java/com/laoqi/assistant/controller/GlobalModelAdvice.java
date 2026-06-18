@@ -48,6 +48,11 @@ public class GlobalModelAdvice {
         return ollamaEmbeddingService.isAvailable();
     }
 
+    @ModelAttribute("ollamaProvider")
+    public String ollamaProvider() {
+        return ollamaEmbeddingService.getProviderLabel();
+    }
+
     @ModelAttribute("ollamaModel")
     public String ollamaModel() {
         return appConfig.getOllamaModel();

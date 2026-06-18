@@ -44,7 +44,7 @@
     <div class="status-item">
         <div class="label">语义检索</div>
         <div class="value" th:classappend="${ollamaAvailable} ? 'status-up' : 'status-down'" th:text="${ollamaAvailable} ? '● 运行中' : '● 未连接'">● 未连接</div>
-        <div class="text-muted" style="font-size:11px;margin-top:2px;" th:text="'模型 ' + ${ollamaModel}">模型 nomic-embed-text</div>
+        <div class="text-muted" style="font-size:11px;margin-top:2px;" th:text="${ollamaProvider}">硅基流动 · BAAI/bge-m3</div>
     </div>
     <div class="status-item">
         <div class="label">最新日报</div>

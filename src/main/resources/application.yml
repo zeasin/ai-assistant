@@ -23,12 +23,6 @@ spring:
     deepseek:
       # 仅用于满足 starter 启动校验，实际 API Key / Model 由 config.json 动态管理
       api-key: ${DEEPSEEK_API_KEY:dummy}
-    ollama:
-      base-url: http://127.0.0.1:11434
-      embedding:
-        options:
-          model: nomic-embed-text
-
     retry:
       max-attempts: 3
       backoff:
