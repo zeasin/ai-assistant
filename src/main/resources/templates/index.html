@@ -37,9 +37,10 @@
 
 <div class="status-bar">
     <div class="status-item">
-        <div class="label">笔记库服务</div>
-        <div class="value" th:classappend="${notesRunning} ? 'status-up' : 'status-down'" th:text="${notesRunning} ? '● 运行中' : '● 已停止'">● 运行中</div>
-        <div class="text-muted" style="font-size:11px;margin-top:2px;">Spring AI 2.0</div>
+        <div class="label">大模型服务</div>
+        <div class="value" th:classappend="${llmConfigured} ? 'status-up' : 'status-down'" th:text="${llmConfigured} ? '● 已配置' : '● 未配置'">● 已配置</div>
+        <div class="text-muted" style="font-size:11px;margin-top:2px;" th:if="${llmConfigured}" th:text="${llmName} + ' · ' + ${llmModel}">DeepSeek · deepseek-chat</div>
+        <div class="text-muted" style="font-size:11px;margin-top:2px;" th:unless="${llmConfigured}">请前往配置页设置</div>
     </div>
     <div class="status-item">
         <div class="label">语义检索</div>

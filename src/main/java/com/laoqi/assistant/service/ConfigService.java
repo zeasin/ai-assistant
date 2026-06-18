@@ -90,10 +90,6 @@ public class ConfigService {
         return dir;
     }
 
-    /** @deprecated use getNotesDir() */
-    @Deprecated
-    public String getBaseDir() { return getNotesDir(); }
-
     public void save(Config config) {
         mergeDefaultValues(config);
         FileUtil.writeJson(appConfig.getConfigFile(), config);

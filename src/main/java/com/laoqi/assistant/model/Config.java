@@ -51,13 +51,6 @@ public class Config {
 
     public Map<String, String> getKeyLabels() { return keyLabels; }
     public void setKeyLabels(Map<String, String> keyLabels) { this.keyLabels = keyLabels; }
-    /** @deprecated use getNotesDir() — kept for callers not yet migrated */
-    @Deprecated
-    public String getBaseDir() { return notesDir; }
-    /** @deprecated use setNotesDir() — kept for callers not yet migrated */
-    @Deprecated
-    public void setBaseDir(String baseDir) { this.notesDir = baseDir; }
-
     public String getNotesDir() { return notesDir; }
     public void setNotesDir(String notesDir) { this.notesDir = notesDir; }
     public String getFeishuWebhookUrl() { return feishuWebhookUrl; }

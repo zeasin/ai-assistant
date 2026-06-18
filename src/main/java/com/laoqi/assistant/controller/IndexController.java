@@ -1,6 +1,8 @@
 package com.laoqi.assistant.controller;
 
+import com.laoqi.assistant.entity.LlmProfileEntity;
 import com.laoqi.assistant.model.TaskData.TaskItem;
+import com.laoqi.assistant.service.LlmConfigResolver;
 import com.laoqi.assistant.service.LogService;
 import com.laoqi.assistant.service.ReportService;
 import com.laoqi.assistant.service.TaskService;
@@ -24,12 +26,14 @@ public class IndexController {
     private final ReportService reportService;
     private final TaskService taskService;
     private final LogService logService;
+    private final LlmConfigResolver llmConfigResolver;
 
     public IndexController(ReportService reportService, TaskService taskService,
-                            LogService logService) {
+                            LogService logService, LlmConfigResolver llmConfigResolver) {
         this.reportService = reportService;
         this.taskService = taskService;
         this.logService = logService;
+        this.llmConfigResolver = llmConfigResolver;
     }
 
     @GetMapping("/")
@@ -62,6 +66,16 @@ public class IndexController {
         model.addAttribute("todoMid", activeTasks.stream().filter(t -> "mid".equals(t.priority)).collect(Collectors.toList()));
         model.addAttribute("todoLow", activeTasks.stream().filter(t -> "low".equals(t.priority)).collect(Collectors.toList()));
         model.addAttribute("todoTotal", activeTasks.size());
+
+        LlmProfileEntity defaultLlm = llmConfigResolver.getDefaultProfile();
+        if (defaultLlm != null && defaultLlm.getApiKey() != null && !defaultLlm.getApiKey().isEmpty()) {
+            model.addAttribute("llmConfigured", true);
+            model.addAttribute("llmName", defaultLlm.getName());
+            model.addAttribute("llmModel", defaultLlm.getModel());
+        } else {
+            model.addAttribute("llmConfigured", false);
+        }
+
         return "index";
     }
 

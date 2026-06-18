@@ -68,16 +68,14 @@ public class SessionService {
         try (Connection conn = dataSource.getConnection(); Statement stmt = conn.createStatement()) {
             stmt.execute("""
                 CREATE TABLE IF NOT EXISTS sessions (
-                    id                        TEXT PRIMARY KEY,
-                    source                    TEXT NOT NULL DEFAULT 'web',
-                    title                     TEXT NOT NULL DEFAULT '新对话',
-                    chat_id                   TEXT NOT NULL DEFAULT '',
-                    chat_type                 TEXT NOT NULL DEFAULT '',
-                    open_code_session_id      TEXT,
-                    open_code_code_session_id TEXT,
-                    mode                      TEXT NOT NULL DEFAULT 'knowledge',
-                    created_at                TEXT NOT NULL,
-                    updated_at                TEXT NOT NULL
+                    id         TEXT PRIMARY KEY,
+                    source     TEXT NOT NULL DEFAULT 'web',
+                    title      TEXT NOT NULL DEFAULT '新对话',
+                    chat_id    TEXT NOT NULL DEFAULT '',
+                    chat_type  TEXT NOT NULL DEFAULT '',
+                    mode       TEXT NOT NULL DEFAULT 'knowledge',
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
                 )
                 """);
             stmt.execute("""
