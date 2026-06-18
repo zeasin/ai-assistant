@@ -1,11 +1,14 @@
 package com.laoqi.assistant.controller;
 
 import com.laoqi.assistant.entity.LlmProfileEntity;
+import com.laoqi.assistant.entity.ModuleEntity;
 import com.laoqi.assistant.model.Config;
+import com.laoqi.assistant.model.ModuleDefinition;
 import com.laoqi.assistant.service.ConfigService;
 import com.laoqi.assistant.service.FeishuService;
 import com.laoqi.assistant.service.LogService;
 import com.laoqi.assistant.service.LlmConfigResolver;
+import com.laoqi.assistant.service.ModuleService;
 import com.laoqi.assistant.service.OllamaEmbeddingService;
 import com.laoqi.assistant.service.db.LlmProfileDbService;
 import org.springframework.web.bind.annotation.*;
@@ -22,18 +25,21 @@ public class ApiConfigController {
     private final OllamaEmbeddingService ollamaEmbeddingService;
     private final LlmProfileDbService llmProfileDbService;
     private final LlmConfigResolver llmConfigResolver;
+    private final ModuleService moduleService;
 
     public ApiConfigController(ConfigService configService, FeishuService feishuService,
                                 LogService logService,
                                 OllamaEmbeddingService ollamaEmbeddingService,
                                 LlmProfileDbService llmProfileDbService,
-                                LlmConfigResolver llmConfigResolver) {
+                                LlmConfigResolver llmConfigResolver,
+                                ModuleService moduleService) {
         this.configService = configService;
         this.feishuService = feishuService;
         this.logService = logService;
         this.ollamaEmbeddingService = ollamaEmbeddingService;
         this.llmProfileDbService = llmProfileDbService;
         this.llmConfigResolver = llmConfigResolver;
+        this.moduleService = moduleService;
     }
 
     @GetMapping("/api/config")
@@ -349,5 +355,48 @@ public class ApiConfigController {
         result.put("provider", config.getEmbeddingProvider());
         result.put("providerLabel", ollamaEmbeddingService.getProviderLabel());
         return result;
+    }
+
+    // ========== Module endpoints (SQLite) ==========
+
+    @GetMapping("/api/config/modules")
+    public Map<String, Object> listModules() {
+        List<ModuleDefinition> modules = moduleService.getModules();
+        return Map.of("ok", true, "modules", modules);
+    }
+
+    @PostMapping("/api/config/modules")
+    public Map<String, Object> saveModule(@RequestBody Map<String, Object> body) {
+        String moduleId = (String) body.get("moduleId");
+        String name = (String) body.get("name");
+        if (moduleId == null || moduleId.isBlank() || name == null || name.isBlank()) {
+            return Map.of("ok", false, "error", "模块ID和名称不能为空");
+        }
+
+        // Check uniqueness of moduleId
+        ModuleDefinition existing = moduleService.getModule(moduleId);
+        boolean isUpdate = body.containsKey("id") && body.get("id") != null;
+
+        if (!isUpdate && existing != null) {
+            return Map.of("ok", false, "error", "模块ID已存在: " + moduleId);
+        }
+
+        moduleService.saveModule(body);
+        logService.add("配置更新", "成功", "模块已保存: " + name);
+        return Map.of("ok", true);
+    }
+
+    @DeleteMapping("/api/config/modules/{moduleId}")
+    public Map<String, Object> deleteModule(@PathVariable String moduleId) {
+        moduleService.removeModuleByModuleId(moduleId);
+        logService.add("配置更新", "成功", "模块已删除: " + moduleId);
+        return Map.of("ok", true);
+    }
+
+    @PostMapping("/api/config/modules/reorder")
+    public Map<String, Object> reorderModules(@RequestBody List<String> moduleIds) {
+        moduleService.reorderModules(moduleIds);
+        logService.add("配置更新", "成功", "模块排序已更新");
+        return Map.of("ok", true);
     }
 }

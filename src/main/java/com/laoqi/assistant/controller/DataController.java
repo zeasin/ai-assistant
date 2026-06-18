@@ -3,7 +3,9 @@ package com.laoqi.assistant.controller;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.laoqi.assistant.config.AppConfig;
 import com.laoqi.assistant.model.Config;
+import com.laoqi.assistant.model.ModuleDefinition;
 import com.laoqi.assistant.service.ConfigService;
+import com.laoqi.assistant.service.ModuleService;
 import com.laoqi.assistant.util.FileUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,10 +34,12 @@ public class DataController {
 
     private final ConfigService configService;
     private final AppConfig appConfig;
+    private final ModuleService moduleService;
 
-    public DataController(ConfigService configService, AppConfig appConfig) {
+    public DataController(ConfigService configService, AppConfig appConfig, ModuleService moduleService) {
         this.configService = configService;
         this.appConfig = appConfig;
+        this.moduleService = moduleService;
     }
 
     private Path getBaseDir() {
@@ -50,18 +54,8 @@ public class DataController {
         if (type == null || type.isEmpty()) {
             return null;
         }
-        // Try module config
-        Map<String, Object> raw = FileUtil.readJson(appConfig.getConfigFile(), mapType, new HashMap<>());
-        Object modules = raw.get("modules");
-        if (modules instanceof List) {
-            for (Object m : (List<?>) modules) {
-                if (m instanceof Map && type.equals(((Map<?,?>) m).get("id"))) {
-                    Object dir = ((Map<?,?>) m).get("dir");
-                    return dir != null ? dir.toString() : null;
-                }
-            }
-        }
-        return null;
+        ModuleDefinition mod = moduleService.getModule(type);
+        return mod != null ? mod.getDir() : null;
     }
 
     private String getTypeLabel(String type) {

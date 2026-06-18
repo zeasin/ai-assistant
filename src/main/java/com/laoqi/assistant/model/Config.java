@@ -18,7 +18,6 @@ public class Config {
     private Boolean feishuPollingEnabled;
     
     private String logFile;
-    private List<Map<String, Object>> modules;
     // aiProvider 废弃 v0.4.0 — 始终直连 LLM，仅保留 getter 兼容旧配置
     private String llmApiKey = "";
     private String llmBaseUrl = "https://api.deepseek.com";
@@ -66,8 +65,6 @@ public class Config {
     public void setFeishuPollingEnabled(Boolean feishuPollingEnabled) { this.feishuPollingEnabled = feishuPollingEnabled; }
     public String getLogFile() { return logFile; }
     public void setLogFile(String logFile) { this.logFile = logFile; }
-    public List<Map<String, Object>> getModules() { return modules; }
-    public void setModules(List<Map<String, Object>> modules) { this.modules = modules; }
     public String getAiProvider() { return "direct"; }
     public void setAiProvider(String aiProvider) { /* 废弃 v0.4.0 */ }
     public String getLlmApiKey() { return llmApiKey; }

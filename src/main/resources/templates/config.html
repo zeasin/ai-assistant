@@ -201,6 +201,51 @@
     </div>
 </div>
 
+<div class="card">
+    <h2>📦 模块管理</h2>
+    <div class="text-muted mb-2">管理导航菜单中的模块。模块数据现存储在 SQLite 中，修改后即时生效。</div>
+
+    <div id="modulesContainer" style="margin-bottom:16px;">
+        <div class="text-muted" style="font-size:13px;padding:12px 0;" id="modulesEmpty">暂无模块，请点击下方"添加模块"。</div>
+        <div id="modulesList"></div>
+    </div>
+
+    <div style="border-top:1px solid #e1e3e6;padding-top:16px;">
+        <h3 style="font-size:14px;margin:0 0 12px;" id="moduleFormTitle">添加模块</h3>
+        <div class="form-row" style="gap:8px;flex-wrap:wrap;">
+            <div class="form-group" style="flex:0 0 140px;">
+                <label style="font-size:12px;">模块ID</label>
+                <input type="text" id="newModuleId" placeholder="如 projects" style="width:100%;padding:8px 10px;border:1px solid #e1e3e6;border-radius:6px;font-size:13px;font-family:monospace;">
+            </div>
+            <div class="form-group" style="flex:0 0 120px;">
+                <label style="font-size:12px;">名称</label>
+                <input type="text" id="newModuleName" placeholder="如 项目" style="width:100%;padding:8px 10px;border:1px solid #e1e3e6;border-radius:6px;font-size:13px;">
+            </div>
+            <div class="form-group" style="flex:0 0 160px;">
+                <label style="font-size:12px;">目录</label>
+                <input type="text" id="newModuleDir" placeholder="如 项目" style="width:100%;padding:8px 10px;border:1px solid #e1e3e6;border-radius:6px;font-size:13px;font-family:monospace;">
+            </div>
+            <div class="form-group" style="flex:0 0 70px;">
+                <label style="font-size:12px;">图标</label>
+                <input type="text" id="newModuleIcon" value="📦" style="width:100%;padding:8px 10px;border:1px solid #e1e3e6;border-radius:6px;font-size:13px;">
+            </div>
+            <div class="form-group" style="flex:1;min-width:200px;">
+                <label style="font-size:12px;">提示词</label>
+                <input type="text" id="newModulePrompt" placeholder="AI 分析提示词" style="width:100%;padding:8px 10px;border:1px solid #e1e3e6;border-radius:6px;font-size:13px;">
+            </div>
+            <div class="form-group" style="flex:1;min-width:160px;">
+                <label style="font-size:12px;">数据文件（逗号分隔）</label>
+                <input type="text" id="newModuleDataFiles" placeholder="如 BUG记录.json,项目日志.json" style="width:100%;padding:8px 10px;border:1px solid #e1e3e6;border-radius:6px;font-size:13px;font-family:monospace;">
+            </div>
+        </div>
+        <div class="flex" style="gap:8px;margin-top:8px;">
+            <button class="btn btn-primary" id="moduleSubmitBtn" onclick="submitModule()">添加模块</button>
+            <button class="btn btn-secondary" id="moduleCancelBtn" onclick="cancelEditModule()" style="display:none;">取消</button>
+            <span id="modulesStatus" class="text-muted" style="margin-left:4px;"></span>
+        </div>
+    </div>
+</div>
+
 <style>
 .form-group { margin-bottom: 12px; }
 .form-group label {
@@ -445,6 +490,7 @@ document.addEventListener('DOMContentLoaded', function() {
     setTimeout(loadLabels, 100);
     setTimeout(loadLlmModels, 200);
     setTimeout(loadEmbeddingModel, 300);
+    setTimeout(loadModules, 400);
 });
 
 function selectChat(el) {
@@ -699,6 +745,178 @@ async function saveCollectorDir() {
     } else {
         status.textContent = '❌ ' + (data.error || '保存失败');
     }
+}
+
+// ===== 模块管理 =====
+
+let modulesList = [];
+let moduleEditingId = null;
+
+function loadModules() {
+    fetch('/api/config/modules')
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) {
+                modulesList = data.modules || [];
+                renderModules();
+            }
+        })
+        .catch(() => {});
+}
+
+function renderModules() {
+    const container = document.getElementById('modulesList');
+    const empty = document.getElementById('modulesEmpty');
+    if (!modulesList.length) {
+        container.innerHTML = '';
+        empty.style.display = 'block';
+        return;
+    }
+    empty.style.display = 'none';
+
+    let html = '<table class="log-table"><thead><tr>' +
+        '<th>模块ID</th><th>名称</th><th>图标</th><th>目录</th><th>提示词</th><th>数据文件</th><th>排序</th><th>操作</th>' +
+        '</tr></thead><tbody>';
+    modulesList.forEach(function(m, idx) {
+        const files = (m.dataFiles || []).join(', ');
+        html += '<tr id="mod-row-' + idx + '">';
+        html += '<td><code>' + escapeHtml(m.id) + '</code></td>';
+        html += '<td><strong>' + escapeHtml(m.name) + '</strong></td>';
+        html += '<td style="font-size:18px;">' + (m.icon || '📦') + '</td>';
+        html += '<td><code>' + escapeHtml(m.dir) + '</code></td>';
+        html += '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:#5c5f66;">' + escapeHtml((m.prompt || '').substring(0, 60)) + '</td>';
+        html += '<td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;"><code>' + escapeHtml(files) + '</code></td>';
+        html += '<td style="white-space:nowrap;">';
+        if (idx > 0) html += '<button class="btn btn-secondary" onclick="moveModule(' + idx + ', -1)" style="padding:2px 8px;font-size:11px;">↑</button>';
+        if (idx < modulesList.length - 1) html += '<button class="btn btn-secondary" onclick="moveModule(' + idx + ', 1)" style="padding:2px 8px;font-size:11px;">↓</button>';
+        html += '</td>';
+        html += '<td>';
+        html += '<button class="btn btn-secondary" onclick="editModule(' + idx + ')" style="padding:2px 8px;font-size:11px;margin-right:4px;">编辑</button>';
+        html += '<button class="btn btn-secondary" onclick="deleteModule(' + idx + ')" style="padding:2px 8px;font-size:11px;color:#ef4444;">删除</button>';
+        html += '</td></tr>';
+    });
+    html += '</tbody></table>';
+    container.innerHTML = html;
+}
+
+function resetModuleForm() {
+    document.getElementById('newModuleId').value = '';
+    document.getElementById('newModuleName').value = '';
+    document.getElementById('newModuleDir').value = '';
+    document.getElementById('newModuleIcon').value = '📦';
+    document.getElementById('newModulePrompt').value = '';
+    document.getElementById('newModuleDataFiles').value = '';
+    document.getElementById('moduleFormTitle').textContent = '添加模块';
+    document.getElementById('moduleSubmitBtn').textContent = '添加模块';
+    document.getElementById('moduleCancelBtn').style.display = 'none';
+    document.getElementById('modulesStatus').textContent = '';
+    moduleEditingId = null;
+}
+
+async function submitModule() {
+    const moduleId = document.getElementById('newModuleId').value.trim();
+    const name = document.getElementById('newModuleName').value.trim();
+    const status = document.getElementById('modulesStatus');
+    if (!moduleId) { status.textContent = '❌ 请输入模块ID'; status.style.color = '#ef4444'; return; }
+    if (!name) { status.textContent = '❌ 请输入模块名称'; status.style.color = '#ef4444'; return; }
+
+    const dataFiles = document.getElementById('newModuleDataFiles').value.trim();
+    const files = dataFiles ? dataFiles.split(',').map(function(s) { return s.trim(); }).filter(function(s) { return s; }) : [];
+
+    const payload = {
+        moduleId: moduleId,
+        name: name,
+        dir: document.getElementById('newModuleDir').value.trim() || moduleId,
+        icon: document.getElementById('newModuleIcon').value.trim() || '📦',
+        prompt: document.getElementById('newModulePrompt').value.trim() || '',
+        dataFiles: files,
+    };
+
+    try {
+        const res = await fetch('/api/config/modules', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (data.ok) {
+            status.textContent = moduleEditingId !== null ? '✅ 已更新' : '✅ 已添加';
+            status.style.color = '#10b981';
+            resetModuleForm();
+            loadModules();
+            setTimeout(() => status.textContent = '', 3000);
+        } else {
+            status.textContent = '❌ ' + (data.error || '保存失败');
+            status.style.color = '#ef4444';
+        }
+    } catch (e) {
+        status.textContent = '❌ 请求失败';
+        status.style.color = '#ef4444';
+    }
+}
+
+function editModule(idx) {
+    const m = modulesList[idx];
+    if (!m) return;
+    document.getElementById('newModuleId').value = m.id;
+    document.getElementById('newModuleName').value = m.name;
+    document.getElementById('newModuleDir').value = m.dir || '';
+    document.getElementById('newModuleIcon').value = m.icon || '📦';
+    document.getElementById('newModulePrompt').value = m.prompt || '';
+    document.getElementById('newModuleDataFiles').value = (m.dataFiles || []).join(', ');
+    document.getElementById('moduleFormTitle').textContent = '编辑模块: ' + m.id;
+    document.getElementById('moduleSubmitBtn').textContent = '保存修改';
+    document.getElementById('moduleCancelBtn').style.display = 'inline-block';
+    moduleEditingId = m.id;
+
+    document.querySelector('.card:last-child').scrollIntoView({ behavior: 'smooth' });
+}
+
+function cancelEditModule() {
+    resetModuleForm();
+}
+
+async function deleteModule(idx) {
+    const m = modulesList[idx];
+    if (!m) return;
+    if (!confirm('确定删除模块「' + m.name + '」？')) return;
+    const status = document.getElementById('modulesStatus');
+    try {
+        const res = await fetch('/api/config/modules/' + encodeURIComponent(m.id), { method: 'DELETE' });
+        const data = await res.json();
+        if (data.ok) {
+            status.textContent = '✅ 已删除';
+            status.style.color = '#10b981';
+            if (moduleEditingId === m.id) resetModuleForm();
+            loadModules();
+            setTimeout(() => status.textContent = '', 3000);
+        } else {
+            status.textContent = '❌ ' + (data.error || '删除失败');
+            status.style.color = '#ef4444';
+        }
+    } catch (e) {
+        status.textContent = '❌ 请求失败';
+        status.style.color = '#ef4444';
+    }
+}
+
+async function moveModule(idx, direction) {
+    const newIdx = idx + direction;
+    if (newIdx < 0 || newIdx >= modulesList.length) return;
+    var arr = modulesList.map(function(m) { return m.id; });
+    var item = arr.splice(idx, 1)[0];
+    arr.splice(newIdx, 0, item);
+    try {
+        const res = await fetch('/api/config/modules/reorder', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(arr),
+        });
+        const data = await res.json();
+        if (data.ok) {
+            loadModules();
+        }
+    } catch (e) {}
 }
 
 async function testFeishu() {

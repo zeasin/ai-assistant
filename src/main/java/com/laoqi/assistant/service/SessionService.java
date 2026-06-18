@@ -149,6 +149,20 @@ public class SessionService {
             try { stmt.execute("ALTER TABLE coding_records ADD COLUMN end_time TEXT NOT NULL DEFAULT ''"); } catch (Exception ignored) {}
             try { stmt.execute("ALTER TABLE coding_records ADD COLUMN duration INTEGER NOT NULL DEFAULT 0"); } catch (Exception ignored) {}
             try { stmt.execute("ALTER TABLE coding_records ADD COLUMN ai_engine TEXT NOT NULL DEFAULT 'pi'"); } catch (Exception ignored) {}
+
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS modules (
+                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                    module_id   TEXT NOT NULL UNIQUE,
+                    name        TEXT NOT NULL,
+                    dir         TEXT NOT NULL,
+                    icon        TEXT NOT NULL DEFAULT '📦',
+                    prompt      TEXT NOT NULL DEFAULT '',
+                    data_files  TEXT NOT NULL DEFAULT '[]',
+                    sort_order  INTEGER NOT NULL DEFAULT 0
+                )
+                """);
+            log.info("Table modules initialized");
         } catch (SQLException e) {
             throw new RuntimeException("Failed to create new tables", e);
         }

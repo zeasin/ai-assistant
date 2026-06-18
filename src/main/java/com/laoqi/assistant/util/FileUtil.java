@@ -1,5 +1,6 @@
 package com.laoqi.assistant.util;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -76,5 +77,24 @@ public class FileUtil {
 
     public static boolean isDirectory(Path path) {
         return Files.isDirectory(path);
+    }
+
+    public static String toJson(Object obj) {
+        try {
+            return mapper.writeValueAsString(obj);
+        } catch (JsonProcessingException e) {
+            log.warn("Failed to serialize to JSON: {}", e.getMessage());
+            return "[]";
+        }
+    }
+
+    public static <T> T readJson(String json, TypeReference<T> typeRef, T defaultVal) {
+        if (json == null || json.isBlank()) return defaultVal;
+        try {
+            return mapper.readValue(json, typeRef);
+        } catch (JsonProcessingException e) {
+            log.warn("Failed to read JSON string: {}", e.getMessage());
+            return defaultVal;
+        }
     }
 }
