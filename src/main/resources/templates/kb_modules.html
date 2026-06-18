@@ -29,7 +29,7 @@
 
 <div th:unless="${kbModules.isEmpty()}" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:20px;">
     <a th:each="m : ${kbModules}"
-       th:href="@{/module/{id}(id=${m.id})}"
+        th:href="@{/kb/{kid}/modules/{mid}(kid=${kb.id}, mid=${m.id})}"
        style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
               background:#fff;border:1px solid #e1e3e6;border-radius:12px;padding:24px 16px;
               text-decoration:none;color:#1a1b1e;transition:all .15s;cursor:pointer;
@@ -39,7 +39,7 @@
         <span style="font-size:36px;" th:text="${m.icon}">📦</span>
         <span style="font-size:14px;font-weight:600;text-align:center;" th:text="${m.name}">名称</span>
         <span style="font-size:11px;color:#909296;" th:text="'目录: ' + ${m.dir}">目录</span>
-        <span style="font-size:11px;color:#909296;" th:text="${#lists.size(m.dataFiles)} + ' 个数据文件'">0 文件</span>
+        <span class="file-count" th:attr="data-mid=${m.id}" style="font-size:11px;color:#909296;">加载中...</span>
     </a>
 </div>
 
@@ -266,6 +266,25 @@ async function moveModule(idx, direction) {
 }
 
 loadModules();
+
+fetch('/kb/' + KB_ID + '/api/file-counts')
+    .then(r => r.json())
+    .then(data => {
+        document.querySelectorAll('.file-count').forEach(function(el) {
+            var mid = el.getAttribute('data-mid');
+            var fc = data[mid];
+            if (fc) {
+                el.textContent = fc.total + ' 文件 \u00b7 ' + fc.data + ' 数据';
+            } else {
+                el.textContent = '0 文件 \u00b7 0 数据';
+            }
+        });
+    })
+    .catch(function() {
+        document.querySelectorAll('.file-count').forEach(function(el) {
+            el.textContent = '--';
+        });
+    });
 </script>
 
 </th:block>

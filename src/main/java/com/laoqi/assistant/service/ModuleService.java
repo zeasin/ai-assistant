@@ -12,10 +12,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 @Service
 public class ModuleService {
@@ -111,6 +115,26 @@ public class ModuleService {
 
     public Path getModuleDir(ModuleDefinition mod) {
         return getModuleBaseDir(mod);
+    }
+
+    public Map<String, Integer> getFileCounts(ModuleDefinition mod) {
+        Map<String, Integer> counts = new HashMap<>();
+        counts.put("total", 0);
+        counts.put("data", 0);
+        Path baseDir = getModuleDir(mod);
+        if (!Files.isDirectory(baseDir)) return counts;
+        try (Stream<Path> stream = Files.walk(baseDir).filter(Files::isRegularFile)) {
+            List<Path> files = stream.toList();
+            counts.put("total", files.size());
+            Path dataDir = baseDir.resolve("data");
+            if (Files.isDirectory(dataDir)) {
+                long dataCount = files.stream().filter(p -> p.startsWith(dataDir)).count();
+                counts.put("data", (int) dataCount);
+            }
+        } catch (IOException e) {
+            log.warn("Failed to count files for module {}: {}", mod.getId(), e.getMessage());
+        }
+        return counts;
     }
 
     private Path getModuleBaseDir(ModuleDefinition mod) {

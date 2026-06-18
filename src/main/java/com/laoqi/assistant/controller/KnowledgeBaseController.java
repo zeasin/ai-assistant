@@ -131,8 +131,33 @@ public class KnowledgeBaseController {
         if (kb == null) return "redirect:/config";
         model.put("kb", kb);
         model.put("labels", parseLabels(kb.getLabels()));
-        model.put("kbModules", moduleService.getModulesByKb(id));
+        List<ModuleDefinition> modules = moduleService.getModulesByKb(id);
+        model.put("kbModules", modules);
         return "kb_modules";
+    }
+
+    @GetMapping("/kb/{id}/modules/{moduleId}")
+    public String moduleDetail(@PathVariable Long id, @PathVariable String moduleId,
+                                Map<String, Object> model) {
+        KnowledgeBaseEntity kb = kbService.getById(id);
+        if (kb == null) return "redirect:/config";
+        ModuleDefinition mod = moduleService.getModule(moduleId);
+        if (mod == null) return "redirect:/kb/" + id + "/modules";
+        model.put("kb", kb);
+        model.put("labels", parseLabels(kb.getLabels()));
+        model.put("module", mod);
+        return "module";
+    }
+
+    @GetMapping("/kb/{id}/api/file-counts")
+    @ResponseBody
+    public Map<String, Object> fileCounts(@PathVariable Long id) {
+        Map<String, Object> result = new java.util.HashMap<>();
+        List<ModuleDefinition> modules = moduleService.getModulesByKb(id);
+        for (ModuleDefinition m : modules) {
+            result.put(m.getId(), moduleService.getFileCounts(m));
+        }
+        return result;
     }
 
     @GetMapping("/kb/{id}/notes")
