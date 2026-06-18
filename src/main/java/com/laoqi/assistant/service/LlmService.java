@@ -10,6 +10,8 @@ import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.deepseek.api.DeepSeekApi;
 import org.springframework.ai.deepseek.DeepSeekChatModel;
 import org.springframework.ai.deepseek.DeepSeekChatOptions;
+import org.springframework.ai.openai.OpenAiChatModel;
+import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.stereotype.Service;
 import org.springframework.util.MimeTypeUtils;
@@ -136,18 +138,31 @@ public class LlmService {
     }
 
     private String buildConfigKey() {
+        boolean multimodal = false;
+        LlmProfileEntity defaultProfile = configResolver.getDefaultProfile();
+        if (defaultProfile != null) multimodal = defaultProfile.isMultimodal();
         return configResolver.resolveBaseUrl() + "|"
                 + configResolver.resolveModel() + "|"
-                + configResolver.resolveApiKey().hashCode();
+                + configResolver.resolveApiKey().hashCode() + "|"
+                + multimodal;
     }
 
     private String buildConfigKey(String modelName) {
+        boolean multimodal = false;
+        LlmProfileEntity profile = configResolver.getProfileByName(modelName);
+        if (profile != null) multimodal = profile.isMultimodal();
         return configResolver.resolveBaseUrl(modelName) + "|"
                 + configResolver.resolveModel(modelName) + "|"
-                + configResolver.resolveApiKey(modelName).hashCode();
+                + configResolver.resolveApiKey(modelName).hashCode() + "|"
+                + multimodal;
     }
 
     private ChatClient buildDefaultClient() {
+        LlmProfileEntity defaultProfile = configResolver.getDefaultProfile();
+        if (defaultProfile != null && defaultProfile.isMultimodal()) {
+            return buildOpenAiClient(defaultProfile);
+        }
+
         String apiKey = configResolver.resolveApiKey();
         String baseUrl = configResolver.resolveBaseUrl();
         String model = configResolver.resolveModel();
@@ -177,6 +192,10 @@ public class LlmService {
     }
 
     private ChatClient buildClient(LlmProfileEntity profile) {
+        if (profile.isMultimodal()) {
+            return buildOpenAiClient(profile);
+        }
+
         String apiKey = profile.getApiKey();
         String baseUrl = profile.getBaseUrl();
         String model = profile.getModel();
@@ -198,6 +217,35 @@ public class LlmService {
         DeepSeekChatModel chatModel = DeepSeekChatModel.builder()
                 .deepSeekApi(deepSeekApi)
                 .options(options)
+                .build();
+
+        return ChatClient.builder(chatModel)
+                .defaultSystem("你是一个有用的AI助手。")
+                .build();
+    }
+
+    /**
+     * 使用 OpenAiChatModel 构建客户端（支持多模态/图片识别）。
+     * 商汤日日新等 OpenAI 兼容的多模态模型通过此方式调用。
+     */
+    private ChatClient buildOpenAiClient(LlmProfileEntity profile) {
+        String apiKey = profile.getApiKey();
+        String baseUrl = profile.getBaseUrl();
+        String model = profile.getModel();
+
+        if (baseUrl.endsWith("/")) {
+            baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
+        }
+
+        OpenAiChatOptions options = OpenAiChatOptions.builder()
+                .model(model)
+                .baseUrl(baseUrl)
+                .apiKey(apiKey)
+                .build();
+
+        OpenAiChatModel chatModel = OpenAiChatModel.builder()
+                .options(options)
+                .observationRegistry(io.micrometer.observation.ObservationRegistry.NOOP)
                 .build();
 
         return ChatClient.builder(chatModel)
