@@ -2,11 +2,12 @@
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{layout}">
 <head>
-    <title layout:fragment="title">综合日报</title>
+    <title layout:fragment="title">首页</title>
 </head>
 <body>
 <th:block layout:fragment="content">
 
+<!-- 待办悬浮面板 -->
 <div class="todo-float" id="todoPanel">
     <h3>
         ⚡ 今日待办
@@ -35,6 +36,7 @@
     </th:block>
 </div>
 
+<!-- ══════ 状态栏 ══════ -->
 <div class="status-bar">
     <div class="status-item">
         <div class="label">大模型服务</div>
@@ -54,110 +56,107 @@
         <div class="text-muted" style="font-size:11px;margin-top:2px;" th:unless="${notesDirConfigured}">请前往配置页设置</div>
     </div>
     <div class="status-item">
-        <div class="label">最新日报</div>
-        <div class="value" id="reportTime" th:text="${report_time}">尚未生成</div>
+        <div class="label">知识库</div>
+        <div class="value" th:text="${#lists.size(kbList)} + ' 个'">0 个</div>
+        <div class="text-muted" style="font-size:11px;margin-top:2px;">
+            <span th:if="${#lists.size(kbList) > 0}">点击卡片查看详情</span>
+            <span th:unless="${#lists.size(kbList) > 0}">未配置</span>
+        </div>
     </div>
 </div>
 
-<div class="card">
-    <div class="flex" style="justify-content:space-between;">
-        <h2>📊 AI 综合日报</h2>
-        <div class="flex" style="gap:8px;">
-            <button class="btn btn-secondary" onclick="openPromptModal()">⚙️ 提示词</button>
-            <button class="btn btn-primary" id="genBtn" onclick="generateReport()">
-                🔄 重新生成
-            </button>
-        </div>
-    </div>
-
-    <th:block th:if="${report_error != null and !report_error.isEmpty()}">
-    <div class="text-muted mb-2" style="color:#ff6b6b;">
-        ⚠️ <span th:text="${report_error}"></span>
-    </div>
-    </th:block>
-
-    <div id="reportContent" class="report">
-        <th:block th:if="${report != null and !report.isEmpty()}">
-            <div th:utext="${report}"></div>
-        </th:block>
-        <th:block th:unless="${report != null and !report.isEmpty()}">
-            <div class="text-muted">
-                暂无日报数据。点击"重新生成"或等待定时任务（每天 09:00）自动推送。
+<!-- ══════ 知识库总览卡片 ══════ -->
+<th:block th:if="${#lists.size(kbList) > 0}">
+<div style="margin-bottom:16px;">
+    <h2 style="font-size:15px;font-weight:600;margin-bottom:10px;color:#5c5f66;">📚 知识库总览</h2>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;">
+        <div th:each="kb : ${kbList}" class="card" style="cursor:pointer;padding:16px;margin:0;"
+             th:onclick="'window.location.href=\'/kb/' + ${kb.id} + '\''">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <span style="font-size:16px;font-weight:600;" th:text="${kb.name}">工作</span>
+                <span style="font-size:12px;color:#909296;">🤖 <span th:text="${#lists.size(kb.modules)}"></span> 模块</span>
             </div>
-        </th:block>
+            <div style="display:flex;gap:12px;flex-wrap:wrap;">
+                <a th:each="m : ${kb.modules}"
+                   th:href="@{/kb/{kbId}/modules/{mid}(kbId=${kb.id}, mid=${m.id})}"
+                   onclick="event.stopPropagation();"
+                   style="font-size:12px;padding:3px 10px;border-radius:6px;background:#f0edff;color:#7c5cfc;text-decoration:none;white-space:nowrap;"
+                   th:text="${m.icon + ' ' + m.name}">模块</a>
+            </div>
+            <div style="margin-top:8px;display:flex;gap:12px;font-size:12px;color:#909296;">
+                <a th:href="@{/kb/{id}/tasks(id=${kb.id})}" onclick="event.stopPropagation();"
+                   style="color:#909296;text-decoration:none;">📋 任务</a>
+                <a th:href="@{/kb/{id}/reminders(id=${kb.id})}" onclick="event.stopPropagation();"
+                   style="color:#909296;text-decoration:none;">🔔 提醒</a>
+                <a th:href="@{/kb/{id}/notes(id=${kb.id})}" onclick="event.stopPropagation();"
+                   style="color:#909296;text-decoration:none;">📄 笔记</a>
+                <a th:href="@{/kb/{id}/config(id=${kb.id})}" onclick="event.stopPropagation();"
+                   style="color:#909296;text-decoration:none;">⚙️ 配置</a>
+            </div>
+        </div>
     </div>
 </div>
+</th:block>
 
-<div id="promptModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:1000;justify-content:center;align-items:center;">
-    <div style="background:#fff;border-radius:12px;padding:24px;width:90%;max-width:700px;max-height:80vh;overflow-y:auto;">
-        <div class="flex" style="justify-content:space-between;align-items:center;margin-bottom:16px;">
-            <h3 style="margin:0;">⚙️ 日报生成提示词</h3>
-            <button class="btn btn-secondary" onclick="closePromptModal()" style="padding:4px 12px;">✕</button>
+<!-- ══════ 无知识库引导 ══════ -->
+<th:block th:if="${#lists.size(kbList) == 0}">
+<div class="card" style="text-align:center;padding:48px 24px;margin-bottom:16px;">
+    <div style="font-size:48px;margin-bottom:12px;">📚</div>
+    <h2 style="margin-bottom:8px;">欢迎使用 AI 助理</h2>
+    <p class="text-muted" style="margin-bottom:20px;">请先配置知识库，开始您的智能助理之旅</p>
+    <a href="/config" class="btn btn-primary">前往配置</a>
+</div>
+</th:block>
+
+<!-- ══════ 快捷入口 ══════ -->
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:16px;">
+    <a href="/chat" class="card" style="display:flex;align-items:center;gap:12px;padding:16px;margin:0;text-decoration:none;color:inherit;">
+        <div style="font-size:28px;">💬</div>
+        <div>
+            <div style="font-size:15px;font-weight:600;">AI 对话</div>
+            <div class="text-muted" style="font-size:12px;">与大模型交流</div>
         </div>
-        <div class="text-muted mb-2" style="font-size:12px;">可用变量：<code>{date}</code> 日期，<code>{weekday}</code> 星期</div>
-        <textarea id="promptContent" rows="12" style="width:100%;padding:10px;border:1px solid #e1e3e6;border-radius:8px;font-size:13px;font-family:monospace;resize:vertical;box-sizing:border-box;"></textarea>
-        <div class="flex" style="gap:8px;margin-top:12px;justify-content:flex-end;">
-            <button class="btn btn-secondary" onclick="closePromptModal()">取消</button>
-            <button class="btn btn-primary" onclick="savePrompt()">保存</button>
+    </a>
+    <a href="/image-recognition" class="card" style="display:flex;align-items:center;gap:12px;padding:16px;margin:0;text-decoration:none;color:inherit;">
+        <div style="font-size:28px;">🖼️</div>
+        <div>
+            <div style="font-size:15px;font-weight:600;">识图</div>
+            <div class="text-muted" style="font-size:12px;">图片识别分析</div>
         </div>
-    </div>
+    </a>
+    <a th:if="${codingEnabled}" href="/coding" class="card" style="display:flex;align-items:center;gap:12px;padding:16px;margin:0;text-decoration:none;color:inherit;">
+        <div style="font-size:28px;">💻</div>
+        <div>
+            <div style="font-size:15px;font-weight:600;">编程 AI</div>
+            <div class="text-muted" style="font-size:12px;">代码辅助</div>
+        </div>
+    </a>
+    <a href="/config" class="card" style="display:flex;align-items:center;gap:12px;padding:16px;margin:0;text-decoration:none;color:inherit;">
+        <div style="font-size:28px;">⚙️</div>
+        <div>
+            <div style="font-size:15px;font-weight:600;">系统配置</div>
+            <div class="text-muted" style="font-size:12px;">管理知识库与模型</div>
+        </div>
+    </a>
 </div>
 
 
-<script>
-function generateReport() {
-    const btn = document.getElementById('genBtn');
-    btn.disabled = true; btn.textContent = '⏳ 生成中...';
 
-    fetch('/generate', { method: 'POST' })
-        .then(r => r.json())
-        .then(data => {
-            if (data.ok) {
-                setTimeout(() => location.reload(), 500);
-            } else {
-                toast('生成失败：' + (data.error || '未知错误'), 'error');
-                btn.disabled = false; btn.textContent = '🔄 重新生成';
-            }
-        })
-        .catch(() => {
-            toast('请求失败，请检查服务状态', 'error');
-            btn.disabled = false; btn.textContent = '🔄 重新生成';
-        });
-}
-
-function openPromptModal() {
-    fetch('/api/report/prompt')
-        .then(r => r.json())
-        .then(data => {
-            if (data.ok) {
-                document.getElementById('promptContent').value = data.prompt;
-                document.getElementById('promptModal').style.display = 'flex';
-            }
-        });
-}
-
-function closePromptModal() {
-    document.getElementById('promptModal').style.display = 'none';
-}
-
-function savePrompt() {
-    const prompt = document.getElementById('promptContent').value;
-    fetch('/api/report/prompt', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: prompt })
-    })
-    .then(r => r.json())
-    .then(data => {
-        if (data.ok) {
-            toast('✅ 提示词已保存');
-            closePromptModal();
-        } else {
-            toast('保存失败', 'error');
-        }
-    });
-}
-</script>
+<!-- ══════ 系统信息 ══════ -->
+<div class="card" style="padding:16px;">
+    <h2 style="margin-bottom:8px;">ℹ️ 系统信息</h2>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;font-size:13px;">
+        <div><span class="text-muted">版本：</span>v1.0</div>
+        <div><span class="text-muted">待办任务：</span><span th:text="${todoTotal}">0</span> 项</div>
+        <div><span class="text-muted">知识库：</span><span th:text="${#lists.size(kbList)}">0</span> 个</div>
+        <div><span class="text-muted">模块总数：</span><span th:text="${#lists.size(modules)}">0</span> 个</div>
+        <div th:if="${llmConfigured}"><span class="text-muted">当前模型：</span><span th:text="${llmName}">DeepSeek</span></div>
+        <div><span class="text-muted">语义检索：</span>
+            <span th:if="${ollamaAvailable}" style="color:#2b8a3e;">● 在线</span>
+            <span th:unless="${ollamaAvailable}" style="color:#e03131;">● 离线</span>
+        </div>
+    </div>
+</div>
 
 </th:block>
 </body>

@@ -7,6 +7,7 @@ import com.laoqi.assistant.service.ConfigService;
 import com.laoqi.assistant.service.LlmService;
 import com.laoqi.assistant.service.ModuleDataService;
 import com.laoqi.assistant.service.ModuleService;
+import com.laoqi.assistant.service.KnowledgeBaseService;
 
 import com.laoqi.assistant.util.FileUtil;
 import com.laoqi.assistant.util.MarkdownUtil;
@@ -45,27 +46,39 @@ public class ModuleController {
     private final LlmService llmService;
     private final AppConfig appConfig;
     private final ConfigService configService;
+    private final KnowledgeBaseService kbService;
 
     public ModuleController(ModuleService moduleService, ModuleDataService moduleDataService,
                             LlmService llmService,
                             AppConfig appConfig,
-                            ConfigService configService) {
+                            ConfigService configService,
+                            KnowledgeBaseService kbService) {
         this.moduleService = moduleService;
         this.moduleDataService = moduleDataService;
         this.llmService = llmService;
         this.appConfig = appConfig;
         this.configService = configService;
+        this.kbService = kbService;
     }
 
     @GetMapping("/{id}")
-    public String modulePage(@PathVariable String id, Model model) {
-        ModuleDefinition mod = moduleService.getModule(id);
-        if (mod == null) {
-            model.addAttribute("error", "模块不存在: " + id);
-            return "module";
+    public String modulePage(@PathVariable String id) {
+        // 旧路由 /module/{id} 已废弃，跳转到 KB 路由
+        // 查找此模块所属的第一个 KB
+        var allKbs = kbService.getAll();
+        for (var kb : allKbs) {
+            var kbModules = moduleService.getModulesByKb(kb.getId());
+            for (var m : kbModules) {
+                if (m.getId().equals(id)) {
+                    return "redirect:/kb/" + kb.getId() + "/modules/" + id;
+                }
+            }
         }
-        model.addAttribute("module", mod);
-        return "module";
+        // 找不到则跳转到第一个 KB 的模块列表
+        if (!allKbs.isEmpty()) {
+            return "redirect:/kb/" + allKbs.get(0).getId() + "/modules";
+        }
+        return "redirect:/";
     }
 
     @GetMapping(value = "/{id}/data/files", produces = MediaType.APPLICATION_JSON_VALUE)

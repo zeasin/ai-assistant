@@ -51,7 +51,7 @@
     <h2 th:text="${labels.get('modules')}">模块/科目</h2>
     <div style="display:flex;gap:12px;flex-wrap:wrap;">
         <a th:each="m : ${modules}"
-           th:href="@{/module/{id}(id=${m.id})}"
+           th:href="@{/kb/{id}/modules/{mid}(id=${kb.id}, mid=${m.id})}"
            class="btn btn-secondary"
            style="flex:0 0 auto;padding:12px 20px;font-size:15px;"
            th:text="${m.icon + ' ' + m.name}">模块</a>
