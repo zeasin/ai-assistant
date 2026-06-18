@@ -1,15 +1,16 @@
 {
   "keyLabels" : { },
+  "notesDir" : "D:\\projects\\richie_learning_notes",
   "feishuWebhookUrl" : "https://open.feishu.cn/open-apis/bot/v2/hook/5684e7f9-3cdc-4ac8-a5ce-97051c4f8393",
   "feishuAppId" : "cli_a8f9b3e8deb9100c",
   "feishuAppSecret" : "IVsBQADPxkx62MnksTdxObxIWiCG6LZs",
   "feishuChatId" : "oc_83c41f86a177d021d2838372b2a11fea",
   "feishuPollingEnabled" : true,
-  "embeddingModel" : "nomic-embed-text",
-  "embeddingBaseUrl" : "http://127.0.0.1:11434",
-  "embeddingApiKey" : "",
-  "embeddingProvider" : "Ollama",
   "logFile" : "assistant_log.json",
+  "llmApiKey" : "",
+  "llmBaseUrl" : "https://api.deepseek.com",
+  "llmModel" : "deepseek-chat",
+  "llmTimeout" : 600,
   "columnSettings" : {
     "customer" : {
       "客户数据_customers" : [ "id", "name", "stage", "source", "product", "company", "createdAt", "notes" ],
@@ -24,12 +25,15 @@
       "自媒体账号_码农老齐" : [ "账号ID", "平台", "名称", "粉丝", "总访问", "文章数", "更新日期", "粉丝更新日期" ]
     }
   },
+  "embeddingModel" : "nomic-embed-text",
+  "embeddingBaseUrl" : "http://127.0.0.1:11434",
+  "embeddingApiKey" : "",
+  "embeddingProvider" : "Ollama",
   "codingFeishuAppId" : "cli_aaa4a47442f8dbdd",
   "codingFeishuAppSecret" : "7VJP46EnZD21fMlmrL698gqwWQqaWbU8",
   "codingFeishuChatId" : "oc_c4c544141ccce40d9d5b4ba6160150c3",
   "codingProjectDir" : "D:\\projects\\qihang-erp-pro",
   "codingPiEnabled" : true,
   "codingPiTimeout" : 300,
-  "aiProvider" : "direct",
-  "notesDir" : "D:\\projects\\richie_learning_notes"
+  "aiProvider" : "direct"
 }

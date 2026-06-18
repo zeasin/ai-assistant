@@ -116,6 +116,19 @@
 </div>
 
 <div class="card">
+    <h2>💻 编程AI</h2>
+    <div class="text-muted mb-2">开启后在导航栏显示编程AI页面，用于通过飞书机器人排查代码问题。</div>
+    <div class="form-group">
+        <label class="toggle-label">
+            <input type="checkbox" id="codingEnabled" onchange="saveCodingToggle()">
+            <span class="toggle-slider"></span>
+            <span id="codingToggleLabel">启用编程AI</span>
+        </label>
+    </div>
+    <div id="codingStatus" class="text-muted mt-2"></div>
+</div>
+
+<div class="card">
     <h2>📥 采集器输出目录</h2>
     <div class="text-muted mb-2">配置采集器数据保存的默认输出路径（相对于笔记库根目录）。每个采集任务可单独覆盖此设置。</div>
     <div class="flex" style="flex-wrap:wrap;gap:8px;">
@@ -300,8 +313,29 @@ fetch('/api/config')
         if (cfg.feishuChatId) document.getElementById('feishuChatId').value = cfg.feishuChatId;
         if (cfg.feishuPollingEnabled) document.getElementById('feishuPollingEnabled').checked = true;
         if (cfg.notesDir) document.getElementById('notesDirPath').value = cfg.notesDir;
+        if (cfg.codingPiEnabled) document.getElementById('codingEnabled').checked = true;
     })
     .catch(() => {});
+
+async function saveCodingToggle() {
+    const enabled = document.getElementById('codingEnabled').checked;
+    const form = new FormData();
+    form.append('enabled', enabled ? 'on' : 'off');
+    form.append('timeout', '300');
+    form.append('appId', '');
+    form.append('appSecret', '');
+    form.append('chatId', '');
+    form.append('projectDir', '');
+    const res = await fetch('/api/config/coding', { method: 'POST', body: form });
+    const data = await res.json();
+    const status = document.getElementById('codingStatus');
+    if (data.ok) {
+        status.textContent = '✅ 已保存';
+        setTimeout(function() { status.textContent = ''; }, 2000);
+    } else {
+        status.textContent = '❌ ' + (data.error || '保存失败');
+    }
+}
 
 async function saveNotesDir(e) {
     e.preventDefault();

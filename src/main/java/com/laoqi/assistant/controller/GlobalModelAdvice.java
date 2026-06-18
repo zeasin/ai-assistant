@@ -57,4 +57,10 @@ public class GlobalModelAdvice {
     public String ollamaModel() {
         return appConfig.getOllamaModel();
     }
+
+    @ModelAttribute("codingEnabled")
+    public boolean codingEnabled() {
+        var config = configService.load();
+        return Boolean.TRUE.equals(config.isCodingPiEnabled());
+    }
 }
