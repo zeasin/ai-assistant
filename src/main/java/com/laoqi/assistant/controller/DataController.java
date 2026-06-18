@@ -42,12 +42,12 @@ public class DataController {
         this.moduleService = moduleService;
     }
 
-    private Path getBaseDir() {
-        String baseDir = configService.load().getBaseDir();
-        if (baseDir == null || baseDir.isEmpty()) {
-            throw new IllegalStateException("baseDir 未配置，请在 config.json 中设置");
+    private Path getNotesDir() {
+        String notesDir = configService.load().getNotesDir();
+        if (notesDir == null || notesDir.isEmpty()) {
+            throw new IllegalStateException("笔记库根目录未配置，请在 config.json 中设置");
         }
-        return Paths.get(baseDir);
+        return Paths.get(notesDir);
     }
 
     private String getDataDirByType(String type) {
@@ -71,7 +71,7 @@ public class DataController {
         
         Path baseDir;
         try {
-            baseDir = getBaseDir();
+            baseDir = getNotesDir();
         } catch (IllegalStateException e) {
             result.put("ok", false);
             result.put("error", e.getMessage());
@@ -155,7 +155,7 @@ public class DataController {
         
         Path baseDir;
         try {
-            baseDir = getBaseDir();
+            baseDir = getNotesDir();
         } catch (IllegalStateException e) {
             result.put("ok", false);
             result.put("error", e.getMessage());
@@ -203,7 +203,7 @@ public class DataController {
         
         Path baseDir;
         try {
-            baseDir = getBaseDir();
+            baseDir = getNotesDir();
         } catch (IllegalStateException e) {
             result.put("ok", false);
             result.put("error", e.getMessage());
@@ -285,7 +285,7 @@ public class DataController {
         
         Path baseDir;
         try {
-            baseDir = getBaseDir();
+            baseDir = getNotesDir();
         } catch (IllegalStateException e) {
             result.put("ok", false);
             result.put("error", e.getMessage());
@@ -381,7 +381,7 @@ public class DataController {
         
         Path baseDir;
         try {
-            baseDir = getBaseDir();
+            baseDir = getNotesDir();
         } catch (IllegalStateException e) {
             result.put("ok", false);
             result.put("error", e.getMessage());
@@ -471,7 +471,7 @@ public class DataController {
         
         Path baseDir;
         try {
-            baseDir = getBaseDir();
+            baseDir = getNotesDir();
         } catch (IllegalStateException e) {
             result.put("ok", false);
             result.put("error", e.getMessage());

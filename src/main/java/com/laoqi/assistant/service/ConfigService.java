@@ -1,5 +1,7 @@
 package com.laoqi.assistant.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.laoqi.assistant.config.AppConfig;
 import com.laoqi.assistant.model.Config;
 import com.laoqi.assistant.util.FileUtil;
@@ -7,10 +9,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.util.Map;
+
 @Service
 public class ConfigService {
 
     private static final Logger log = LoggerFactory.getLogger(ConfigService.class);
+    private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
     private final AppConfig appConfig;
 
     public ConfigService(AppConfig appConfig) {
@@ -18,8 +23,21 @@ public class ConfigService {
     }
 
     public Config load() {
-        Config config = FileUtil.readJson(appConfig.getConfigFile(), Config.class,
-                Config.defaultConfig("", ""));
+        // Migration: rename old baseDir field to notesDir
+        Map<String, Object> raw = FileUtil.readJson(appConfig.getConfigFile(), MAP_TYPE, null);
+        if (raw != null && raw.containsKey("baseDir") && !raw.containsKey("notesDir")) {
+            raw.put("notesDir", raw.get("baseDir"));
+            raw.remove("baseDir");
+            FileUtil.writeJson(appConfig.getConfigFile(), raw);
+            log.info("已迁移 config.json: baseDir → notesDir");
+        }
+
+        Config config;
+        if (raw != null) {
+            config = new ObjectMapper().convertValue(raw, Config.class);
+        } else {
+            config = Config.defaultConfig("", "");
+        }
         mergeDefaultValues(config);
         return config;
     }
@@ -63,14 +81,18 @@ public class ConfigService {
         }
     }
 
-    public String getBaseDir() {
+    public String getNotesDir() {
         Config config = load();
-        String dir = config.getBaseDir();
+        String dir = config.getNotesDir();
         if (dir == null || dir.isEmpty()) {
             throw new IllegalStateException("未配置笔记库根目录，请先在「设置」页面配置");
         }
         return dir;
     }
+
+    /** @deprecated use getNotesDir() */
+    @Deprecated
+    public String getBaseDir() { return getNotesDir(); }
 
     public void save(Config config) {
         mergeDefaultValues(config);

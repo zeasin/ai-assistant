@@ -58,13 +58,13 @@ public class ApiConfigController {
         return Map.of("ok", true);
     }
 
-    @PostMapping("/api/config/baseDir")
-    public Map<String, Object> updateBaseDir(@RequestParam String baseDir) {
+    @PostMapping("/api/config/notesDir")
+    public Map<String, Object> updateNotesDir(@RequestParam String notesDir) {
         try {
             Config cfg = configService.load();
-            cfg.setBaseDir(baseDir);
+            cfg.setNotesDir(notesDir);
             configService.save(cfg);
-            logService.add("配置更新", "成功", "笔记库根目录已更新为: " + baseDir);
+            logService.add("配置更新", "成功", "笔记库根目录已更新为: " + notesDir);
             return Map.of("ok", true);
         } catch (Exception e) {
             return Map.of("ok", false, "error", e.getMessage());

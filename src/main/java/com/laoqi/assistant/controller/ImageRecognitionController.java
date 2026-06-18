@@ -57,7 +57,7 @@ public class ImageRecognitionController {
     @ResponseBody
     public Map<String, Object> listImages() {
         try {
-            Path basePath = Paths.get(configService.getBaseDir());
+            Path basePath = Paths.get(configService.getNotesDir());
             if (!Files.isDirectory(basePath)) {
                 return Map.of("ok", false, "error", "笔记库目录不存在");
             }
@@ -86,7 +86,7 @@ public class ImageRecognitionController {
     @ResponseBody
     public org.springframework.http.ResponseEntity<byte[]> thumbnail(@RequestParam String path) {
         try {
-            Path baseDir = Paths.get(configService.getBaseDir());
+            Path baseDir = Paths.get(configService.getNotesDir());
             Path file = baseDir.resolve(path).normalize();
             if (!file.startsWith(baseDir) || !Files.exists(file)) {
                 return org.springframework.http.ResponseEntity.notFound().build();
@@ -106,7 +106,7 @@ public class ImageRecognitionController {
     @GetMapping("/subdirs")
     @ResponseBody
     public Map<String, Object> getSubdirs(@RequestParam(required = false, defaultValue = "") String dir) {
-        String baseDir = configService.getBaseDir();
+        String baseDir = configService.getNotesDir();
         Path basePath = Paths.get(baseDir);
         Path targetDir = dir.isEmpty() ? basePath : basePath.resolve(dir);
 
@@ -170,7 +170,7 @@ public class ImageRecognitionController {
             String prompt = body.getOrDefault("prompt", "请详细分析这张图片的内容");
             String modelName = body.getOrDefault("modelName", "");
 
-            Path baseDir = Paths.get(configService.getBaseDir());
+            Path baseDir = Paths.get(configService.getNotesDir());
             Path file = baseDir.resolve(filePath).normalize();
             if (!file.startsWith(baseDir) || !Files.exists(file)) {
                 return Map.of("ok", false, "error", "图片文件不存在");
@@ -203,7 +203,7 @@ public class ImageRecognitionController {
             String path = body.get("path");
             String content = body.get("content");
 
-            Path baseDir = Paths.get(configService.getBaseDir());
+            Path baseDir = Paths.get(configService.getNotesDir());
             Path file = baseDir.resolve(path).normalize();
             if (!file.startsWith(baseDir)) {
                 return Map.of("ok", false, "error", "路径不合法");

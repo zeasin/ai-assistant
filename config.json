@@ -1,6 +1,5 @@
 {
   "keyLabels" : { },
-  "baseDir" : "D:\\projects\\richie_learning_notes",
   "feishuWebhookUrl" : "https://open.feishu.cn/open-apis/bot/v2/hook/5684e7f9-3cdc-4ac8-a5ce-97051c4f8393",
   "feishuAppId" : "cli_a8f9b3e8deb9100c",
   "feishuAppSecret" : "IVsBQADPxkx62MnksTdxObxIWiCG6LZs",
@@ -31,5 +30,6 @@
   "codingProjectDir" : "D:\\projects\\qihang-erp-pro",
   "codingPiEnabled" : true,
   "codingPiTimeout" : 300,
-  "aiProvider" : "direct"
+  "aiProvider" : "direct",
+  "notesDir" : "D:\\projects\\richie_learning_notes"
 }

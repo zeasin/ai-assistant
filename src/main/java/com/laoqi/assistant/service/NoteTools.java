@@ -29,7 +29,7 @@ public class NoteTools {
     }
 
     private Path baseDir() {
-        return Path.of(configService.getBaseDir());
+        return Path.of(configService.getNotesDir());
     }
 
     @Tool(description = "列出笔记库指定目录下的所有文件和子目录，path 是相对于笔记库根目录的路径")

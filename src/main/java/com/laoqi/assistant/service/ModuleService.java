@@ -90,11 +90,11 @@ public class ModuleService {
     }
 
     public Path getModuleDataDir(ModuleDefinition mod) {
-        return Path.of(configService.getBaseDir()).resolve(mod.getDir()).resolve("data");
+        return Path.of(configService.getNotesDir()).resolve(mod.getDir()).resolve("data");
     }
 
     public Path getModuleDir(ModuleDefinition mod) {
-        return Path.of(configService.getBaseDir()).resolve(mod.getDir());
+        return Path.of(configService.getNotesDir()).resolve(mod.getDir());
     }
 
     public void saveModules(List<ModuleDefinition> modules) {

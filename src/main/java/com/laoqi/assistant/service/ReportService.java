@@ -43,7 +43,7 @@ public class ReportService {
     }
 
     private Path getComprehensiveReportDir() {
-        return Paths.get(configService.getBaseDir()).resolve("AI").resolve("综合日报");
+        return Paths.get(configService.getNotesDir()).resolve("AI").resolve("综合日报");
     }
 
     private Path getPromptsDir() {
@@ -168,13 +168,13 @@ public class ReportService {
      */
     private String collectNoteContext() {
         StringBuilder sb = new StringBuilder();
-        String baseDir;
+        String notesDir;
         try {
-            baseDir = configService.getBaseDir();
+            notesDir = configService.getNotesDir();
         } catch (Exception e) {
             return "";
         }
-        Path base = Paths.get(baseDir);
+        Path base = Paths.get(notesDir);
 
         // 1. AGENTS.md
         Path agents = base.resolve("AGENTS.md");

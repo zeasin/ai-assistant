@@ -38,12 +38,12 @@ public class BrowseController {
         this.configService = configService;
     }
 
-    private Path getBaseDir() {
-        return Paths.get(configService.getBaseDir());
+    private Path getNotesDir() {
+        return Paths.get(configService.getNotesDir());
     }
 
     private Path safeResolve(String rel) {
-        Path base = getBaseDir().normalize();
+        Path base = getNotesDir().normalize();
         Path resolved = base.resolve(rel != null ? rel : "").normalize();
         if (!resolved.startsWith(base)) return base;
         return resolved;

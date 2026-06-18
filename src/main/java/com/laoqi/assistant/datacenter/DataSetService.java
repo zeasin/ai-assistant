@@ -97,7 +97,7 @@ public class DataSetService {
 
     private void migrateFromFiles() {
         try {
-            String baseDir = configService.getBaseDir();
+            String baseDir = configService.getNotesDir();
             if (baseDir == null || baseDir.isEmpty()) return;
 
             Path fileDir = java.nio.file.Paths.get(baseDir).resolve("AI").resolve("数据中心");

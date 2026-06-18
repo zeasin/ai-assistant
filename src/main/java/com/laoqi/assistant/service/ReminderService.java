@@ -64,8 +64,8 @@ public class ReminderService {
     }
 
     private Path getRemindersDir() {
-        String baseDir = configService.getBaseDir();
-        Path reminderDir = Paths.get(baseDir, "AI", "提醒");
+        String notesDir = configService.getNotesDir();
+        Path reminderDir = Paths.get(notesDir, "AI", "提醒");
         if (!Files.exists(reminderDir)) {
             try {
                 Files.createDirectories(reminderDir);

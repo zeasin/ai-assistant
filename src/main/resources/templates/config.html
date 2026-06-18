@@ -26,17 +26,17 @@
 <div class="card">
     <h2>📁 笔记库根目录配置</h2>
     <div class="text-muted mb-2">配置笔记库的根目录路径，修改后所有数据文件的相对路径都将基于此目录。</div>
-    <form id="baseDirForm" onsubmit="return saveBaseDir(event)">
+    <form id="notesDirForm" onsubmit="return saveNotesDir(event)">
         <div class="form-group">
             <label>笔记库根目录</label>
-            <input type="text" id="baseDirPath" placeholder="D:\projects\richie_learning_notes" style="font-family:monospace;">
+            <input type="text" id="notesDirPath" placeholder="D:\projects\richie_learning_notes" style="font-family:monospace;">
             <div class="text-muted" style="font-size:12px;margin-top:4px;">
                 支持绝对路径，如 <code>D:\notes</code> 或 <code>C:\Users\xxx\Notes</code>
             </div>
         </div>
         <div class="flex" style="gap:8px;">
             <button type="submit" class="btn btn-primary">保存根目录</button>
-            <span id="baseDirStatus" class="text-muted" style="margin-left:4px;"></span>
+            <span id="notesDirStatus" class="text-muted" style="margin-left:4px;"></span>
         </div>
     </form>
 </div>
@@ -299,17 +299,17 @@ fetch('/api/config')
         if (cfg.feishuAppSecret) document.getElementById('feishuAppSecret').value = cfg.feishuAppSecret;
         if (cfg.feishuChatId) document.getElementById('feishuChatId').value = cfg.feishuChatId;
         if (cfg.feishuPollingEnabled) document.getElementById('feishuPollingEnabled').checked = true;
-        if (cfg.baseDir) document.getElementById('baseDirPath').value = cfg.baseDir;
+        if (cfg.notesDir) document.getElementById('notesDirPath').value = cfg.notesDir;
     })
     .catch(() => {});
 
-async function saveBaseDir(e) {
+async function saveNotesDir(e) {
     e.preventDefault();
     const form = new FormData();
-    form.append('baseDir', document.getElementById('baseDirPath').value.trim());
-    const res = await fetch('/api/config/baseDir', { method: 'POST', body: form });
+    form.append('notesDir', document.getElementById('notesDirPath').value.trim());
+    const res = await fetch('/api/config/notesDir', { method: 'POST', body: form });
     const data = await res.json();
-    const status = document.getElementById('baseDirStatus');
+    const status = document.getElementById('notesDirStatus');
     if (data.ok) {
         status.textContent = '✅ 已保存';
         setTimeout(() => status.textContent = '', 3000);

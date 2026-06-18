@@ -21,12 +21,12 @@ public class TaskService {
         this.configService = configService;
     }
 
-    private Path getBaseDir() {
-        return Paths.get(configService.getBaseDir());
+    private Path getNotesDir() {
+        return Paths.get(configService.getNotesDir());
     }
 
     private Path dataFile() {
-        Path taskDir = getBaseDir().resolve("AI").resolve("任务");
+        Path taskDir = getNotesDir().resolve("AI").resolve("任务");
         if (!java.nio.file.Files.exists(taskDir)) {
             try {
                 java.nio.file.Files.createDirectories(taskDir);

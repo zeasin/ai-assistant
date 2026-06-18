@@ -162,8 +162,8 @@ public class AiGuideController {
 
     private Path getAgentsFile() {
         try {
-            String baseDir = configService.getBaseDir();
-            return Paths.get(baseDir, "AGENTS.md");
+            String notesDir = configService.getNotesDir();
+            return Paths.get(notesDir, "AGENTS.md");
         } catch (IllegalStateException e) {
             return null;
         }
@@ -171,8 +171,8 @@ public class AiGuideController {
 
     private Path getMemoryDir() {
         try {
-            String baseDir = configService.getBaseDir();
-            return Paths.get(baseDir, "AI", "记忆");
+            String notesDir = configService.getNotesDir();
+            return Paths.get(notesDir, "AI", "记忆");
         } catch (IllegalStateException e) {
             return null;
         }

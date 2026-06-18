@@ -20,12 +20,12 @@ public class TodoService {
         this.configService = configService;
     }
 
-    private Path getBaseDir() {
-        return Paths.get(configService.getBaseDir());
+    private Path getNotesDir() {
+        return Paths.get(configService.getNotesDir());
     }
 
     private Path getRemindFile() {
-        return getBaseDir().resolve("代办.md");
+        return getNotesDir().resolve("代办.md");
     }
 
     public static class Todos {
