@@ -102,7 +102,7 @@ public class ReminderService {
     private void save(String notesDir, Root root) {
         if (root.reminders == null) root.reminders = new ArrayList<>();
         if (root.meta == null) root.meta = new LinkedHashMap<>();
-        FileUtil.writeJson(getRemindersFile(), root);
+        FileUtil.writeJson(getRemindersFile(notesDir), root);
     }
 
     public List<Reminder> getAllReminders() {
@@ -123,7 +123,12 @@ public class ReminderService {
 
     public Reminder addReminder(String name, String message, String type, String time,
                                  String date, String dayOfWeek, String dayOfMonth, String monthDay) {
-        Root root = load();
+        return addReminder(configService.getNotesDir(), name, message, type, time, date, dayOfWeek, dayOfMonth, monthDay);
+    }
+
+    public Reminder addReminder(String notesDir, String name, String message, String type, String time,
+                                 String date, String dayOfWeek, String dayOfMonth, String monthDay) {
+        Root root = load(notesDir);
         if (root.reminders == null) root.reminders = new ArrayList<>();
         if (root.meta == null) root.meta = new LinkedHashMap<>();
 
@@ -165,7 +170,7 @@ public class ReminderService {
 
         root.reminders.add(r);
         root.meta.put("lastUpdated", LocalDate.now(TZ).toString());
-        save(root);
+        save(notesDir, root);
 
         log.info("[提醒] 新增提醒: {} ({})", name, type);
         return r;
@@ -174,7 +179,13 @@ public class ReminderService {
     public boolean updateReminder(String id, String name, String message, String type,
                                     String time, String date, String dayOfWeek, String dayOfMonth,
                                     String monthDay, Boolean enabled) {
-        Root root = load();
+        return updateReminder(configService.getNotesDir(), id, name, message, type, time, date, dayOfWeek, dayOfMonth, monthDay, enabled);
+    }
+
+    public boolean updateReminder(String notesDir, String id, String name, String message, String type,
+                                    String time, String date, String dayOfWeek, String dayOfMonth,
+                                    String monthDay, Boolean enabled) {
+        Root root = load(notesDir);
         if (root.reminders == null) return false;
 
         for (Reminder r : root.reminders) {
@@ -243,27 +254,35 @@ public class ReminderService {
     }
 
     public boolean deleteReminder(String id) {
-        Root root = load();
+        return deleteReminder(configService.getNotesDir(), id);
+    }
+
+    public boolean deleteReminder(String notesDir, String id) {
+        Root root = load(notesDir);
         if (root.reminders == null) return false;
 
         boolean removed = root.reminders.removeIf(r -> r.id.equals(id));
         if (removed) {
             root.meta.put("lastUpdated", LocalDate.now(TZ).toString());
-            save(root);
+            save(notesDir, root);
             log.info("[提醒] 删除提醒: {}", id);
         }
         return removed;
     }
 
     public boolean toggleReminder(String id) {
-        Root root = load();
+        return toggleReminder(configService.getNotesDir(), id);
+    }
+
+    public boolean toggleReminder(String notesDir, String id) {
+        Root root = load(notesDir);
         if (root.reminders == null) return false;
 
         for (Reminder r : root.reminders) {
             if (r.id.equals(id)) {
                 r.enabled = !r.enabled;
                 root.meta.put("lastUpdated", LocalDate.now(TZ).toString());
-                save(root);
+                save(notesDir, root);
                 log.info("[提醒] {}提醒: {}", r.enabled ? "启用" : "禁用", r.name);
                 return true;
             }
@@ -272,6 +291,10 @@ public class ReminderService {
     }
 
     public void triggerReminder(Reminder r) {
+        triggerReminder(configService.getNotesDir(), r);
+    }
+
+    public void triggerReminder(String notesDir, Reminder r) {
         if (r == null || !r.enabled) return;
 
         try {
@@ -286,7 +309,7 @@ public class ReminderService {
                 return;
             }
 
-            Root root = load();
+            Root root = load(notesDir);
             if (root.reminders != null) {
                 for (Reminder rem : root.reminders) {
                     if (rem.id.equals(r.id)) {
@@ -295,7 +318,7 @@ public class ReminderService {
                     }
                 }
             }
-            save(root);
+            save(notesDir, root);
 
             log.info("[提醒] 触发提醒: {}", r.name);
         } catch (Exception e) {

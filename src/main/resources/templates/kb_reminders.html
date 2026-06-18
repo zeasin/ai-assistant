@@ -262,6 +262,7 @@
 
 <script th:inline="javascript">
 var reminders = /*[[${reminders}]]*/ [];
+const KB_ID = [[${kb.id}]];
 
 document.addEventListener('DOMContentLoaded', function() {
     renderReminders();
@@ -417,9 +418,9 @@ async function saveReminder() {
     var yearDay = document.getElementById('reminder-yearDay').value;
     var monthDay = (yearMonth && yearDay) ? yearMonth + '-' + yearDay : '';
 
-    var url = id ? '/api/reminders/update' : '/api/reminders/add';
+    var url = id ? '/kb/' + KB_ID + '/api/reminders/update' : '/kb/' + KB_ID + '/api/reminders/add';
     var formData = new URLSearchParams();
-    if (id) formData.append('id', id);
+    if (id) formData.append('reminderId', id);
     formData.append('name', name);
     formData.append('message', message);
     formData.append('type', type);
@@ -457,10 +458,10 @@ async function saveReminder() {
 
 async function toggleReminder(id) {
     try {
-        var resp = await fetch('/api/reminders/toggle', {
+        var resp = await fetch('/kb/' + KB_ID + '/api/reminders/toggle', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: 'id=' + encodeURIComponent(id)
+            body: 'reminderId=' + encodeURIComponent(id)
         });
         var data = await resp.json();
         if (data.ok) {
@@ -481,10 +482,10 @@ function showDeleteModal(id) {
 async function confirmDelete() {
     var id = document.getElementById('delete-id').value;
     try {
-        var resp = await fetch('/api/reminders/delete', {
+        var resp = await fetch('/kb/' + KB_ID + '/api/reminders/delete', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: 'id=' + encodeURIComponent(id)
+            body: 'reminderId=' + encodeURIComponent(id)
         });
         var data = await resp.json();
         if (data.ok) {
@@ -501,10 +502,10 @@ async function confirmDelete() {
 
 async function triggerNow(id) {
     try {
-        var resp = await fetch('/api/reminders/trigger', {
+        var resp = await fetch('/kb/' + KB_ID + '/api/reminders/trigger', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: 'id=' + encodeURIComponent(id)
+            body: 'reminderId=' + encodeURIComponent(id)
         });
         var data = await resp.json();
         if (data.ok) {

@@ -4,6 +4,8 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.laoqi.assistant.config.AppConfig;
 import com.laoqi.assistant.entity.KnowledgeBaseEntity;
 import com.laoqi.assistant.model.ModuleDefinition;
+import com.laoqi.assistant.model.ReminderData.Reminder;
+import com.laoqi.assistant.model.TaskData.TaskItem;
 import com.laoqi.assistant.service.ConfigService;
 import com.laoqi.assistant.service.KnowledgeBaseService;
 import com.laoqi.assistant.service.LogService;
@@ -109,6 +111,7 @@ public class KnowledgeBaseController {
         if (kb == null) return "redirect:/config";
         model.put("kb", kb);
         model.put("labels", parseLabels(kb.getLabels()));
+        model.put("tasks", taskService.getAllTasks(kb.getNotesDir()));
         return "kb_tasks";
     }
 
@@ -118,6 +121,7 @@ public class KnowledgeBaseController {
         if (kb == null) return "redirect:/config";
         model.put("kb", kb);
         model.put("labels", parseLabels(kb.getLabels()));
+        model.put("reminders", reminderService.getAllReminders(kb.getNotesDir()));
         return "kb_reminders";
     }
 
@@ -278,6 +282,249 @@ public class KnowledgeBaseController {
             return Map.of("ok", true);
         } catch (IOException e) {
             return Map.of("ok", false, "error", "删除失败: " + e.getMessage());
+        }
+    }
+
+    // ========== KB 范围的任务 API ==========
+
+    @ResponseBody
+    @PostMapping("/kb/{id}/api/tasks/add")
+    public Map<String, Object> kbAddTask(@PathVariable Long id, @RequestParam String title,
+                                          @RequestParam(required = false, defaultValue = "") String description,
+                                          @RequestParam(required = false, defaultValue = "mid") String priority,
+                                          @RequestParam(required = false, defaultValue = "") String dueDate) {
+        KnowledgeBaseEntity kb = kbService.getById(id);
+        if (kb == null) return Map.of("ok", false, "error", "知识库不存在");
+        try {
+            TaskItem task = taskService.addTask(kb.getNotesDir(), title, description, priority, dueDate);
+            logService.add("任务看板", "成功", "添加任务: " + title);
+            return Map.of("ok", true, "task", task);
+        } catch (Exception e) {
+            return Map.of("ok", false, "error", e.getMessage());
+        }
+    }
+
+    @ResponseBody
+    @PostMapping("/kb/{id}/api/tasks/update")
+    public Map<String, Object> kbUpdateTask(@PathVariable Long id, @RequestParam String taskId,
+                                              @RequestParam(required = false) String title,
+                                              @RequestParam(required = false) String description,
+                                              @RequestParam(required = false) String status,
+                                              @RequestParam(required = false) String priority,
+                                              @RequestParam(required = false) String dueDate) {
+        KnowledgeBaseEntity kb = kbService.getById(id);
+        if (kb == null) return Map.of("ok", false, "error", "知识库不存在");
+        try {
+            TaskItem task = taskService.updateTask(kb.getNotesDir(), taskId, title, description, status, priority, dueDate);
+            if (task == null) return Map.of("ok", false, "error", "任务不存在");
+            logService.add("任务看板", "成功", "更新任务: " + task.title);
+            return Map.of("ok", true, "task", task);
+        } catch (Exception e) {
+            return Map.of("ok", false, "error", e.getMessage());
+        }
+    }
+
+    @ResponseBody
+    @PostMapping("/kb/{id}/api/tasks/delete")
+    public Map<String, Object> kbDeleteTask(@PathVariable Long id, @RequestParam String taskId) {
+        KnowledgeBaseEntity kb = kbService.getById(id);
+        if (kb == null) return Map.of("ok", false, "error", "知识库不存在");
+        try {
+            boolean ok = taskService.deleteTask(kb.getNotesDir(), taskId);
+            if (ok) logService.add("任务看板", "成功", "删除任务: " + taskId);
+            return Map.of("ok", ok);
+        } catch (Exception e) {
+            return Map.of("ok", false, "error", e.getMessage());
+        }
+    }
+
+    // ========== KB 范围的提醒 API ==========
+
+    @ResponseBody
+    @PostMapping("/kb/{id}/api/reminders/add")
+    public Map<String, Object> kbAddReminder(@PathVariable Long id,
+                                              @RequestParam String name,
+                                              @RequestParam(required = false, defaultValue = "") String message,
+                                              @RequestParam String type,
+                                              @RequestParam(required = false, defaultValue = "09:00") String time,
+                                              @RequestParam(required = false, defaultValue = "") String date,
+                                              @RequestParam(required = false, defaultValue = "") String dayOfWeek,
+                                              @RequestParam(required = false, defaultValue = "") String dayOfMonth,
+                                              @RequestParam(required = false, defaultValue = "") String monthDay) {
+        KnowledgeBaseEntity kb = kbService.getById(id);
+        if (kb == null) return Map.of("ok", false, "error", "知识库不存在");
+        try {
+            Reminder r = reminderService.addReminder(kb.getNotesDir(), name, message, type, time, date, dayOfWeek, dayOfMonth, monthDay);
+            logService.add("提醒管理", "成功", "添加提醒: " + name);
+            return Map.of("ok", true, "reminder", r);
+        } catch (Exception e) {
+            return Map.of("ok", false, "error", e.getMessage());
+        }
+    }
+
+    @ResponseBody
+    @PostMapping("/kb/{id}/api/reminders/update")
+    public Map<String, Object> kbUpdateReminder(@PathVariable Long id,
+                                                 @RequestParam String reminderId,
+                                                 @RequestParam(required = false) String name,
+                                                 @RequestParam(required = false) String message,
+                                                 @RequestParam(required = false) String type,
+                                                 @RequestParam(required = false) String time,
+                                                 @RequestParam(required = false) String date,
+                                                 @RequestParam(required = false) String dayOfWeek,
+                                                 @RequestParam(required = false) String dayOfMonth,
+                                                 @RequestParam(required = false) String monthDay,
+                                                 @RequestParam(required = false) Boolean enabled) {
+        KnowledgeBaseEntity kb = kbService.getById(id);
+        if (kb == null) return Map.of("ok", false, "error", "知识库不存在");
+        try {
+            boolean ok = reminderService.updateReminder(kb.getNotesDir(), reminderId, name, message, type, time, date, dayOfWeek, dayOfMonth, monthDay, enabled);
+            if (!ok) return Map.of("ok", false, "error", "提醒不存在");
+            logService.add("提醒管理", "成功", "更新提醒: " + name);
+            return Map.of("ok", true);
+        } catch (Exception e) {
+            return Map.of("ok", false, "error", e.getMessage());
+        }
+    }
+
+    @ResponseBody
+    @PostMapping("/kb/{id}/api/reminders/delete")
+    public Map<String, Object> kbDeleteReminder(@PathVariable Long id, @RequestParam String reminderId) {
+        KnowledgeBaseEntity kb = kbService.getById(id);
+        if (kb == null) return Map.of("ok", false, "error", "知识库不存在");
+        try {
+            boolean ok = reminderService.deleteReminder(kb.getNotesDir(), reminderId);
+            if (ok) logService.add("提醒管理", "成功", "删除提醒");
+            return Map.of("ok", ok);
+        } catch (Exception e) {
+            return Map.of("ok", false, "error", e.getMessage());
+        }
+    }
+
+    @ResponseBody
+    @PostMapping("/kb/{id}/api/reminders/toggle")
+    public Map<String, Object> kbToggleReminder(@PathVariable Long id, @RequestParam String reminderId) {
+        KnowledgeBaseEntity kb = kbService.getById(id);
+        if (kb == null) return Map.of("ok", false, "error", "知识库不存在");
+        try {
+            boolean ok = reminderService.toggleReminder(kb.getNotesDir(), reminderId);
+            return Map.of("ok", ok);
+        } catch (Exception e) {
+            return Map.of("ok", false, "error", e.getMessage());
+        }
+    }
+
+    @ResponseBody
+    @PostMapping("/kb/{id}/api/reminders/trigger")
+    public Map<String, Object> kbTriggerReminder(@PathVariable Long id, @RequestParam String reminderId) {
+        KnowledgeBaseEntity kb = kbService.getById(id);
+        if (kb == null) return Map.of("ok", false, "error", "知识库不存在");
+        try {
+            Reminder r = reminderService.getAllReminders(kb.getNotesDir()).stream()
+                    .filter(x -> x.id.equals(reminderId)).findFirst().orElse(null);
+            if (r == null) return Map.of("ok", false, "error", "提醒不存在");
+            reminderService.triggerReminder(kb.getNotesDir(), r);
+            logService.add("提醒管理", "成功", "手动触发: " + r.name);
+            return Map.of("ok", true);
+        } catch (Exception e) {
+            return Map.of("ok", false, "error", e.getMessage());
+        }
+    }
+
+    // ========== KB 范围的 AI 指南 API ==========
+
+    @ResponseBody
+    @GetMapping("/kb/{id}/api/ai-guide/agents")
+    public Map<String, Object> kbGetAgents(@PathVariable Long id) {
+        KnowledgeBaseEntity kb = kbService.getById(id);
+        if (kb == null) return Map.of("ok", false, "error", "知识库不存在");
+        Path file = Paths.get(kb.getNotesDir(), "AGENTS.md");
+        if (!Files.exists(file)) return Map.of("ok", true, "content", "", "path", file.toString());
+        return Map.of("ok", true, "content", FileUtil.readText(file), "path", file.toString());
+    }
+
+    @ResponseBody
+    @PostMapping("/kb/{id}/api/ai-guide/agents")
+    public Map<String, Object> kbSaveAgents(@PathVariable Long id, @RequestBody Map<String, String> body) {
+        KnowledgeBaseEntity kb = kbService.getById(id);
+        if (kb == null) return Map.of("ok", false, "error", "知识库不存在");
+        Path file = Paths.get(kb.getNotesDir(), "AGENTS.md");
+        try {
+            FileUtil.writeText(file, body.getOrDefault("content", ""));
+            logService.add("AI指南", "保存AGENTS.md", file.toString());
+            return Map.of("ok", true);
+        } catch (Exception e) {
+            return Map.of("ok", false, "error", e.getMessage());
+        }
+    }
+
+    @ResponseBody
+    @GetMapping("/kb/{id}/api/ai-guide/memory")
+    public Map<String, Object> kbListMemory(@PathVariable Long id) {
+        KnowledgeBaseEntity kb = kbService.getById(id);
+        if (kb == null) return Map.of("ok", false, "error", "知识库不存在");
+        Path dir = Paths.get(kb.getNotesDir(), "AI", "记忆");
+        if (!Files.exists(dir)) return Map.of("ok", true, "files", List.of(), "path", dir.toString());
+        try (var files = Files.list(dir)) {
+            List<Map<String, String>> fileList = files
+                    .filter(p -> p.getFileName().toString().endsWith(".md"))
+                    .sorted()
+                    .map(p -> Map.<String, String>of("name", p.getFileName().toString(), "path", p.toString()))
+                    .collect(Collectors.toList());
+            return Map.of("ok", true, "files", fileList, "path", dir.toString());
+        } catch (Exception e) {
+            return Map.of("ok", false, "error", e.getMessage());
+        }
+    }
+
+    @ResponseBody
+    @GetMapping("/kb/{id}/api/ai-guide/memory/{name}")
+    public Map<String, Object> kbGetMemory(@PathVariable Long id, @PathVariable String name) {
+        KnowledgeBaseEntity kb = kbService.getById(id);
+        if (kb == null) return Map.of("ok", false, "error", "知识库不存在");
+        Path dir = Paths.get(kb.getNotesDir(), "AI", "记忆");
+        Path file = dir.resolve(name).normalize();
+        if (!file.startsWith(dir)) return Map.of("ok", false, "error", "非法文件名");
+        if (!Files.exists(file)) return Map.of("ok", true, "content", "");
+        return Map.of("ok", true, "content", FileUtil.readText(file));
+    }
+
+    @ResponseBody
+    @PostMapping("/kb/{id}/api/ai-guide/memory")
+    public Map<String, Object> kbSaveMemory(@PathVariable Long id, @RequestBody Map<String, String> body) {
+        KnowledgeBaseEntity kb = kbService.getById(id);
+        if (kb == null) return Map.of("ok", false, "error", "知识库不存在");
+        String name = body.getOrDefault("name", "");
+        String content = body.getOrDefault("content", "");
+        if (name.isEmpty()) return Map.of("ok", false, "error", "文件名不能为空");
+        if (!name.endsWith(".md")) name += ".md";
+        Path dir = Paths.get(kb.getNotesDir(), "AI", "记忆");
+        try {
+            Files.createDirectories(dir);
+            Path file = dir.resolve(name).normalize();
+            if (!file.startsWith(dir)) return Map.of("ok", false, "error", "非法文件名");
+            FileUtil.writeText(file, content);
+            logService.add("AI指南", "保存记忆", name);
+            return Map.of("ok", true);
+        } catch (Exception e) {
+            return Map.of("ok", false, "error", e.getMessage());
+        }
+    }
+
+    @ResponseBody
+    @DeleteMapping("/kb/{id}/api/ai-guide/memory/{name}")
+    public Map<String, Object> kbDeleteMemory(@PathVariable Long id, @PathVariable String name) {
+        KnowledgeBaseEntity kb = kbService.getById(id);
+        if (kb == null) return Map.of("ok", false, "error", "知识库不存在");
+        Path dir = Paths.get(kb.getNotesDir(), "AI", "记忆");
+        Path file = dir.resolve(name).normalize();
+        if (!file.startsWith(dir)) return Map.of("ok", false, "error", "非法文件名");
+        try {
+            Files.deleteIfExists(file);
+            logService.add("AI指南", "删除记忆", name);
+            return Map.of("ok", true);
+        } catch (Exception e) {
+            return Map.of("ok", false, "error", e.getMessage());
         }
     }
 

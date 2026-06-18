@@ -46,7 +46,11 @@ public class TaskService {
     }
 
     private void saveData(Root root) {
-        FileUtil.writeJson(dataFile(), root);
+        saveData(root, configService.getNotesDir());
+    }
+
+    private void saveData(Root root, String notesDir) {
+        FileUtil.writeJson(dataFile(notesDir), root);
     }
 
     public List<TaskItem> getAllTasks() {
@@ -82,14 +86,19 @@ public class TaskService {
 
         root.tasks.add(task);
         root.meta.put("lastUpdated", now);
-        saveData(root);
+        saveData(root, notesDir);
 
         return task;
     }
 
     public TaskItem updateTask(String id, String title, String description, String status,
                                 String priority, String dueDate) {
-        Root root = loadData();
+        return updateTask(configService.getNotesDir(), id, title, description, status, priority, dueDate);
+    }
+
+    public TaskItem updateTask(String notesDir, String id, String title, String description, String status,
+                                String priority, String dueDate) {
+        Root root = loadData(notesDir);
         if (root.tasks == null) return null;
         if (root.meta == null) root.meta = new LinkedHashMap<>();
 
@@ -102,7 +111,7 @@ public class TaskService {
                 if (dueDate != null) task.dueDate = dueDate.isEmpty() ? null : dueDate;
                 task.updatedAt = java.time.LocalDate.now().toString();
                 root.meta.put("lastUpdated", task.updatedAt);
-                saveData(root);
+                saveData(root, notesDir);
                 return task;
             }
         }
@@ -110,14 +119,18 @@ public class TaskService {
     }
 
     public boolean deleteTask(String id) {
-        Root root = loadData();
+        return deleteTask(configService.getNotesDir(), id);
+    }
+
+    public boolean deleteTask(String notesDir, String id) {
+        Root root = loadData(notesDir);
         if (root.tasks == null) return false;
         if (root.meta == null) root.meta = new LinkedHashMap<>();
 
         boolean removed = root.tasks.removeIf(t -> t.id.equals(id));
         if (removed) {
             root.meta.put("lastUpdated", java.time.LocalDate.now().toString());
-            saveData(root);
+            saveData(root, notesDir);
         }
         return removed;
     }

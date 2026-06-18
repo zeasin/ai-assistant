@@ -180,6 +180,7 @@
 </div>
 
 <script>
+const KB_ID = [[${kb.id}]];
 var showingPreview = false;
 
 function switchTab(tab) {
@@ -194,7 +195,7 @@ function switchTab(tab) {
 // ---- AGENTS.md ----
 
 function loadAgents() {
-    fetch('/api/ai-guide/agents')
+    fetch('/kb/' + KB_ID + '/api/ai-guide/agents')
         .then(function(r) { return r.json(); })
         .then(function(data) {
             if (data.ok) {
@@ -217,7 +218,7 @@ function saveAgents() {
     btn.textContent = '⏳ 保存...';
 
     var content = document.getElementById('agentsEditor').value;
-    fetch('/api/ai-guide/agents', {
+    fetch('/kb/' + KB_ID + '/api/ai-guide/agents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: content })
@@ -259,7 +260,7 @@ function loadMemoryList() {
     var container = document.getElementById('memoryList');
     container.innerHTML = '<div style="text-align:center;padding:20px;color:#909296;">⏳ 加载中...</div>';
 
-    fetch('/api/ai-guide/memory')
+    fetch('/kb/' + KB_ID + '/api/ai-guide/memory')
         .then(function(r) { return r.json(); })
         .then(function(data) {
             if (!data.ok) {
@@ -328,7 +329,7 @@ function showMemoryEditor(name) {
     var deleteBtn = document.getElementById('memoryDeleteBtn');
     deleteBtn.style.display = (name === 'MEMORY.md') ? 'none' : 'inline-block';
 
-    fetch('/api/ai-guide/memory/' + encodeURIComponent(name))
+    fetch('/kb/' + KB_ID + '/api/ai-guide/memory/' + encodeURIComponent(name))
         .then(function(r) { return r.json(); })
         .then(function(data) {
             if (data.ok) {
@@ -377,12 +378,12 @@ function saveMemory() {
 
     // If name changed, delete old file first
     var deleteFirst = (origName && origName !== name)
-        ? fetch('/api/ai-guide/memory/' + encodeURIComponent(origName), { method: 'DELETE' })
+        ? fetch('/kb/' + KB_ID + '/api/ai-guide/memory/' + encodeURIComponent(origName), { method: 'DELETE' })
         : Promise.resolve();
 
     deleteFirst
         .then(function() {
-            return fetch('/api/ai-guide/memory', {
+            return fetch('/kb/' + KB_ID + '/api/ai-guide/memory', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name: name, content: content })
@@ -409,7 +410,7 @@ function saveMemory() {
 
 function deleteMemoryConfirm(name) {
     if (!confirm('确定删除 ' + name + '？')) return;
-    fetch('/api/ai-guide/memory/' + encodeURIComponent(name), { method: 'DELETE' })
+    fetch('/kb/' + KB_ID + '/api/ai-guide/memory/' + encodeURIComponent(name), { method: 'DELETE' })
         .then(function(r) { return r.json(); })
         .then(function(data) {
             if (data.ok) {

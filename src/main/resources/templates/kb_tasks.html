@@ -226,6 +226,7 @@
 <script th:inline="javascript">
 var tasks = /*[[${tasks}]]*/ [];
 var isEdit = false;
+const KB_ID = [[${kb.id}]];
 
 document.addEventListener('DOMContentLoaded', function() {
     if (!tasks || tasks.length === 0) {
@@ -357,16 +358,16 @@ async function saveTask() {
     var url, formData;
     if (isEdit) {
         var status = document.getElementById('task-status').value;
-        url = '/api/tasks/update';
+        url = '/kb/' + KB_ID + '/api/tasks/update';
         formData = new URLSearchParams();
-        formData.append('id', id);
+        formData.append('taskId', id);
         formData.append('title', title);
         formData.append('description', description);
         formData.append('priority', priority);
         formData.append('dueDate', dueDate);
         formData.append('status', status);
     } else {
-        url = '/api/tasks/add';
+        url = '/kb/' + KB_ID + '/api/tasks/add';
         formData = new URLSearchParams();
         formData.append('title', title);
         formData.append('description', description);
@@ -395,11 +396,11 @@ async function saveTask() {
 
 async function quickChangeStatus(id, newStatus) {
     var formData = new URLSearchParams();
-    formData.append('id', id);
+    formData.append('taskId', id);
     formData.append('status', newStatus);
 
     try {
-        var resp = await fetch('/api/tasks/update', {
+        var resp = await fetch('/kb/' + KB_ID + '/api/tasks/update', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: formData
@@ -421,10 +422,10 @@ async function deleteTask(id) {
     if (!confirm('确定要删除这个任务吗？')) return;
 
     var formData = new URLSearchParams();
-    formData.append('id', id);
+    formData.append('taskId', id);
 
     try {
-        var resp = await fetch('/api/tasks/delete', {
+        var resp = await fetch('/kb/' + KB_ID + '/api/tasks/delete', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: formData

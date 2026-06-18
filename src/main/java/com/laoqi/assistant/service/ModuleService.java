@@ -2,6 +2,7 @@ package com.laoqi.assistant.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.laoqi.assistant.config.AppConfig;
+import com.laoqi.assistant.entity.KnowledgeBaseEntity;
 import com.laoqi.assistant.entity.ModuleEntity;
 import com.laoqi.assistant.model.ModuleDefinition;
 import com.laoqi.assistant.service.db.ModuleDbService;
@@ -26,11 +27,14 @@ public class ModuleService {
     private final AppConfig appConfig;
     private final ConfigService configService;
     private final ModuleDbService moduleDbService;
+    private final KnowledgeBaseService kbService;
 
-    public ModuleService(AppConfig appConfig, ConfigService configService, ModuleDbService moduleDbService) {
+    public ModuleService(AppConfig appConfig, ConfigService configService, ModuleDbService moduleDbService,
+                         KnowledgeBaseService kbService) {
         this.appConfig = appConfig;
         this.configService = configService;
         this.moduleDbService = moduleDbService;
+        this.kbService = kbService;
     }
 
     @PostConstruct
@@ -102,10 +106,23 @@ public class ModuleService {
     }
 
     public Path getModuleDataDir(ModuleDefinition mod) {
-        return Path.of(configService.getNotesDir()).resolve(mod.getDir()).resolve("data");
+        return getModuleBaseDir(mod).resolve("data");
     }
 
     public Path getModuleDir(ModuleDefinition mod) {
+        return getModuleBaseDir(mod);
+    }
+
+    private Path getModuleBaseDir(ModuleDefinition mod) {
+        ModuleEntity e = moduleDbService.lambdaQuery()
+                .eq(ModuleEntity::getModuleId, mod.getId())
+                .one();
+        if (e != null && e.getKbId() != null) {
+            KnowledgeBaseEntity kb = kbService.getById(e.getKbId());
+            if (kb != null) {
+                return Path.of(kb.getNotesDir()).resolve(mod.getDir());
+            }
+        }
         return Path.of(configService.getNotesDir()).resolve(mod.getDir());
     }
 
