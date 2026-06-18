@@ -43,10 +43,7 @@ public class DataController {
     }
 
     private Path getNotesDir() {
-        String notesDir = configService.load().getNotesDir();
-        if (notesDir == null || notesDir.isEmpty()) {
-            throw new IllegalStateException("笔记库根目录未配置，请在 config.json 中设置");
-        }
+        String notesDir = configService.getNotesDir();
         return Paths.get(notesDir);
     }
 

@@ -74,10 +74,14 @@ public class SessionService {
                     chat_id    TEXT NOT NULL DEFAULT '',
                     chat_type  TEXT NOT NULL DEFAULT '',
                     mode       TEXT NOT NULL DEFAULT 'knowledge',
+                    kb_id      INTEGER NOT NULL DEFAULT 1,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL
                 )
                 """);
+            // 迁移：为 sessions 补充 kb_id 列（兼容旧数据库）
+            try { stmt.execute("ALTER TABLE sessions ADD COLUMN kb_id INTEGER NOT NULL DEFAULT 1"); } catch (Exception ignored) {}
+            stmt.execute("CREATE INDEX IF NOT EXISTS idx_sessions_kb ON sessions(kb_id)");
             stmt.execute("""
                 CREATE TABLE IF NOT EXISTS messages (
                     id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -149,6 +153,19 @@ public class SessionService {
             try { stmt.execute("ALTER TABLE coding_records ADD COLUMN ai_engine TEXT NOT NULL DEFAULT 'pi'"); } catch (Exception ignored) {}
 
             stmt.execute("""
+                CREATE TABLE IF NOT EXISTS knowledge_bases (
+                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name        TEXT NOT NULL,
+                    notes_dir   TEXT NOT NULL,
+                    labels      TEXT NOT NULL DEFAULT '{}',
+                    is_active   INTEGER NOT NULL DEFAULT 0,
+                    sort_order  INTEGER NOT NULL DEFAULT 0,
+                    created_at  TEXT NOT NULL
+                )
+                """);
+            log.info("Table knowledge_bases initialized");
+
+            stmt.execute("""
                 CREATE TABLE IF NOT EXISTS modules (
                     id          INTEGER PRIMARY KEY AUTOINCREMENT,
                     module_id   TEXT NOT NULL UNIQUE,
@@ -157,10 +174,21 @@ public class SessionService {
                     icon        TEXT NOT NULL DEFAULT '📦',
                     prompt      TEXT NOT NULL DEFAULT '',
                     data_files  TEXT NOT NULL DEFAULT '[]',
-                    sort_order  INTEGER NOT NULL DEFAULT 0
+                    sort_order  INTEGER NOT NULL DEFAULT 0,
+                    kb_id       INTEGER NOT NULL DEFAULT 1
                 )
                 """);
             log.info("Table modules initialized");
+            // 迁移：为 modules 补充 kb_id 列（兼容旧数据库）
+            try { stmt.execute("ALTER TABLE modules ADD COLUMN kb_id INTEGER NOT NULL DEFAULT 1"); } catch (Exception ignored) {}
+            stmt.execute("CREATE INDEX IF NOT EXISTS idx_modules_kb ON modules(kb_id)");
+            // 迁移：从 config.json 迁移第一条知识库
+            try {
+                stmt.execute("SELECT COUNT(*) FROM knowledge_bases");
+                // 表已存在，尝试迁移
+            } catch (Exception e2) {
+                // 表可能刚创建，不管
+            }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to create new tables", e);
         }

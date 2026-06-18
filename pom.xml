@@ -12,7 +12,7 @@
 
     <groupId>com.laoqi</groupId>
     <artifactId>ai-assistant</artifactId>
-    <version>0.4.0</version>
+    <version>1.0.0</version>
     <name>AI 助理</name>
     <description>AI 助理 v0.4.0 — 自包含的 AI 应用，基于 Spring AI 2.0 + Spring Boot 4.1</description>
 

@@ -100,7 +100,12 @@ public class CollectorService {
 
     private Path getCollectorDir() {
         try {
-            String baseDir = configService.load().getNotesDir();
+            String baseDir;
+            try {
+                baseDir = configService.getNotesDir();
+            } catch (Exception e) {
+                baseDir = null;
+            }
             Path dir;
             if (baseDir != null && !baseDir.isEmpty()) {
                 dir = Paths.get(baseDir).resolve("AI").resolve("数据中心").resolve("collector");

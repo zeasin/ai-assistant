@@ -1,6 +1,5 @@
 {
   "keyLabels" : { },
-  "notesDir" : "",
   "feishuWebhookUrl" : "",
   "feishuAppId" : "",
   "feishuAppSecret" : "",
@@ -16,6 +15,5 @@
   "codingFeishuChatId" : "",
   "codingProjectDir" : "",
   "codingPiEnabled" : false,
-  "codingPiTimeout" : 300,
-  "aiProvider" : "direct"
+  "codingPiTimeout" : 300
 }

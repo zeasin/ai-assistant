@@ -20,9 +20,11 @@ public class ConfigService {
     private static final Logger log = LoggerFactory.getLogger(ConfigService.class);
     private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
     private final AppConfig appConfig;
+    private final KnowledgeBaseService kbService;
 
-    public ConfigService(AppConfig appConfig) {
+    public ConfigService(AppConfig appConfig, KnowledgeBaseService kbService) {
         this.appConfig = appConfig;
+        this.kbService = kbService;
     }
 
     private void ensureConfigFile() {
@@ -42,14 +44,7 @@ public class ConfigService {
     public Config load() {
         ensureConfigFile();
 
-        // Migration: rename old baseDir field to notesDir
         Map<String, Object> raw = FileUtil.readJson(appConfig.getConfigFile(), MAP_TYPE, null);
-        if (raw != null && raw.containsKey("baseDir") && !raw.containsKey("notesDir")) {
-            raw.put("notesDir", raw.get("baseDir"));
-            raw.remove("baseDir");
-            FileUtil.writeJson(appConfig.getConfigFile(), raw);
-            log.info("已迁移 config.json: baseDir → notesDir");
-        }
 
         Config config;
         if (raw != null) {
@@ -89,10 +84,9 @@ public class ConfigService {
     }
 
     public String getNotesDir() {
-        Config config = load();
-        String dir = config.getNotesDir();
+        String dir = kbService.getNotesDir();
         if (dir == null || dir.isEmpty()) {
-            throw new IllegalStateException("未配置笔记库根目录，请先在「设置」页面配置");
+            throw new IllegalStateException("未配置笔记库，请先在「设置」页面添加知识库并配置笔记库路径");
         }
         return dir;
     }
