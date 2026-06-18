@@ -1,7 +1,6 @@
 package com.laoqi.assistant.service;
 
 import com.laoqi.assistant.entity.LlmProfileEntity;
-import com.laoqi.assistant.model.Config;
 import com.laoqi.assistant.service.db.LlmProfileDbService;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
@@ -39,39 +38,26 @@ public class LlmConfigResolver {
         List<LlmProfileEntity> existing = llmProfileDbService.listAllOrdered();
         if (!existing.isEmpty()) return;
 
-        Config cfg = loadConfig();
-        String apiKey = cfg != null ? cfg.getLlmApiKey() : "";
-        if (apiKey == null || apiKey.isEmpty()) {
-            apiKey = System.getenv("LLM_API_KEY");
-        }
+        String apiKey = System.getenv("LLM_API_KEY");
         if (apiKey == null || apiKey.isEmpty()) {
             apiKey = System.getenv("DEEPSEEK_API_KEY");
         }
         if (apiKey == null || apiKey.isEmpty()) return;
 
-        String baseUrl = (cfg != null && cfg.getLlmBaseUrl() != null && !cfg.getLlmBaseUrl().isEmpty())
-                ? cfg.getLlmBaseUrl() : "https://api.deepseek.com";
-        String model = (cfg != null && cfg.getLlmModel() != null && !cfg.getLlmModel().isEmpty())
-                ? cfg.getLlmModel() : "deepseek-chat";
-        int timeout = (cfg != null && cfg.getLlmTimeout() > 0) ? cfg.getLlmTimeout() : 600;
+        String baseUrl = System.getenv("LLM_BASE_URL");
+        if (baseUrl == null || baseUrl.isEmpty()) baseUrl = "https://api.deepseek.com";
+        String model = System.getenv("LLM_MODEL");
+        if (model == null || model.isEmpty()) model = "deepseek-chat";
 
         LlmProfileEntity profile = new LlmProfileEntity();
         profile.setName("default");
         profile.setApiKey(apiKey);
         profile.setBaseUrl(baseUrl);
         profile.setModel(model);
-        profile.setTimeout(timeout);
+        profile.setTimeout(600);
         profile.setIsDefault(true);
         llmProfileDbService.save(profile);
         log.info("Migrated legacy LLM config to llm_profiles table (model={})", model);
-    }
-
-    private Config loadConfig() {
-        try {
-            return configService.load();
-        } catch (Exception e) {
-            return null;
-        }
     }
 
     private LlmProfileEntity resolveDefaultProfile() {
@@ -95,11 +81,6 @@ public class LlmConfigResolver {
     public String resolveApiKey() {
         LlmProfileEntity p = resolveDefaultProfile();
         if (p != null) return p.getApiKey();
-        Config cfg = loadConfig();
-        if (cfg != null) {
-            String key = cfg.getLlmApiKey();
-            if (key != null && !key.isEmpty()) return key;
-        }
         String key = System.getenv("LLM_API_KEY");
         if (key != null && !key.isEmpty()) return key;
         key = System.getenv("DEEPSEEK_API_KEY");
@@ -110,11 +91,6 @@ public class LlmConfigResolver {
     public String resolveBaseUrl() {
         LlmProfileEntity p = resolveDefaultProfile();
         if (p != null) return p.getBaseUrl();
-        Config cfg = loadConfig();
-        if (cfg != null) {
-            String url = cfg.getLlmBaseUrl();
-            if (url != null && !url.isEmpty()) return url;
-        }
         String envUrl = System.getenv("LLM_BASE_URL");
         if (envUrl != null && !envUrl.isEmpty()) return envUrl;
         return "https://api.deepseek.com";
@@ -123,19 +99,12 @@ public class LlmConfigResolver {
     public String resolveModel() {
         LlmProfileEntity p = resolveDefaultProfile();
         if (p != null) return p.getModel();
-        Config cfg = loadConfig();
-        if (cfg != null) {
-            String model = cfg.getLlmModel();
-            if (model != null && !model.isEmpty()) return model;
-        }
         return "deepseek-chat";
     }
 
     public int resolveTimeout() {
         LlmProfileEntity p = resolveDefaultProfile();
         if (p != null && p.getTimeout() != null && p.getTimeout() > 0) return p.getTimeout();
-        Config cfg = loadConfig();
-        if (cfg != null && cfg.getLlmTimeout() > 0) return cfg.getLlmTimeout();
         return 60;
     }
 

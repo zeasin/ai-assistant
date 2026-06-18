@@ -1,0 +1,21 @@
+{
+  "keyLabels" : { },
+  "notesDir" : "",
+  "feishuWebhookUrl" : "",
+  "feishuAppId" : "",
+  "feishuAppSecret" : "",
+  "feishuChatId" : "",
+  "feishuPollingEnabled" : false,
+  "logFile" : "assistant_log.json",
+  "embeddingModel" : "nomic-embed-text",
+  "embeddingBaseUrl" : "http://127.0.0.1:11434",
+  "embeddingApiKey" : "",
+  "embeddingProvider" : "Ollama",
+  "codingFeishuAppId" : "",
+  "codingFeishuAppSecret" : "",
+  "codingFeishuChatId" : "",
+  "codingProjectDir" : "",
+  "codingPiEnabled" : false,
+  "codingPiTimeout" : 300,
+  "aiProvider" : "direct"
+}

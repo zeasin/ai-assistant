@@ -181,15 +181,9 @@ public class ApiConfigController {
 
     @PostMapping("/api/config/llm")
     public Map<String, Object> updateLlmConfig(@RequestBody Map<String, Object> body) {
-        Config cfg = configService.load();
-        if (body.containsKey("apiKey")) cfg.setLlmApiKey((String) body.get("apiKey"));
-        if (body.containsKey("baseUrl")) cfg.setLlmBaseUrl((String) body.get("baseUrl"));
-        if (body.containsKey("model")) cfg.setLlmModel((String) body.get("model"));
-        if (body.containsKey("timeout")) cfg.setLlmTimeout(((Number) body.get("timeout")).intValue());
-        configService.save(cfg);
         logService.add("配置更新", "成功", "LLM 配置已更新");
 
-        // Also sync to llm_profiles table
+        // Sync to llm_profiles table
         List<LlmProfileEntity> profiles = llmProfileDbService.listAllOrdered();
         if (profiles.isEmpty()) {
             LlmProfileEntity p = new LlmProfileEntity();

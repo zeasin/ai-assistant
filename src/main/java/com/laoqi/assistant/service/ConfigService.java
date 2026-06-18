@@ -5,10 +5,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.laoqi.assistant.config.AppConfig;
 import com.laoqi.assistant.model.Config;
 import com.laoqi.assistant.util.FileUtil;
+import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Map;
 
 @Service
@@ -22,7 +25,23 @@ public class ConfigService {
         this.appConfig = appConfig;
     }
 
+    private void ensureConfigFile() {
+        Path configFile = appConfig.getConfigFile();
+        if (Files.exists(configFile)) return;
+        Path template = appConfig.getConfigDirPath().resolve("config.template.json");
+        if (Files.exists(template)) {
+            try {
+                Files.copy(template, configFile);
+                log.info("config.json 不存在，已从 config.template.json 创建");
+            } catch (Exception e) {
+                log.warn("无法从模板创建 config.json: {}", e.getMessage());
+            }
+        }
+    }
+
     public Config load() {
+        ensureConfigFile();
+
         // Migration: rename old baseDir field to notesDir
         Map<String, Object> raw = FileUtil.readJson(appConfig.getConfigFile(), MAP_TYPE, null);
         if (raw != null && raw.containsKey("baseDir") && !raw.containsKey("notesDir")) {
@@ -47,18 +66,6 @@ public class ConfigService {
         
         if (config.isFeishuPollingEnabled() == null) {
             config.setFeishuPollingEnabled(defaultConfig.isFeishuPollingEnabled());
-        }
-        // aiProvider 废弃 v0.4.0 — 始终直连 LLM
-        if (config.getLlmBaseUrl() == null || config.getLlmBaseUrl().isEmpty()) {
-            config.setLlmBaseUrl("https://api.deepseek.com");
-        }
-        if (config.getLlmModel() == null || config.getLlmModel().isEmpty()) {
-            config.setLlmModel("deepseek-chat");
-        }
-        if (config.getLlmTimeout() <= 0) {
-            config.setLlmTimeout(600);
-        } else if (config.getLlmTimeout() <= 180) {
-            config.setLlmTimeout(600);
         }
         // 编程AI 默认值
         if (config.isCodingPiEnabled() == null) {
