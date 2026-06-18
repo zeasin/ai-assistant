@@ -146,7 +146,7 @@ public class KnowledgeBaseController {
         model.put("kb", kb);
         model.put("labels", parseLabels(kb.getLabels()));
         model.put("module", mod);
-        return "module";
+        return "kb_module_detail";
     }
 
     @GetMapping("/kb/{id}/api/file-counts")

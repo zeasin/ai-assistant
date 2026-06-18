@@ -551,7 +551,8 @@ src/main/resources/
     ├── kb_overview.html                # KB 概览（含日报生成）
     ├── kb_tasks.html                   # 任务/学习计划
     ├── kb_reminders.html               # 提醒/复习提醒
-    ├── kb_modules.html                 # 模块/科目
+    ├── kb_modules.html                 # 模块/科目列表
+    ├── kb_module_detail.html           # 模块详情（AI分析/数据/文档）
     ├── kb_browse.html                  # 笔记浏览
     ├── kb_ai_guide.html                # AI 引导（AGENTS.md + 记忆）
     ├── datacenter.html                 # 数据中心

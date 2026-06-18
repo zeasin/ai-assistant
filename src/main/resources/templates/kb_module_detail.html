@@ -68,6 +68,18 @@
             background:#fff; color:#1a1b1e; box-sizing:border-box;
         }
         .prompt-editor textarea:focus { border-color:#7c5cfc; }
+
+        .module-stats {
+            display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:12px; margin-bottom:16px;
+        }
+        .stat-card {
+            background:#fff; border:1px solid #e1e3e6; border-radius:10px; padding:14px 16px; text-align:center;
+        }
+        .stat-card .stat-value { font-size:24px; font-weight:700; color:#7c5cfc; }
+        .stat-card .stat-label { font-size:12px; color:#909296; margin-top:4px; }
+
+        .quick-actions { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
+        .quick-actions .btn { flex:0 0 auto; }
     </style>
 </head>
 <body>
@@ -96,14 +108,41 @@
 
 <div th:unless="${error}">
 <div class="card" style="padding:16px 20px;">
-    <div style="display:flex;align-items:center;gap:12px;">
-        <span style="font-size:28px;" th:text="${module.icon}">📁</span>
-        <div>
-            <h2 style="margin:0;font-size:20px;" th:text="${module.name}">模块名</h2>
-            <div class="text-muted" style="font-size:12px;">
-                目录：<code th:text="${module.dir}"></code>
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:12px;">
+            <span style="font-size:28px;" th:text="${module.icon}">📁</span>
+            <div>
+                <h2 style="margin:0;font-size:20px;" th:text="${module.name}">模块名</h2>
+                <div class="text-muted" style="font-size:12px;">
+                    目录：<code th:text="${module.dir}"></code>
+                </div>
             </div>
         </div>
+        <div class="quick-actions">
+            <button class="btn btn-secondary" onclick="refreshModuleData()" style="font-size:12px;">🔄 刷新</button>
+            <button class="btn btn-secondary" onclick="exportModuleData()" style="font-size:12px;">📥 导出</button>
+            <a th:href="@{/chat(kbId=${kb.id})}"
+               class="btn btn-primary" style="font-size:12px;text-decoration:none;">💬 AI 对话</a>
+        </div>
+    </div>
+</div>
+
+<div class="module-stats" id="moduleStats">
+    <div class="stat-card">
+        <div class="stat-value" id="statFiles">-</div>
+        <div class="stat-label">数据文件</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" id="statRecords">-</div>
+        <div class="stat-label">数据记录</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" id="statDocs">-</div>
+        <div class="stat-label">文档数</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" id="statAnalysis">-</div>
+        <div class="stat-label">分析报告</div>
     </div>
 </div>
 
@@ -189,7 +228,72 @@ function switchTab(name) {
 window.addEventListener('DOMContentLoaded', function() {
     loadAnalysisReport();
     loadPrompt();
+    loadModuleStats();
 });
+
+/* ===== Module Stats ===== */
+async function loadModuleStats() {
+    try {
+        // Load data files count and records
+        var dataRes = await fetch('/module/' + MODULE_ID + '/data/files');
+        var dataInfo = await dataRes.json();
+        var fileCount = 0;
+        var recordCount = 0;
+
+        if (dataInfo.ok && dataInfo.files) {
+            fileCount = dataInfo.files.length;
+            for (var i = 0; i < dataInfo.files.length; i++) {
+                var file = dataInfo.files[i];
+                var fileRes = await fetch('/module/' + MODULE_ID + '/data/file?file=' + encodeURIComponent(file.fileName));
+                var fileData = await fileRes.json();
+                if (fileData.ok && fileData.groups) {
+                    for (var g in fileData.groups) {
+                        recordCount += fileData.groups[g].count || 0;
+                    }
+                }
+            }
+        }
+        document.getElementById('statFiles').textContent = fileCount;
+        document.getElementById('statRecords').textContent = recordCount;
+
+        // Load docs count
+        var docsRes = await fetch('/module/' + MODULE_ID + '/docs/tree');
+        var docsInfo = await docsRes.json();
+        var docCount = 0;
+        if (docsInfo.ok && docsInfo.tree && docsInfo.tree.children) {
+            docCount = docsInfo.tree.children.filter(function(c) { return c.type === 'file'; }).length;
+        }
+        document.getElementById('statDocs').textContent = docCount;
+
+        // Load analysis report info
+        var analysisRes = await fetch('/module/' + MODULE_ID + '/analysis/report');
+        var analysisInfo = await analysisRes.json();
+        document.getElementById('statAnalysis').textContent = analysisInfo.ok && analysisInfo.date ? analysisInfo.date : '无';
+
+    } catch (e) {
+        console.error('Failed to load module stats:', e);
+    }
+}
+
+function refreshModuleData() {
+    document.getElementById('data-content').dataset.loaded = '';
+    document.getElementById('data-content').innerHTML = '';
+    document.getElementById('docs-tree').dataset.loaded = '';
+    document.getElementById('docs-tree').innerHTML = '';
+    loadModuleStats();
+    loadAnalysisReport();
+    toast('✅ 数据已刷新');
+}
+
+function exportModuleData() {
+    var link = document.createElement('a');
+    link.href = '/module/' + MODULE_ID + '/data/files';
+    link.download = MODULE_NAME + '_data.json';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast('📥 导出请求已发送');
+}
 
 /* ===== Prompt Editor ===== */
 var currentPrompt = '';
