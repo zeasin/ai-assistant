@@ -36,10 +36,10 @@ public class SchedulerService {
     @Scheduled(cron = "0 * * * * ?", zone = "Asia/Shanghai")
     public void checkDynamicReminders() {
         try {
-            log.info("[{}] ⏰ 检查动态提醒...", TimeUtil.nowStr());
+//            log.info("[{}] ⏰ 检查动态提醒...", TimeUtil.nowStr());
             List<Reminder> dueReminders = reminderService.getDueReminders();
             if (dueReminders.isEmpty()) {
-                log.info("[{}] ⏰ 没有到期的提醒", TimeUtil.nowStr());
+//                log.info("[{}] ⏰ 没有到期的提醒", TimeUtil.nowStr());
             } else {
                 log.info("[{}] ⏰ 找到 {} 个到期的提醒", TimeUtil.nowStr(), dueReminders.size());
                 for (Reminder r : dueReminders) {

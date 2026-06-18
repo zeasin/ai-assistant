@@ -35,7 +35,7 @@ public class SessionService {
 
     private static final float COSINE_THRESHOLD = 0.5f;
     private static final int MAX_TURNS_PER_SESSION = 4;
-    private static final int MAX_GLOBAL_TURNS = 8;
+    private static final int MAX_GLOBAL_TURNS = 5;
     private static final int DEFAULT_FALLBACK_TURNS = 3;
     private static final int EMBEDDING_DIM = 768;
 
