@@ -15,6 +15,11 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableScheduling
 public class AssistantApplication {
 
+    static {
+        // 静默 protobuf 兼容性警告（OpenAI SDK 依赖的旧版 protobuf gencode）
+        System.setProperty("com.google.protobuf.use_unsafe_pre22_gencode", "true");
+    }
+
     public static void main(String[] args) {
         SpringApplication.run(AssistantApplication.class, args);
     }

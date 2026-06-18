@@ -194,28 +194,42 @@ public class ImageRecognitionController {
     public Map<String, Object> recognizeSync(@RequestParam("image") MultipartFile image,
                                               @RequestParam(value = "prompt", defaultValue = "") String prompt,
                                               @RequestParam(value = "modelName", defaultValue = "") String modelName) {
+        long startMs = System.currentTimeMillis();
         try {
             byte[] imageBytes = image.getBytes();
             String imageType = image.getContentType();
             if (imageType == null || imageType.isEmpty()) imageType = "image/jpeg";
+            String fileName = image.getOriginalFilename();
 
-            String base64Image = Base64.getEncoder().encodeToString(imageBytes);
             String userPrompt = (prompt == null || prompt.trim().isEmpty())
                     ? "请详细分析这张图片的内容，用中文回答。" : prompt;
 
+            log.info("识图请求: model={}, file={}, type={}, size={}KB, prompt=\"{}\"",
+                    modelName, fileName, imageType, imageBytes.length / 1024,
+                    userPrompt.length() > 60 ? userPrompt.substring(0, 60) + "..." : userPrompt);
+
             if (!llmService.isAvailable()) {
+                log.warn("识图失败: LLM API Key 未配置");
                 return Map.of("ok", false, "error", "LLM API Key 未配置");
             }
+            String base64Image = Base64.getEncoder().encodeToString(imageBytes);
             String systemPrompt = "你是一个专业的图片分析助手，请根据用户指定的场景详细分析图片内容，用中文回答。";
             String reply = llmService.chatWithImage(systemPrompt, userPrompt, base64Image, imageType, modelName);
 
+            long elapsed = System.currentTimeMillis() - startMs;
             String imageUrl = "data:" + imageType + ";base64," + base64Image;
             String result = (reply != null && !reply.isEmpty()) ? reply : "(AI 未返回结果)";
+
+            log.info("识图成功: model={}, file={}, 耗时={}ms, 响应长度={}chars",
+                    modelName, fileName, elapsed, result.length());
+            log.debug("识图响应内容 (前200字): {}",
+                    result.length() > 200 ? result.substring(0, 200) + "..." : result);
 
             logService.add("识图分析", "成功", "上传图片识别");
             return Map.of("ok", true, "image_url", imageUrl, "result", result);
         } catch (Exception e) {
-            log.error("识图分析失败", e);
+            long elapsed = System.currentTimeMillis() - startMs;
+            log.error("识图失败: model={}, 耗时={}ms, 错误={}", modelName, elapsed, e.getMessage());
             return Map.of("ok", false, "error", "AI 服务调用失败: " + e.getMessage());
         }
     }
@@ -224,37 +238,51 @@ public class ImageRecognitionController {
     @PostMapping("/recognize-file")
     @ResponseBody
     public Map<String, Object> recognizeFile(@RequestBody Map<String, String> body) {
+        long startMs = System.currentTimeMillis();
+        String filePath = body.getOrDefault("path", "");
+        String modelName = body.getOrDefault("modelName", "");
         try {
-            String filePath = body.get("path");
             Long kbId = body.containsKey("kbId") ? Long.parseLong(body.get("kbId")) : 0L;
             String prompt = body.getOrDefault("prompt", "请详细分析这张图片的内容");
-            String modelName = body.getOrDefault("modelName", "");
 
             Path baseDir = getKbBasePath(kbId);
             if (baseDir == null) baseDir = Paths.get(configService.getNotesDir());
             Path file = baseDir.resolve(filePath).normalize();
             if (!file.startsWith(baseDir) || !Files.exists(file)) {
+                log.warn("识图失败: 文件不存在 path={}", filePath);
                 return Map.of("ok", false, "error", "图片文件不存在");
             }
 
             byte[] imageBytes = Files.readAllBytes(file);
             String imageType = guessImageType(file.getFileName().toString().toLowerCase());
-            String base64Image = Base64.getEncoder().encodeToString(imageBytes);
+
+            log.info("识图请求: model={}, file={}, type={}, size={}KB, prompt=\"{}\"",
+                    modelName, filePath, imageType, imageBytes.length / 1024,
+                    prompt.length() > 60 ? prompt.substring(0, 60) + "..." : prompt);
 
             if (!llmService.isAvailable()) {
+                log.warn("识图失败: LLM API Key 未配置");
                 return Map.of("ok", false, "error", "LLM API Key 未配置");
             }
+            String base64Image = Base64.getEncoder().encodeToString(imageBytes);
             String systemPrompt = "你是一个专业的图片分析助手，请根据用户指定的场景详细分析图片内容，用中文回答。";
             String reply = llmService.chatWithImage(systemPrompt, prompt, base64Image, imageType, modelName);
 
+            long elapsed = System.currentTimeMillis() - startMs;
             String imageUrl = "/image-recognition/thumb?path=" + java.net.URLEncoder.encode(filePath, "UTF-8")
                     + "&kbId=" + kbId;
             String result = (reply != null && !reply.isEmpty()) ? reply : "(AI 未返回结果)";
 
+            log.info("识图成功: model={}, file={}, 耗时={}ms, 响应长度={}chars",
+                    modelName, filePath, elapsed, result.length());
+            log.debug("识图响应内容 (前200字): {}",
+                    result.length() > 200 ? result.substring(0, 200) + "..." : result);
+
             logService.add("识图分析", "成功", filePath);
             return Map.of("ok", true, "image_url", imageUrl, "result", result);
         } catch (Exception e) {
-            log.error("识图分析失败", e);
+            long elapsed = System.currentTimeMillis() - startMs;
+            log.error("识图失败: model={}, file={}, 耗时={}ms, 错误={}", modelName, filePath, elapsed, e.getMessage());
             return Map.of("ok", false, "error", "AI 服务调用失败: " + e.getMessage());
         }
     }

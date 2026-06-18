@@ -16,6 +16,7 @@ import org.springframework.core.io.ByteArrayResource;
 import org.springframework.stereotype.Service;
 import org.springframework.util.MimeTypeUtils;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
@@ -96,14 +97,20 @@ public class LlmService {
             throw new IllegalStateException("LLM API Key 未配置，请在配置页填写");
         }
 
+        // 直接传 data URI，避免解码→再编码的浪费
         String mediaType = (imageType != null && !imageType.isEmpty()) ? imageType : "image/jpeg";
-        byte[] imageBytes = Base64.getDecoder().decode(base64Image);
+        // 如果已经是 data URI 前缀，直接使用；否则拼接
+        String dataUri = base64Image.startsWith("data:")
+                ? base64Image
+                : "data:" + mediaType + ";base64," + base64Image;
 
         return client.prompt()
                 .system(systemPrompt != null ? systemPrompt : "")
                 .user(u -> u.text(userMessage)
-                        .media(MimeTypeUtils.parseMimeType(mediaType),
-                                new ByteArrayResource(imageBytes)))
+                        .media(org.springframework.ai.content.Media.builder()
+                                .mimeType(MimeTypeUtils.parseMimeType(mediaType))
+                                .data(java.net.URI.create(dataUri))
+                                .build()))
                 .call()
                 .content();
     }
@@ -237,10 +244,13 @@ public class LlmService {
             baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
         }
 
+        int timeoutSec = (profile.getTimeout() != null && profile.getTimeout() > 0)
+                ? profile.getTimeout() : 600;
         OpenAiChatOptions options = OpenAiChatOptions.builder()
                 .model(model)
                 .baseUrl(baseUrl)
                 .apiKey(apiKey)
+                .timeout(Duration.ofSeconds(timeoutSec))
                 .build();
 
         OpenAiChatModel chatModel = OpenAiChatModel.builder()

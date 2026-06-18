@@ -46,6 +46,8 @@ logging:
     com.laoqi.assistant.service.SchedulerService: DEBUG
     com.laoqi.assistant.service.ConfigService: DEBUG
     com.laoqi.assistant.service.FeishuService: DEBUG
+    com.laoqi.assistant.controller.ImageRecognitionController: DEBUG
+    com.laoqi.assistant.service.LlmService: DEBUG
 
   pattern:
     console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
