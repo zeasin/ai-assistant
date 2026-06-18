@@ -148,6 +148,10 @@ public class ModuleService {
             e.setDataFiles("[]");
         }
 
+        if (body.get("kbId") != null) {
+            e.setKbId(body.get("kbId") instanceof Number n ? n.longValue() : Long.valueOf(body.get("kbId").toString()));
+        }
+
         if (isNew) {
             moduleDbService.save(e);
         } else {

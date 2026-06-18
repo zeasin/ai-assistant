@@ -51,7 +51,7 @@ public class ReminderController {
             model.addAttribute("reminders", List.of());
             model.addAttribute("error", e.getMessage());
         }
-        return "reminders";
+        return "kb_reminders";
     }
 
     @GetMapping("/api/reminders")

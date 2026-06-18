@@ -85,7 +85,7 @@ public class KnowledgeBaseController {
         if (kb == null) return "redirect:/config";
         model.put("kb", kb);
         model.put("labels", parseLabels(kb.getLabels()));
-        return "tasks";
+        return "kb_tasks";
     }
 
     @GetMapping("/kb/{id}/reminders")
@@ -94,7 +94,7 @@ public class KnowledgeBaseController {
         if (kb == null) return "redirect:/config";
         model.put("kb", kb);
         model.put("labels", parseLabels(kb.getLabels()));
-        return "reminders";
+        return "kb_reminders";
     }
 
     @GetMapping("/kb/{id}/modules")
@@ -113,7 +113,7 @@ public class KnowledgeBaseController {
         if (kb == null) return "redirect:/config";
         model.put("kb", kb);
         model.put("labels", parseLabels(kb.getLabels()));
-        return "browse";
+        return "kb_browse";
     }
 
     @GetMapping("/kb/{id}/config")
@@ -122,7 +122,7 @@ public class KnowledgeBaseController {
         if (kb == null) return "redirect:/config";
         model.put("kb", kb);
         model.put("labels", parseLabels(kb.getLabels()));
-        return "ai_guide";
+        return "kb_ai_guide";
     }
 
     // ========== REST API ==========

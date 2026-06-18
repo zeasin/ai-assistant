@@ -29,7 +29,7 @@ public class TaskController {
             model.addAttribute("tasks", List.of());
             model.addAttribute("error", e.getMessage());
         }
-        return "tasks";
+        return "kb_tasks";
     }
 
     @PostMapping("/api/tasks/add")

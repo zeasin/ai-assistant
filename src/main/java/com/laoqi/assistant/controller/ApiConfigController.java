@@ -375,8 +375,13 @@ public class ApiConfigController {
     // ========== Module endpoints (SQLite) ==========
 
     @GetMapping("/api/config/modules")
-    public Map<String, Object> listModules() {
-        List<ModuleDefinition> modules = moduleService.getModules();
+    public Map<String, Object> listModules(@RequestParam(required = false) Long kbId) {
+        List<ModuleDefinition> modules;
+        if (kbId != null) {
+            modules = moduleService.getModulesByKb(kbId);
+        } else {
+            modules = moduleService.getModules();
+        }
         return Map.of("ok", true, "modules", modules);
     }
 

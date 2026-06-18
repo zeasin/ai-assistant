@@ -331,33 +331,10 @@
         <a th:classappend="${requestURI == '/chat' ? 'active' : ''}" href="/chat">对话</a>
         <a th:classappend="${requestURI == '/image-recognition' ? 'active' : ''}" href="/image-recognition">识图</a>
 
-        <div th:each="kb : ${kbList}" class="dropdown">
-            <a th:href="@{/kb/{id}(id=${kb.id})}"
-               class="dropdown-toggle"
-               th:classappend="${requestURI == '/kb/' + kb.id} ? 'active' : ''"
-               th:text="${kb.name + ' ▾'}">知识库</a>
-            <div class="dropdown-content">
-                <a th:href="@{/kb/{id}/tasks(id=${kb.id})}"
-                   th:classappend="${requestURI == '/kb/' + kb.id + '/tasks'} ? 'active' : ''"
-                   th:text="'📋 ' + ${kb.labels.get('tasks')}">任务</a>
-                <a th:href="@{/kb/{id}/reminders(id=${kb.id})}"
-                   th:classappend="${requestURI == '/kb/' + kb.id + '/reminders'} ? 'active' : ''"
-                   th:text="'🔔 ' + ${kb.labels.get('reminders')}">提醒</a>
-                <hr style="margin:4px 0;border:none;border-top:1px solid #e1e3e6;">
-                <a th:each="m : ${kb.modules}"
-                   th:href="@{/module/{id}(id=${m.id})}"
-                   th:classappend="${requestURI == '/module/' + m.id} ? 'active' : ''"
-                   th:text="${m.icon + ' ' + m.name}"
-                   style="padding-left:24px;font-size:13px;">模块</a>
-                <hr style="margin:4px 0;border:none;border-top:1px solid #e1e3e6;">
-                <a th:href="@{/kb/{id}/notes(id=${kb.id})}"
-                   th:classappend="${requestURI == '/kb/' + kb.id + '/notes'} ? 'active' : ''"
-                   th:text="'📄 ' + ${kb.labels.get('notes')}">笔记</a>
-                <a th:href="@{/kb/{id}/config(id=${kb.id})}"
-                   th:classappend="${requestURI == '/kb/' + kb.id + '/config'} ? 'active' : ''"
-                   th:text="'⚙️ ' + ${kb.labels.get('config')}">配置</a>
-            </div>
-        </div>
+        <a th:each="kb : ${kbList}"
+           th:href="@{/kb/{id}(id=${kb.id})}"
+           th:classappend="${#strings.startsWith(requestURI, '/kb/' + kb.id)} ? 'active' : ''"
+           th:text="${kb.name}">知识库</a>
 
         <a th:if="${codingEnabled}" th:classappend="${requestURI == '/coding' ? 'active' : ''}" href="/coding">💻 编程AI</a>
         <a th:classappend="${requestURI == '/config' ? 'active' : ''}" href="/config">配置</a>

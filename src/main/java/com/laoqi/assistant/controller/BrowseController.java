@@ -55,7 +55,7 @@ public class BrowseController {
         Path target = safeResolve(dir);
         if (!Files.isDirectory(target)) {
             model.addAttribute("error", "目录不存在");
-            return "browse";
+return "kb_browse";
         }
 
         List<Map<String, Object>> dirs = new ArrayList<>();
@@ -103,7 +103,7 @@ public class BrowseController {
         model.addAttribute("parent", parent);
         model.addAttribute("breadcrumbs", breadcrumbs);
         model.addAttribute("breadcrumbPaths", breadcrumbPaths);
-        return "browse";
+        return "kb_browse";
     }
 
     @PostMapping("/browse/new")

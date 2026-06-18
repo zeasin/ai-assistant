@@ -7,6 +7,20 @@
 <body>
 <th:block layout:fragment="content">
 
+<div th:if="${kb != null}" style="font-size:13px;color:#909296;margin-bottom:8px;display:flex;align-items:center;gap:4px;">
+    <a th:href="@{/kb/{id}(id=${kb.id})}" style="color:#7c5cfc;text-decoration:none;" th:text="${kb.name}">知识库</a>
+    <span>›</span>
+    <span th:text="${labels.get('notes')}">笔记</span>
+</div>
+
+<div th:if="${kb != null}" style="display:flex;gap:4px;margin-bottom:20px;border-bottom:2px solid #e1e3e6;">
+    <a th:href="@{/kb/{id}/tasks(id=${kb.id})}" style="padding:10px 20px;font-size:14px;text-decoration:none;color:#5c5f66;border-bottom:2px solid transparent;" th:text="${labels.get('tasks')}">任务</a>
+    <a th:href="@{/kb/{id}/reminders(id=${kb.id})}" style="padding:10px 20px;font-size:14px;text-decoration:none;color:#5c5f66;border-bottom:2px solid transparent;" th:text="${labels.get('reminders')}">提醒</a>
+    <a th:href="@{/kb/{id}/modules(id=${kb.id})}" style="padding:10px 20px;font-size:14px;text-decoration:none;color:#5c5f66;border-bottom:2px solid transparent;" th:text="${labels.get('modules')}">模块</a>
+    <a th:href="@{/kb/{id}/notes(id=${kb.id})}" style="padding:10px 20px;font-size:14px;text-decoration:none;color:#7c5cfc;border-bottom:2px solid #7c5cfc;font-weight:600;" th:text="${labels.get('notes')}">笔记</a>
+    <a th:href="@{/kb/{id}/config(id=${kb.id})}" style="padding:10px 20px;font-size:14px;text-decoration:none;color:#5c5f66;border-bottom:2px solid transparent;" th:text="${labels.get('config')}">配置</a>
+</div>
+
 <div class="card">
     <div th:if="${error != null and !error.isEmpty()}" class="alert alert-error" style="background:#fff0f0;color:#c92a2a;padding:10px 16px;border-radius:8px;margin-bottom:12px;font-size:14px;border:1px solid #ffc9c9;" th:text="${error}">错误</div>
     <div class="flex" style="justify-content:space-between;margin-bottom:16px;">
@@ -19,7 +33,7 @@
         </div>
     </div>
 
-    <th:block th:if="${#lists.size(breadcrumbs) > 0}">
+    <th:block th:if="${breadcrumbs != null and #lists.size(breadcrumbs) > 0}">
     <div class="text-muted mb-2" style="font-size:13px;">
         / <a th:href="@{/browse}">root</a>
         <th:block th:each="crumb, iterStat : ${breadcrumbs}">
@@ -28,7 +42,7 @@
     </div>
     </th:block>
 
-    <th:block th:if="${#lists.size(dirs) > 0 || #lists.size(files) > 0}">
+    <th:block th:if="${dirs != null and files != null and (#lists.size(dirs) > 0 or #lists.size(files) > 0)}">
     <table class="log-table">
         <thead>
             <tr>
@@ -70,7 +84,7 @@
         </tbody>
     </table>
     </th:block>
-    <th:block th:unless="${#lists.size(dirs) > 0 || #lists.size(files) > 0}">
+    <th:block th:if="${dirs == null or files == null or (#lists.size(dirs) == 0 and #lists.size(files) == 0)}">
     <div class="text-muted">空目录</div>
     </th:block>
 </div>
