@@ -25,4 +25,14 @@ public class SessionDbServiceImpl extends ServiceImpl<SessionMapper, SessionEnti
     public List<SessionEntity> listBySourceOrderByUpdate(String source) {
         return sessionMapper.listBySourceOrderByUpdate(source);
     }
+
+    @Override
+    public SessionEntity findLatestByKb(Integer kbId) {
+        return sessionMapper.findLatestByKb(kbId);
+    }
+
+    @Override
+    public List<SessionEntity> listByKb(Integer kbId) {
+        return sessionMapper.listByKb(kbId);
+    }
 }

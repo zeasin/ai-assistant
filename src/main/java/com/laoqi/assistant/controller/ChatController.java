@@ -1,20 +1,14 @@
 package com.laoqi.assistant.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.laoqi.assistant.entity.KnowledgeBaseEntity;
 import com.laoqi.assistant.entity.LlmProfileEntity;
-import com.laoqi.assistant.model.ChatSession;
-import com.laoqi.assistant.model.ChatSession.ChatMessage;
-import com.laoqi.assistant.service.ChatSessionService;
-import com.laoqi.assistant.service.ChatSessionService.SessionsData;
-import com.laoqi.assistant.config.AppConfig;
-import com.laoqi.assistant.service.ConfigService;
-import com.laoqi.assistant.service.LlmConfigResolver;
-import com.laoqi.assistant.service.LlmService;
-import com.laoqi.assistant.service.LogService;
-import com.laoqi.assistant.service.NoteAssistantService;
+import com.laoqi.assistant.entity.MessageEntity;
+import com.laoqi.assistant.entity.SessionEntity;
+import com.laoqi.assistant.service.*;
+import com.laoqi.assistant.service.db.MessageDbService;
+import com.laoqi.assistant.service.db.SessionDbService;
 import com.laoqi.assistant.util.TimeUtil;
-import java.util.List;
-import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Controller;
@@ -25,6 +19,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
 
 @Controller
 @RequestMapping("/chat")
@@ -37,139 +32,162 @@ public class ChatController {
         t.setDaemon(true);
         return t;
     });
+    private static final int PAGE_SIZE = 60;
 
-    private final ChatSessionService sessionService;
+    private final KnowledgeBaseService kbService;
+    private final SessionDbService sessionDbService;
+    private final MessageDbService messageDbService;
+    private final SessionService sessionService;
     private final LlmService llmService;
     private final NoteAssistantService noteAssistantService;
-    private final ConfigService configService;
-    private final LogService logService;
-    private final AppConfig appConfig;
     private final LlmConfigResolver llmConfigResolver;
+    private final LogService logService;
 
-    public ChatController(ChatSessionService sessionService,
-                          LlmService llmService, NoteAssistantService noteAssistantService,
-                          ConfigService configService,
-                          LogService logService, AppConfig appConfig,
-                          LlmConfigResolver llmConfigResolver) {
+    public ChatController(KnowledgeBaseService kbService,
+                          SessionDbService sessionDbService,
+                          MessageDbService messageDbService,
+                          SessionService sessionService,
+                          LlmService llmService,
+                          NoteAssistantService noteAssistantService,
+                          LlmConfigResolver llmConfigResolver,
+                          LogService logService) {
+        this.kbService = kbService;
+        this.sessionDbService = sessionDbService;
+        this.messageDbService = messageDbService;
         this.sessionService = sessionService;
         this.llmService = llmService;
         this.noteAssistantService = noteAssistantService;
-        this.configService = configService;
-        this.logService = logService;
-        this.appConfig = appConfig;
         this.llmConfigResolver = llmConfigResolver;
+        this.logService = logService;
     }
 
+    // ========== 页面路由 ==========
+
     @GetMapping
-    public String chatPage(@RequestParam(required = false, defaultValue = "") String id,
-                           @RequestParam(required = false, defaultValue = "knowledge") String mode,
-                           Model model) {
-        model.addAttribute("chatMode", mode);
-        var data = sessionService.load();
-
-        // 用户明确要求新对话
-        if ("new".equals(id)) {
-            ChatSession newSession = sessionService.createSession("新对话", mode);
-            return "redirect:/chat?id=" + newSession.getId() + "&mode=" + mode;
+    public String chatPage(@RequestParam(required = false) Long kbId, Model model) {
+        // 确定当前 KB
+        KnowledgeBaseEntity kb;
+        if (kbId != null) {
+            kb = kbService.getById(kbId);
+        } else {
+            kb = kbService.getFirst();
         }
+        if (kb == null) return "redirect:/config";
 
-        // 如果没有任何会话，自动创建一个
-        if (data.sessions.isEmpty()) {
-            ChatSession newSession = sessionService.createSession("新对话", mode);
-            return "redirect:/chat?id=" + newSession.getId() + "&mode=" + mode;
-        }
+        model.addAttribute("currentKb", kb);
+        model.addAttribute("kbId", kb.getId());
+        model.addAttribute("kbName", kb.getName());
 
-        // 有会话但 URL 没有 id 参数，跳转到最近的会话
-        if (id.isEmpty() && data.current != null) {
-            return "redirect:/chat?id=" + data.current + "&mode=" + mode;
-        }
+        // 获取消息总数
+        long total = messageDbService.countByKb(kb.getId().intValue());
+        model.addAttribute("totalMessages", total);
 
-        model.addAttribute("sessions", data.sessions);
-
-        // 确定当前选中的会话 ID：优先使用 URL 参数，否则使用最近的会话
-        String currentId = !id.isEmpty() ? id : data.current;
-        model.addAttribute("current_id", currentId);
-        model.addAttribute("current_mode", mode);
-
-        // 加载当前会话（含消息列表）
-        ChatSession session = sessionService.getSession(currentId);
-        if (session != null) {
-            model.addAttribute("sessionId", session.getId());
-            model.addAttribute("sessionTitle", session.getTitle());
-            model.addAttribute("current", session);
-        }
-        model.addAttribute("ai_provider", "direct");
         // 聊天页面只显示文本模型和多模态模型，不显示向量模型
         List<LlmProfileEntity> chatModels = llmConfigResolver.getAllProfiles()
                 .stream()
                 .filter(p -> !LlmProfileEntity.TYPE_EMBEDDING.equals(p.getModelType()))
                 .collect(Collectors.toList());
-        model.addAttribute("chat_models", chatModels);
+        model.addAttribute("chatModels", chatModels);
         LlmProfileEntity defaultProfile = llmConfigResolver.getDefaultProfile();
-        model.addAttribute("default_model", defaultProfile != null ? defaultProfile.getName() : "");
+        model.addAttribute("defaultModel", defaultProfile != null ? defaultProfile.getName() : "");
+
+        model.addAttribute("aiProvider", "direct");
         return "chat";
     }
 
-    @GetMapping("/history")
-    @ResponseBody
-    public SessionsData history(@RequestParam(defaultValue = "knowledge") String mode) {
-        return sessionService.load();
-    }
+    // ========== API: 加载消息（分页） ==========
 
-    @GetMapping("/session/{id}")
+    @GetMapping("/api/kb/{kbId}/messages")
     @ResponseBody
-    public ChatSession getSession(@PathVariable String id) {
-        return sessionService.getSession(id);
-    }
+    public Map<String, Object> kbMessages(@PathVariable Long kbId,
+                                           @RequestParam(defaultValue = "0") int offset,
+                                           @RequestParam(defaultValue = "60") int limit) {
+        List<MessageEntity> msgs = messageDbService.listByKb(kbId.intValue(), offset, limit);
+        long total = messageDbService.countByKb(kbId.intValue());
 
-    @DeleteMapping("/session/{id}")
-    @ResponseBody
-    public Map<String, Object> deleteSession(@PathVariable String id) {
-        try {
-            sessionService.deleteSession(id);
-            return Map.of("ok", true);
-        } catch (Exception e) {
-            return Map.of("ok", false, "error", e.getMessage());
+        // 翻转时间顺序（DB 返回 DESC，转成 ASC 给前端）
+        List<Map<String, Object>> messages = new ArrayList<>();
+        for (int i = msgs.size() - 1; i >= 0; i--) {
+            MessageEntity me = msgs.get(i);
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("role", me.getRole());
+            m.put("content", me.getContent());
+            m.put("time", me.getCreatedAt());
+            m.put("mode", me.getMode());
+            messages.add(m);
         }
+
+        return Map.of("ok", true, "messages", messages, "total", total, "offset", offset);
     }
+
+    // ========== API: 搜索消息 ==========
+
+    @GetMapping("/api/kb/{kbId}/search")
+    @ResponseBody
+    public Map<String, Object> searchMessages(@PathVariable Long kbId,
+                                               @RequestParam String q,
+                                               @RequestParam(defaultValue = "30") int limit) {
+        if (q == null || q.isBlank()) {
+            return Map.of("ok", true, "messages", List.of());
+        }
+        List<MessageEntity> msgs = messageDbService.searchByKb(kbId.intValue(), q, limit);
+        List<Map<String, Object>> messages = new ArrayList<>();
+        for (MessageEntity me : msgs) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("role", me.getRole());
+            m.put("content", me.getContent());
+            m.put("time", me.getCreatedAt());
+            m.put("mode", me.getMode());
+            messages.add(m);
+        }
+        return Map.of("ok", true, "messages", messages, "query", q);
+    }
+
+    // ========== API: 发送消息（SSE 流式） ==========
 
     @PostMapping("/send")
     @ResponseBody
     public SseEmitter send(@RequestParam String message,
-                           @RequestParam(required = false, defaultValue = "") String sessionId,
+                           @RequestParam(required = false) Long kbId,
                            @RequestParam(required = false, defaultValue = "knowledge") String mode,
                            @RequestParam(required = false, defaultValue = "") String modelName) {
         SseEmitter emitter = new SseEmitter(300_000L);
-        String finalSessionId;
-        if (sessionId == null || sessionId.isEmpty()) {
-            var data = sessionService.load();
-            if (data.current != null && !data.current.isEmpty()) {
-                finalSessionId = data.current;
-            } else {
-                finalSessionId = sessionService.createSession("新对话", mode).getId();
-            }
-        } else {
-            finalSessionId = sessionId;
+
+        // 确定 KB
+        Long resolvedKbId = kbId;
+        if (resolvedKbId == null) {
+            KnowledgeBaseEntity first = kbService.getFirst();
+            if (first != null) resolvedKbId = first.getId();
         }
+        if (resolvedKbId == null) {
+            try {
+                sendError(emitter, "未配置任何知识库，请先到配置页设置");
+            } catch (Exception ignored) {}
+            return emitter;
+        }
+        final Long finalKbId = resolvedKbId;
+
+        // 获取或创建会话
+        String sessionId = getOrCreateKbSession(finalKbId, mode);
 
         chatExecutor.execute(() -> {
             try {
                 emitter.send(SseEmitter.event().data(mapper.writeValueAsString(
-                        Map.of("type", "session", "sessionId", finalSessionId))));
+                        Map.of("type", "session", "sessionId", sessionId))));
 
                 sendStatus(emitter, mode, "正在处理...");
 
-                sessionService.saveMessage(finalSessionId, "user", message, mode);
+                sessionService.saveMessage(sessionId, "user", message, mode, "web");
 
                 if (!llmService.isAvailable()) {
                     throw new IllegalStateException("LLM API Key 未配置，请在配置页填写");
                 }
 
-                log.info("[chat] 使用 NoteAssistant（含工具编排 + 历史上下文注入, model={})",
-                        modelName.isEmpty() ? "default" : modelName);
+                log.info("[chat] KB={} 使用 NoteAssistant（含工具编排 + 历史上下文注入, model={})",
+                        finalKbId, modelName.isEmpty() ? "default" : modelName);
 
                 StringBuilder replyBuffer = new StringBuilder();
-                String replyText = noteAssistantService.streamChat(finalSessionId, message, mode, modelName, chunk -> {
+                noteAssistantService.streamChat(sessionId, message, mode, modelName, chunk -> {
                     replyBuffer.append(chunk);
                     Map<String, Object> data = new LinkedHashMap<>();
                     data.put("type", "text");
@@ -182,8 +200,9 @@ public class ChatController {
                     }
                 });
 
+                String replyText = replyBuffer.toString();
                 log.info("[chat] 收到回复, 长度={}", replyText.length());
-                sessionService.saveMessage(finalSessionId, "assistant", replyText, mode);
+                sessionService.saveMessage(sessionId, "assistant", replyText, mode, "web");
                 sendDone(emitter, mode);
 
             } catch (Exception e) {
@@ -204,35 +223,69 @@ public class ChatController {
         return emitter;
     }
 
-    @PostMapping("/clear")
+    // ========== API: 清空对话 ==========
+
+    @DeleteMapping("/api/kb/{kbId}/clear")
     @ResponseBody
-    public Map<String, Object> clearHistory(@RequestParam(defaultValue = "knowledge") String mode) {
-        sessionService.clearSession(mode);
+    public Map<String, Object> clearKbMessages(@PathVariable Long kbId) {
+        List<SessionEntity> sessions = sessionDbService.listByKb(kbId.intValue());
+        for (SessionEntity se : sessions) {
+            sessionService.deleteSession(se.getId());
+        }
+        logService.add("对话", "清空", "清空知识库(KB=" + kbId + ")的聊天记录");
         return Map.of("ok", true);
     }
 
-    @GetMapping("/export/{id}")
+    // ========== API: 导出对话 ==========
+
+    @GetMapping("/api/kb/{kbId}/export")
     @ResponseBody
-    public Map<String, Object> exportSession(@PathVariable String id) {
-        try {
-            ChatSession session = sessionService.getSession(id);
-            if (session == null) return Map.of("ok", false, "error", "会话不存在");
-            String title = session.getTitle() != null ? session.getTitle() : "对话导出";
-            String date = TimeUtil.todayStr();
-            StringBuilder sb = new StringBuilder();
-            sb.append("---\ntitle: ").append(title).append("\ndate: ").append(date).append("\n---\n\n");
-            for (ChatMessage msg : session.getMessages()) {
-                sb.append("**").append("user".equals(msg.getRole()) ? "👤 用户" : "🤖 AI").append("**\n");
-                sb.append(msg.getContent()).append("\n\n");
-            }
-            return Map.of("ok", true, "title", title, "content", sb.toString(), "path",
-                    "对话/" + title + "/" + date + ".md");
-        } catch (Exception e) {
-            return Map.of("ok", false, "error", e.getMessage());
+    public Map<String, Object> exportKbMessages(@PathVariable Long kbId) {
+        List<MessageEntity> msgs = messageDbService.listByKb(kbId.intValue(), 0, 99999);
+        List<Map<String, Object>> messages = new ArrayList<>();
+        for (MessageEntity me : msgs) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("role", me.getRole());
+            m.put("content", me.getContent());
+            m.put("time", me.getCreatedAt());
+            messages.add(m);
         }
+
+        KnowledgeBaseEntity kb = kbService.getById(kbId);
+        String title = (kb != null ? kb.getName() : "知识库") + "对话导出";
+        String date = TimeUtil.todayStr();
+        StringBuilder sb = new StringBuilder();
+        sb.append("---\ntitle: ").append(title).append("\ndate: ").append(date).append("\n---\n\n");
+
+        // 翻转时间顺序（DB 返回降序，导出时按时间升序）
+        for (int i = messages.size() - 1; i >= 0; i--) {
+            Map<String, Object> m = messages.get(i);
+            sb.append("**").append("user".equals(m.get("role")) ? "👤 用户" : "🤖 AI").append("**\n");
+            sb.append(m.get("content")).append("\n\n");
+        }
+
+        return Map.of("ok", true, "title", title, "content", sb.toString());
     }
 
-    // ========== SSE 辅助方法 ==========
+    // ========== 辅助方法 ==========
+
+    private String getOrCreateKbSession(Long kbId, String mode) {
+        SessionEntity latest = sessionDbService.findLatestByKb(kbId.intValue());
+        if (latest != null) return latest.getId();
+
+        String id = UUID.randomUUID().toString().substring(0, 12);
+        String now = TimeUtil.nowStr();
+        SessionEntity se = new SessionEntity();
+        se.setId(id);
+        se.setSource("web");
+        se.setTitle("连续对话");
+        se.setMode(mode != null ? mode : "knowledge");
+        se.setKbId(kbId.intValue());
+        se.setCreatedAt(now);
+        se.setUpdatedAt(now);
+        sessionDbService.save(se);
+        return id;
+    }
 
     private void sendStatus(SseEmitter emitter, String mode, String text) {
         try {
@@ -246,23 +299,6 @@ public class ChatController {
         }
     }
 
-    private void sendText(SseEmitter emitter, String mode, String text) {
-        try {
-            Map<String, Object> data = new LinkedHashMap<>();
-            data.put("type", "text");
-            data.put("content", text);
-            data.put("mode", mode);
-            emitter.send(SseEmitter.event().data(mapper.writeValueAsString(data)));
-        } catch (Exception e) {
-            log.error("发送文本消息失败", e);
-            try {
-                emitter.completeWithError(e);
-            } catch (Exception ex) {
-                log.error("无法完成发射器", ex);
-            }
-        }
-    }
-
     private void sendDone(SseEmitter emitter, String mode) {
         try {
             Map<String, Object> data = new LinkedHashMap<>();
@@ -272,11 +308,7 @@ public class ChatController {
             emitter.complete();
         } catch (Exception e) {
             log.error("发送完成消息失败", e);
-            try {
-                emitter.complete();
-            } catch (Exception ex) {
-                log.error("无法完成发射器", ex);
-            }
+            try { emitter.complete(); } catch (Exception ignored) {}
         }
     }
 
@@ -287,11 +319,7 @@ public class ChatController {
             emitter.complete();
         } catch (Exception e) {
             log.error("发送错误消息失败", e);
-            try {
-                emitter.completeWithError(new RuntimeException(error));
-            } catch (Exception ex) {
-                log.error("无法完成错误发送", ex);
-            }
+            try { emitter.completeWithError(new RuntimeException(error)); } catch (Exception ignored) {}
         }
     }
 
@@ -310,7 +338,6 @@ public class ChatController {
             if (msg.contains("context_length_exceeded") || msg.contains("maximum context length")) {
                 return "对话过长，请开启新对话。";
             }
-            // 尝试提取 API 返回的 error message
             int idx = msg.indexOf("\"message\":\"");
             if (idx != -1) {
                 int start = idx + "\"message\":\"".length();

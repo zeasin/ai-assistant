@@ -17,4 +17,13 @@ public interface MessageMapper extends BaseMapper<MessageEntity> {
 
     @Select("SELECT * FROM messages WHERE session_id = #{sessionId} ORDER BY created_at DESC LIMIT #{limit}")
     List<MessageEntity> listRecentBySession(@Param("sessionId") String sessionId, @Param("limit") int limit);
+
+    @Select("SELECT m.* FROM messages m JOIN sessions s ON m.session_id = s.id WHERE s.source = 'web' AND s.kb_id = #{kbId} ORDER BY m.created_at DESC LIMIT #{limit} OFFSET #{offset}")
+    List<MessageEntity> listByKb(@Param("kbId") Integer kbId, @Param("offset") int offset, @Param("limit") int limit);
+
+    @Select("SELECT COUNT(*) FROM messages m JOIN sessions s ON m.session_id = s.id WHERE s.source = 'web' AND s.kb_id = #{kbId}")
+    long countByKb(@Param("kbId") Integer kbId);
+
+    @Select("SELECT m.* FROM messages m JOIN sessions s ON m.session_id = s.id WHERE s.source = 'web' AND s.kb_id = #{kbId} AND m.content LIKE '%' || #{q} || '%' ORDER BY m.created_at DESC LIMIT #{limit}")
+    List<MessageEntity> searchByKb(@Param("kbId") Integer kbId, @Param("q") String q, @Param("limit") int limit);
 }

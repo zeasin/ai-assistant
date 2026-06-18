@@ -90,11 +90,16 @@ public class SessionService {
                     role        TEXT NOT NULL,
                     content     TEXT NOT NULL,
                     mode        TEXT NOT NULL DEFAULT 'knowledge',
+                    kb_id       INTEGER,
                     created_at  TEXT NOT NULL,
                     FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
                 )
                 """);
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id, created_at)");
+            // 迁移：为 messages 补充 kb_id 列（兼容旧数据库）
+            try { stmt.execute("ALTER TABLE messages ADD COLUMN kb_id INTEGER"); } catch (Exception ignored) {}
+            try { stmt.execute("UPDATE messages SET kb_id = (SELECT kb_id FROM sessions WHERE sessions.id = messages.session_id) WHERE kb_id IS NULL"); } catch (Exception ignored) {}
+            stmt.execute("CREATE INDEX IF NOT EXISTS idx_messages_kb ON messages(kb_id)");
             stmt.execute("""
                 CREATE TABLE IF NOT EXISTS turn_embeddings (
                     id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -264,6 +269,11 @@ public class SessionService {
         msg.setContent(content);
         msg.setMode(mode != null ? mode : "knowledge");
         msg.setCreatedAt(now);
+        // 填充 kb_id：从 session 中获取
+        SessionEntity se = sessionDbService.getById(sessionId);
+        if (se != null && se.getKbId() != null) {
+            msg.setKbId(se.getKbId());
+        }
         messageDbService.save(msg);
 
         markSessionUpdated(sessionId, role, mode);
