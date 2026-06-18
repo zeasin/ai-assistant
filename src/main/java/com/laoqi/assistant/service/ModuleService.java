@@ -82,6 +82,18 @@ public class ModuleService {
         return result;
     }
 
+    public List<ModuleDefinition> getModulesByKb(Long kbId) {
+        List<ModuleEntity> entities = moduleDbService.lambdaQuery()
+                .eq(ModuleEntity::getKbId, kbId)
+                .orderByAsc(ModuleEntity::getSortOrder)
+                .list();
+        List<ModuleDefinition> result = new ArrayList<>();
+        for (ModuleEntity e : entities) {
+            result.add(toDefinition(e));
+        }
+        return result;
+    }
+
     public ModuleDefinition getModule(String id) {
         ModuleEntity e = moduleDbService.lambdaQuery()
                 .eq(ModuleEntity::getModuleId, id)

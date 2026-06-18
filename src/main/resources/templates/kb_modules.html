@@ -1,0 +1,26 @@
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title th:text="${kb.name} + ' - ' + ${labels.get('modules')}">模块</title>
+</head>
+<body>
+<th:block layout:fragment="content">
+
+<div th:if="${kbModules.isEmpty()}">
+    <div class="text-muted" style="text-align:center;padding:40px;">
+        暂未配置模块
+    </div>
+</div>
+
+<div th:unless="${kbModules.isEmpty()}" style="display:flex;gap:12px;flex-wrap:wrap;">
+    <a th:each="m : ${kbModules}"
+       th:href="@{/module/{id}(id=${m.id})}"
+       class="btn btn-secondary"
+       style="flex:0 0 auto;padding:16px 24px;font-size:16px;"
+       th:text="${m.icon + ' ' + m.name}">模块</a>
+</div>
+
+</th:block>
+</body>
+</html>

@@ -16,6 +16,7 @@ public class ModuleEntity {
     private String prompt;
     private String dataFiles;
     private Integer sortOrder;
+    private Long kbId;
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -33,4 +34,6 @@ public class ModuleEntity {
     public void setDataFiles(String dataFiles) { this.dataFiles = dataFiles; }
     public Integer getSortOrder() { return sortOrder; }
     public void setSortOrder(Integer sortOrder) { this.sortOrder = sortOrder; }
+    public Long getKbId() { return kbId; }
+    public void setKbId(Long kbId) { this.kbId = kbId; }
 }
