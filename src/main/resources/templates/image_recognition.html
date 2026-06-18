@@ -2,360 +2,606 @@
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{layout}">
 <head>
-    <title layout:fragment="title">识图</title>
+    <title layout:fragment="title">识图 - AI 助理</title>
 </head>
 <body>
 <th:block layout:fragment="content">
 
-<div class="card">
-    <h2>📷 图片识别</h2>
-    <p class="text-muted mb-2">上传图片或从笔记库选择图片，AI 自动识别并给出解答</p>
+<style>
+.sr-card { background:#fff; border:1px solid #e1e3e6; border-radius:12px; padding:20px; margin-bottom:16px; }
+.sr-card h3 { font-size:15px; font-weight:600; margin:0 0 12px; color:#1a1b1e; display:flex; align-items:center; gap:6px; }
+.sr-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px,1fr)); gap:10px; }
+.sr-img-card { border:2px solid #e1e3e6; border-radius:10px; overflow:hidden; cursor:pointer; transition:all .15s; text-align:center; background:#fafafa; }
+.sr-img-card:hover { border-color:#7c5cfc; }
+.sr-img-card.selected { border-color:#7c5cfc; box-shadow:0 0 0 3px rgba(124,92,252,.2); }
+.sr-img-card .thumb { width:100%; height:110px; object-fit:cover; display:block; background:#f0f0f0; }
+.sr-img-card .name { padding:5px 8px; font-size:11px; color:#5c5f66; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.sr-scenario-btn { padding:7px 14px; border-radius:8px; font-size:13px; cursor:pointer; transition:all .15s; border:1px solid #e1e3e6; background:#fff; color:#5c5f66; }
+.sr-scenario-btn:hover { border-color:#7c5cfc; color:#7c5cfc; }
+.sr-scenario-btn.active { background:#7c5cfc; color:#fff; border-color:#7c5cfc; }
+.sr-upload-zone { border:2px dashed #d0d5dd; border-radius:12px; padding:36px 20px; text-align:center; cursor:pointer; transition:all .2s; background:#fafafa; }
+.sr-upload-zone:hover { border-color:#7c5cfc; background:#f5f3ff; }
+.sr-upload-zone.dragover { border-color:#7c5cfc; background:#f0edff; }
+.sr-result-area { animation:fadeIn .3s ease; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+.sr-result-text { line-height:1.8; font-size:15px; color:#1a1b1e; word-wrap:break-word; }
+.sr-result-text h1 { font-size:22px; font-weight:700; margin:20px 0 12px; padding-bottom:6px; border-bottom:2px solid #7c5cfc; }
+.sr-result-text h2 { font-size:18px; font-weight:600; margin:18px 0 10px; padding-left:10px; border-left:3px solid #7c5cfc; }
+.sr-result-text h3 { font-size:15px; font-weight:600; margin:14px 0 8px; }
+.sr-result-text p { margin:0 0 10px; }
+.sr-result-text ul, .sr-result-text ol { margin:8px 0; padding-left:20px; }
+.sr-result-text li { margin:4px 0; }
+.sr-result-text blockquote { margin:10px 0; padding:10px 14px; background:#f8f7ff; border-left:4px solid #7c5cfc; border-radius:0 8px 8px 0; }
+.sr-result-text pre { background:#1e1e2e; color:#cdd6f4; padding:14px 16px; border-radius:8px; overflow-x:auto; margin:10px 0; font-size:13px; }
+.sr-result-text code { background:#f0edff; padding:2px 6px; border-radius:4px; font-size:13px; color:#5c3dcf; }
+.sr-result-text table { width:100%; border-collapse:collapse; margin:10px 0; font-size:14px; border-radius:8px; overflow:hidden; }
+.sr-result-text th, .sr-result-text td { padding:8px 12px; border:1px solid #e1e3e6; text-align:left; }
+.sr-result-text th { background:#f8f7ff; font-weight:600; color:#5c3dcf; }
+.sr-breadcrumb a { color:#7c5cfc; text-decoration:none; font-size:13px; }
+.sr-breadcrumb a:hover { text-decoration:underline; }
+.sr-loading { text-align:center; color:#909296; padding:40px 0; font-size:14px; grid-column:1/-1; }
+.sr-empty { text-align:center; color:#909296; padding:40px 0; font-size:14px; grid-column:1/-1; }
+.sr-tree-item { display:flex; align-items:center; padding:5px 12px; cursor:pointer; color:#3c4043; transition:all .1s; border-left:3px solid transparent; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.sr-tree-item:hover { background:#f0edff; color:#7c5cfc; }
+.sr-tree-item.active { background:#f0edff; color:#7c5cfc; border-left-color:#7c5cfc; font-weight:500; }
+.sr-tree-item .icon { width:18px; text-align:center; margin-right:4px; flex-shrink:0; }
+.sr-tree-item .arrow { width:16px; text-align:center; margin-right:2px; flex-shrink:0; font-size:10px; color:#909296; transition:transform .15s; }
+.sr-tree-item .arrow.expanded { transform:rotate(90deg); }
+.sr-tree-item .label { overflow:hidden; text-overflow:ellipsis; font-size:13px; }
+.sr-tree-children { }
+.sr-tab-bar { display:flex; gap:0; border-bottom:2px solid #e1e3e6; }
+.sr-tab-btn { padding:10px 24px; font-size:14px; cursor:pointer; transition:all .15s; border:none; background:transparent; color:#5c5f66; border-bottom:2px solid transparent; margin-bottom:-2px; font-weight:500; }
+.sr-tab-btn:hover { color:#1a1b1e; background:#f5f5f7; border-radius:6px 6px 0 0; }
+.sr-tab-btn.active { color:#7c5cfc; border-bottom-color:#7c5cfc; font-weight:600; }
+</style>
 
-    <div style="display:flex; gap:8px; margin-bottom:16px;">
-        <button class="btn btn-primary" onclick="switchTab('upload')" id="tabUpload">📤 上传图片</button>
-        <button class="btn btn-secondary" onclick="switchTab('browse')" id="tabBrowse">📚 笔记库图片</button>
-    </div>
+<div th:if="${#lists.size(kbList) == 0}" class="card" style="text-align:center;padding:60px 20px;">
+    <div style="font-size:48px;margin-bottom:16px;">📚</div>
+    <h2 style="margin-bottom:8px;">尚未配置知识库</h2>
+    <p style="color:#5c5f66;font-size:14px;margin-bottom:20px;">识图功能需要先配置知识库来管理图片和保存分析结果</p>
+    <a href="/config" class="btn btn-primary">⚙️ 前往配置知识库</a>
+</div>
 
-    <div id="panelUpload">
-        <form id="recognizeForm">
-            <div style="margin-bottom:16px;">
-                <div id="dropZone" style="border:2px dashed #d0d5dd; border-radius:12px; padding:40px 20px; text-align:center; cursor:pointer; transition:all .2s; background:#fafafa;" onclick="document.getElementById('fileInput').click()">
-                    <div id="dropHint" style="color:#909296; font-size:14px;">
-                        <div style="font-size:32px; margin-bottom:8px;">📁</div>
-                        点击选择图片 或 拖拽图片到此处<br>
-                        <span style="font-size:12px;">支持 jpg / png / gif / webp / bmp，最大 10MB</span>
-                    </div>
-                    <div id="preview" style="display:none;">
-                        <img id="previewImg" style="max-height:300px; border-radius:8px; margin-bottom:8px;" />
-                        <div id="fileName" style="font-size:13px; color:#5c5f66;"></div>
-                    </div>
-                </div>
-                <input type="file" id="fileInput" accept="image/*" style="display:none" onchange="previewImage(this)" />
-            </div>
+<div th:if="${#lists.size(kbList) > 0}">
 
-            <div style="margin-bottom:16px;">
-                <label style="font-size:13px; color:#5c5f66; font-weight:500; display:block; margin-bottom:4px;">识别提示词（可修改）</label>
-                <textarea id="uploadPrompt" rows="3" style="width:100%; padding:10px 12px; border:1px solid #e1e3e6; border-radius:8px; font-size:14px; resize:vertical; outline:none; font-family:inherit;">请识别这张图片中的内容。</textarea>
-            </div>
-
-            <div style="display:flex; gap:8px;">
-                <select id="modelSelector" style="flex:1; padding:10px 12px; border:1px solid #e1e3e6; border-radius:8px; background:#fff; font-size:14px; outline:none;">
-                    <th:block th:if="${#lists.size(visionModels) > 0}">
-                        <option value="">选择多模态模型...</option>
-                        <th:block th:each="m : ${visionModels}">
-                            <option th:value="${m.name}" th:text="${m.name + ' (' + m.model + ')'}">模型</option>
-                        </th:block>
-                    </th:block>
-                    <th:block th:unless="${#lists.size(visionModels) > 0}">
-                        <option value="">暂无支持多模态的模型，请在配置页添加</option>
-                    </th:block>
-                </select>
-                <button type="button" class="btn btn-primary" id="submitBtn" style="white-space:nowrap;" onclick="uploadAndRecognize()">🔍 开始识别</button>
-            </div>
-        </form>
-    </div>
-
-    <div id="panelBrowse" style="display:none;">
-        <div style="margin-bottom:12px;">
-            <div style="display:flex; gap:8px; align-items:center; margin-bottom:12px;">
-                <input type="text" id="searchInput" placeholder="搜索文件名..." oninput="filterImages()" style="flex:1; padding:8px 12px; border:1px solid #e1e3e6; border-radius:8px; font-size:13px; outline:none;" />
-                <button class="btn btn-secondary" onclick="loadImages()">🔄 刷新</button>
-            </div>
-            <div id="imageGrid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); gap:12px; max-height:400px; overflow-y:auto; padding:4px;">
-                <div style="text-align:center; color:#909296; grid-column:1/-1; padding:40px 0;">加载中...</div>
-            </div>
+<div class="sr-card" style="padding:14px 20px;">
+    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;">
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+            <span style="font-size:13px;color:#5c5f66;font-weight:500;">🎯 分析场景</span>
+            <button class="sr-scenario-btn active" data-scenario="exam">📝 试卷识别</button>
+            <button class="sr-scenario-btn" data-scenario="data">📊 数据统计</button>
+            <button class="sr-scenario-btn" data-scenario="general">🖼️ 通用识别</button>
         </div>
-
-        <div style="margin-bottom:12px;">
-            <label style="font-size:13px; color:#5c5f66; font-weight:500; display:block; margin-bottom:4px;">识别提示词（可修改）</label>
-            <textarea id="browsePrompt" rows="3" style="width:100%; padding:10px 12px; border:1px solid #e1e3e6; border-radius:8px; font-size:14px; resize:vertical; outline:none; font-family:inherit;">请识别这张图片中的内容。</textarea>
-        </div>
-
-        <div style="display:flex; gap:8px;">
-            <select id="browseModelSelector" style="flex:1; padding:10px 12px; border:1px solid #e1e3e6; border-radius:8px; background:#fff; font-size:14px; outline:none;">
-                <th:block th:if="${#lists.size(visionModels) > 0}">
-                    <option value="">选择多模态模型...</option>
-                    <th:block th:each="m : ${visionModels}">
-                        <option th:value="${m.name}" th:text="${m.name + ' (' + m.model + ')'}">模型</option>
-                    </th:block>
-                </th:block>
-                <th:block th:unless="${#lists.size(visionModels) > 0}">
-                    <option value="">暂无支持多模态的模型，请在配置页添加</option>
-                </th:block>
+        <div style="display:flex;gap:8px;align-items:center;">
+            <span style="font-size:13px;color:#5c5f66;font-weight:500;">📂 知识库</span>
+            <select id="kbSelector" style="padding:8px 12px;border:1px solid #e1e3e6;border-radius:8px;font-size:13px;background:#fff;outline:none;min-width:140px;">
+                <option th:each="kb : ${kbList}" th:value="${kb.id}" th:text="${kb.name}" th:selected="${kbStat.first}">知识库</option>
             </select>
-            <button class="btn btn-primary" id="browseSubmitBtn" onclick="recognizeFile()" style="white-space:nowrap;" disabled>🔍 识别选中图片</button>
+        </div>
+    </div>
+</div>
+
+<div class="sr-tab-bar">
+    <button class="sr-tab-btn active" data-tab="upload">📤 上传图片</button>
+    <button class="sr-tab-btn" data-tab="browse">📚 知识库图片</button>
+</div>
+
+<div id="panelUpload" class="sr-card" style="border-radius:0 0 12px 12px;border-top:none;">
+    <div class="sr-upload-zone" id="uploadZone">
+        <div id="uploadHint" style="color:#909296;font-size:14px;">
+            <div style="font-size:40px;margin-bottom:8px;">📁</div>
+            点击选择图片 或 拖拽图片到此处<br>
+            <span style="font-size:12px;">支持 jpg / png / gif / webp / bmp，最大 10MB</span>
+        </div>
+        <div id="uploadPreview" style="display:none;">
+            <img id="previewImg" style="max-height:320px;border-radius:8px;border:1px solid #e1e3e6;" />
+            <div id="previewFileName" style="margin-top:8px;font-size:13px;color:#5c5f66;"></div>
+        </div>
+    </div>
+    <input type="file" id="fileInput" accept="image/*" style="display:none" />
+
+    <div style="margin-top:14px;">
+        <label style="font-size:12px;color:#5c5f66;font-weight:500;display:block;margin-bottom:4px;">💬 识别提示词</label>
+        <textarea id="uploadPrompt" rows="2" style="width:100%;padding:8px 12px;border:1px solid #e1e3e6;border-radius:8px;font-size:13px;resize:vertical;outline:none;font-family:inherit;">请识别这张试卷图片中的所有题目，给出每道题的正确答案并详细解析。</textarea>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:12px;">
+        <select id="uploadModelSelector" style="flex:1;padding:8px 12px;border:1px solid #e1e3e6;border-radius:8px;background:#fff;font-size:13px;outline:none;">
+            <option th:if="${#lists.size(visionModels) > 0}" value="">选择多模态模型...</option>
+            <option th:unless="${#lists.size(visionModels) > 0}" value="">暂无多模态模型，请在配置页添加</option>
+            <option th:each="m : ${visionModels}" th:value="${m.name}" th:text="${m.name + ' (' + m.model + ')'}">模型</option>
+        </select>
+        <button class="btn btn-primary" id="uploadBtn" style="white-space:nowrap;">🔍 识别</button>
+    </div>
+</div>
+
+<div id="panelBrowse" style="display:none;">
+    <div style="display:flex;gap:0;border-radius:0 0 12px 12px;overflow:hidden;border:1px solid #e1e3e6;border-top:none;">
+        <div style="width:240px;min-width:240px;background:#fafafa;border-right:1px solid #e1e3e6;display:flex;flex-direction:column;">
+            <div style="padding:10px 12px;font-size:13px;font-weight:600;color:#1a1b1e;border-bottom:1px solid #e1e3e6;">📁 笔记库目录</div>
+            <div id="dirTree" style="flex:1;overflow-y:auto;padding:6px 0;font-size:13px;">
+                <div class="sr-loading" style="padding:20px 0;">⌛ 加载目录树...</div>
+            </div>
+        </div>
+        <div style="flex:1;padding:16px;min-width:0;">
+            <div id="browseBreadcrumb" class="sr-breadcrumb" style="margin-bottom:8px;"></div>
+            <div style="display:flex;gap:6px;margin-bottom:10px;">
+                <input type="text" id="searchInput" placeholder="搜索文件名..." style="flex:1;padding:7px 10px;border:1px solid #e1e3e6;border-radius:8px;font-size:13px;outline:none;" />
+                <button class="btn btn-secondary" id="refreshBtn" style="padding:6px 12px;font-size:12px;">🔄</button>
+            </div>
+            <div id="imageGrid" class="sr-grid" style="max-height:340px;overflow-y:auto;padding:2px;">
+                <div class="sr-loading">⌛ 加载中...</div>
+            </div>
+            <div style="margin-top:12px;">
+                <label style="font-size:12px;color:#5c5f66;font-weight:500;display:block;margin-bottom:4px;">💬 识别提示词</label>
+                <textarea id="browsePrompt" rows="2" style="width:100%;padding:8px 12px;border:1px solid #e1e3e6;border-radius:8px;font-size:13px;resize:vertical;outline:none;font-family:inherit;">请识别这张试卷图片中的所有题目，给出每道题的正确答案并详细解析。</textarea>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:10px;">
+                <select id="browseModelSelector" style="flex:1;padding:8px 12px;border:1px solid #e1e3e6;border-radius:8px;background:#fff;font-size:13px;outline:none;">
+                    <option th:if="${#lists.size(visionModels) > 0}" value="">选择多模态模型...</option>
+                    <option th:unless="${#lists.size(visionModels) > 0}" value="">暂无多模态模型，请在配置页添加</option>
+                    <option th:each="m : ${visionModels}" th:value="${m.name}" th:text="${m.name + ' (' + m.model + ')'}">模型</option>
+                </select>
+                <button class="btn btn-primary" id="browseBtn" style="white-space:nowrap;" disabled>🔍 识别选中</button>
+            </div>
         </div>
     </div>
 </div>
 
 <div id="resultArea" style="display:none;">
-    <div class="card">
-        <h2>📸 识别的图片</h2>
-        <div style="text-align:center; padding:12px 0;">
-            <img id="resultImg" style="max-width:100%; max-height:400px; border-radius:8px; border:1px solid #e1e3e6;" />
-        </div>
-    </div>
-    <div class="card">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-            <h2 style="margin:0;">💡 识别结果</h2>
-            <div style="display:flex; gap:8px; align-items:center;">
-                <span id="saveStatus" style="font-size:13px;"></span>
-                <button class="btn btn-primary" id="saveBtn" onclick="saveResult()">💾 保存到笔记库</button>
+    <div class="sr-card sr-result-area">
+        <div style="display:flex;gap:20px;flex-wrap:wrap;">
+            <div style="flex:1;min-width:200px;max-width:360px;">
+                <h3>📸 识别的图片</h3>
+                <div style="text-align:center;margin-top:8px;">
+                    <img id="resultImg" style="max-width:100%;max-height:360px;border-radius:8px;border:1px solid #e1e3e6;" />
+                </div>
+            </div>
+            <div style="flex:2;min-width:280px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+                    <h3 style="margin:0;">💡 识别结果</h3>
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <span id="saveStatus" style="font-size:13px;color:#2b8a3e;"></span>
+                        <button class="btn btn-primary" id="saveBtn" style="font-size:13px;padding:6px 14px;">💾 保存到笔记库</button>
+                    </div>
+                </div>
+                <div id="resultText" class="sr-result-text" style="max-height:520px;overflow-y:auto;padding-right:4px;"></div>
             </div>
         </div>
-        <div id="resultText" class="report"></div>
     </div>
 </div>
 
-<!-- Save Path Modal -->
 <div class="modal-overlay" id="saveModal">
-    <div class="modal" style="width:500px;">
-        <h3>💾 保存到笔记库</h3>
-        <div class="form-group" style="margin-bottom:12px;">
-            <label style="font-size:12px; color:#5c5f66; font-weight:500;">文件名</label>
-            <input type="text" id="saveFilename" style="width:100%; padding:8px 10px; border:1px solid #e1e3e6; border-radius:6px; font-size:13px;" />
+    <div class="modal" style="width:520px;">
+        <h3>💾 保存识图结果到笔记库</h3>
+        <div style="margin-bottom:12px;">
+            <label style="font-size:12px;color:#5c5f66;font-weight:500;display:block;margin-bottom:4px;">目标知识库</label>
+            <select id="saveKbSelector" style="width:100%;padding:8px 10px;border:1px solid #e1e3e6;border-radius:6px;font-size:13px;background:#fff;outline:none;">
+                <option th:each="kb : ${kbList}" th:value="${kb.id}" th:text="${kb.name}">知识库</option>
+            </select>
         </div>
-        <div class="form-group" style="margin-bottom:12px;">
-            <label style="font-size:12px; color:#5c5f66; font-weight:500;">保存路径</label>
-            <div style="display:flex; gap:6px;">
-                <input type="text" id="savePathInput" readonly style="flex:1; padding:8px 10px; border:1px solid #e1e3e6; border-radius:6px; font-size:13px;" />
-                <button class="btn btn-secondary btn-sm" onclick="openPathBrowser()">选择</button>
+        <div style="margin-bottom:12px;">
+            <label style="font-size:12px;color:#5c5f66;font-weight:500;display:block;margin-bottom:4px;">文件名</label>
+            <input type="text" id="saveFilename" style="width:100%;padding:8px 10px;border:1px solid #e1e3e6;border-radius:6px;font-size:13px;outline:none;" />
+        </div>
+        <div style="margin-bottom:12px;">
+            <label style="font-size:12px;color:#5c5f66;font-weight:500;display:block;margin-bottom:4px;">保存路径</label>
+            <div style="display:flex;gap:6px;">
+                <input type="text" id="savePathInput" readonly style="flex:1;padding:8px 10px;border:1px solid #e1e3e6;border-radius:6px;font-size:13px;background:#fafafa;" />
+                <button class="btn btn-secondary btn-sm" id="browseSaveBtn" style="padding:6px 12px;font-size:12px;">浏览</button>
             </div>
         </div>
-        <div id="pathBrowser" style="display:none; margin-bottom:12px;">
-            <div id="pathBreadcrumb" style="font-size:12px; margin-bottom:8px;"></div>
-            <div id="pathList" style="max-height:200px; overflow-y:auto; border:1px solid #e1e3e6; border-radius:6px;"></div>
+        <div id="savePathBrowser" style="display:none;margin-bottom:12px;">
+            <div id="saveBreadcrumb" class="sr-breadcrumb" style="font-size:12px;margin-bottom:8px;"></div>
+            <div id="saveDirList" style="max-height:180px;overflow-y:auto;border:1px solid #e1e3e6;border-radius:6px;padding:4px;"></div>
         </div>
-        <div style="display:flex; gap:8px; justify-content:flex-end;">
-            <button class="btn btn-secondary" onclick="closeSaveModal()">取消</button>
-            <button class="btn btn-primary" onclick="confirmSave()">保存</button>
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button class="btn btn-secondary" id="closeSaveBtn">取消</button>
+            <button class="btn btn-primary" id="confirmSaveBtn">💾 保存</button>
         </div>
     </div>
 </div>
+
+</div><!-- end th:if kbList>0 -->
 
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script>
+const SCENARIO_PROMPTS = {
+    exam: '请识别这张试卷图片中的所有题目，逐题给出正确答案和详细解析。包括：题目类型、考察知识点、解题思路、易错点提示。用中文回答，Markdown 格式。',
+    data: '请分析这张数据统计图片中的内容和数据。包括：数据概览、关键指标、趋势分析、异常点、结论建议。用中文回答，Markdown 格式，适当使用表格。',
+    general: '请详细分析这张图片的内容，识别其中的文字、图表、结构等关键信息。用中文回答，Markdown 格式。'
+};
+
 let allImages = [];
 let selectedImage = null;
 let currentResultMd = '';
-let currentImageSrc = '';
+let currentBrowseDir = '';
 let selectedSaveDir = '';
 
+function selectScenario(btn) {
+    document.querySelectorAll('.sr-scenario-btn').forEach(function(b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+    var prompt = SCENARIO_PROMPTS[btn.dataset.scenario] || SCENARIO_PROMPTS.general;
+    document.getElementById('uploadPrompt').value = prompt;
+    document.getElementById('browsePrompt').value = prompt;
+}
+
 function switchTab(tab) {
+    document.querySelectorAll('.sr-tab-btn').forEach(function(b) {
+        if (b.dataset.tab === tab) b.classList.add('active'); else b.classList.remove('active');
+    });
     document.getElementById('panelUpload').style.display = tab === 'upload' ? 'block' : 'none';
     document.getElementById('panelBrowse').style.display = tab === 'browse' ? 'block' : 'none';
-    document.getElementById('tabUpload').className = tab === 'upload' ? 'btn btn-primary' : 'btn btn-secondary';
-    document.getElementById('tabBrowse').className = tab === 'browse' ? 'btn btn-primary' : 'btn btn-secondary';
-    if (tab === 'browse' && allImages.length === 0) loadImages();
+    if (tab === 'browse') {
+        if (allImages.length === 0) loadImages();
+        if (document.getElementById('dirTree').children.length <= 1) loadDirTree();
+    }
+}
+
+function getKbId() { return parseInt(document.getElementById('kbSelector').value); }
+
+function onKbChange() {
+    allImages = [];
+    selectedImage = null;
+    currentBrowseDir = '';
+    document.getElementById('browseBtn').disabled = true;
+    document.getElementById('dirTree').innerHTML = '<div class="sr-loading" style="padding:20px 0;">⌛ 加载目录树...</div>';
+    loadImages();
+    browseDir('');
+    loadDirTree();
 }
 
 function previewImage(input) {
     if (!input.files || !input.files[0]) return;
-    const file = input.files[0];
-    const reader = new FileReader();
+    var file = input.files[0];
+    var reader = new FileReader();
     reader.onload = function(e) {
-        document.getElementById('dropHint').style.display = 'none';
-        document.getElementById('preview').style.display = 'block';
+        document.getElementById('uploadHint').style.display = 'none';
+        document.getElementById('uploadPreview').style.display = 'block';
         document.getElementById('previewImg').src = e.target.result;
-        document.getElementById('fileName').textContent = file.name + ' (' + (file.size/1024).toFixed(1) + 'KB)';
+        document.getElementById('previewFileName').textContent = file.name + ' (' + (file.size/1024).toFixed(1) + 'KB)';
     };
     reader.readAsDataURL(file);
 }
 
-const dropZone = document.getElementById('dropZone');
-dropZone.addEventListener('dragover', function(e) { e.preventDefault(); this.style.borderColor = '#7c5cfc'; this.style.background = '#f0edff'; });
-dropZone.addEventListener('dragleave', function(e) { this.style.borderColor = '#d0d5dd'; this.style.background = '#fafafa'; });
-dropZone.addEventListener('drop', function(e) {
-    e.preventDefault(); this.style.borderColor = '#d0d5dd'; this.style.background = '#fafafa';
-    if (e.dataTransfer.files.length > 0) {
-        document.getElementById('fileInput').files = e.dataTransfer.files;
-        previewImage(document.getElementById('fileInput'));
-    }
-});
-
 async function uploadAndRecognize() {
-    const input = document.getElementById('fileInput');
+    var input = document.getElementById('fileInput');
     if (!input.files || !input.files[0]) { toast('请先选择图片', 'error'); return; }
-    const modelSel = document.getElementById('modelSelector');
-    const modelName = modelSel ? modelSel.value : '';
+    var modelSel = document.getElementById('uploadModelSelector');
+    var modelName = modelSel ? modelSel.value : '';
     if (!modelName) { toast('请选择多模态模型', 'error'); return; }
-    const btn = document.getElementById('submitBtn');
-    btn.disabled = true; btn.textContent = '⏳ 识别中，请稍候...';
-
-    const fd = new FormData();
+    var btn = document.getElementById('uploadBtn');
+    btn.disabled = true; btn.textContent = '⏳ 识别中...';
+    var fd = new FormData();
     fd.append('image', input.files[0]);
     fd.append('prompt', document.getElementById('uploadPrompt').value);
     fd.append('modelName', modelName);
-
     try {
-        const resp = await fetch('/image-recognition/recognize-sync', { method: 'POST', body: fd });
-        const data = await resp.json();
-        if (data.ok) {
-            showResult(data.image_url, data.result);
-        } else {
-            toast('识别失败: ' + (data.error || '未知错误'), 'error');
-        }
-    } catch(e) {
-        toast('请求失败', 'error');
-    }
-    btn.disabled = false; btn.textContent = '🔍 开始识别';
+        var resp = await fetch('/image-recognition/recognize-sync', { method: 'POST', body: fd });
+        var data = await resp.json();
+        if (data.ok) showResult(data.image_url, data.result);
+        else toast('识别失败: ' + (data.error || '未知错误'), 'error');
+    } catch(e) { toast('请求失败', 'error'); }
+    btn.disabled = false; btn.textContent = '🔍 识别';
 }
 
 async function loadImages() {
-    const grid = document.getElementById('imageGrid');
-    grid.innerHTML = '<div style="text-align:center; color:#909296; grid-column:1/-1; padding:40px 0;">加载中...</div>';
+    var grid = document.getElementById('imageGrid');
+    grid.innerHTML = '<div class="sr-loading">⌛ 加载中...</div>';
     try {
-        const resp = await fetch('/image-recognition/api/images');
-        const data = await resp.json();
-        if (data.ok) {
-            allImages = data.images;
-            renderImages(allImages);
-        } else {
-            grid.innerHTML = '<div style="text-align:center; color:#909296; grid-column:1/-1;">加载失败</div>';
-        }
-    } catch(e) {
-        grid.innerHTML = '<div style="text-align:center; color:#909296; grid-column:1/-1;">请求失败</div>';
-    }
+        var url = '/image-recognition/api/images?kbId=' + getKbId() + '&dir=' + encodeURIComponent(currentBrowseDir);
+        var resp = await fetch(url);
+        var data = await resp.json();
+        if (data.ok) { allImages = data.images; renderImages(allImages); }
+        else grid.innerHTML = '<div class="sr-empty">加载失败</div>';
+    } catch(e) { grid.innerHTML = '<div class="sr-empty">请求失败</div>'; }
 }
 
 function renderImages(images) {
-    const grid = document.getElementById('imageGrid');
-    if (images.length === 0) {
-        grid.innerHTML = '<div style="text-align:center; color:#909296; grid-column:1/-1; padding:40px 0;">笔记库中暂无图片</div>';
-        return;
+    var grid = document.getElementById('imageGrid');
+    if (images.length === 0) { grid.innerHTML = '<div class="sr-empty">📭 此目录下暂无图片</div>'; return; }
+    grid.innerHTML = '';
+    for (var i = 0; i < images.length; i++) {
+        var img = images[i];
+        var card = document.createElement('div');
+        card.className = 'sr-img-card';
+        card.onclick = function(path) { return function() { selectImage(path, this); }; }(img.path);
+        var thumb = document.createElement('img');
+        thumb.className = 'thumb';
+        thumb.src = '/image-recognition/thumb?path=' + encodeURIComponent(img.path) + '&kbId=' + getKbId();
+        thumb.loading = 'lazy';
+        thumb.onerror = function() { this.style.display = 'none'; };
+        card.appendChild(thumb);
+        var nameDiv = document.createElement('div');
+        nameDiv.className = 'name';
+        nameDiv.title = img.path;
+        nameDiv.textContent = img.name;
+        card.appendChild(nameDiv);
+        grid.appendChild(card);
     }
-    grid.innerHTML = images.map(img => `
-        <div onclick="selectImage('${img.path.replace(/'/g, "\\'")}', this)" style="border:2px solid #e1e3e6; border-radius:8px; overflow:hidden; cursor:pointer; transition:all .15s; text-align:center; background:#fafafa;" onmouseover="this.style.borderColor='#7c5cfc'" onmouseout="if(!this.classList.contains('sel'))this.style.borderColor='#e1e3e6'">
-            <img src="/image-recognition/thumb?path=${encodeURIComponent(img.path)}" style="width:100%; height:100px; object-fit:cover;" loading="lazy" onerror="this.style.display='none'" />
-            <div style="padding:6px 8px; font-size:11px; color:#5c5f66; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${img.path}">${img.name}</div>
-        </div>
-    `).join('');
 }
 
 function selectImage(path, el) {
-    document.querySelectorAll('#imageGrid > div').forEach(d => { d.classList.remove('sel'); d.style.borderColor = '#e1e3e6'; });
-    el.classList.add('sel');
-    el.style.borderColor = '#7c5cfc';
+    document.querySelectorAll('.sr-img-card').forEach(function(d) { d.classList.remove('selected'); });
+    el.classList.add('selected');
     selectedImage = path;
-    document.getElementById('browseSubmitBtn').disabled = false;
+    document.getElementById('browseBtn').disabled = false;
 }
 
 function filterImages() {
-    const q = document.getElementById('searchInput').value.toLowerCase();
-    const filtered = allImages.filter(img => img.name.toLowerCase().includes(q) || img.path.toLowerCase().includes(q));
-    renderImages(filtered);
+    var q = document.getElementById('searchInput').value.toLowerCase();
+    renderImages(allImages.filter(function(img) { return img.name.toLowerCase().indexOf(q) >= 0 || img.path.toLowerCase().indexOf(q) >= 0; }));
+}
+
+async function browseDir(dir) {
+    currentBrowseDir = dir;
+    var bc = document.getElementById('browseBreadcrumb');
+    var html = '<a href="javascript:void(0)" class="sr-bc-link" data-dir="">根目录</a>';
+    if (dir) {
+        var parts = dir.split('/');
+        var accum = '';
+        for (var i = 0; i < parts.length; i++) {
+            accum = accum ? accum + '/' + parts[i] : parts[i];
+            html += ' / <a href="javascript:void(0)" class="sr-bc-link" data-dir="' + accum.replace(/'/g, '&apos;') + '">' + parts[i] + '</a>';
+        }
+    }
+    bc.innerHTML = html;
+    bc.querySelectorAll('.sr-bc-link').forEach(function(a) {
+        a.addEventListener('click', function() { browseDir(this.dataset.dir); });
+    });
+    loadImages();
+}
+
+async function loadDirTree() {
+    var container = document.getElementById('dirTree');
+    try {
+        var resp = await fetch('/image-recognition/api/dir-tree?kbId=' + getKbId());
+        var data = await resp.json();
+        if (data.ok && data.tree && data.tree.length > 0) {
+            container.innerHTML = '';
+            renderTreeNodes(data.tree, container, '', true);
+        } else if (data.ok) {
+            container.innerHTML = '<div class="sr-empty" style="padding:20px 0;">此知识库无子目录</div>';
+        } else {
+            container.innerHTML = '<div class="sr-empty" style="padding:20px 0;">加载失败</div>';
+        }
+    } catch(e) {
+        container.innerHTML = '<div class="sr-empty" style="padding:20px 0;">请求失败</div>';
+    }
+}
+
+function renderTreeNodes(nodes, parentEl, parentPath, expand) {
+    if (!nodes || nodes.length === 0) {
+        if (!parentPath && parentEl.id !== 'dirTree') return;
+        return;
+    }
+    for (var i = 0; i < nodes.length; i++) {
+        var node = nodes[i];
+        var hasChildren = node.children && node.children.length > 0;
+        var item = document.createElement('div');
+        item.className = 'sr-tree-item';
+        if (currentBrowseDir === node.path) item.classList.add('active');
+        // arrow
+        var arrow = document.createElement('span');
+        arrow.className = 'arrow';
+        arrow.textContent = '▶';
+        if (hasChildren) {
+            arrow.style.visibility = 'visible';
+            arrow.style.cursor = 'pointer';
+        } else { arrow.style.visibility = 'hidden'; }
+        item.appendChild(arrow);
+        // icon
+        var icon = document.createElement('span');
+        icon.className = 'icon';
+        icon.textContent = '📁';
+        item.appendChild(icon);
+        // label
+        var label = document.createElement('span');
+        label.className = 'label';
+        label.textContent = node.name;
+        item.appendChild(label);
+        // children container
+        var childContainer = document.createElement('div');
+        childContainer.className = 'sr-tree-children';
+        childContainer.style.paddingLeft = '18px';
+        // first-level directories expand by default; deeper ones collapsed
+        var shouldExpand = expand === true || (currentBrowseDir && currentBrowseDir.indexOf(node.path) === 0);
+        childContainer.style.display = shouldExpand ? 'block' : 'none';
+        renderTreeNodes(node.children, childContainer, node.path);
+        // click events
+        label.onclick = icon.onclick = function(p, el) {
+            return function() { selectTreeDir(p, el); };
+        }(node.path, item);
+        if (hasChildren) {
+            arrow.onclick = function(cnt, arr) {
+                return function(e) {
+                    e.stopPropagation();
+                    var hidden = cnt.style.display === 'none';
+                    cnt.style.display = hidden ? 'block' : 'none';
+                    arr.classList.toggle('expanded', hidden);
+                };
+            }(childContainer, arrow);
+            if (shouldExpand) arrow.classList.add('expanded');
+        }
+        parentEl.appendChild(item);
+        parentEl.appendChild(childContainer);
+    }
+}
+
+function selectTreeDir(path, el) {
+    document.querySelectorAll('.sr-tree-item').forEach(function(d) { d.classList.remove('active'); });
+    el.classList.add('active');
+    browseDir(path);
 }
 
 async function recognizeFile() {
-    if (!selectedImage) return;
-    const modelSel = document.getElementById('browseModelSelector');
-    const modelName = modelSel ? modelSel.value : '';
+    if (!selectedImage) { toast('请先选择一张图片', 'error'); return; }
+    var modelName = document.getElementById('browseModelSelector').value;
     if (!modelName) { toast('请选择多模态模型', 'error'); return; }
-    const btn = document.getElementById('browseSubmitBtn');
-    btn.disabled = true; btn.textContent = '⏳ 识别中，请稍候...';
-
+    var btn = document.getElementById('browseBtn');
+    btn.disabled = true; btn.textContent = '⏳ 识别中...';
     try {
-        const resp = await fetch('/image-recognition/recognize-file', {
+        var resp = await fetch('/image-recognition/recognize-file', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({path: selectedImage, prompt: document.getElementById('browsePrompt').value, modelName: modelName})
+            body: JSON.stringify({path: selectedImage, prompt: document.getElementById('browsePrompt').value, modelName: modelName, kbId: getKbId()})
         });
-        const data = await resp.json();
-        if (data.ok) {
-            showResult(data.image_url, data.result);
-        } else {
-            toast('识别失败: ' + (data.error || '未知错误'), 'error');
-        }
-    } catch(e) {
-        toast('请求失败', 'error');
-    }
-    btn.disabled = false; btn.textContent = '🔍 识别选中图片';
+        var data = await resp.json();
+        if (data.ok) showResult(data.image_url, data.result);
+        else toast('识别失败: ' + (data.error || ''), 'error');
+    } catch(e) { toast('请求失败', 'error'); }
+    btn.disabled = false; btn.textContent = '🔍 识别选中';
 }
 
 function showResult(imageUrl, resultMd) {
     currentResultMd = resultMd;
-    currentImageSrc = imageUrl;
     document.getElementById('resultArea').style.display = 'block';
     document.getElementById('resultImg').src = imageUrl;
     document.getElementById('resultText').innerHTML = marked.parse(resultMd);
     document.getElementById('saveStatus').textContent = '';
     document.getElementById('saveBtn').disabled = false;
-    document.getElementById('saveBtn').textContent = '💾 保存到笔记库';
-    document.getElementById('resultArea').scrollIntoView({behavior: 'smooth'});
+    document.getElementById('resultArea').scrollIntoView({behavior: 'smooth', block: 'start'});
 }
 
-function saveResult() {
+function showSaveModal() {
     if (!currentResultMd) return;
-    const now = new Date();
-    const dateStr = now.getFullYear() + '' + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0');
-    document.getElementById('saveFilename').value = '识图分析_' + dateStr + '.md';
+    var now = new Date();
+    var ds = now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0');
+    document.getElementById('saveFilename').value = '识图分析_' + ds + '.md';
     document.getElementById('savePathInput').value = '';
+    selectedSaveDir = '';
+    document.getElementById('saveKbSelector').value = getKbId();
+    document.getElementById('savePathBrowser').style.display = 'none';
     document.getElementById('saveModal').classList.add('active');
 }
 
-function closeSaveModal() {
-    document.getElementById('saveModal').classList.remove('active');
+function closeSaveModal() { document.getElementById('saveModal').classList.remove('active'); }
+
+function togglePathBrowser() {
+    var pb = document.getElementById('savePathBrowser');
+    if (pb.style.display === 'block') { pb.style.display = 'none'; return; }
+    pb.style.display = 'block';
+    browseSaveDir('');
 }
 
-function openPathBrowser() {
-    document.getElementById('pathBrowser').style.display = 'block';
-    browsePath('');
-}
-
-async function browsePath(dir) {
+async function browseSaveDir(dir) {
+    selectedSaveDir = dir;
+    var bc = document.getElementById('saveBreadcrumb');
+    var html = '<a href="javascript:void(0)" class="sr-save-link" data-dir="">根目录</a>';
+    if (dir) {
+        var parts = dir.split('/');
+        var accum = '';
+        for (var i = 0; i < parts.length; i++) {
+            accum = accum ? accum + '/' + parts[i] : parts[i];
+            html += ' / <a href="javascript:void(0)" class="sr-save-link" data-dir="' + accum + '">' + parts[i] + '</a>';
+        }
+    }
+    bc.innerHTML = html;
+    bc.querySelectorAll('.sr-save-link').forEach(function(a) {
+        a.addEventListener('click', function() { browseSaveDir(this.dataset.dir); });
+    });
     try {
-        const resp = await fetch('/image-recognition/subdirs?dir=' + encodeURIComponent(dir));
-        const data = await resp.json();
-        const bc = document.getElementById('pathBreadcrumb');
-        let html = '<span style="cursor:pointer;color:#7c5cfc;" onclick="browsePath(\'\')">根目录</span>';
-        if (dir) {
-            const parts = dir.split('/');
-            let accum = '';
-            for (let i = 0; i < parts.length; i++) {
-                accum = accum ? accum + '/' + parts[i] : parts[i];
-                const d = accum;
-                html += ' / <span style="cursor:pointer;color:#7c5cfc;" onclick="browsePath(\'' + d.replace(/'/g, "\\'") + '\')">' + parts[i] + '</span>';
+        var kbId = parseInt(document.getElementById('saveKbSelector').value);
+        var resp = await fetch('/image-recognition/subdirs?kbId=' + kbId + '&dir=' + encodeURIComponent(dir));
+        var data = await resp.json();
+        var list = document.getElementById('saveDirList');
+        list.innerHTML = '';
+        if (data.ok && data.subdirs && data.subdirs.length > 0) {
+            for (var i = 0; i < data.subdirs.length; i++) {
+                var d = data.subdirs[i];
+                var div = document.createElement('div');
+                div.textContent = '📁 ' + d.name;
+                div.style.cssText = 'padding:8px 12px;cursor:pointer;border-radius:6px;font-size:13px;';
+                div.onmouseover = function() { this.style.background = '#f5f3ff'; this.style.color = '#7c5cfc'; };
+                div.onmouseout = function() { this.style.background = ''; this.style.color = ''; };
+                (function(p) { div.onclick = function() { selectSaveDir(p); }; })(d.path);
+                list.appendChild(div);
             }
-        }
-        bc.innerHTML = html;
+        } else { list.innerHTML = '<div style="padding:12px;color:#909296;font-size:13px;text-align:center;">无子目录</div>'; }
+    } catch(e) { document.getElementById('saveDirList').innerHTML = '<div style="padding:12px;color:#909296;font-size:13px;">加载失败</div>'; }
+}
 
-        const list = document.getElementById('pathList');
-        if (data.ok && data.subdirs.length > 0) {
-            list.innerHTML = data.subdirs.map(d =>
-                '<div class="path-item" onclick="browsePath(\'' + d.path.replace(/'/g, "\\'") + '\')" style="padding:8px 12px; cursor:pointer; border-radius:6px; font-size:13px;">📁 ' + d.name + '</div>'
-            ).join('');
-        } else {
-            list.innerHTML = '<div style="padding:12px;color:#909296;font-size:13px;">无子目录</div>';
-        }
-        selectedSaveDir = dir;
-    } catch(e) { toast('加载目录失败', 'error'); }
+function selectSaveDir(dir) {
+    selectedSaveDir = dir;
+    document.getElementById('savePathInput').value = dir;
+    browseSaveDir(dir);
 }
 
 async function confirmSave() {
-    const filename = document.getElementById('saveFilename').value.trim();
-    const subdir = document.getElementById('savePathInput').value.trim();
+    var filename = document.getElementById('saveFilename').value.trim();
     if (!filename) { toast('请输入文件名', 'error'); return; }
-
-    let fullPath = subdir ? subdir + '/' + filename : filename;
-
+    var subdir = document.getElementById('savePathInput').value.trim();
+    var fullPath = subdir ? subdir + '/' + filename : filename;
+    var kbId = parseInt(document.getElementById('saveKbSelector').value);
     try {
-        const resp = await fetch('/image-recognition/save', {
+        var resp = await fetch('/image-recognition/save', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({path: fullPath, content: currentResultMd})
+            body: JSON.stringify({path: fullPath, content: currentResultMd, kbId: kbId})
         });
-        const data = await resp.json();
+        var data = await resp.json();
         if (data.ok) {
-            toast('保存成功: ' + data.path);
-            document.getElementById('saveStatus').textContent = '✅ 已保存';
-            document.getElementById('saveStatus').style.color = '#2b8a3e';
+            toast('✅ 已保存: ' + data.path);
+            document.getElementById('saveStatus').textContent = '✅ 已保存到笔记库';
             closeSaveModal();
-        } else {
-            toast('保存失败: ' + (data.error || ''), 'error');
-        }
+        } else { toast('保存失败: ' + (data.error || ''), 'error'); }
     } catch(e) { toast('保存失败', 'error'); }
 }
+
+// Init
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.sr-scenario-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() { selectScenario(this); });
+    });
+    document.querySelectorAll('.sr-tab-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() { switchTab(this.dataset.tab); });
+    });
+    var uz = document.getElementById('uploadZone');
+    if (uz) {
+        uz.addEventListener('click', function() { document.getElementById('fileInput').click(); });
+        uz.addEventListener('dragover', function(e) { e.preventDefault(); this.classList.add('dragover'); });
+        uz.addEventListener('dragleave', function(e) { this.classList.remove('dragover'); });
+        uz.addEventListener('drop', function(e) {
+            e.preventDefault(); this.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) {
+                document.getElementById('fileInput').files = e.dataTransfer.files;
+                previewImage(document.getElementById('fileInput'));
+            }
+        });
+    }
+    document.getElementById('fileInput').addEventListener('change', function() { previewImage(this); });
+    document.getElementById('uploadBtn').addEventListener('click', uploadAndRecognize);
+    document.getElementById('browseBtn').addEventListener('click', recognizeFile);
+    document.getElementById('saveBtn').addEventListener('click', showSaveModal);
+    document.getElementById('refreshBtn').addEventListener('click', loadImages);
+    document.getElementById('searchInput').addEventListener('input', filterImages);
+    document.getElementById('browseSaveBtn').addEventListener('click', togglePathBrowser);
+    document.getElementById('closeSaveBtn').addEventListener('click', closeSaveModal);
+    document.getElementById('confirmSaveBtn').addEventListener('click', confirmSave);
+    document.getElementById('saveKbSelector').addEventListener('change', function() {
+        selectedSaveDir = '';
+        document.getElementById('savePathInput').value = '';
+        document.getElementById('savePathBrowser').style.display = 'none';
+    });
+    document.getElementById('kbSelector').addEventListener('change', function() {
+        allImages = [];
+        selectedImage = null;
+        currentBrowseDir = '';
+        document.getElementById('browseBtn').disabled = true;
+        document.getElementById('dirTree').innerHTML = '<div class="sr-loading" style="padding:20px 0;">⌛ 加载目录树...</div>';
+        browseDir('');
+        loadImages();
+        loadDirTree();
+    });
+    var firstScenario = document.querySelector('.sr-scenario-btn');
+    if (firstScenario) selectScenario(firstScenario);
+    loadImages();
+    browseDir('');
+    loadDirTree();
+});
 </script>
+
+</div><!-- end th:if kbList>0 -->
 
 </th:block>
 </body>

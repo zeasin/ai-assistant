@@ -1,8 +1,10 @@
 package com.laoqi.assistant.controller;
 
 import com.laoqi.assistant.config.AppConfig;
+import com.laoqi.assistant.entity.KnowledgeBaseEntity;
 import com.laoqi.assistant.entity.LlmProfileEntity;
 import com.laoqi.assistant.service.ConfigService;
+import com.laoqi.assistant.service.KnowledgeBaseService;
 import com.laoqi.assistant.service.LlmConfigResolver;
 import com.laoqi.assistant.service.LlmService;
 import com.laoqi.assistant.service.LogService;
@@ -29,15 +31,18 @@ public class ImageRecognitionController {
 
     private final AppConfig appConfig;
     private final ConfigService configService;
+    private final KnowledgeBaseService kbService;
     private final LlmService llmService;
     private final LogService logService;
     private final LlmConfigResolver llmConfigResolver;
 
     public ImageRecognitionController(AppConfig appConfig, ConfigService configService,
+                                       KnowledgeBaseService kbService,
                                        LlmService llmService, LogService logService,
                                        LlmConfigResolver llmConfigResolver) {
         this.appConfig = appConfig;
         this.configService = configService;
+        this.kbService = kbService;
         this.llmService = llmService;
         this.logService = logService;
         this.llmConfigResolver = llmConfigResolver;
@@ -53,17 +58,24 @@ public class ImageRecognitionController {
         return "image_recognition";
     }
 
+    /** 列出指定 KB 当前目录下的图片文件（仅当前层，不递归） */
     @GetMapping("/api/images")
     @ResponseBody
-    public Map<String, Object> listImages() {
+    public Map<String, Object> listImages(@RequestParam(required = false, defaultValue = "0") Long kbId,
+                                           @RequestParam(required = false, defaultValue = "") String dir) {
         try {
-            Path basePath = Paths.get(configService.getNotesDir());
-            if (!Files.isDirectory(basePath)) {
-                return Map.of("ok", false, "error", "笔记库目录不存在");
+            Path basePath = getKbBasePath(kbId);
+            if (basePath == null) {
+                return Map.of("ok", false, "error", "知识库不存在");
             }
+            Path searchDir = dir.isEmpty() ? basePath : basePath.resolve(dir).normalize();
+            if (!searchDir.startsWith(basePath) || !Files.isDirectory(searchDir)) {
+                return Map.of("ok", false, "error", "目录不存在");
+            }
+
             List<Map<String, String>> images = new ArrayList<>();
-            try (Stream<Path> walk = Files.walk(basePath, 5)) {
-                walk.filter(Files::isRegularFile)
+            try (Stream<Path> list = Files.list(searchDir)) {
+                list.filter(Files::isRegularFile)
                         .filter(p -> {
                             String name = p.getFileName().toString().toLowerCase();
                             return IMAGE_EXTENSIONS.stream().anyMatch(name::endsWith);
@@ -82,11 +94,14 @@ public class ImageRecognitionController {
         }
     }
 
+    /** 图片缩略图 */
     @GetMapping("/thumb")
     @ResponseBody
-    public org.springframework.http.ResponseEntity<byte[]> thumbnail(@RequestParam String path) {
+    public org.springframework.http.ResponseEntity<byte[]> thumbnail(@RequestParam String path,
+                                                                      @RequestParam(required = false, defaultValue = "0") Long kbId) {
         try {
-            Path baseDir = Paths.get(configService.getNotesDir());
+            Path baseDir = getKbBasePath(kbId);
+            if (baseDir == null) baseDir = Paths.get(configService.getNotesDir());
             Path file = baseDir.resolve(path).normalize();
             if (!file.startsWith(baseDir) || !Files.exists(file)) {
                 return org.springframework.http.ResponseEntity.notFound().build();
@@ -103,11 +118,52 @@ public class ImageRecognitionController {
         }
     }
 
+    /** 获取指定 KB 的完整目录树（嵌套结构，含根节点） */
+    @GetMapping("/api/dir-tree")
+    @ResponseBody
+    public Map<String, Object> getDirTree(@RequestParam Long kbId) {
+        Path basePath = getKbBasePath(kbId);
+        if (basePath == null) {
+            return Map.of("ok", false, "error", "知识库不存在");
+        }
+        // 根节点
+        Map<String, Object> root = new LinkedHashMap<>();
+        root.put("name", "根目录");
+        root.put("path", "");
+        root.put("children", buildDirTree(basePath, basePath, "", 0));
+        return Map.of("ok", true, "tree", List.of(root));
+    }
+
+    private List<Map<String, Object>> buildDirTree(Path basePath, Path currentDir, String relPath, int depth) {
+        if (depth > 20) return List.of();
+        List<Map<String, Object>> result = new ArrayList<>();
+        try (var stream = Files.list(currentDir)) {
+            stream.filter(Files::isDirectory)
+                    .filter(p -> !p.getFileName().toString().startsWith("."))
+                    .sorted(Comparator.comparing(p -> p.getFileName().toString()))
+                    .forEach(p -> {
+                        String rel = relPath.isEmpty() ? p.getFileName().toString() : relPath + "/" + p.getFileName().toString();
+                        Map<String, Object> node = new LinkedHashMap<>();
+                        node.put("name", p.getFileName().toString());
+                        node.put("path", rel);
+                        node.put("children", buildDirTree(basePath, p, rel, depth + 1));
+                        result.add(node);
+                    });
+        } catch (IOException e) {
+            // skip inaccessible directories
+        }
+        return result;
+    }
+
+    /** 列出指定 KB 下的子目录 */
     @GetMapping("/subdirs")
     @ResponseBody
-    public Map<String, Object> getSubdirs(@RequestParam(required = false, defaultValue = "") String dir) {
-        String baseDir = configService.getNotesDir();
-        Path basePath = Paths.get(baseDir);
+    public Map<String, Object> getSubdirs(@RequestParam(required = false, defaultValue = "0") Long kbId,
+                                           @RequestParam(required = false, defaultValue = "") String dir) {
+        Path basePath = getKbBasePath(kbId);
+        if (basePath == null) {
+            return Map.of("ok", false, "error", "知识库不存在");
+        }
         Path targetDir = dir.isEmpty() ? basePath : basePath.resolve(dir);
 
         if (!Files.isDirectory(targetDir)) {
@@ -132,6 +188,7 @@ public class ImageRecognitionController {
         return Map.of("ok", true, "subdirs", subdirs);
     }
 
+    /** 上传图片并识别 */
     @PostMapping("/recognize-sync")
     @ResponseBody
     public Map<String, Object> recognizeSync(@RequestParam("image") MultipartFile image,
@@ -144,17 +201,18 @@ public class ImageRecognitionController {
 
             String base64Image = Base64.getEncoder().encodeToString(imageBytes);
             String userPrompt = (prompt == null || prompt.trim().isEmpty())
-                    ? "请详细分析这张图片的内容" : prompt;
+                    ? "请详细分析这张图片的内容，用中文回答。" : prompt;
 
             if (!llmService.isAvailable()) {
                 return Map.of("ok", false, "error", "LLM API Key 未配置");
             }
-            String reply = llmService.chatWithImage("你是一个图片分析助手，请用中文回答。", userPrompt, base64Image, imageType, modelName);
+            String systemPrompt = "你是一个专业的图片分析助手，请根据用户指定的场景详细分析图片内容，用中文回答。";
+            String reply = llmService.chatWithImage(systemPrompt, userPrompt, base64Image, imageType, modelName);
 
             String imageUrl = "data:" + imageType + ";base64," + base64Image;
             String result = (reply != null && !reply.isEmpty()) ? reply : "(AI 未返回结果)";
 
-            logService.add("识图分析", "成功", "上传图片");
+            logService.add("识图分析", "成功", "上传图片识别");
             return Map.of("ok", true, "image_url", imageUrl, "result", result);
         } catch (Exception e) {
             log.error("识图分析失败", e);
@@ -162,15 +220,18 @@ public class ImageRecognitionController {
         }
     }
 
+    /** 识别知识库中的图片 */
     @PostMapping("/recognize-file")
     @ResponseBody
     public Map<String, Object> recognizeFile(@RequestBody Map<String, String> body) {
         try {
             String filePath = body.get("path");
+            Long kbId = body.containsKey("kbId") ? Long.parseLong(body.get("kbId")) : 0L;
             String prompt = body.getOrDefault("prompt", "请详细分析这张图片的内容");
             String modelName = body.getOrDefault("modelName", "");
 
-            Path baseDir = Paths.get(configService.getNotesDir());
+            Path baseDir = getKbBasePath(kbId);
+            if (baseDir == null) baseDir = Paths.get(configService.getNotesDir());
             Path file = baseDir.resolve(filePath).normalize();
             if (!file.startsWith(baseDir) || !Files.exists(file)) {
                 return Map.of("ok", false, "error", "图片文件不存在");
@@ -183,9 +244,11 @@ public class ImageRecognitionController {
             if (!llmService.isAvailable()) {
                 return Map.of("ok", false, "error", "LLM API Key 未配置");
             }
-            String reply = llmService.chatWithImage("你是一个图片分析助手，请用中文回答。", prompt, base64Image, imageType, modelName);
+            String systemPrompt = "你是一个专业的图片分析助手，请根据用户指定的场景详细分析图片内容，用中文回答。";
+            String reply = llmService.chatWithImage(systemPrompt, prompt, base64Image, imageType, modelName);
 
-            String imageUrl = "/image-recognition/thumb?path=" + java.net.URLEncoder.encode(filePath, "UTF-8");
+            String imageUrl = "/image-recognition/thumb?path=" + java.net.URLEncoder.encode(filePath, "UTF-8")
+                    + "&kbId=" + kbId;
             String result = (reply != null && !reply.isEmpty()) ? reply : "(AI 未返回结果)";
 
             logService.add("识图分析", "成功", filePath);
@@ -196,22 +259,26 @@ public class ImageRecognitionController {
         }
     }
 
+    /** 保存分析结果到指定 KB */
     @PostMapping("/save")
     @ResponseBody
     public Map<String, Object> saveResult(@RequestBody Map<String, String> body) {
         try {
             String path = body.get("path");
             String content = body.get("content");
+            Long kbId = body.containsKey("kbId") ? Long.parseLong(body.get("kbId")) : 0L;
 
-            Path baseDir = Paths.get(configService.getNotesDir());
+            Path baseDir = getKbBasePath(kbId);
+            if (baseDir == null) baseDir = Paths.get(configService.getNotesDir());
             Path file = baseDir.resolve(path).normalize();
             if (!file.startsWith(baseDir)) {
                 return Map.of("ok", false, "error", "路径不合法");
             }
 
             Files.createDirectories(file.getParent());
-            String fullContent = "---\ntitle: 识图分析\ndate: " + java.time.LocalDateTime.now()
-                    .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+            String now = java.time.LocalDateTime.now()
+                    .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            String fullContent = "---\ntitle: 识图分析\ndate: " + now
                     + "\ntags: [识图分析]\n---\n\n" + content;
             Files.writeString(file, fullContent, java.nio.charset.StandardCharsets.UTF_8);
 
@@ -219,6 +286,39 @@ public class ImageRecognitionController {
             return Map.of("ok", true, "path", path);
         } catch (IOException e) {
             return Map.of("ok", false, "error", "保存失败: " + e.getMessage());
+        }
+    }
+
+    /** 获取所有知识库 */
+    @GetMapping("/api/kb-list")
+    @ResponseBody
+    public Map<String, Object> kbList() {
+        List<KnowledgeBaseEntity> all = kbService.getAll();
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (KnowledgeBaseEntity kb : all) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("id", kb.getId());
+            item.put("name", kb.getName());
+            item.put("notesDir", kb.getNotesDir());
+            result.add(item);
+        }
+        return Map.of("ok", true, "kbs", result);
+    }
+
+    // ========== 私有方法 ==========
+
+    private Path getKbBasePath(Long kbId) {
+        if (kbId != null && kbId > 0) {
+            KnowledgeBaseEntity kb = kbService.getById(kbId);
+            if (kb != null) {
+                Path p = Paths.get(kb.getNotesDir());
+                if (Files.isDirectory(p)) return p;
+            }
+        }
+        try {
+            return Paths.get(configService.getNotesDir());
+        } catch (Exception e) {
+            return null;
         }
     }
 
