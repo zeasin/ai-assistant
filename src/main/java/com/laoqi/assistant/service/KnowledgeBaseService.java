@@ -141,6 +141,13 @@ public class KnowledgeBaseService {
         return "";
     }
 
+    public String getNotesDirById(Long kbId) {
+        if (kbId == null) return getNotesDir();
+        KnowledgeBaseEntity kb = getById(kbId);
+        if (kb != null) return kb.getNotesDir();
+        return getNotesDir();
+    }
+
     private static String str(Object o) {
         return o == null ? "" : o.toString();
     }

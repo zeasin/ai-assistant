@@ -553,6 +553,44 @@ public class KnowledgeBaseController {
         }
     }
 
+    // ========== 日报 API ==========
+
+    @PostMapping("/kb/{id}/api/generate")
+    @ResponseBody
+    public Map<String, Object> generate(@PathVariable Long id) {
+        try {
+            KnowledgeBaseEntity kb = kbService.getById(id);
+            if (kb == null) return Map.of("ok", false, "error", "知识库不存在");
+            var r = reportService.generate(kb.getId());
+            if (r.report != null) {
+                reportService.saveComprehensiveReport(r.report, kb.getId());
+                logService.add("手动生成日报", "成功", "知识库: " + kb.getName());
+                return Map.of("ok", true);
+            } else {
+                logService.add("手动生成日报", "失败", r.error);
+                return Map.of("ok", false, "error", r.error != null ? r.error : "AI 分析不可用");
+            }
+        } catch (Exception e) {
+            logService.add("手动生成日报", "失败", e.getMessage());
+            return Map.of("ok", false, "error", e.getMessage());
+        }
+    }
+
+    @GetMapping("/kb/{id}/api/report/prompt")
+    @ResponseBody
+    public Map<String, Object> getPrompt(@PathVariable Long id) {
+        return Map.of("ok", true, "prompt", reportService.readPrompt(id));
+    }
+
+    @PostMapping("/kb/{id}/api/report/prompt")
+    @ResponseBody
+    public Map<String, Object> savePrompt(@PathVariable Long id,
+                                          @RequestBody Map<String, String> body) {
+        reportService.writePrompt(body.getOrDefault("prompt", ""), id);
+        logService.add("综合日报", "保存提示词", "成功");
+        return Map.of("ok", true);
+    }
+
     // ========== KB API ==========
 
     @ResponseBody

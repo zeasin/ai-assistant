@@ -192,14 +192,6 @@
 </div>
 
 <div class="card">
-    <h2>🔧 手动触发</h2>
-    <div class="text-muted mb-2">手动执行以下任务，立即推送飞书。</div>
-    <div style="display:flex;flex-wrap:wrap;gap:8px;">
-        <button class="btn btn-secondary" onclick="triggerJob('morning')">🌅 生成综合日报</button>
-    </div>
-</div>
-
-<div class="card">
     <h2>💻 编程AI</h2>
     <div class="text-muted mb-2">开启后在导航栏显示编程AI页面，用于通过飞书机器人排查代码问题。</div>
     <div class="form-group">
@@ -329,18 +321,6 @@
 </style>
 
 <script>
-function triggerJob(job) {
-    const form = new FormData();
-    form.append('job', job);
-    fetch('/config/trigger', { method: 'POST', body: form })
-        .then(r => r.json())
-        .then(data => {
-            if (data.ok) toast('任务已触发', 'ok');
-            else toast('失败：' + (data.error || ''), 'error');
-        })
-        .catch(() => toast('请求失败', 'error'));
-}
-
 // Load current config on page load
 fetch('/api/config')
     .then(r => r.json())

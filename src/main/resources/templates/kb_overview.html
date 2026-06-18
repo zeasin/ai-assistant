@@ -103,11 +103,13 @@
 </div>
 
 <script>
+const KB_ID = [[${kb.id}]];
+
 function generateReport() {
     const btn = document.getElementById('genBtn');
     btn.disabled = true; btn.textContent = '⏳ 生成中...';
 
-    fetch('/generate', { method: 'POST' })
+    fetch('/kb/' + KB_ID + '/api/generate', { method: 'POST' })
         .then(r => r.json())
         .then(data => {
             if (data.ok) {
@@ -124,7 +126,7 @@ function generateReport() {
 }
 
 function openPromptModal() {
-    fetch('/api/report/prompt')
+    fetch('/kb/' + KB_ID + '/api/report/prompt')
         .then(r => r.json())
         .then(data => {
             if (data.ok) {
@@ -140,7 +142,7 @@ function closePromptModal() {
 
 function savePrompt() {
     const prompt = document.getElementById('promptContent').value;
-    fetch('/api/report/prompt', {
+    fetch('/kb/' + KB_ID + '/api/report/prompt', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: prompt })

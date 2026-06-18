@@ -1,6 +1,7 @@
 package com.laoqi.assistant.controller;
 
 import com.laoqi.assistant.model.TaskData.*;
+import com.laoqi.assistant.service.ConfigService;
 import com.laoqi.assistant.service.LogService;
 import com.laoqi.assistant.service.TaskService;
 import org.springframework.stereotype.Controller;
@@ -14,17 +15,21 @@ public class TaskController {
 
     private final TaskService taskService;
     private final LogService logService;
+    private final ConfigService configService;
 
-    public TaskController(TaskService taskService, LogService logService) {
+    public TaskController(TaskService taskService, LogService logService, ConfigService configService) {
         this.taskService = taskService;
         this.logService = logService;
+        this.configService = configService;
     }
 
     @GetMapping("/tasks")
-    public String taskBoardPage(Model model) {
+    public String taskBoardPage(@RequestParam(required = false) Long kbId, Model model) {
         try {
-            List<TaskItem> tasks = taskService.getAllTasks();
+            String notesDir = configService.getNotesDir(kbId);
+            List<TaskItem> tasks = taskService.getAllTasks(notesDir);
             model.addAttribute("tasks", tasks);
+            model.addAttribute("kbId", kbId);
         } catch (Exception e) {
             model.addAttribute("tasks", List.of());
             model.addAttribute("error", e.getMessage());
@@ -35,12 +40,14 @@ public class TaskController {
     @PostMapping("/api/tasks/add")
     @ResponseBody
     public Map<String, Object> addTask(
+            @RequestParam(required = false) Long kbId,
             @RequestParam String title,
             @RequestParam(required = false, defaultValue = "") String description,
             @RequestParam(required = false, defaultValue = "mid") String priority,
             @RequestParam(required = false, defaultValue = "") String dueDate) {
         try {
-            TaskItem task = taskService.addTask(title, description, priority, dueDate);
+            String notesDir = configService.getNotesDir(kbId);
+            TaskItem task = taskService.addTask(notesDir, title, description, priority, dueDate);
             logService.add("任务看板", "成功", "添加任务: " + title);
             return Map.of("ok", true, "task", task);
         } catch (Exception e) {
@@ -51,6 +58,7 @@ public class TaskController {
     @PostMapping("/api/tasks/update")
     @ResponseBody
     public Map<String, Object> updateTask(
+            @RequestParam(required = false) Long kbId,
             @RequestParam String id,
             @RequestParam(required = false) String title,
             @RequestParam(required = false) String description,
@@ -58,7 +66,8 @@ public class TaskController {
             @RequestParam(required = false) String priority,
             @RequestParam(required = false) String dueDate) {
         try {
-            TaskItem task = taskService.updateTask(id, title, description, status, priority, dueDate);
+            String notesDir = configService.getNotesDir(kbId);
+            TaskItem task = taskService.updateTask(notesDir, id, title, description, status, priority, dueDate);
             if (task == null) {
                 return Map.of("ok", false, "error", "任务不存在");
             }
@@ -71,9 +80,12 @@ public class TaskController {
 
     @PostMapping("/api/tasks/delete")
     @ResponseBody
-    public Map<String, Object> deleteTask(@RequestParam String id) {
+    public Map<String, Object> deleteTask(
+            @RequestParam(required = false) Long kbId,
+            @RequestParam String id) {
         try {
-            boolean ok = taskService.deleteTask(id);
+            String notesDir = configService.getNotesDir(kbId);
+            boolean ok = taskService.deleteTask(notesDir, id);
             if (ok) {
                 logService.add("任务看板", "成功", "删除任务: " + id);
             }

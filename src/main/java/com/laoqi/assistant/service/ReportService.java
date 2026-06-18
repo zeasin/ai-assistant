@@ -25,6 +25,7 @@ public class ReportService {
     private final LogService logService;
     private final LlmService llmService;
     private final ConfigService configService;
+    private final KnowledgeBaseService kbService;
 
     private volatile String latestReport = "";
     private volatile String latestReportTime = "";
@@ -34,16 +35,22 @@ public class ReportService {
                           FeishuService feishuService,
                           LogService logService,
                           LlmService llmService,
-                          ConfigService configService) {
+                          ConfigService configService,
+                          KnowledgeBaseService kbService) {
         this.appConfig = appConfig;
         this.feishuService = feishuService;
         this.logService = logService;
         this.llmService = llmService;
         this.configService = configService;
+        this.kbService = kbService;
     }
 
     private Path getComprehensiveReportDir() {
         return getComprehensiveReportDir(configService.getNotesDir());
+    }
+
+    private Path getComprehensiveReportDir(Long kbId) {
+        return getComprehensiveReportDir(kbService.getNotesDirById(kbId));
     }
 
     private Path getComprehensiveReportDir(String notesDir) {
@@ -54,8 +61,16 @@ public class ReportService {
         return getComprehensiveReportDir();
     }
 
+    private Path getPromptsDir(Long kbId) {
+        return getComprehensiveReportDir(kbId);
+    }
+
     public String readPrompt() {
-        Path dir = getPromptsDir();
+        return readPrompt((Long) null);
+    }
+
+    public String readPrompt(Long kbId) {
+        Path dir = getPromptsDir(kbId);
         if (dir == null) return DEFAULT_PROMPT;
         Path file = dir.resolve(PROMPT_FILENAME);
         if (FileUtil.exists(file)) {
@@ -72,7 +87,11 @@ public class ReportService {
     }
 
     public void writePrompt(String content) {
-        Path dir = getPromptsDir();
+        writePrompt(content, (Long) null);
+    }
+
+    public void writePrompt(String content, Long kbId) {
+        Path dir = getPromptsDir(kbId);
         if (dir == null) return;
         try {
             java.nio.file.Files.createDirectories(dir);
@@ -89,9 +108,13 @@ public class ReportService {
     }
 
     public ReportResult generate() {
+        return generate((Long) null);
+    }
+
+    public ReportResult generate(Long kbId) {
         ReportResult result = new ReportResult();
         try {
-            String prompt = readPrompt();
+            String prompt = readPrompt(kbId);
             prompt = prompt.replace("{date}", TimeUtil.todayStr());
             prompt = prompt.replace("{weekday}", TimeUtil.weekdayCn(TimeUtil.now()));
 
@@ -103,7 +126,7 @@ public class ReportService {
                 return result;
             }
             // 收集笔记库上下文
-            String context = collectNoteContext();
+            String context = collectNoteContext(kbId);
             String fullPrompt = prompt;
             if (context != null && !context.isEmpty()) {
                 fullPrompt += "\n\n以下是我的工作笔记和记忆文件内容，请基于这些内容生成日报：\n\n" + context;
@@ -155,14 +178,18 @@ public class ReportService {
     }
 
     public void generateAndPush() {
-        ReportResult r = generate();
+        generateAndPush((Long) null);
+    }
+
+    public void generateAndPush(Long kbId) {
+        ReportResult r = generate(kbId);
         if (r.report != null) {
             String today = TimeUtil.todayStr();
             String wd = TimeUtil.weekdayCn(TimeUtil.now());
             String title = TimeUtil.greetingEmoji() + " 老齐" + TimeUtil.greetingText() + " · " + today + " · " + wd;
             var paras = feishuService.reportToParagraphs(r.report);
             feishuService.sendPost(title, paras);
-            saveComprehensiveReport(r.report);
+            saveComprehensiveReport(r.report, kbId);
             logService.add("日报生成", "成功", "AI 日报已生成并推送");
         } else {
             log.error("日报生成失败: {}", r.error);
@@ -175,10 +202,14 @@ public class ReportService {
      * 读取 AGENTS.md、AI/记忆/ 目录下的文件，以及今天的工作日报。
      */
     private String collectNoteContext() {
+        return collectNoteContext((Long) null);
+    }
+
+    private String collectNoteContext(Long kbId) {
         StringBuilder sb = new StringBuilder();
         String notesDir;
         try {
-            notesDir = configService.getNotesDir();
+            notesDir = kbService.getNotesDirById(kbId);
         } catch (Exception e) {
             return "";
         }
@@ -231,7 +262,11 @@ public class ReportService {
     }
 
     public void saveComprehensiveReport(String report) {
-        Path dir = getComprehensiveReportDir();
+        saveComprehensiveReport(report, (Long) null);
+    }
+
+    public void saveComprehensiveReport(String report, Long kbId) {
+        Path dir = getComprehensiveReportDir(kbId);
         String date = TimeUtil.todayStr();
         Path file = dir.resolve(date + ".md");
         FileUtil.writeText(file, report);

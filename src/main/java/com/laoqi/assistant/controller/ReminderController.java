@@ -1,6 +1,7 @@
 package com.laoqi.assistant.controller;
 
 import com.laoqi.assistant.model.ReminderData.Reminder;
+import com.laoqi.assistant.service.ConfigService;
 import com.laoqi.assistant.service.LogService;
 import com.laoqi.assistant.service.ReminderService;
 import org.springframework.stereotype.Controller;
@@ -15,16 +16,19 @@ public class ReminderController {
 
     private final ReminderService reminderService;
     private final LogService logService;
+    private final ConfigService configService;
 
-    public ReminderController(ReminderService reminderService, LogService logService) {
+    public ReminderController(ReminderService reminderService, LogService logService, ConfigService configService) {
         this.reminderService = reminderService;
         this.logService = logService;
+        this.configService = configService;
     }
 
     @GetMapping("/reminders")
-    public String remindersPage(Model model) {
+    public String remindersPage(@RequestParam(required = false) Long kbId, Model model) {
         try {
-            List<Reminder> reminders = reminderService.getAllReminders();
+            String notesDir = configService.getNotesDir(kbId);
+            List<Reminder> reminders = reminderService.getAllReminders(notesDir);
             List<Map<String, Object>> displayList = reminders.stream()
                     .map(r -> {
                         Map<String, Object> m = new java.util.LinkedHashMap<>();
@@ -47,6 +51,7 @@ public class ReminderController {
                     })
                     .toList();
             model.addAttribute("reminders", displayList);
+            model.addAttribute("kbId", kbId);
         } catch (Exception e) {
             model.addAttribute("reminders", List.of());
             model.addAttribute("error", e.getMessage());
@@ -56,8 +61,9 @@ public class ReminderController {
 
     @GetMapping("/api/reminders")
     @ResponseBody
-    public List<Map<String, Object>> getReminders() {
-        return reminderService.getAllReminders().stream()
+    public List<Map<String, Object>> getReminders(@RequestParam(required = false) Long kbId) {
+        String notesDir = configService.getNotesDir(kbId);
+        return reminderService.getAllReminders(notesDir).stream()
                 .map(r -> {
                     Map<String, Object> m = new java.util.LinkedHashMap<>();
                     m.put("id", r.id);
@@ -81,6 +87,7 @@ public class ReminderController {
     @PostMapping("/api/reminders/add")
     @ResponseBody
     public Map<String, Object> addReminder(
+            @RequestParam(required = false) Long kbId,
             @RequestParam String name,
             @RequestParam(required = false, defaultValue = "") String message,
             @RequestParam String type,
@@ -90,7 +97,8 @@ public class ReminderController {
             @RequestParam(required = false, defaultValue = "") String dayOfMonth,
             @RequestParam(required = false, defaultValue = "") String monthDay) {
         try {
-            Reminder r = reminderService.addReminder(name, message, type, time,
+            String notesDir = configService.getNotesDir(kbId);
+            Reminder r = reminderService.addReminder(notesDir, name, message, type, time,
                     date, dayOfWeek, dayOfMonth, monthDay);
             logService.add("提醒管理", "成功", "添加提醒: " + name);
             return Map.of("ok", true, "reminder", r);
@@ -102,6 +110,7 @@ public class ReminderController {
     @PostMapping("/api/reminders/update")
     @ResponseBody
     public Map<String, Object> updateReminder(
+            @RequestParam(required = false) Long kbId,
             @RequestParam String id,
             @RequestParam(required = false) String name,
             @RequestParam(required = false) String message,
@@ -113,7 +122,8 @@ public class ReminderController {
             @RequestParam(required = false) String monthDay,
             @RequestParam(required = false) Boolean enabled) {
         try {
-            boolean ok = reminderService.updateReminder(id, name, message, type, time,
+            String notesDir = configService.getNotesDir(kbId);
+            boolean ok = reminderService.updateReminder(notesDir, id, name, message, type, time,
                     date, dayOfWeek, dayOfMonth, monthDay, enabled);
             if (!ok) {
                 return Map.of("ok", false, "error", "提醒不存在");
@@ -127,9 +137,12 @@ public class ReminderController {
 
     @PostMapping("/api/reminders/delete")
     @ResponseBody
-    public Map<String, Object> deleteReminder(@RequestParam String id) {
+    public Map<String, Object> deleteReminder(
+            @RequestParam(required = false) Long kbId,
+            @RequestParam String id) {
         try {
-            boolean ok = reminderService.deleteReminder(id);
+            String notesDir = configService.getNotesDir(kbId);
+            boolean ok = reminderService.deleteReminder(notesDir, id);
             if (ok) {
                 logService.add("提醒管理", "成功", "删除提醒");
             }
@@ -141,9 +154,12 @@ public class ReminderController {
 
     @PostMapping("/api/reminders/toggle")
     @ResponseBody
-    public Map<String, Object> toggleReminder(@RequestParam String id) {
+    public Map<String, Object> toggleReminder(
+            @RequestParam(required = false) Long kbId,
+            @RequestParam String id) {
         try {
-            boolean ok = reminderService.toggleReminder(id);
+            String notesDir = configService.getNotesDir(kbId);
+            boolean ok = reminderService.toggleReminder(notesDir, id);
             if (ok) {
                 logService.add("提醒管理", ok ? "启用" : "禁用", "切换提醒状态");
             }
@@ -155,14 +171,17 @@ public class ReminderController {
 
     @PostMapping("/api/reminders/trigger")
     @ResponseBody
-    public Map<String, Object> triggerReminder(@RequestParam String id) {
+    public Map<String, Object> triggerReminder(
+            @RequestParam(required = false) Long kbId,
+            @RequestParam String id) {
         try {
-            List<Reminder> reminders = reminderService.getAllReminders();
+            String notesDir = configService.getNotesDir(kbId);
+            List<Reminder> reminders = reminderService.getAllReminders(notesDir);
             Reminder r = reminders.stream().filter(x -> x.id.equals(id)).findFirst().orElse(null);
             if (r == null) {
                 return Map.of("ok", false, "error", "提醒不存在");
             }
-            reminderService.triggerReminder(r);
+            reminderService.triggerReminder(notesDir, r);
             logService.add("提醒管理", "成功", "手动触发: " + r.name);
             return Map.of("ok", true);
         } catch (Exception e) {

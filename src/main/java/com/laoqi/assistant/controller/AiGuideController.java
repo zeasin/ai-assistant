@@ -28,7 +28,7 @@ public class AiGuideController {
     }
 
     @GetMapping("/ai-guide")
-    public String aiGuidePage() {
+    public String aiGuidePage(@RequestParam(required = false) Long kbId) {
         return "kb_ai_guide";
     }
 
@@ -36,8 +36,8 @@ public class AiGuideController {
 
     @GetMapping("/api/ai-guide/agents")
     @ResponseBody
-    public Map<String, Object> getAgents() {
-        Path file = getAgentsFile();
+    public Map<String, Object> getAgents(@RequestParam(required = false) Long kbId) {
+        Path file = getAgentsFile(kbId);
         if (file == null) {
             return Map.of("ok", false, "error", "未配置笔记库根目录，请先在「设置」页面配置");
         }
@@ -50,9 +50,10 @@ public class AiGuideController {
 
     @PostMapping("/api/ai-guide/agents")
     @ResponseBody
-    public Map<String, Object> saveAgents(@RequestBody Map<String, String> body) {
+    public Map<String, Object> saveAgents(@RequestParam(required = false) Long kbId,
+                                          @RequestBody Map<String, String> body) {
         String content = body.getOrDefault("content", "");
-        Path file = getAgentsFile();
+        Path file = getAgentsFile(kbId);
         if (file == null) {
             return Map.of("ok", false, "error", "未配置笔记库根目录，请先在「设置」页面配置");
         }
@@ -69,8 +70,8 @@ public class AiGuideController {
 
     @GetMapping("/api/ai-guide/memory")
     @ResponseBody
-    public Map<String, Object> listMemory() {
-        Path dir = getMemoryDir();
+    public Map<String, Object> listMemory(@RequestParam(required = false) Long kbId) {
+        Path dir = getMemoryDir(kbId);
         if (dir == null || !Files.exists(dir)) {
             return Map.of("ok", true, "files", List.of(), "path", dir != null ? dir.toString() : "");
         }
@@ -93,8 +94,9 @@ public class AiGuideController {
 
     @GetMapping("/api/ai-guide/memory/{name}")
     @ResponseBody
-    public Map<String, Object> getMemory(@PathVariable String name) {
-        Path dir = getMemoryDir();
+    public Map<String, Object> getMemory(@PathVariable String name,
+                                         @RequestParam(required = false) Long kbId) {
+        Path dir = getMemoryDir(kbId);
         if (dir == null) {
             return Map.of("ok", false, "error", "无法确定记忆目录");
         }
@@ -111,7 +113,8 @@ public class AiGuideController {
 
     @PostMapping("/api/ai-guide/memory")
     @ResponseBody
-    public Map<String, Object> saveMemory(@RequestBody Map<String, String> body) {
+    public Map<String, Object> saveMemory(@RequestParam(required = false) Long kbId,
+                                          @RequestBody Map<String, String> body) {
         String name = body.getOrDefault("name", "");
         String content = body.getOrDefault("content", "");
         if (name.isEmpty()) {
@@ -120,7 +123,7 @@ public class AiGuideController {
         if (!name.endsWith(".md")) {
             name = name + ".md";
         }
-        Path dir = getMemoryDir();
+        Path dir = getMemoryDir(kbId);
         if (dir == null) {
             return Map.of("ok", false, "error", "无法确定记忆目录");
         }
@@ -140,8 +143,9 @@ public class AiGuideController {
 
     @DeleteMapping("/api/ai-guide/memory/{name}")
     @ResponseBody
-    public Map<String, Object> deleteMemory(@PathVariable String name) {
-        Path dir = getMemoryDir();
+    public Map<String, Object> deleteMemory(@PathVariable String name,
+                                            @RequestParam(required = false) Long kbId) {
+        Path dir = getMemoryDir(kbId);
         if (dir == null) {
             return Map.of("ok", false, "error", "无法确定记忆目录");
         }
@@ -160,18 +164,18 @@ public class AiGuideController {
 
     // ---- helpers ----
 
-    private Path getAgentsFile() {
+    private Path getAgentsFile(Long kbId) {
         try {
-            String notesDir = configService.getNotesDir();
+            String notesDir = configService.getNotesDir(kbId);
             return Paths.get(notesDir, "AGENTS.md");
         } catch (IllegalStateException e) {
             return null;
         }
     }
 
-    private Path getMemoryDir() {
+    private Path getMemoryDir(Long kbId) {
         try {
-            String notesDir = configService.getNotesDir();
+            String notesDir = configService.getNotesDir(kbId);
             return Paths.get(notesDir, "AI", "记忆");
         } catch (IllegalStateException e) {
             return null;

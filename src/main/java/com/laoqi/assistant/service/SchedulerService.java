@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import com.laoqi.assistant.entity.KnowledgeBaseEntity;
 import com.laoqi.assistant.model.ReminderData.Reminder;
 import com.laoqi.assistant.util.TimeUtil;
 
@@ -18,19 +19,30 @@ public class SchedulerService {
     private final ReportService reportService;
     private final LogService logService;
     private final ReminderService reminderService;
+    private final KnowledgeBaseService kbService;
 
     public SchedulerService(ReportService reportService,
                             LogService logService,
-                            ReminderService reminderService) {
+                            ReminderService reminderService,
+                            KnowledgeBaseService kbService) {
         this.reportService = reportService;
         this.logService = logService;
         this.reminderService = reminderService;
+        this.kbService = kbService;
     }
 
     @Scheduled(cron = "0 0 9 * * ?", zone = "Asia/Shanghai")
     public void morningReport() {
         log.info("[{}] ⏰ 定时任务：生成综合日报", TimeUtil.nowStr());
-        reportService.generateAndPush();
+        List<KnowledgeBaseEntity> kbs = kbService.getAll();
+        for (KnowledgeBaseEntity kb : kbs) {
+            try {
+                log.info("[{}] ⏰ 为知识库「{}」生成日报", TimeUtil.nowStr(), kb.getName());
+                reportService.generateAndPush(kb.getId());
+            } catch (Exception e) {
+                log.error("[{}] ⏰ 知识库「{}」日报生成失败: {}", TimeUtil.nowStr(), kb.getName(), e.getMessage());
+            }
+        }
     }
 
     @Scheduled(cron = "0 * * * * ?", zone = "Asia/Shanghai")

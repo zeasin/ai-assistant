@@ -91,6 +91,14 @@ public class ConfigService {
         return dir;
     }
 
+    public String getNotesDir(Long kbId) {
+        String dir = kbService.getNotesDirById(kbId);
+        if (dir == null || dir.isEmpty()) {
+            throw new IllegalStateException("未配置笔记库，请先在「设置」页面添加知识库并配置笔记库路径");
+        }
+        return dir;
+    }
+
     public void save(Config config) {
         mergeDefaultValues(config);
         FileUtil.writeJson(appConfig.getConfigFile(), config);

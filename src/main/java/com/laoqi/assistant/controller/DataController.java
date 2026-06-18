@@ -42,8 +42,8 @@ public class DataController {
         this.moduleService = moduleService;
     }
 
-    private Path getNotesDir() {
-        String notesDir = configService.getNotesDir();
+    private Path getNotesDir(Long kbId) {
+        String notesDir = configService.getNotesDir(kbId);
         return Paths.get(notesDir);
     }
 
@@ -61,6 +61,7 @@ public class DataController {
 
     @GetMapping(value = "/list", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Map<String, Object>> listData(
+            @RequestParam(required = false) Long kbId,
             @RequestParam(required = false) String type,
             @RequestParam(required = false, defaultValue = "false") boolean includeData) {
         
@@ -68,7 +69,7 @@ public class DataController {
         
         Path baseDir;
         try {
-            baseDir = getNotesDir();
+            baseDir = getNotesDir(kbId);
         } catch (IllegalStateException e) {
             result.put("ok", false);
             result.put("error", e.getMessage());
@@ -146,13 +147,14 @@ public class DataController {
     @GetMapping(value = "/file/{fileName}", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Map<String, Object>> getFileData(
             @PathVariable String fileName,
+            @RequestParam(required = false) Long kbId,
             @RequestParam(required = false) String type) {
         
         Map<String, Object> result = new LinkedHashMap<>();
         
         Path baseDir;
         try {
-            baseDir = getNotesDir();
+            baseDir = getNotesDir(kbId);
         } catch (IllegalStateException e) {
             result.put("ok", false);
             result.put("error", e.getMessage());
@@ -194,13 +196,14 @@ public class DataController {
     public ResponseEntity<Map<String, Object>> getGroupData(
             @RequestParam String fileName,
             @RequestParam String group,
+            @RequestParam(required = false) Long kbId,
             @RequestParam(required = false) String type) {
         
         Map<String, Object> result = new LinkedHashMap<>();
         
         Path baseDir;
         try {
-            baseDir = getNotesDir();
+            baseDir = getNotesDir(kbId);
         } catch (IllegalStateException e) {
             result.put("ok", false);
             result.put("error", e.getMessage());
@@ -276,13 +279,14 @@ public class DataController {
             @RequestParam String idField,
             @RequestParam String idValue,
             @RequestBody Map<String, Object> updates,
+            @RequestParam(required = false) Long kbId,
             @RequestParam(required = false) String type) {
         
         Map<String, Object> result = new LinkedHashMap<>();
         
         Path baseDir;
         try {
-            baseDir = getNotesDir();
+            baseDir = getNotesDir(kbId);
         } catch (IllegalStateException e) {
             result.put("ok", false);
             result.put("error", e.getMessage());
@@ -371,6 +375,7 @@ public class DataController {
             @RequestParam String fileName,
             @RequestParam String group,
             @RequestBody Map<String, Object> record,
+            @RequestParam(required = false) Long kbId,
             @RequestParam(required = false) String type,
             @RequestParam(required = false) String subGroup) {
         
@@ -378,7 +383,7 @@ public class DataController {
         
         Path baseDir;
         try {
-            baseDir = getNotesDir();
+            baseDir = getNotesDir(kbId);
         } catch (IllegalStateException e) {
             result.put("ok", false);
             result.put("error", e.getMessage());
@@ -462,13 +467,14 @@ public class DataController {
             @RequestParam String group,
             @RequestParam String idField,
             @RequestParam String idValue,
+            @RequestParam(required = false) Long kbId,
             @RequestParam(required = false) String type) {
         
         Map<String, Object> result = new LinkedHashMap<>();
         
         Path baseDir;
         try {
-            baseDir = getNotesDir();
+            baseDir = getNotesDir(kbId);
         } catch (IllegalStateException e) {
             result.put("ok", false);
             result.put("error", e.getMessage());

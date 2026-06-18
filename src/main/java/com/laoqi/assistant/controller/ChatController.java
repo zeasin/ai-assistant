@@ -218,7 +218,7 @@ public class ChatController {
                         finalKbId, modelName.isEmpty() ? "default" : modelName);
 
                 StringBuilder replyBuffer = new StringBuilder();
-                noteAssistantService.streamChat(sessionId, message, mode, modelName, chunk -> {
+                noteAssistantService.streamChat(sessionId, message, mode, finalKbId, modelName, chunk -> {
                     replyBuffer.append(chunk);
                     Map<String, Object> data = new LinkedHashMap<>();
                     data.put("type", "text");

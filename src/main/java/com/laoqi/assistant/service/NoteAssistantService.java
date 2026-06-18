@@ -41,10 +41,14 @@ public class NoteAssistantService {
     }
 
     public String chat(String sessionId, String userMessage, String mode) throws Exception {
-        return chat(sessionId, userMessage, mode, null);
+        return chat(sessionId, userMessage, mode, null, null);
     }
 
-    public String chat(String sessionId, String userMessage, String mode, String modelName) throws Exception {
+    public String chat(String sessionId, String userMessage, String mode, Long kbId) throws Exception {
+        return chat(sessionId, userMessage, mode, kbId, null);
+    }
+
+    public String chat(String sessionId, String userMessage, String mode, Long kbId, String modelName) throws Exception {
         if (!isAvailable()) {
             throw new IllegalStateException("LLM API Key 未配置，请在配置页填写");
         }
@@ -54,34 +58,39 @@ public class NoteAssistantService {
             throw new IllegalStateException("ChatClient 初始化失败");
         }
 
-        String context = sessionService.buildHistoryContext(sessionId, mode, userMessage);
-        String fullMessage;
-        if (context != null) {
-            fullMessage = context + "\n\n---\n\n用户最新消息:\n" + userMessage;
-            log.info("[编排] 注入了历史上下文（含语义检索），总消息长度={}", fullMessage.length());
-        } else {
-            fullMessage = userMessage;
-            log.info("[编排] 无历史上下文，仅当前消息");
+        NoteTools.setCurrentKbId(kbId);
+        try {
+            String context = sessionService.buildHistoryContext(sessionId, mode, userMessage);
+            String fullMessage;
+            if (context != null) {
+                fullMessage = context + "\n\n---\n\n用户最新消息:\n" + userMessage;
+                log.info("[编排] 注入了历史上下文（含语义检索），总消息长度={}", fullMessage.length());
+            } else {
+                fullMessage = userMessage;
+                log.info("[编排] 无历史上下文，仅当前消息");
+            }
+
+            log.info("[编排] 用户: {} (session={}, kbId={}, model={})", userMessage, sessionId, kbId,
+                    modelName != null ? modelName : "default");
+
+            String reply = client.prompt()
+                    .system(SYSTEM_PROMPT)
+                    .user(fullMessage)
+                    .call()
+                    .content();
+
+            log.info("[编排] 回复长度: {}", reply != null ? reply.length() : 0);
+            return reply != null ? reply : "（AI 未返回回复）";
+        } finally {
+            NoteTools.clearCurrentKbId();
         }
-
-        log.info("[编排] 用户: {} (session={}, model={})", userMessage, sessionId,
-                modelName != null ? modelName : "default");
-
-        String reply = client.prompt()
-                .system(SYSTEM_PROMPT)
-                .user(fullMessage)
-                .call()
-                .content();
-
-        log.info("[编排] 回复长度: {}", reply != null ? reply.length() : 0);
-        return reply != null ? reply : "（AI 未返回回复）";
     }
 
     public String chat(String sessionId, String userMessage) throws Exception {
-        return chat(sessionId, userMessage, "knowledge", null);
+        return chat(sessionId, userMessage, "knowledge", null, null);
     }
 
-    public String streamChat(String sessionId, String userMessage, String mode, String modelName, Consumer<String> chunkCallback) throws Exception {
+    public String streamChat(String sessionId, String userMessage, String mode, Long kbId, String modelName, Consumer<String> chunkCallback) throws Exception {
         if (!isAvailable()) {
             throw new IllegalStateException("LLM API Key 未配置，请在配置页填写");
         }
@@ -91,46 +100,51 @@ public class NoteAssistantService {
             throw new IllegalStateException("ChatClient 初始化失败");
         }
 
-        String context = sessionService.buildHistoryContext(sessionId, mode, userMessage);
-        String fullMessage;
-        if (context != null) {
-            fullMessage = context + "\n\n---\n\n用户最新消息:\n" + userMessage;
-            log.info("[编排] 注入了历史上下文（含语义检索），总消息长度={}", fullMessage.length());
-        } else {
-            fullMessage = userMessage;
-            log.info("[编排] 无历史上下文，仅当前消息");
+        NoteTools.setCurrentKbId(kbId);
+        try {
+            String context = sessionService.buildHistoryContext(sessionId, mode, userMessage);
+            String fullMessage;
+            if (context != null) {
+                fullMessage = context + "\n\n---\n\n用户最新消息:\n" + userMessage;
+                log.info("[编排] 注入了历史上下文（含语义检索），总消息长度={}", fullMessage.length());
+            } else {
+                fullMessage = userMessage;
+                log.info("[编排] 无历史上下文，仅当前消息");
+            }
+
+            log.info("[编排] 用户: {} (session={}, kbId={}, model={})", userMessage, sessionId, kbId,
+                    modelName != null ? modelName : "default");
+
+            StringBuilder fullReply = new StringBuilder();
+            boolean[] isFirstChunk = {true};
+            client.prompt()
+                    .system(SYSTEM_PROMPT)
+                    .user(fullMessage)
+                    .stream()
+                    .content()
+                    .toStream()
+                    .forEach(chunk -> {
+                        if (chunk != null && !chunk.isEmpty()) {
+                            String processedChunk = chunk;
+                            if (isFirstChunk[0]) {
+                                processedChunk = chunk.replaceFirst("^[\\s\\r\\n]+", "");
+                                isFirstChunk[0] = false;
+                            }
+                            processedChunk = processedChunk.replaceAll("\\n{3,}", "\n\n");
+                            fullReply.append(processedChunk);
+                            if (chunkCallback != null) {
+                                chunkCallback.accept(processedChunk);
+                            }
+                            log.debug("[编排] 流式接收: {} chars", processedChunk.length());
+                        }
+                    });
+
+            String reply = fullReply.toString().trim().replaceAll("\\n{3,}", "\n\n");
+            log.info("[编排] 回复长度: {}", reply.length());
+            return reply.isEmpty() ? "（AI 未返回回复）" : reply;
+        } finally {
+            NoteTools.clearCurrentKbId();
         }
-
-        log.info("[编排] 用户: {} (session={}, model={})", userMessage, sessionId,
-                modelName != null ? modelName : "default");
-
-        StringBuilder fullReply = new StringBuilder();
-        boolean[] isFirstChunk = {true};
-        client.prompt()
-                .system(SYSTEM_PROMPT)
-                .user(fullMessage)
-                .stream()
-                .content()
-                .toStream()
-                .forEach(chunk -> {
-                    if (chunk != null && !chunk.isEmpty()) {
-                        String processedChunk = chunk;
-                        if (isFirstChunk[0]) {
-                            processedChunk = chunk.replaceFirst("^[\\s\\r\\n]+", "");
-                            isFirstChunk[0] = false;
-                        }
-                        processedChunk = processedChunk.replaceAll("\\n{3,}", "\n\n");
-                        fullReply.append(processedChunk);
-                        if (chunkCallback != null) {
-                            chunkCallback.accept(processedChunk);
-                        }
-                        log.debug("[编排] 流式接收: {} chars", processedChunk.length());
-                    }
-                });
-
-        String reply = fullReply.toString().trim().replaceAll("\\n{3,}", "\n\n");
-        log.info("[编排] 回复长度: {}", reply.length());
-        return reply.isEmpty() ? "（AI 未返回回复）" : reply;
     }
 
     private ChatClient getOrCreateClient(String modelName) {

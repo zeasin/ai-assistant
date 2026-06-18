@@ -1,5 +1,6 @@
 package com.laoqi.assistant.service;
 
+import com.laoqi.assistant.entity.KnowledgeBaseEntity;
 import com.laoqi.assistant.util.FileUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,15 +22,36 @@ import java.util.stream.Stream;
 public class NoteTools {
 
     private static final Logger log = LoggerFactory.getLogger(NoteTools.class);
+    private static final ThreadLocal<Long> CURRENT_KB_ID = new ThreadLocal<>();
 
     private final ConfigService configService;
+    private final KnowledgeBaseService kbService;
 
-    public NoteTools(ConfigService configService) {
+    public NoteTools(ConfigService configService, KnowledgeBaseService kbService) {
         this.configService = configService;
+        this.kbService = kbService;
+    }
+
+    public static void setCurrentKbId(Long kbId) {
+        if (kbId != null) {
+            CURRENT_KB_ID.set(kbId);
+        } else {
+            CURRENT_KB_ID.remove();
+        }
+    }
+
+    public static Long getCurrentKbId() {
+        return CURRENT_KB_ID.get();
+    }
+
+    public static void clearCurrentKbId() {
+        CURRENT_KB_ID.remove();
     }
 
     private Path baseDir() {
-        return Path.of(configService.getNotesDir());
+        Long kbId = CURRENT_KB_ID.get();
+        String dir = kbService.getNotesDirById(kbId);
+        return Path.of(dir);
     }
 
     @Tool(description = "列出笔记库指定目录下的所有文件和子目录，path 是相对于笔记库根目录的路径")

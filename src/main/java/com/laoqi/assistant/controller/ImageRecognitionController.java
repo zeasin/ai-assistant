@@ -3,7 +3,6 @@ package com.laoqi.assistant.controller;
 import com.laoqi.assistant.config.AppConfig;
 import com.laoqi.assistant.entity.KnowledgeBaseEntity;
 import com.laoqi.assistant.entity.LlmProfileEntity;
-import com.laoqi.assistant.service.ConfigService;
 import com.laoqi.assistant.service.KnowledgeBaseService;
 import com.laoqi.assistant.service.LlmConfigResolver;
 import com.laoqi.assistant.service.LlmService;
@@ -30,18 +29,16 @@ public class ImageRecognitionController {
             ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp");
 
     private final AppConfig appConfig;
-    private final ConfigService configService;
     private final KnowledgeBaseService kbService;
     private final LlmService llmService;
     private final LogService logService;
     private final LlmConfigResolver llmConfigResolver;
 
-    public ImageRecognitionController(AppConfig appConfig, ConfigService configService,
+    public ImageRecognitionController(AppConfig appConfig,
                                        KnowledgeBaseService kbService,
                                        LlmService llmService, LogService logService,
                                        LlmConfigResolver llmConfigResolver) {
         this.appConfig = appConfig;
-        this.configService = configService;
         this.kbService = kbService;
         this.llmService = llmService;
         this.logService = logService;
@@ -112,10 +109,9 @@ public class ImageRecognitionController {
     @GetMapping("/thumb")
     @ResponseBody
     public org.springframework.http.ResponseEntity<byte[]> thumbnail(@RequestParam String path,
-                                                                      @RequestParam(required = false, defaultValue = "0") Long kbId) {
+                                                                      @RequestParam Long kbId) {
         try {
             Path baseDir = getKbBasePath(kbId);
-            if (baseDir == null) baseDir = Paths.get(configService.getNotesDir());
             Path file = baseDir.resolve(path).normalize();
             if (!file.startsWith(baseDir) || !Files.exists(file)) {
                 return org.springframework.http.ResponseEntity.notFound().build();
@@ -256,11 +252,10 @@ public class ImageRecognitionController {
         String filePath = body.getOrDefault("path", "");
         String modelName = body.getOrDefault("modelName", "");
         try {
-            Long kbId = body.containsKey("kbId") ? Long.parseLong(body.get("kbId")) : 0L;
+            Long kbId = body.containsKey("kbId") ? Long.parseLong(body.get("kbId")) : null;
             String prompt = body.getOrDefault("prompt", "请详细分析这张图片的内容");
 
             Path baseDir = getKbBasePath(kbId);
-            if (baseDir == null) baseDir = Paths.get(configService.getNotesDir());
             Path file = baseDir.resolve(filePath).normalize();
             if (!file.startsWith(baseDir) || !Files.exists(file)) {
                 log.warn("识图失败: 文件不存在 path={}", filePath);
@@ -308,10 +303,9 @@ public class ImageRecognitionController {
         try {
             String path = body.get("path");
             String content = body.get("content");
-            Long kbId = body.containsKey("kbId") ? Long.parseLong(body.get("kbId")) : 0L;
+            Long kbId = body.containsKey("kbId") ? Long.parseLong(body.get("kbId")) : null;
 
             Path baseDir = getKbBasePath(kbId);
-            if (baseDir == null) baseDir = Paths.get(configService.getNotesDir());
             Path file = baseDir.resolve(path).normalize();
             if (!file.startsWith(baseDir)) {
                 return Map.of("ok", false, "error", "路径不合法");
@@ -350,18 +344,18 @@ public class ImageRecognitionController {
     // ========== 私有方法 ==========
 
     private Path getKbBasePath(Long kbId) {
-        if (kbId != null && kbId > 0) {
-            KnowledgeBaseEntity kb = kbService.getById(kbId);
-            if (kb != null) {
-                Path p = Paths.get(kb.getNotesDir());
-                if (Files.isDirectory(p)) return p;
-            }
+        if (kbId == null || kbId <= 0) {
+            throw new IllegalStateException("缺少 kbId 参数");
         }
-        try {
-            return Paths.get(configService.getNotesDir());
-        } catch (Exception e) {
-            return null;
+        KnowledgeBaseEntity kb = kbService.getById(kbId);
+        if (kb == null) {
+            throw new IllegalStateException("知识库不存在: kbId=" + kbId);
         }
+        Path p = Paths.get(kb.getNotesDir());
+        if (!Files.isDirectory(p)) {
+            throw new IllegalStateException("笔记库目录不存在: " + kb.getNotesDir());
+        }
+        return p;
     }
 
     private String guessImageType(String name) {
