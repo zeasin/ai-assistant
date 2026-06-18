@@ -12,7 +12,6 @@ public class KnowledgeBaseEntity {
     private String name;
     private String notesDir;
     private String labels;
-    private Integer isActive;
     private Integer sortOrder;
     private String createdAt;
 
@@ -24,8 +23,6 @@ public class KnowledgeBaseEntity {
     public void setNotesDir(String notesDir) { this.notesDir = notesDir; }
     public String getLabels() { return labels; }
     public void setLabels(String labels) { this.labels = labels; }
-    public Integer getIsActive() { return isActive; }
-    public void setIsActive(Integer isActive) { this.isActive = isActive; }
     public Integer getSortOrder() { return sortOrder; }
     public void setSortOrder(Integer sortOrder) { this.sortOrder = sortOrder; }
     public String getCreatedAt() { return createdAt; }

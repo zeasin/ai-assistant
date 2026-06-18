@@ -45,7 +45,6 @@ public class KnowledgeBaseService {
             kb.setName("工作");
             kb.setNotesDir(notesDir);
             kb.setLabels("{\"tasks\":\"任务\",\"reminders\":\"提醒\",\"modules\":\"模块\",\"notes\":\"笔记\",\"config\":\"配置\"}");
-            kb.setIsActive(1);
             kb.setSortOrder(0);
             kb.setCreatedAt(TimeUtil.nowStr());
             kbDbService.save(kb);
@@ -63,12 +62,6 @@ public class KnowledgeBaseService {
 
     public KnowledgeBaseEntity getById(Long id) {
         return kbDbService.getById(id);
-    }
-
-    public KnowledgeBaseEntity getActiveKb() {
-        return kbDbService.lambdaQuery()
-                .eq(KnowledgeBaseEntity::getIsActive, 1)
-                .one();
     }
 
     public KnowledgeBaseEntity getFirst() {
@@ -125,27 +118,9 @@ public class KnowledgeBaseService {
         if (e == null) return;
 
         kbDbService.removeById(id);
-
-        if (e.getIsActive() == 1) {
-            List<KnowledgeBaseEntity> remaining = kbDbService.lambdaQuery()
-                    .orderByAsc(KnowledgeBaseEntity::getSortOrder)
-                    .list();
-            if (!remaining.isEmpty()) {
-                KnowledgeBaseEntity first = remaining.get(0);
-                first.setIsActive(1);
-                kbDbService.updateById(first);
-            }
-        }
     }
 
     public void setActive(Long id) {
-        kbDbService.lambdaUpdate()
-                .set(KnowledgeBaseEntity::getIsActive, 0)
-                .update();
-        kbDbService.lambdaUpdate()
-                .eq(KnowledgeBaseEntity::getId, id)
-                .set(KnowledgeBaseEntity::getIsActive, 1)
-                .update();
     }
 
     public void reorder(List<Long> ids) {
@@ -159,10 +134,6 @@ public class KnowledgeBaseService {
     }
 
     public String getNotesDir() {
-        KnowledgeBaseEntity active = getActiveKb();
-        if (active != null) {
-            return active.getNotesDir();
-        }
         KnowledgeBaseEntity first = getFirst();
         if (first != null) {
             return first.getNotesDir();

@@ -797,15 +797,12 @@ function renderKb() {
     empty.style.display = 'none';
 
     let html = '<table class="log-table"><thead><tr>' +
-        '<th>名称</th><th>笔记库路径</th><th>状态</th><th>排序</th><th>操作</th>' +
+        '<th>名称</th><th>笔记库路径</th><th>排序</th><th>操作</th>' +
         '</tr></thead><tbody>';
     kbList.forEach(function(kb, idx) {
-        const isActive = kb.isActive === 1;
         html += '<tr id="kb-row-' + idx + '">';
         html += '<td><strong>' + escapeHtml(kb.name) + '</strong></td>';
         html += '<td><code style="font-size:12px;">' + escapeHtml(kb.notesDir) + '</code></td>';
-        html += '<td>' + (isActive ? '<span style="color:#10b981;">✓ 当前</span>' :
-            '<button class="btn btn-secondary" onclick="setActiveKb(' + kb.id + ')" style="padding:2px 8px;font-size:11px;">设为当前</button>') + '</td>';
         html += '<td style="white-space:nowrap;">';
         if (idx > 0) html += '<button class="btn btn-secondary" onclick="moveKb(' + idx + ', -1)" style="padding:2px 8px;font-size:11px;">↑</button>';
         if (idx < kbList.length - 1) html += '<button class="btn btn-secondary" onclick="moveKb(' + idx + ', 1)" style="padding:2px 8px;font-size:11px;">↓</button>';
@@ -913,15 +910,6 @@ async function deleteKb(idx) {
     } catch (e) {}
 }
 
-async function setActiveKb(id) {
-    try {
-        const res = await fetch('/api/kb/active/' + id, { method: 'POST' });
-        const data = await res.json();
-        if (data.ok) {
-            loadKb();
-        }
-    } catch (e) {}
-}
 
 function moveKb(idx, dir) {
     const newIdx = idx + dir;

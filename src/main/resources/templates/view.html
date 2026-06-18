@@ -7,13 +7,27 @@
 <body>
 <th:block layout:fragment="content">
 
+<div th:if="${kb != null}" style="font-size:13px;color:#909296;margin-bottom:8px;display:flex;align-items:center;gap:4px;">
+    <a th:href="@{/kb/{id}(id=${kb.id})}" style="color:#7c5cfc;text-decoration:none;" th:text="${kb.name}">知识库</a>
+    <span>›</span>
+    <span th:text="${labels.get('notes')}">笔记</span>
+</div>
+
+<div th:if="${kb != null}" style="display:flex;gap:4px;margin-bottom:20px;border-bottom:2px solid #e1e3e6;">
+    <a th:href="@{/kb/{id}/tasks(id=${kb.id})}" style="padding:10px 20px;font-size:14px;text-decoration:none;color:#5c5f66;border-bottom:2px solid transparent;" th:text="${labels.get('tasks')}">任务</a>
+    <a th:href="@{/kb/{id}/reminders(id=${kb.id})}" style="padding:10px 20px;font-size:14px;text-decoration:none;color:#5c5f66;border-bottom:2px solid transparent;" th:text="${labels.get('reminders')}">提醒</a>
+    <a th:href="@{/kb/{id}/modules(id=${kb.id})}" style="padding:10px 20px;font-size:14px;text-decoration:none;color:#5c5f66;border-bottom:2px solid transparent;" th:text="${labels.get('modules')}">模块</a>
+    <a th:href="@{/kb/{id}/notes(id=${kb.id})}" style="padding:10px 20px;font-size:14px;text-decoration:none;color:#7c5cfc;border-bottom:2px solid #7c5cfc;font-weight:600;" th:text="${labels.get('notes')}">笔记</a>
+    <a th:href="@{/kb/{id}/config(id=${kb.id})}" style="padding:10px 20px;font-size:14px;text-decoration:none;color:#5c5f66;border-bottom:2px solid transparent;" th:text="${labels.get('config')}">配置</a>
+</div>
+
 <div class="card article-card">
     <div class="flex" style="justify-content:space-between;margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid #e1e3e6;">
         <h2 style="font-size:18px;margin:0;" th:text="${title}">标题</h2>
         <div class="flex">
             <button class="btn btn-primary" onclick="copyArticle()" id="copyBtn">📋 复制文章</button>
             <a class="btn btn-secondary"
-   th:with="backUrl=${parent != null && !parent.isEmpty() ? '/browse?dir=' + parent : '/browse'}"
+   th:with="backUrl=${parent != null && !parent.isEmpty() ? '/kb/' + kb.id + '/notes?dir=' + parent : '/kb/' + kb.id + '/notes'}"
    th:href="${backUrl}">← 返回</a>
         </div>
     </div>

@@ -158,7 +158,6 @@ public class SessionService {
                     name        TEXT NOT NULL,
                     notes_dir   TEXT NOT NULL,
                     labels      TEXT NOT NULL DEFAULT '{}',
-                    is_active   INTEGER NOT NULL DEFAULT 0,
                     sort_order  INTEGER NOT NULL DEFAULT 0,
                     created_at  TEXT NOT NULL
                 )

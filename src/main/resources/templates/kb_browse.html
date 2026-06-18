@@ -29,15 +29,15 @@
             <button class="btn btn-primary" onclick="showNewModal()">✏️ 新建</button>
             <a th:if="${rel != null && !rel.isEmpty()}" class="btn btn-secondary"
                th:with="parentDir=${parent != null && !parent.isEmpty() ? '?dir=' + parent : ''}"
-               th:href="|/browse${parentDir}|">← 上级目录</a>
+               th:href="@{|/kb/${kb.id}/notes${parentDir}|}">← 上级目录</a>
         </div>
     </div>
 
     <th:block th:if="${breadcrumbs != null and #lists.size(breadcrumbs) > 0}">
     <div class="text-muted mb-2" style="font-size:13px;">
-        / <a th:href="@{/browse}">root</a>
+        / <a th:href="@{|/kb/${kb.id}/notes|}">root</a>
         <th:block th:each="crumb, iterStat : ${breadcrumbs}">
-            / <a th:href="|/browse?dir=${breadcrumbPaths[iterStat.index]}|" th:text="${crumb}">folder</a>
+            / <a th:href="@{|/kb/${kb.id}/notes?dir=${breadcrumbPaths[iterStat.index]}|}" th:text="${crumb}">folder</a>
         </th:block>
     </div>
     </th:block>
@@ -58,7 +58,7 @@
                 <td>
                     <a class="btn btn-secondary"
                        th:with="dirPath=${rel != null && !rel.isEmpty() ? rel + '/' + d.name : d.name}"
-                       th:href="|/browse?dir=${dirPath}|"
+                       th:href="@{|/kb/${kb.id}/notes?dir=${dirPath}|}"
                        style="padding:4px 12px;font-size:12px;">打开</a>
                 </td>
             </tr>
@@ -72,7 +72,7 @@
                 <td>
                     <a th:if="${#strings.endsWith(f.name, '.md')}" class="btn btn-primary"
                        th:with="filePath=${rel != null && !rel.isEmpty() ? rel + '/' + f.name : f.name}"
-                       th:href="|/view?path=${filePath}|"
+                       th:href="@{|/kb/${kb.id}/notes/view?path=${filePath}|}"
                        style="padding:4px 12px;font-size:12px;">查看</a>
                     <button th:if="${#strings.endsWith(f.name, '.md')}" class="btn btn-secondary"
                             th:data-path="${rel != null && !rel.isEmpty() ? rel + '/' + f.name : f.name}"
@@ -137,6 +137,7 @@
 </style>
 
 <script>
+const KB_ID = [[${kb.id}]];
 function showNewModal() {
     document.getElementById('newModal').style.display = 'flex';
     document.getElementById('filename').focus();
@@ -155,7 +156,7 @@ async function submitNew(e) {
     form.set('filename', filename);
     form.set('content', content);
 
-    const res = await fetch('/browse/new', { method: 'POST', body: form });
+    const res = await fetch('/kb/' + KB_ID + '/notes/new', { method: 'POST', body: form });
     const data = await res.json();
     if (data.ok) {
         toast('创建成功！', 'success');
@@ -168,7 +169,7 @@ async function submitNew(e) {
 }
 async function deleteFile(path) {
     if (!confirm('确定要删除这个文件吗？')) return;
-    const res = await fetch('/browse/delete', {
+    const res = await fetch('/kb/' + KB_ID + '/notes/delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: 'path=' + encodeURIComponent(path),
