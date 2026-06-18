@@ -14,9 +14,13 @@
             background: #f5f5f7; color: #1a1b1e; min-height: 100vh;
         }
         .nav {
-            background: #fff; border-bottom: 1px solid #e1e3e6;
-            padding: 0 24px; display: flex; align-items: center; height: 52px;
-            gap: 4px; justify-content: center;
+            background: #f8f9fa; border-bottom: 1px solid #e1e3e6;
+            display: flex; align-items: center; height: 52px;
+            justify-content: center;
+        }
+        .nav-inner {
+            width: 100%; max-width: 1000px; padding: 0 24px;
+            display: flex; align-items: center; gap: 4px;
         }
         .nav a {
             color: #5c5f66; text-decoration: none; padding: 8px 16px;
@@ -24,8 +28,8 @@
         }
         .nav a:hover { color: #1a1b1e; background: #e8e8ed; }
         .nav a.active { color: #7c5cfc; background: #f0edff; }
-        .nav .title { color: #1a1b1e; font-size: 16px; font-weight: 600; margin-right: auto; }
-        .nav .subtitle { color: #909296; font-size: 12px; margin-left: auto; }
+        .nav .title { color: #1a1b1e; font-size: 16px; font-weight: 600; }
+        .nav .subtitle { color: #909296; font-size: 12px; }
         .dropdown { position: relative; display: inline-flex; }
         .dropdown-toggle {
             color: #5c5f66; text-decoration: none; padding: 8px 16px;
@@ -326,6 +330,7 @@
     </div>
 
     <nav class="nav">
+        <div class="nav-inner">
         <span class="title">AI 助理</span>
         <a th:classappend="${requestURI == '/' ? 'active' : ''}" href="/">首页</a>
         <a th:classappend="${requestURI == '/chat' ? 'active' : ''}" href="/chat">对话</a>
@@ -341,6 +346,7 @@
         <a th:classappend="${requestURI == '/log' ? 'active' : ''}" href="/log">日志</a>
         <a th:classappend="${requestURI == '/help' ? 'active' : ''}" href="/help">帮助</a>
         <span class="subtitle">v1.0</span>
+        </div>
     </nav>
     <div class="container">
         <th:block layout:fragment="content" />

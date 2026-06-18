@@ -76,13 +76,13 @@ public class KnowledgeBaseController {
         model.put("labels", parseLabels(kb.getLabels()));
         model.put("modules", moduleService.getModulesByKb(id));
 
-        long activeTaskCount = taskService.getAllTasks().stream()
+        long activeTaskCount = taskService.getAllTasks(kb.getNotesDir()).stream()
                 .filter(t -> !"done".equals(t.status))
                 .count();
         model.put("taskCount", activeTaskCount);
-        model.put("reminderCount", reminderService.getAllReminders().size());
+        model.put("reminderCount", reminderService.getAllReminders(kb.getNotesDir()).size());
 
-        String todayReport = reportService.readTodayReport();
+        String todayReport = reportService.readTodayReport(kb.getNotesDir());
         if (todayReport != null) {
             model.put("report", MarkdownUtil.toHtml(todayReport));
             model.put("report_time", reportService.getLatestReportTime().isEmpty() ? "今日已生成" : reportService.getLatestReportTime());

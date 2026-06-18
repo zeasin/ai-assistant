@@ -21,12 +21,12 @@ public class TaskService {
         this.configService = configService;
     }
 
-    private Path getNotesDir() {
-        return Paths.get(configService.getNotesDir());
+    private Path dataFile() {
+        return dataFile(configService.getNotesDir());
     }
 
-    private Path dataFile() {
-        Path taskDir = getNotesDir().resolve("AI").resolve("任务");
+    private Path dataFile(String notesDir) {
+        Path taskDir = Paths.get(notesDir).resolve("AI").resolve("任务");
         if (!java.nio.file.Files.exists(taskDir)) {
             try {
                 java.nio.file.Files.createDirectories(taskDir);
@@ -38,7 +38,11 @@ public class TaskService {
     }
 
     public Root loadData() {
-        return FileUtil.readJson(dataFile(), Root.class, new Root());
+        return loadData(configService.getNotesDir());
+    }
+
+    public Root loadData(String notesDir) {
+        return FileUtil.readJson(dataFile(notesDir), Root.class, new Root());
     }
 
     private void saveData(Root root) {
@@ -46,14 +50,22 @@ public class TaskService {
     }
 
     public List<TaskItem> getAllTasks() {
-        Root root = loadData();
+        return getAllTasks(configService.getNotesDir());
+    }
+
+    public List<TaskItem> getAllTasks(String notesDir) {
+        Root root = loadData(notesDir);
         if (root.tasks == null) root.tasks = new ArrayList<>();
         if (root.meta == null) root.meta = new LinkedHashMap<>();
         return root.tasks;
     }
 
     public TaskItem addTask(String title, String description, String priority, String dueDate) {
-        Root root = loadData();
+        return addTask(configService.getNotesDir(), title, description, priority, dueDate);
+    }
+
+    public TaskItem addTask(String notesDir, String title, String description, String priority, String dueDate) {
+        Root root = loadData(notesDir);
         if (root.tasks == null) root.tasks = new ArrayList<>();
         if (root.meta == null) root.meta = new LinkedHashMap<>();
 

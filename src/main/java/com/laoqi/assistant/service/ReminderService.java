@@ -64,7 +64,10 @@ public class ReminderService {
     }
 
     private Path getRemindersDir() {
-        String notesDir = configService.getNotesDir();
+        return getRemindersDir(configService.getNotesDir());
+    }
+
+    private Path getRemindersDir(String notesDir) {
         Path reminderDir = Paths.get(notesDir, "AI", "提醒");
         if (!Files.exists(reminderDir)) {
             try {
@@ -80,18 +83,34 @@ public class ReminderService {
         return getRemindersDir().resolve("reminders.json");
     }
 
+    private Path getRemindersFile(String notesDir) {
+        return getRemindersDir(notesDir).resolve("reminders.json");
+    }
+
     public Root load() {
-        return FileUtil.readJson(getRemindersFile(), Root.class, new Root());
+        return load(configService.getNotesDir());
+    }
+
+    public Root load(String notesDir) {
+        return FileUtil.readJson(getRemindersFile(notesDir), Root.class, new Root());
     }
 
     private void save(Root root) {
+        save(configService.getNotesDir(), root);
+    }
+
+    private void save(String notesDir, Root root) {
         if (root.reminders == null) root.reminders = new ArrayList<>();
         if (root.meta == null) root.meta = new LinkedHashMap<>();
         FileUtil.writeJson(getRemindersFile(), root);
     }
 
     public List<Reminder> getAllReminders() {
-        Root root = load();
+        return getAllReminders(configService.getNotesDir());
+    }
+
+    public List<Reminder> getAllReminders(String notesDir) {
+        Root root = load(notesDir);
         if (root.reminders == null) root.reminders = new ArrayList<>();
         return root.reminders;
     }

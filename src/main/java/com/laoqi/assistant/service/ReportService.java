@@ -43,7 +43,11 @@ public class ReportService {
     }
 
     private Path getComprehensiveReportDir() {
-        return Paths.get(configService.getNotesDir()).resolve("AI").resolve("综合日报");
+        return getComprehensiveReportDir(configService.getNotesDir());
+    }
+
+    private Path getComprehensiveReportDir(String notesDir) {
+        return Paths.get(notesDir).resolve("AI").resolve("综合日报");
     }
 
     private Path getPromptsDir() {
@@ -130,7 +134,11 @@ public class ReportService {
     public String getLatestError() { return latestError; }
 
     public String readTodayReport() {
-        Path dir = getComprehensiveReportDir();
+        return readTodayReport(configService.getNotesDir());
+    }
+
+    public String readTodayReport(String notesDir) {
+        Path dir = getComprehensiveReportDir(notesDir);
         String date = TimeUtil.todayStr();
         Path file = dir.resolve(date + ".md");
         if (FileUtil.exists(file)) {
