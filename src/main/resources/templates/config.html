@@ -33,7 +33,7 @@
     <div class="status-item">
         <div class="label">知识库</div>
         <div class="value" style="font-size:16px;" th:text="${#lists.size(kbList)} + ' 个'">0 个</div>
-        <div class="text-muted" style="font-size:11px;margin-top:2px;">点下方知识库管理查看详情</div>
+        <div class="text-muted" style="font-size:11px;margin-top:2px;">在导航栏知识库菜单中管理</div>
     </div>
     <div class="status-item">
         <div class="label">模块总数</div>
@@ -72,15 +72,6 @@
             <span class="text-muted" th:text="${job.time}">时间</span>
         </li>
     </ul>
-</div>
-
-<div class="card">
-    <h2>🗂️ 知识库管理</h2>
-    <div class="text-muted mb-2">管理多个知识库，每个知识库拥有独立的笔记库目录、模块/科目、任务/提醒、聊天历史。</div>
-    <div style="padding:12px 0;text-align:center;">
-        <a href="/kb" class="btn btn-primary">📚 前往笔记库管理页面</a>
-    </div>
-</div>
 </div>
 
 <div class="card">
