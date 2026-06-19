@@ -10,7 +10,7 @@
 <!-- 笔记库未配置横幅 -->
 <div th:unless="${kbReady}" class="port-banner" style="margin-bottom:16px;">
     <span>⚠️ 尚未配置笔记库</span>
-    <span style="flex:1;">请先在<a href="/config" style="color:#7c5cfc;font-weight:600;">配置页面</a>中添加知识库并设置笔记库路径。</span>
+    <span style="flex:1;">请先在<a href="/config" style="color:#7c5cfc;font-weight:600;">配置页面</a>中添加笔记库并设置笔记库路径。</span>
     <button class="port-close" onclick="this.parentElement.remove()">✕</button>
 </div>
 
@@ -58,7 +58,7 @@
                     <th:block th:each="kb : ${kbList}">
                     <a th:classappend="${kb.id == kbId} ? 'active' : ''"
                        th:href="@{/chat?kbId={id}(id=${kb.id})}"
-                       th:text="${kb.name}">知识库</a>
+                       th:text="${kb.name}">笔记库</a>
                     </th:block>
                 </div>
             </div>
@@ -253,7 +253,7 @@ function showError(m){toast(m,'error')}
 function toast(m,t){var d=document.createElement('div');d.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:10px 24px;border-radius:8px;font-size:14px;z-index:999;background:'+(t==='error'?'#e03131':'#2b8a3e')+';color:#fff;box-shadow:0 4px 12px rgba(0,0,0,0.15);';d.textContent=m;document.body.appendChild(d);setTimeout(function(){d.remove()},2500);}
 function showConfirm(t,m,c){document.getElementById('confirmTitle').textContent=t;document.getElementById('confirmMessage').textContent=m;document.getElementById('confirmBtn').onclick=function(){closeConfirmModal();if(c)c()};document.getElementById('confirmModal').classList.add('active');}
 function closeConfirmModal(){document.getElementById('confirmModal').classList.remove('active')}
-document.addEventListener('DOMContentLoaded',async function(){var app=document.getElementById('chatApp');if(app){currentKbId=Number(app.dataset.kbId||0);currentKbName=app.dataset.kbName||''}var ms=document.getElementById('modelSelector');if(ms&&ms.options.length>0&&!ms.value)ms.selectedIndex=0;if(!currentKbId){document.getElementById('messageList').innerHTML='<div style="text-align:center;padding:60px;color:#909296"><p>请先配置知识库</p></div>';return}await loadMessages(0,60);var inp=document.getElementById('chatInput');if(inp)inp.focus();var c=document.getElementById('chatMessages');c.addEventListener('scroll',function(){if(c.scrollTop<80&&!isLoadingMore&&!allLoaded&&!isSearchMode)loadMore()});});
+document.addEventListener('DOMContentLoaded',async function(){var app=document.getElementById('chatApp');if(app){currentKbId=Number(app.dataset.kbId||0);currentKbName=app.dataset.kbName||''}var ms=document.getElementById('modelSelector');if(ms&&ms.options.length>0&&!ms.value)ms.selectedIndex=0;if(!currentKbId){document.getElementById('messageList').innerHTML='<div style="text-align:center;padding:60px;color:#909296"><p>请先配置笔记库</p></div>';return}await loadMessages(0,60);var inp=document.getElementById('chatInput');if(inp)inp.focus();var c=document.getElementById('chatMessages');c.addEventListener('scroll',function(){if(c.scrollTop<80&&!isLoadingMore&&!allLoaded&&!isSearchMode)loadMore()});});
 document.addEventListener('click',function(e){var s=document.getElementById('kbSelector');if(s&&!s.contains(e.target))s.classList.remove('open')});
 function toggleKbDropdown(){document.getElementById('kbSelector').classList.toggle('open')}
 async function loadMessages(offset,limit){if(!currentKbId)return;var listEl=document.getElementById('messageList');try{var res=await fetch('/chat/api/kb/'+currentKbId+'/messages?offset='+offset+'&limit='+limit);var data=await res.json();if(!data.ok){showError('加载消息失败');return}var msgs=data.messages||[],total=data.total||0;if(msgs.length===0&&offset===0){showWelcome();return}if(offset===0)listEl.innerHTML='';if(offset+limit>=total){allLoaded=true;document.getElementById('loadMore').style.display='none'}else{allLoaded=false;var lm=document.getElementById('loadMore');lm.style.display='block';lm.innerHTML='<span>加载更多...</span>'}if(msgs.length>0)renderMessages(msgs);if(offset===0)setTimeout(function(){document.getElementById('chatMessages').scrollTop=document.getElementById('chatMessages').scrollHeight},50)}catch(e){showError('网络错误: '+e.message)}}
@@ -265,7 +265,7 @@ async function sendMessage(){var inp=document.getElementById('chatInput'),btn=do
 async function searchMessages(){var inp=document.getElementById('searchInput'),q=inp.value.trim();if(!q||!currentKbId)return;isSearchMode=true;var b=document.getElementById('searchBanner');b.style.display='flex';document.getElementById('searchBannerText').textContent='🔍 搜索: "'+q+'"';document.getElementById('searchCloseBtn').style.display='inline-block';document.getElementById('chatMessages').scrollTop=0;try{var res=await fetch('/chat/api/kb/'+currentKbId+'/search?q='+encodeURIComponent(q)+'&limit=30'),data=await res.json();if(!data.ok)return;var hits=data.messages||[],listEl=document.getElementById('messageList');if(hits.length===0){listEl.innerHTML='<div style="text-align:center;padding:60px;font-size:14px;color:#909296">未找到包含 "'+escapeHtml(q)+'" 的消息</div>';return}var html='<div style="padding:8px 24px;font-size:13px;color:#5c5f66">找到 '+hits.length+' 条结果</div>';for(var i=0;i<hits.length;i++){var h=hits[i],c=h.content||'',t=h.time||'',r=h.role==='user'?'👤 用户':'🤖 AI',pv=c.length>200?c.substring(0,200)+'...':c;html+='<div class="search-hit"><div class="hit-label">'+r+' · '+t.substring(0,16)+'</div><div class="hit-text">'+escapeHtml(pv)+'</div></div>'}listEl.innerHTML=html}catch(e){showError('搜索失败')}}
 function closeSearch(){document.getElementById('searchInput').value='';document.getElementById('searchCloseBtn').style.display='none'}
 function exitSearch(){isSearchMode=false;document.getElementById('searchBanner').style.display='none';document.getElementById('searchCloseBtn').style.display='none';allLoaded=false;loadMessages(0,60)}
-async function clearChat(){if(!currentKbId)return;showConfirm('清空对话','确定要清空当前知识库的所有聊天记录吗？此操作不可恢复。',async function(){try{var r=await fetch('/chat/api/kb/'+currentKbId+'/clear',{method:'DELETE'}),d=await r.json();if(d.ok){toast('已清空所有对话');allLoaded=false;loadMessages(0,60)}else toast('清空失败','error')}catch(e){toast('网络错误','error')}})}
+async function clearChat(){if(!currentKbId)return;showConfirm('清空对话','确定要清空当前笔记库的所有聊天记录吗？此操作不可恢复。',async function(){try{var r=await fetch('/chat/api/kb/'+currentKbId+'/clear',{method:'DELETE'}),d=await r.json();if(d.ok){toast('已清空所有对话');allLoaded=false;loadMessages(0,60)}else toast('清空失败','error')}catch(e){toast('网络错误','error')}})}
 async function exportChat(){if(!currentKbId)return;try{var r=await fetch('/chat/api/kb/'+currentKbId+'/export'),d=await r.json();if(!d.ok){toast('导出失败','error');return}var b=new Blob([d.content],{type:'text/markdown;charset=utf-8'}),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=currentKbName+'-对话.md';document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(u);toast('导出成功')}catch(e){toast('导出失败','error')}}
 </script>
 

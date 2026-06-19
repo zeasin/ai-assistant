@@ -5,12 +5,16 @@
 <head>
     <title>计划 · 任务与提醒</title>
     <style>
-        .pl-tabs { display: flex; gap: 0; margin-bottom: 20px; border-bottom: 2px solid #e1e3e6; }
-        .pl-tab { padding: 10px 20px; cursor: pointer; font-size: 14px; color: #5c5f66; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all .15s; }
-        .pl-tab.active { color: #7c5cfc; border-bottom-color: #7c5cfc; font-weight: 500; }
-        .pl-tab:hover { color: #7c5cfc; }
-        .pl-panel { display: none; }
-        .pl-panel.active { display: block; }
+        .section-header {
+            display:flex; justify-content:space-between; align-items:center;
+            margin-bottom:16px; padding-bottom:12px; border-bottom:2px solid #e1e3e6;
+        }
+        .section-header h2 {
+            font-size:18px; font-weight:600; margin:0; display:flex; align-items:center; gap:8px;
+        }
+        .section-header .count {
+            font-size:12px; background:#f0edff; color:#7c5cfc; padding:2px 8px; border-radius:10px;
+        }
 
         .task-column { background:#fff; border:1px solid #e1e3e6; border-radius:12px; overflow:hidden; min-height:200px; }
         .column-header { padding:12px 16px; font-size:14px; font-weight:600; display:flex; align-items:center; justify-content:space-between; }
@@ -53,6 +57,8 @@
         .toggle-switch::after { content:''; position:absolute; top:2px; left:2px; width:18px; height:18px; background:#fff; border-radius:50%; transition:all .2s; box-shadow:0 1px 3px rgba(0,0,0,0.2); }
         .toggle-switch.active::after { left:20px; }
         #reminder-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:16px; }
+
+        .section-divider { height:32px; }
     </style>
 </head>
 <body>
@@ -60,38 +66,33 @@
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
             <h1 style="font-size:22px;font-weight:600;">📋 计划</h1>
         </div>
-        <div class="text-muted" style="margin-bottom:16px;font-size:13px;">
+        <div class="text-muted" style="margin-bottom:20px;font-size:13px;">
             管理任务和定时提醒
             <span th:if="${error}" style="color:#e03131;margin-left:8px;">⚠️ <span th:text="${error}">错误</span></span>
         </div>
 
-        <div class="pl-tabs">
-            <div class="pl-tab active" onclick="switchPlTab('tasks', this)">📋 任务看板</div>
-            <div class="pl-tab" onclick="switchPlTab('reminders', this)">⏰ 定时提醒</div>
-        </div>
-
         <!-- 任务看板 -->
-        <div class="pl-panel active" id="panel-tasks">
-            <div style="display:flex;gap:8px;margin-bottom:16px;">
-                <button class="btn btn-primary" onclick="showAddTaskModal()">+ 添加任务</button>
-            </div>
-            <div id="task-board-container"></div>
+        <div class="section-header">
+            <h2>📋 任务看板 <span class="count" id="task-total-count" th:text="${tasks.size()}">0</span></h2>
+            <button class="btn btn-primary" onclick="showAddTaskModal()">+ 添加任务</button>
         </div>
+        <div id="task-board-container"></div>
+
+        <div class="section-divider"></div>
 
         <!-- 定时提醒 -->
-        <div class="pl-panel" id="panel-reminders">
-            <div class="card" style="margin-bottom:16px;">
-                <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
-                    <button class="btn btn-primary" onclick="showAddReminderModal()">+ 添加提醒</button>
-                    <span class="text-muted" style="font-size:13px;">已启用: <span id="enabled-count">0</span> 个提醒</span>
-                </div>
+        <div class="section-header">
+            <h2>⏰ 定时提醒 <span class="count" id="reminder-total-count">0</span></h2>
+            <div style="display:flex;gap:8px;align-items:center;">
+                <span class="text-muted" style="font-size:13px;">已启用: <span id="enabled-count">0</span></span>
+                <button class="btn btn-primary" onclick="showAddReminderModal()">+ 添加提醒</button>
             </div>
-            <div id="reminder-grid"></div>
-            <div id="reminder-empty" style="display:none;text-align:center;padding:40px 20px;border:2px dashed #d9d0ff;background:#fafafe;" class="card">
-                <div style="font-size:48px;margin-bottom:12px;">⏰</div>
-                <div style="font-size:16px;font-weight:600;color:#7c5cfc;margin-bottom:8px;">暂无提醒</div>
-                <div class="text-muted" style="margin-bottom:16px;">点击上方「添加提醒」按钮创建一个新的定时提醒</div>
-            </div>
+        </div>
+        <div id="reminder-grid"></div>
+        <div id="reminder-empty" style="display:none;text-align:center;padding:40px 20px;border:2px dashed #d9d0ff;background:#fafafe;border-radius:12px;">
+            <div style="font-size:48px;margin-bottom:12px;">⏰</div>
+            <div style="font-size:16px;font-weight:600;color:#7c5cfc;margin-bottom:8px;">暂无提醒</div>
+            <div class="text-muted" style="margin-bottom:16px;">点击上方「添加提醒」按钮创建一个新的定时提醒</div>
         </div>
 
         <!-- 任务弹窗 -->
@@ -197,13 +198,6 @@
                 renderTaskBoard();
                 renderReminders();
             });
-
-            function switchPlTab(tab, el) {
-                document.querySelectorAll('.pl-tab').forEach(function(t) { t.classList.remove('active'); });
-                document.querySelectorAll('.pl-panel').forEach(function(p) { p.classList.remove('active'); });
-                if (el) el.classList.add('active');
-                document.getElementById('panel-' + tab).classList.add('active');
-            }
 
             function closeModal(id) { document.getElementById(id).classList.remove('active'); }
             document.querySelectorAll('.modal-overlay').forEach(function(m) {
@@ -349,9 +343,12 @@
                 var ec = 0;
                 if (!reminders||reminders.length===0) {
                     grid.style.display='none'; empty.style.display='block';
-                    document.getElementById('enabled-count').textContent='0'; return;
+                    document.getElementById('enabled-count').textContent='0';
+                    document.getElementById('reminder-total-count').textContent='0';
+                    return;
                 }
                 grid.style.display='grid'; empty.style.display='none';
+                document.getElementById('reminder-total-count').textContent=reminders.length;
                 var tl = {daily:'每天',once:'一次',weekly:'每周',monthly:'每月',yearly:'每年'};
                 var h = '';
                 for (var i=0;i<reminders.length;i++) {
