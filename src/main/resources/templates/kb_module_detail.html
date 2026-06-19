@@ -38,6 +38,22 @@
             box-shadow:0 8px 32px rgba(0,0,0,0.15);
         }
         .modal h3 { font-size:16px; margin-bottom:16px; }
+
+        .file-item {
+            display:flex; align-items:center; gap:10px; padding:10px 12px;
+            border-bottom:1px solid #f0f0f0; transition:background .1s;
+        }
+        .file-item:hover { background:#f8f7ff; }
+        .file-item:last-child { border-bottom:none; }
+        .file-actions { display:flex; gap:4px; opacity:0; transition:opacity .15s; }
+        .file-item:hover .file-actions { opacity:1; }
+        .file-action-btn {
+            padding:4px 8px; font-size:11px; border:1px solid #e1e3e6;
+            border-radius:4px; background:#fff; cursor:pointer; transition:all .1s;
+        }
+        .file-action-btn:hover { background:#f0edff; border-color:#7c5cfc; }
+        .file-action-btn.danger { color:#d32f2f; border-color:#ffcdd2; }
+        .file-action-btn.danger:hover { background:#ffebee; }
     </style>
 </head>
 <body>
@@ -48,8 +64,13 @@
 <!-- 面包屑 -->
 <div style="margin-bottom:16px;font-size:13px;">
     <a th:href="@{/kb/{id}/notes(id=${kb.id})}" style="color:#7c5cfc;text-decoration:none;">📂 全部目录</a>
-    <span th:each="b : ${breadcrumbs}" style="color:#999;"> / </span>
-    <span th:text="${currentDir}" style="font-weight:600;">当前目录</span>
+    <th:block th:each="b,iter : ${breadcrumbs}">
+        <span style="color:#999;"> / </span>
+        <a th:if="${!iter.last}"
+           th:href="@{/kb/{id}/notes(dir=${#strings.listJoin(#strings.arraySplit(currentDir, '/')[0 to iter.index + 1], '/')}, id=${kb.id})}"
+           style="color:#7c5cfc;text-decoration:none;" th:text="${b}"></a>
+        <span th:if="${iter.last}" th:text="${b}" style="font-weight:600;"></span>
+    </th:block>
 </div>
 
 <!-- Tab 栏 -->
@@ -62,19 +83,33 @@
 <!-- 文件 Tab -->
 <div id="tab-files" class="tab-content active">
     <div class="card">
-        <div style="margin-top:12px;">
-            <div th:each="f : ${files}" style="padding:8px 0;border-bottom:1px solid #f0f0f0;">
+        <div class="flex" style="justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <h2 th:text="'📁 ' + ${currentDir}" style="margin:0;font-size:16px;">目录名</h2>
+            <div class="flex" style="gap:8px;">
+                <button class="btn btn-secondary" id="fileEditBtn" style="font-size:12px;" onclick="toggleFileEditMode()">✏️ 编辑</button>
+                <button class="btn btn-primary" onclick="openNewFileModal()">+ 新建笔记</button>
+            </div>
+        </div>
+        <div id="fileListContainer">
+            <div th:each="f : ${files}" class="file-item" th:attr="data-name=${f.name}, data-isdir=${f.is_dir}">
                 <a th:if="${!f.is_dir}"
                    th:href="@{/kb/{id}/notes/view(path=${currentDir + '/' + f.name})}"
-                   style="text-decoration:none;color:#333;">
-                    <span>📄</span> <span th:text="${f.name}">文件名</span>
+                   style="text-decoration:none;color:#333;display:flex;align-items:center;gap:8px;flex:1;min-width:0;">
+                    <span>📄</span>
+                    <span th:text="${f.name}" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">文件名</span>
                 </a>
                 <a th:if="${f.is_dir}"
                    th:href="@{/kb/{id}/notes(dir=${currentDir + '/' + f.name}, id=${kb.id})}"
-                   style="text-decoration:none;color:#333;">
-                    <span>📁</span> <span th:text="${f.name}">目录名</span>
+                   style="text-decoration:none;color:#333;display:flex;align-items:center;gap:8px;flex:1;min-width:0;">
+                    <span>📁</span>
+                    <span th:text="${f.name}" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">目录名</span>
                 </a>
-                <span class="text-muted" style="font-size:12px;margin-left:8px;" th:text="${f.modified}"></span>
+                <span class="text-muted" style="font-size:12px;white-space:nowrap;" th:text="${f.modified}"></span>
+                <div class="file-actions">
+                    <button th:if="${!f.is_dir}" class="file-action-btn" th:attr="data-name=${f.name}" onclick="editFile(this.getAttribute('data-name'))">编辑</button>
+                    <button class="file-action-btn" th:attr="data-name=${f.name}, data-isdir=${f.is_dir}" onclick="renameItem(this.getAttribute('data-name'), this.getAttribute('data-isdir') === 'true')">重命名</button>
+                    <button class="file-action-btn danger" th:attr="data-name=${f.name}, data-isdir=${f.is_dir}" onclick="deleteItem(this.getAttribute('data-name'), this.getAttribute('data-isdir') === 'true')">删除</button>
+                </div>
             </div>
             <div th:if="${files.isEmpty()}" class="text-muted" style="padding:20px;text-align:center;">
                 目录为空
@@ -126,9 +161,46 @@
     </div>
 </div>
 
+<!-- 编辑文件弹窗 -->
+<div id="editFileModal" class="modal-overlay">
+    <div class="modal" style="width:800px;">
+        <h3>编辑文件 - <span id="editFileName"></span></h3>
+        <textarea id="editFileContent" rows="20"
+            style="width:100%;padding:12px;border:1px solid #e1e3e6;border-radius:8px;font-size:13px;
+                   font-family:'SF Mono','Fira Code',monospace;resize:vertical;box-sizing:border-box;line-height:1.6;"></textarea>
+        <div class="flex" style="gap:8px;margin-top:12px;justify-content:flex-end;">
+            <button class="btn btn-secondary" onclick="closeEditFileModal()">取消</button>
+            <button class="btn btn-primary" id="saveFileBtn" onclick="saveFile()">💾 保存</button>
+        </div>
+    </div>
+</div>
+
+<!-- 新建文件弹窗 -->
+<div id="newFileModal" class="modal-overlay">
+    <div class="modal">
+        <h3>📝 新建笔记</h3>
+        <div style="margin-bottom:12px;">
+            <label style="font-size:13px;font-weight:500;display:block;margin-bottom:4px;">文件名</label>
+            <input type="text" id="newFileName" placeholder="输入文件名（不含 .md 后缀）"
+                style="width:100%;padding:10px;border:1px solid #e1e3e6;border-radius:8px;font-size:14px;box-sizing:border-box;">
+        </div>
+        <div style="margin-bottom:12px;">
+            <label style="font-size:13px;font-weight:500;display:block;margin-bottom:4px;">内容（可选）</label>
+            <textarea id="newFileContent" rows="8" placeholder="输入笔记内容（支持 Markdown）"
+                style="width:100%;padding:10px;border:1px solid #e1e3e6;border-radius:8px;font-size:13px;
+                       font-family:monospace;resize:vertical;box-sizing:border-box;"></textarea>
+        </div>
+        <div class="flex" style="gap:8px;justify-content:flex-end;">
+            <button class="btn btn-secondary" onclick="closeNewFileModal()">取消</button>
+            <button class="btn btn-primary" onclick="createNewFile()">创建</button>
+        </div>
+    </div>
+</div>
+
 <script>
 var KB_ID = [[${kb.id}]];
-var CURRENT_DIR = [[${currentDir}]];
+var CURRENT_DIR = /*[[${currentDir}]]*/ '';
+var fileEditMode = false;
 
 function switchTab(name) {
     document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
@@ -137,6 +209,148 @@ function switchTab(name) {
     document.getElementById('tab-' + name).classList.add('active');
 }
 
+// ====== 文件编辑模式 ======
+function toggleFileEditMode() {
+    fileEditMode = !fileEditMode;
+    var btn = document.getElementById('fileEditBtn');
+    btn.textContent = fileEditMode ? '✕ 完成' : '✏️ 编辑';
+    var actions = document.querySelectorAll('.file-actions');
+    actions.forEach(function(el) {
+        el.style.opacity = fileEditMode ? '1' : '';
+        el.style.pointerEvents = fileEditMode ? 'auto' : '';
+    });
+}
+
+// ====== 编辑文件 ======
+function editFile(name) {
+    var path = CURRENT_DIR ? CURRENT_DIR + '/' + name : name;
+    fetch('/kb/' + KB_ID + '/notes/raw?path=' + encodeURIComponent(path))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.ok) {
+                document.getElementById('editFileName').textContent = name;
+                document.getElementById('editFileContent').value = data.content;
+                document.getElementById('editFileModal').classList.add('active');
+                document.getElementById('editFileContent').focus();
+            } else {
+                toast('❌ 读取文件失败');
+            }
+        });
+}
+
+function closeEditFileModal() {
+    document.getElementById('editFileModal').classList.remove('active');
+}
+
+function saveFile() {
+    var name = document.getElementById('editFileName').textContent;
+    var content = document.getElementById('editFileContent').value;
+    var path = CURRENT_DIR ? CURRENT_DIR + '/' + name : name;
+    var btn = document.getElementById('saveFileBtn');
+    btn.disabled = true;
+    btn.textContent = '⏳ 保存中...';
+
+    fetch('/kb/' + KB_ID + '/notes/save', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({path: path, content: content})
+    }).then(function(r) { return r.json(); })
+      .then(function(data) {
+          btn.disabled = false;
+          btn.textContent = '💾 保存';
+          if (data.ok) {
+              toast('✅ 已保存');
+              closeEditFileModal();
+          } else {
+              toast('❌ ' + (data.error || '保存失败'));
+          }
+      });
+}
+
+// ====== 新建文件 ======
+function openNewFileModal() {
+    document.getElementById('newFileName').value = '';
+    document.getElementById('newFileContent').value = '';
+    document.getElementById('newFileModal').classList.add('active');
+    document.getElementById('newFileName').focus();
+}
+
+function closeNewFileModal() {
+    document.getElementById('newFileModal').classList.remove('active');
+}
+
+function createNewFile() {
+    var name = document.getElementById('newFileName').value.trim();
+    var content = document.getElementById('newFileContent').value;
+    if (!name) { toast('❌ 请输入文件名'); return; }
+
+    fetch('/kb/' + KB_ID + '/notes/new?dir=' + encodeURIComponent(CURRENT_DIR) + '&filename=' + encodeURIComponent(name), {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: content ? JSON.stringify({content: content}) : '{}'
+    }).then(function(r) { return r.json(); })
+      .then(function(data) {
+          if (data.ok) {
+              toast('✅ 创建成功');
+              closeNewFileModal();
+              location.reload();
+          } else {
+              toast('❌ ' + (data.error || '创建失败'));
+          }
+      });
+}
+
+// ====== 重命名 ======
+function renameItem(name, isDir) {
+    var newName = prompt('重命名' + (isDir ? '目录' : '文件'), name);
+    if (!newName || newName === name) return;
+    newName = newName.trim();
+    if (!newName) return;
+
+    var path = CURRENT_DIR ? CURRENT_DIR + '/' + name : name;
+    var newPath = CURRENT_DIR ? CURRENT_DIR + '/' + newName : newName;
+
+    fetch('/kb/' + KB_ID + '/notes/rename', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({oldPath: path, newPath: newPath})
+    }).then(function(r) { return r.json(); })
+      .then(function(data) {
+          if (data.ok) {
+              toast('✅ 重命名成功');
+              location.reload();
+          } else {
+              toast('❌ ' + (data.error || '重命名失败'));
+          }
+      });
+}
+
+// ====== 删除 ======
+function deleteItem(name, isDir) {
+    var type = isDir ? '目录' : '文件';
+    if (!confirm('确定要删除' + type + '「' + name + '」吗？')) return;
+
+    var path = CURRENT_DIR ? CURRENT_DIR + '/' + name : name;
+    var endpoint = isDir ? '/kb/' + KB_ID + '/api/dir-delete' : '/kb/' + KB_ID + '/notes/delete';
+
+    fetch(endpoint, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: isDir ? JSON.stringify({name: path}) : undefined
+    }).then(function(r) {
+        if (isDir) return r.json();
+        return fetch('/kb/' + KB_ID + '/notes/delete?path=' + encodeURIComponent(path), {method: 'POST'}).then(function(r2) { return r2.json(); });
+    }).then(function(data) {
+        if (data.ok) {
+            toast('✅ 已删除');
+            location.reload();
+        } else {
+            toast('❌ ' + (data.error || '删除失败'));
+        }
+    });
+}
+
+// ====== AI 分析 ======
 function startAnalysis() {
     var btn = document.getElementById('analyzeBtn');
     btn.disabled = true; btn.textContent = '⏳ 分析中...';

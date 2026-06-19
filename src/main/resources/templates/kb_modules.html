@@ -18,27 +18,12 @@
         </div>
 
         <div id="dirToolbar" style="display:none;margin-bottom:12px;padding:12px;background:#f9f9fb;border-radius:8px;">
-            <div class="text-muted" style="font-size:12px;margin-bottom:8px;">拖拽排序，点击 👁️ 隐藏目录</div>
-            <button class="btn btn-primary" onclick="saveDirSettings()" style="font-size:12px;">💾 保存排序</button>
+            <div class="text-muted" style="font-size:12px;margin-bottom:8px;">拖拽排序，点击 👁️/👁️‍🗨️ 切换显示/隐藏</div>
+            <button class="btn btn-primary" id="saveDirBtn" style="font-size:12px;">💾 保存排序</button>
         </div>
 
-        <div th:if="${!topDirs.isEmpty()}" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;">
-            <div th:each="d : ${topDirs}" class="dir-item" th:attr="data-dir=${d}"
-                 draggable="true" style="display:flex;align-items:center;gap:10px;padding:16px;background:#f5f6f8;
-                        border-radius:10px;transition:all .15s;">
-                <span class="dir-handle" style="display:none;cursor:move;color:#999;font-size:18px;">⋮⋮</span>
-                <a th:href="@{/kb/{id}/notes(dir=${d}, id=${kb.id})}" style="text-decoration:none;color:inherit;flex:1;display:flex;align-items:center;gap:10px;">
-                    <span style="font-size:24px;">📁</span>
-                    <span style="font-size:14px;font-weight:500;" th:text="${d}">目录名</span>
-                </a>
-                <button class="dir-hide-btn btn btn-secondary" style="display:none;padding:2px 8px;font-size:11px;"
-                        th:attr="data-dir=${d}">👁️ 隐藏</button>
-            </div>
-        </div>
-
-        <div th:if="${topDirs.isEmpty()}" class="text-muted" style="padding:40px;text-align:center;">
-            笔记库为空，请先添加笔记文件
-        </div>
+        <!-- 目录列表容器（由 JS 动态渲染） -->
+        <div id="dirListContainer" style="min-height:80px;"></div>
     </div>
 </div>
 
@@ -126,47 +111,282 @@
 <script>
 var KB_ID = [[${kb.id}]];
 var CURRENT_DIR = /*[[${currentDir}]]*/ '';
-var dirSortOrder = [];
-var dirHidden = [];
+var dirData = [];
+var isEditing = false;
+var dragItem = null;
 
+// ====== 加载目录数据 ======
+function loadDirData() {
+    var container = document.getElementById('dirListContainer');
+    container.innerHTML = '<div class="text-muted" style="padding:20px;text-align:center;">⏳ 加载中...</div>';
+
+    Promise.all([
+        fetch('/kb/' + KB_ID + '/api/dirs').then(function(r) { return r.json(); }),
+        fetch('/kb/' + KB_ID + '/api/dir-settings').then(function(r) { return r.json(); })
+    ]).then(function(results) {
+        var dirsRes = results[0];
+        var settingsRes = results[1];
+        if (!dirsRes.ok) { container.innerHTML = '<div class="text-muted" style="padding:40px;text-align:center;">加载失败</div>'; return; }
+
+        var allDirs = dirsRes.dirs || [];
+        var settings = settingsRes.ok ? (settingsRes.settings || {}) : {};
+        var hidden = settings.hidden || [];
+        var sort = settings.sort || [];
+
+        var orderMap = {};
+        sort.forEach(function(name, i) { orderMap[name] = i; });
+
+        dirData = allDirs.map(function(name) {
+            return { name: name, hidden: hidden.indexOf(name) !== -1, sortOrder: orderMap[name] !== undefined ? orderMap[name] : 999 };
+        });
+        dirData.sort(function(a, b) { return a.sortOrder - b.sortOrder; });
+
+        renderDirs();
+    }).catch(function() {
+        container.innerHTML = '<div class="text-muted" style="padding:40px;text-align:center;">网络错误</div>';
+    });
+}
+
+// ====== 渲染目录列表 ======
+function renderDirs() {
+    var container = document.getElementById('dirListContainer');
+    if (!dirData.length) {
+        container.innerHTML = '<div class="text-muted" style="padding:40px;text-align:center;">笔记库为空，请先添加笔记文件</div>';
+        return;
+    }
+    if (isEditing) {
+        renderEditMode(container);
+    } else {
+        renderNormalMode(container);
+    }
+}
+
+function renderNormalMode(container) {
+    var visible = dirData.filter(function(d) { return !d.hidden; });
+    if (!visible.length) {
+        container.innerHTML = '<div class="text-muted" style="padding:40px;text-align:center;">所有目录已隐藏，点击「编辑排序」可重新显示</div>';
+        return;
+    }
+    var html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;">';
+    visible.forEach(function(d) {
+        html += '<a href="/kb/' + KB_ID + '/notes?dir=' + encodeURIComponent(d.name) + '" class="dir-card" style="display:flex;align-items:center;gap:10px;padding:16px;background:#f5f6f8;border-radius:10px;text-decoration:none;color:inherit;transition:all .15s;">'
+            + '<span style="font-size:24px;">📁</span>'
+            + '<span style="font-size:14px;font-weight:500;">' + escapeHtml(d.name) + '</span>'
+            + '</a>';
+    });
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function renderEditMode(container) {
+    var html = '';
+    dirData.forEach(function(d) {
+        var hiddenStyle = d.hidden ? 'opacity:0.5;background:#e8e8ed;' : '';
+        var dragStyle = d._dragging ? 'opacity:0.4;transform:scale(0.98);' : '';
+        html += '<div class="dir-item" data-dir="' + escapeHtml(d.name) + '" data-hidden="' + d.hidden + '" draggable="true"'
+            + ' style="display:flex;align-items:center;gap:10px;padding:14px 16px;margin-bottom:6px;background:#fff;border:1px solid #e8eaed;border-radius:10px;transition:all .15s;cursor:default;' + hiddenStyle + dragStyle + '">'
+            + '<span class="dir-handle" style="cursor:grab;color:#bbb;font-size:16px;user-select:none;" title="拖拽排序">⠿</span>'
+            + '<span style="font-size:18px;">📁</span>'
+            + '<span class="dir-name" style="font-size:14px;font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(d.name) + '</span>';
+        if (d.hidden) {
+            html += '<span style="font-size:11px;color:#909296;background:#e8e8ed;padding:2px 8px;border-radius:4px;">已隐藏</span>';
+        }
+        html += '<button class="dir-toggle-btn" data-dir="' + escapeHtml(d.name) + '" data-hidden="' + d.hidden + '"'
+            + ' style="padding:4px 10px;font-size:12px;border:1px solid #ddd;border-radius:6px;background:#fff;cursor:pointer;transition:all .15s;"'
+            + ' onmouseenter="this.style.background=\'#f0edff\'" onmouseleave="this.style.background=\'#fff\'">'
+            + (d.hidden ? '👁️ 显示' : '👁️‍🗨️ 隐藏')
+            + '</button>'
+            + '<button class="dir-rename-btn" data-dir="' + escapeHtml(d.name) + '"'
+            + ' style="padding:4px 10px;font-size:12px;border:1px solid #ddd;border-radius:6px;background:#fff;cursor:pointer;transition:all .15s;"'
+            + ' onmouseenter="this.style.background=\'#fff3e0\'" onmouseleave="this.style.background=\'#fff\'"'
+            + ' title="重命名">✏️</button>'
+            + '<button class="dir-delete-btn" data-dir="' + escapeHtml(d.name) + '"'
+            + ' style="padding:4px 10px;font-size:12px;border:1px solid #ffcdd2;border-radius:6px;background:#fff;color:#d32f2f;cursor:pointer;transition:all .15s;"'
+            + ' onmouseenter="this.style.background=\'#ffebee\'" onmouseleave="this.style.background=\'#fff\'"'
+            + ' title="删除">🗑️</button>'
+            + '</div>';
+    });
+    container.innerHTML = html;
+    setupDragDrop();
+}
+
+// ====== 编辑模式开关 ======
 function toggleEditDirs() {
+    isEditing = !isEditing;
     var toolbar = document.getElementById('dirToolbar');
-    var isHidden = toolbar.style.display === 'none';
-    toolbar.style.display = isHidden ? 'block' : 'none';
-
-    document.querySelectorAll('.dir-item').forEach(function(el) {
-        el.querySelector('.dir-handle').style.display = isHidden ? 'inline' : 'none';
-        el.querySelector('.dir-hide-btn').style.display = isHidden ? 'inline' : 'none';
-    });
+    var btn = document.getElementById('editDirBtn');
+    toolbar.style.display = isEditing ? 'block' : 'none';
+    btn.textContent = isEditing ? '✕ 完成编辑' : '✏️ 编辑排序';
+    btn.className = isEditing ? 'btn btn-secondary' : 'btn btn-secondary';
+    renderDirs();
 }
 
-function hideDir(name) {
-    dirHidden.push(name);
-    document.querySelector('.dir-item[data-dir="' + name + '"]').style.display = 'none';
+// ====== 切换隐藏/显示 ======
+function toggleDir(name) {
+    for (var i = 0; i < dirData.length; i++) {
+        if (dirData[i].name === name) {
+            dirData[i].hidden = !dirData[i].hidden;
+            break;
+        }
+    }
+    renderDirs();
 }
 
-function saveDirSettings() {
-    var items = document.querySelectorAll('.dir-item');
-    var order = [];
-    items.forEach(function(el) {
-        var d = el.getAttribute('data-dir');
-        if (dirHidden.indexOf(d) === -1) order.push(d);
-    });
+// ====== 重命名目录 ======
+function renameDir(oldName) {
+    var newName = prompt('重命名目录', oldName);
+    if (!newName || newName === oldName) return;
+    newName = newName.trim();
+    if (!newName) return;
 
-    fetch('/kb/' + KB_ID + '/api/dir-settings', {
+    var exists = dirData.some(function(d) { return d.name === newName; });
+    if (exists) { toast('❌ 目录名已存在'); return; }
+
+    fetch('/kb/' + KB_ID + '/api/dir-rename', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({sort: order, hidden: dirHidden})
+        body: JSON.stringify({oldName: oldName, newName: newName})
     }).then(function(r) { return r.json(); })
       .then(function(data) {
           if (data.ok) {
-              toast('✅ 已保存');
-              setTimeout(function() { location.reload(); }, 500);
+              toast('✅ 重命名成功');
+              loadDirData();
+          } else {
+              toast('❌ ' + (data.error || '重命名失败'));
           }
       });
 }
 
-// AI 分析
+// ====== 删除目录 ======
+function deleteDir(name) {
+    if (!confirm('确定要删除目录「' + name + '」吗？\n目录下的所有文件将被永久删除！')) return;
+
+    fetch('/kb/' + KB_ID + '/api/dir-delete', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name: name})
+    }).then(function(r) { return r.json(); })
+      .then(function(data) {
+          if (data.ok) {
+              toast('✅ 已删除');
+              loadDirData();
+          } else {
+              toast('❌ ' + (data.error || '删除失败'));
+          }
+      });
+}
+
+// ====== 保存设置 ======
+function saveDirSettings() {
+    var items = document.querySelectorAll('.dir-item');
+    var order = [];
+    var hidden = [];
+    items.forEach(function(el) {
+        var d = el.getAttribute('data-dir');
+        order.push(d);
+        if (el.getAttribute('data-hidden') === 'true') {
+            hidden.push(d);
+        }
+    });
+
+    var btn = document.getElementById('saveDirBtn');
+    btn.disabled = true;
+    btn.textContent = '⏳ 保存中...';
+
+    fetch('/kb/' + KB_ID + '/api/dir-settings', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({sort: order, hidden: hidden})
+    }).then(function(r) { return r.json(); })
+      .then(function(data) {
+          btn.disabled = false;
+          btn.textContent = '💾 保存排序';
+          if (data.ok) {
+              toast('✅ 已保存');
+              isEditing = false;
+              document.getElementById('dirToolbar').style.display = 'none';
+              document.getElementById('editDirBtn').textContent = '✏️ 编辑排序';
+              loadDirData();
+          } else {
+              toast('❌ 保存失败');
+          }
+      }).catch(function() {
+          btn.disabled = false;
+          btn.textContent = '💾 保存排序';
+          toast('❌ 网络错误');
+      });
+}
+
+// ====== 拖拽排序 ======
+function setupDragDrop() {
+    var container = document.getElementById('dirListContainer');
+    if (!container) return;
+
+    container.ondragstart = function(e) {
+        var item = e.target.closest('.dir-item');
+        if (!item) return;
+        dragItem = item;
+        item.style.opacity = '0.4';
+        item.style.transform = 'scale(0.98)';
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', '');
+    };
+
+    container.ondragend = function(e) {
+        if (dragItem) {
+            dragItem.style.opacity = '1';
+            dragItem.style.transform = '';
+        }
+        document.querySelectorAll('.dir-item').forEach(function(el) {
+            el.style.borderTop = '';
+            el.style.borderBottom = '';
+        });
+        dragItem = null;
+    };
+
+    container.ondragover = function(e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        var target = e.target.closest('.dir-item');
+        if (!target || target === dragItem) return;
+
+        document.querySelectorAll('.dir-item').forEach(function(el) {
+            el.style.borderTop = '';
+            el.style.borderBottom = '';
+        });
+
+        var rect = target.getBoundingClientRect();
+        var midY = rect.top + rect.height / 2;
+        if (e.clientY < midY) {
+            target.style.borderTop = '2px solid #7c5cfc';
+        } else {
+            target.style.borderBottom = '2px solid #7c5cfc';
+        }
+    };
+
+    container.ondrop = function(e) {
+        e.preventDefault();
+        var target = e.target.closest('.dir-item');
+        if (!target || target === dragItem) return;
+
+        var rect = target.getBoundingClientRect();
+        var midY = rect.top + rect.height / 2;
+        if (e.clientY < midY) {
+            container.insertBefore(dragItem, target);
+        } else {
+            container.insertBefore(dragItem, target.nextSibling);
+        }
+
+        document.querySelectorAll('.dir-item').forEach(function(el) {
+            el.style.borderTop = '';
+            el.style.borderBottom = '';
+        });
+    };
+}
+
+function escapeHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ====== AI 分析 ======
 function openAnalyzeModal() {
     document.getElementById('analyzeDirName').textContent = CURRENT_DIR;
     document.getElementById('analyzePrompt').value = '';
@@ -230,47 +450,28 @@ function loadJsonData(fileName) {
         });
 }
 
-// 拖拽排序
+// ====== 初始化 ======
 document.addEventListener('DOMContentLoaded', function() {
-    // 编辑排序按钮
-    var editBtn = document.getElementById('editDirBtn');
-    if (editBtn) {
-        editBtn.addEventListener('click', toggleEditDirs);
-    }
+    loadDirData();
 
-    var container = document.querySelector('.dir-item')?.parentElement;
-    if (!container) return;
+    document.getElementById('editDirBtn').addEventListener('click', toggleEditDirs);
+    document.getElementById('saveDirBtn').addEventListener('click', saveDirSettings);
 
-    var dragItem = null;
-
-    container.addEventListener('dragstart', function(e) {
-        dragItem = e.target.closest('.dir-item');
-        if (dragItem) dragItem.style.opacity = '0.5';
-    });
-
-    container.addEventListener('dragend', function(e) {
-        if (dragItem) dragItem.style.opacity = '1';
-        dragItem = null;
-    });
-
-    container.addEventListener('dragover', function(e) {
-        e.preventDefault();
-        var target = e.target.closest('.dir-item');
-        if (target && target !== dragItem) {
-            var rect = target.getBoundingClientRect();
-            var midY = rect.top + rect.height / 2;
-            if (e.clientY < midY) {
-                container.insertBefore(dragItem, target);
-            } else {
-                container.insertBefore(dragItem, target.nextSibling);
-            }
-        }
-    });
-
-    // 隐藏按钮事件委托
     document.addEventListener('click', function(e) {
-        if (e.target.classList.contains('dir-hide-btn')) {
-            hideDir(e.target.getAttribute('data-dir'));
+        var btn = e.target.closest('.dir-toggle-btn');
+        if (btn) {
+            toggleDir(btn.getAttribute('data-dir'));
+            return;
+        }
+        var renameBtn = e.target.closest('.dir-rename-btn');
+        if (renameBtn) {
+            renameDir(renameBtn.getAttribute('data-dir'));
+            return;
+        }
+        var deleteBtn = e.target.closest('.dir-delete-btn');
+        if (deleteBtn) {
+            deleteDir(deleteBtn.getAttribute('data-dir'));
+            return;
         }
     });
 });

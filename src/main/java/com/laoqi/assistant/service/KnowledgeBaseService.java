@@ -74,8 +74,6 @@ public class KnowledgeBaseService {
     public void save(Map<String, Object> body) {
         Object idRaw = body.get("id");
         Long id = idRaw != null ? Long.valueOf(idRaw.toString()) : null;
-        String name = str(body.get("name"));
-        String notesDir = str(body.get("notesDir"));
 
         KnowledgeBaseEntity e;
         boolean isNew = false;
@@ -90,9 +88,10 @@ public class KnowledgeBaseService {
             isNew = true;
         }
 
-        if (name != null) e.setName(name);
-        if (notesDir != null) e.setNotesDir(notesDir);
+        if (body.containsKey("name")) e.setName(str(body.get("name")));
+        if (body.containsKey("notesDir")) e.setNotesDir(str(body.get("notesDir")));
         if (body.containsKey("labels")) e.setLabels(str(body.get("labels")));
+        if (body.containsKey("dirSettings")) e.setDirSettings(str(body.get("dirSettings")));
         if (body.containsKey("sortOrder")) {
             e.setSortOrder(Integer.valueOf(body.get("sortOrder").toString()));
         }

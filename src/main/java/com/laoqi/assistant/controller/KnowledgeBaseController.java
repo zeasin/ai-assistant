@@ -139,6 +139,8 @@ public class KnowledgeBaseController {
         // dir 为空 → 显示一级目录列表
         if (dir.isEmpty()) {
             model.put("topDirs", listTopDirs(base, kb.getDirSettings()));
+            model.put("allDirInfos", listAllDirInfos(base, kb.getDirSettings()));
+            model.put("dirSettings", parseDirSettings(kb.getDirSettings()));
             model.put("currentDir", "");
             return "kb_modules";
         }
@@ -150,6 +152,8 @@ public class KnowledgeBaseController {
         }
 
         model.put("topDirs", listTopDirs(base, kb.getDirSettings()));
+        model.put("allDirInfos", listAllDirInfos(base, kb.getDirSettings()));
+        model.put("dirSettings", parseDirSettings(kb.getDirSettings()));
         model.put("currentDir", dir);
         model.put("files", listDirContents(target));
         model.put("breadcrumbs", buildBreadcrumbs(dir));
@@ -260,12 +264,133 @@ public class KnowledgeBaseController {
     }
 
     @ResponseBody
+    @GetMapping("/kb/{id}/api/dirs")
+    public Map<String, Object> listDirs(@PathVariable Long id) {
+        KnowledgeBaseEntity kb = kbService.getById(id);
+        if (kb == null) return Map.of("ok", false, "error", "知识库不存在");
+        if (kb.getNotesDir() == null || kb.getNotesDir().isBlank()) {
+            return Map.of("ok", true, "dirs", List.of());
+        }
+        Path base = kbDir(kb);
+        List<String> allDirs = scanTopDirs(base);
+        return Map.of("ok", true, "dirs", allDirs);
+    }
+
+    @ResponseBody
     @GetMapping("/kb/{id}/api/dir-settings")
     public Map<String, Object> getDirSettings(@PathVariable Long id) {
         KnowledgeBaseEntity kb = kbService.getById(id);
         if (kb == null) return Map.of("ok", false);
         Map<String, Object> settings = parseDirSettings(kb.getDirSettings());
         return Map.of("ok", true, "settings", settings);
+    }
+
+    @ResponseBody
+    @PostMapping("/kb/{id}/api/dir-rename")
+    public Map<String, Object> renameDir(@PathVariable Long id, @RequestBody Map<String, String> body) {
+        KnowledgeBaseEntity kb = kbService.getById(id);
+        if (kb == null) return Map.of("ok", false, "error", "知识库不存在");
+
+        String oldName = body.getOrDefault("oldName", "").trim();
+        String newName = body.getOrDefault("newName", "").trim();
+        if (oldName.isEmpty() || newName.isEmpty()) {
+            return Map.of("ok", false, "error", "目录名不能为空");
+        }
+
+        Path base = kbDir(kb);
+        Path oldPath = safeResolve(base, oldName);
+        Path newPath = safeResolve(base, newName);
+
+        if (!Files.isDirectory(oldPath)) {
+            return Map.of("ok", false, "error", "原目录不存在");
+        }
+        if (Files.exists(newPath)) {
+            return Map.of("ok", false, "error", "目标目录名已存在");
+        }
+
+        try {
+            Files.move(oldPath, newPath);
+
+            // 更新 dirSettings 中的排序和隐藏列表
+            String dirSettings = kb.getDirSettings();
+            if (dirSettings != null && !dirSettings.isBlank()) {
+                Map<String, Object> settings = parseDirSettings(dirSettings);
+                @SuppressWarnings("unchecked")
+                List<String> sort = (List<String>) settings.getOrDefault("sort", new ArrayList<>());
+                @SuppressWarnings("unchecked")
+                List<String> hidden = (List<String>) settings.getOrDefault("hidden", new ArrayList<>());
+
+                int idx = sort.indexOf(oldName);
+                if (idx >= 0) sort.set(idx, newName);
+                idx = hidden.indexOf(oldName);
+                if (idx >= 0) hidden.set(idx, newName);
+
+                settings.put("sort", sort);
+                settings.put("hidden", hidden);
+                kb.setDirSettings(mapper.writeValueAsString(settings));
+                kbService.save(Map.of("id", id, "dirSettings", kb.getDirSettings()));
+            }
+
+            logService.add("目录管理", "重命名", oldName + " → " + newName);
+            return Map.of("ok", true);
+        } catch (IOException e) {
+            return Map.of("ok", false, "error", "重命名失败: " + e.getMessage());
+        }
+    }
+
+    @ResponseBody
+    @PostMapping("/kb/{id}/api/dir-delete")
+    public Map<String, Object> deleteDir(@PathVariable Long id, @RequestBody Map<String, String> body) {
+        KnowledgeBaseEntity kb = kbService.getById(id);
+        if (kb == null) return Map.of("ok", false, "error", "知识库不存在");
+
+        String dirName = body.getOrDefault("name", "").trim();
+        if (dirName.isEmpty()) {
+            return Map.of("ok", false, "error", "目录名不能为空");
+        }
+
+        Path base = kbDir(kb);
+        Path target = safeResolve(base, dirName);
+
+        if (!Files.isDirectory(target)) {
+            return Map.of("ok", false, "error", "目录不存在");
+        }
+
+        try {
+            deleteRecursively(target);
+
+            // 更新 dirSettings
+            String dirSettings = kb.getDirSettings();
+            if (dirSettings != null && !dirSettings.isBlank()) {
+                Map<String, Object> settings = parseDirSettings(dirSettings);
+                @SuppressWarnings("unchecked")
+                List<String> sort = (List<String>) settings.getOrDefault("sort", new ArrayList<>());
+                @SuppressWarnings("unchecked")
+                List<String> hidden = (List<String>) settings.getOrDefault("hidden", new ArrayList<>());
+
+                sort.remove(dirName);
+                hidden.remove(dirName);
+
+                settings.put("sort", sort);
+                settings.put("hidden", hidden);
+                kb.setDirSettings(mapper.writeValueAsString(settings));
+                kbService.save(Map.of("id", id, "dirSettings", kb.getDirSettings()));
+            }
+
+            logService.add("目录管理", "删除", dirName);
+            return Map.of("ok", true);
+        } catch (IOException e) {
+            return Map.of("ok", false, "error", "删除失败: " + e.getMessage());
+        }
+    }
+
+    private void deleteRecursively(Path dir) throws IOException {
+        if (!Files.exists(dir)) return;
+        Files.walk(dir)
+            .sorted(Comparator.reverseOrder())
+            .forEach(p -> {
+                try { Files.deleteIfExists(p); } catch (IOException ignored) {}
+            });
     }
 
     // ========== 笔记 API ==========
@@ -309,6 +434,76 @@ public class KnowledgeBaseController {
             return Map.of("ok", true);
         } catch (IOException e) {
             return Map.of("ok", false, "error", "删除失败: " + e.getMessage());
+        }
+    }
+
+    @ResponseBody
+    @GetMapping("/kb/{id}/notes/raw")
+    public Map<String, Object> readRawFile(@PathVariable Long id, @RequestParam String path) {
+        KnowledgeBaseEntity kb = kbService.getById(id);
+        if (kb == null) return Map.of("ok", false, "error", "知识库不存在");
+        Path target = safeResolve(kbDir(kb), path);
+        if (!Files.isRegularFile(target))
+            return Map.of("ok", false, "error", "文件不存在");
+        try {
+            String content = Files.readString(target, java.nio.charset.StandardCharsets.UTF_8);
+            return Map.of("ok", true, "content", content);
+        } catch (IOException e) {
+            return Map.of("ok", false, "error", "读取失败: " + e.getMessage());
+        }
+    }
+
+    @ResponseBody
+    @PostMapping("/kb/{id}/notes/save")
+    public Map<String, Object> saveFile(@PathVariable Long id, @RequestBody Map<String, String> body) {
+        KnowledgeBaseEntity kb = kbService.getById(id);
+        if (kb == null) return Map.of("ok", false, "error", "知识库不存在");
+
+        String path = body.getOrDefault("path", "").trim();
+        String content = body.getOrDefault("content", "");
+        if (path.isEmpty()) return Map.of("ok", false, "error", "文件路径不能为空");
+
+        Path target = safeResolve(kbDir(kb), path);
+        try {
+            Files.createDirectories(target.getParent());
+            Files.writeString(target, content, java.nio.charset.StandardCharsets.UTF_8);
+            logService.add("保存笔记", "成功", path);
+            return Map.of("ok", true);
+        } catch (IOException e) {
+            return Map.of("ok", false, "error", "保存失败: " + e.getMessage());
+        }
+    }
+
+    @ResponseBody
+    @PostMapping("/kb/{id}/notes/rename")
+    public Map<String, Object> renameFile(@PathVariable Long id, @RequestBody Map<String, String> body) {
+        KnowledgeBaseEntity kb = kbService.getById(id);
+        if (kb == null) return Map.of("ok", false, "error", "知识库不存在");
+
+        String oldPath = body.getOrDefault("oldPath", "").trim();
+        String newPath = body.getOrDefault("newPath", "").trim();
+        if (oldPath.isEmpty() || newPath.isEmpty()) {
+            return Map.of("ok", false, "error", "路径不能为空");
+        }
+
+        Path base = kbDir(kb);
+        Path old = safeResolve(base, oldPath);
+        Path nw = safeResolve(base, newPath);
+
+        if (!Files.exists(old)) {
+            return Map.of("ok", false, "error", "原文件不存在");
+        }
+        if (Files.exists(nw)) {
+            return Map.of("ok", false, "error", "目标文件已存在");
+        }
+
+        try {
+            Files.createDirectories(nw.getParent());
+            Files.move(old, nw);
+            logService.add("重命名", "成功", oldPath + " → " + newPath);
+            return Map.of("ok", true);
+        } catch (IOException e) {
+            return Map.of("ok", false, "error", "重命名失败: " + e.getMessage());
         }
     }
 
@@ -743,21 +938,32 @@ public class KnowledgeBaseController {
 
     // ========== 辅助方法 ==========
 
-    private List<String> listTopDirs(Path base, String dirSettings) {
-        Set<String> defaultIgnored = Set.of(".git", ".obsidian", "__pycache__", ".DS_Store",
-                ".claude", ".playwright-mcp", ".sisyphus", "AI");
+    private static final Set<String> DEFAULT_IGNORED = Set.of(".git", ".obsidian", "__pycache__",
+            ".DS_Store", ".claude", ".playwright-mcp", ".sisyphus", "AI");
 
-        List<String> allDirs;
+    private List<String> scanTopDirs(Path base) {
         try (var stream = Files.list(base)) {
-            allDirs = stream.filter(Files::isDirectory)
+            return stream.filter(Files::isDirectory)
                     .filter(p -> !p.getFileName().toString().startsWith("."))
-                    .filter(p -> !defaultIgnored.contains(p.getFileName().toString()))
+                    .filter(p -> !DEFAULT_IGNORED.contains(p.getFileName().toString()))
                     .map(p -> p.getFileName().toString())
                     .sorted()
                     .collect(Collectors.toList());
         } catch (Exception e) {
             return List.of();
         }
+    }
+
+    private List<String> listTopDirs(Path base, String dirSettings) {
+        return listAllDirInfos(base, dirSettings).stream()
+                .filter(m -> !Boolean.TRUE.equals(m.get("hidden")))
+                .map(m -> (String) m.get("name"))
+                .collect(Collectors.toList());
+    }
+
+    private List<Map<String, Object>> listAllDirInfos(Path base, String dirSettings) {
+        List<String> allDirs = scanTopDirs(base);
+        if (allDirs.isEmpty()) return List.of();
 
         // 解析用户设置
         Map<String, Object> settings = parseDirSettings(dirSettings);
@@ -766,19 +972,19 @@ public class KnowledgeBaseController {
         @SuppressWarnings("unchecked")
         List<String> sort = (List<String>) settings.getOrDefault("sort", List.of());
 
-        // 隐藏
-        allDirs = allDirs.stream()
-                .filter(d -> !hidden.contains(d))
-                .collect(Collectors.toList());
+        // 构建完整目录信息
+        Map<String, String> orderMap = new HashMap<>();
+        for (int i = 0; i < sort.size(); i++) orderMap.put(sort.get(i), String.valueOf(i));
 
-        // 排序：按 sort 列表顺序，未在 sort 中的追加到末尾
-        if (!sort.isEmpty()) {
-            Map<String, Integer> order = new HashMap<>();
-            for (int i = 0; i < sort.size(); i++) order.put(sort.get(i), i);
-            allDirs.sort(Comparator.comparingInt(d -> order.getOrDefault(d, 999)));
-        }
-
-        return allDirs;
+        return allDirs.stream().map(name -> {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("name", name);
+            m.put("hidden", hidden.contains(name));
+            m.put("sortOrder", orderMap.getOrDefault(name, "999"));
+            return m;
+        })
+        .sorted(Comparator.comparing(m -> (String) m.get("sortOrder")))
+        .collect(Collectors.toList());
     }
 
     private List<Map<String, Object>> listDirContents(Path dir) {
