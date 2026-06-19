@@ -61,15 +61,6 @@
 .sr-tab-btn.active { color:#7c5cfc; border-bottom-color:#7c5cfc; font-weight:600; }
 </style>
 
-<div th:if="${#lists.size(kbList) == 0}" class="card" style="text-align:center;padding:60px 20px;">
-    <div style="font-size:48px;margin-bottom:16px;">📚</div>
-    <h2 style="margin-bottom:8px;">尚未配置知识库</h2>
-    <p style="color:#5c5f66;font-size:14px;margin-bottom:20px;">识图功能需要先配置知识库来管理图片和保存分析结果</p>
-    <a href="/config" class="btn btn-primary">⚙️ 前往配置知识库</a>
-</div>
-
-<div th:if="${#lists.size(kbList) > 0}">
-
 <div class="sr-card" style="padding:14px 20px;">
     <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;">
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
@@ -78,7 +69,7 @@
             <button class="sr-scenario-btn" data-scenario="data">📊 数据统计</button>
             <button class="sr-scenario-btn" data-scenario="general">🖼️ 通用识别</button>
         </div>
-        <div style="display:flex;gap:8px;align-items:center;">
+        <div th:if="${#lists.size(kbList) > 0}" style="display:flex;gap:8px;align-items:center;">
             <span style="font-size:13px;color:#5c5f66;font-weight:500;">📂 知识库</span>
             <select id="kbSelector" style="padding:8px 12px;border:1px solid #e1e3e6;border-radius:8px;font-size:13px;background:#fff;outline:none;min-width:140px;">
                 <option th:each="kb : ${kbList}" th:value="${kb.id}" th:text="${kb.name}" th:selected="${kb.id == currentKbId}">知识库</option>
@@ -89,7 +80,7 @@
 
 <div class="sr-tab-bar">
     <button class="sr-tab-btn active" data-tab="upload">📤 上传图片</button>
-    <button class="sr-tab-btn" data-tab="browse">📚 知识库图片</button>
+    <button th:if="${#lists.size(kbList) > 0}" class="sr-tab-btn" data-tab="browse">📚 知识库图片</button>
 </div>
 
 <div id="panelUpload" class="sr-card" style="border-radius:0 0 12px 12px;border-top:none;">
@@ -228,8 +219,6 @@
     </div>
 </div>
 
-</div><!-- end th:if kbList>0 -->
-
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/contrib/auto-render.min.js"
@@ -268,7 +257,11 @@ function switchTab(tab) {
     }
 }
 
-function getKbId() { return parseInt(document.getElementById('kbSelector').value); }
+function getKbId() {
+    var el = document.getElementById('kbSelector');
+    if (!el || !el.value) return null;
+    return parseInt(el.value);
+}
 
 function onKbChange() {
     allImages = [];
@@ -681,8 +674,6 @@ document.addEventListener('DOMContentLoaded', function() {
     loadDirTree();
 });
 </script>
-
-</div><!-- end th:if kbList>0 -->
 
 </th:block>
 </body>
