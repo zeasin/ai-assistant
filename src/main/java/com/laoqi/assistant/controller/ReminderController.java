@@ -5,7 +5,6 @@ import com.laoqi.assistant.service.ConfigService;
 import com.laoqi.assistant.service.LogService;
 import com.laoqi.assistant.service.ReminderService;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -24,40 +23,7 @@ public class ReminderController {
         this.configService = configService;
     }
 
-    @GetMapping("/reminders")
-    public String remindersPage(@RequestParam(required = false) Long kbId, Model model) {
-        try {
-            String notesDir = configService.getNotesDir(kbId);
-            List<Reminder> reminders = reminderService.getAllReminders(notesDir);
-            List<Map<String, Object>> displayList = reminders.stream()
-                    .map(r -> {
-                        Map<String, Object> m = new java.util.LinkedHashMap<>();
-                        m.put("id", r.id);
-                        m.put("name", r.name);
-                        m.put("message", r.message);
-                        m.put("type", r.type);
-                        m.put("time", r.time);
-                        m.put("date", r.date);
-                        m.put("dayOfWeek", r.dayOfWeek);
-                        m.put("dayOfMonth", r.dayOfMonth);
-                        m.put("monthDay", r.monthDay);
-                        m.put("enabled", r.enabled);
-                        m.put("createdAt", r.createdAt);
-                        m.put("lastTriggered", r.lastTriggered);
-                        m.put("description", reminderService.getReminderDescription(r));
-                        m.put("typeLabel", reminderService.getTypeLabel(r.type));
-                        m.put("weekdayLabel", reminderService.getWeekdayLabel(r.dayOfWeek));
-                        return m;
-                    })
-                    .toList();
-            model.addAttribute("reminders", displayList);
-            model.addAttribute("kbId", kbId);
-        } catch (Exception e) {
-            model.addAttribute("reminders", List.of());
-            model.addAttribute("error", e.getMessage());
-        }
-        return "kb_reminders";
-    }
+    // 页面路由已迁移到 /planner
 
     @GetMapping("/api/reminders")
     @ResponseBody

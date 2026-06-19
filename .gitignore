@@ -86,3 +86,6 @@ memory*.db
 # ========== 配置文件（含敏感凭据） ==========
 config.json
 !config.template.json
+
+
+AI

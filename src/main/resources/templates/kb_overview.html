@@ -29,12 +29,9 @@
 <div class="card">
     <h2>快速入口</h2>
     <div style="display:flex;gap:12px;flex-wrap:wrap;">
-        <a th:href="@{/kb/{id}/tasks(id=${kb.id})}" class="btn btn-primary"
+        <a th:href="@{/planner}" class="btn btn-primary"
            style="flex:1;min-width:120px;justify-content:center;"
-           th:text="'📋 ' + ${labels.get('tasks')}">任务</a>
-        <a th:href="@{/kb/{id}/reminders(id=${kb.id})}" class="btn btn-primary"
-           style="flex:1;min-width:120px;justify-content:center;"
-           th:text="'🔔 ' + ${labels.get('reminders')}">提醒</a>
+           th:text="'📋 计划'">计划</a>
         <a th:href="@{/kb/{id}/modules(id=${kb.id})}" class="btn btn-primary"
            style="flex:1;min-width:120px;justify-content:center;"
            th:text="'🤖 ' + ${labels.get('modules')}">模块</a>

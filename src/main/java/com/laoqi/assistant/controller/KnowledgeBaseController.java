@@ -105,25 +105,7 @@ public class KnowledgeBaseController {
         return "kb_overview";
     }
 
-    @GetMapping("/kb/{id}/tasks")
-    public String tasks(@PathVariable Long id, Map<String, Object> model) {
-        KnowledgeBaseEntity kb = kbService.getById(id);
-        if (kb == null) return "redirect:/config";
-        model.put("kb", kb);
-        model.put("labels", parseLabels(kb.getLabels()));
-        model.put("tasks", taskService.getAllTasks(kb.getNotesDir()));
-        return "kb_tasks";
-    }
-
-    @GetMapping("/kb/{id}/reminders")
-    public String reminders(@PathVariable Long id, Map<String, Object> model) {
-        KnowledgeBaseEntity kb = kbService.getById(id);
-        if (kb == null) return "redirect:/config";
-        model.put("kb", kb);
-        model.put("labels", parseLabels(kb.getLabels()));
-        model.put("reminders", reminderService.getAllReminders(kb.getNotesDir()));
-        return "kb_reminders";
-    }
+    // 任务/提醒页面已迁移到 /planner
 
     @GetMapping("/kb/{id}/modules")
     public String modulesPage(@PathVariable Long id, Map<String, Object> model) {

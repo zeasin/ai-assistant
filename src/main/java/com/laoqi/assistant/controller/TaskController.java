@@ -5,7 +5,6 @@ import com.laoqi.assistant.service.ConfigService;
 import com.laoqi.assistant.service.LogService;
 import com.laoqi.assistant.service.TaskService;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
@@ -23,19 +22,7 @@ public class TaskController {
         this.configService = configService;
     }
 
-    @GetMapping("/tasks")
-    public String taskBoardPage(@RequestParam(required = false) Long kbId, Model model) {
-        try {
-            String notesDir = configService.getNotesDir(kbId);
-            List<TaskItem> tasks = taskService.getAllTasks(notesDir);
-            model.addAttribute("tasks", tasks);
-            model.addAttribute("kbId", kbId);
-        } catch (Exception e) {
-            model.addAttribute("tasks", List.of());
-            model.addAttribute("error", e.getMessage());
-        }
-        return "kb_tasks";
-    }
+    // 页面路由已迁移到 /planner
 
     @PostMapping("/api/tasks/add")
     @ResponseBody
