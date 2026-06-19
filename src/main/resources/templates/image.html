@@ -7,6 +7,13 @@
 <body>
 <th:block layout:fragment="content">
 
+<!-- 笔记库未配置横幅 -->
+<div th:unless="${kbReady}" class="port-banner" style="margin-bottom:16px;">
+    <span>⚠️ 尚未配置笔记库</span>
+    <span style="flex:1;">请先在<a href="/config" style="color:#7c5cfc;font-weight:600;">配置页面</a>中添加知识库并设置笔记库路径。</span>
+    <button class="port-close" onclick="this.parentElement.remove()">✕</button>
+</div>
+
 <style>
 .sr-card { background:#fff; border:1px solid #e1e3e6; border-radius:12px; padding:20px; margin-bottom:16px; }
 .sr-card h3 { font-size:15px; font-weight:600; margin:0 0 12px; color:#1a1b1e; display:flex; align-items:center; gap:6px; }

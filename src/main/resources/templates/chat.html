@@ -7,6 +7,13 @@
 <body>
 <th:block layout:fragment="content">
 
+<!-- 笔记库未配置横幅 -->
+<div th:unless="${kbReady}" class="port-banner" style="margin-bottom:16px;">
+    <span>⚠️ 尚未配置笔记库</span>
+    <span style="flex:1;">请先在<a href="/config" style="color:#7c5cfc;font-weight:600;">配置页面</a>中添加知识库并设置笔记库路径。</span>
+    <button class="port-close" onclick="this.parentElement.remove()">✕</button>
+</div>
+
 <!-- 待办悬浮面板 -->
 <div class="todo-float" id="todoPanel">
     <h3>

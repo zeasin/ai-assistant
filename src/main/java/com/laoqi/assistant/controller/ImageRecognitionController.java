@@ -47,19 +47,31 @@ public class ImageRecognitionController {
 
     @GetMapping
     public String page(@RequestParam(required = false) Long kbId, Model model) {
-        // 无 kbId 时重定向到带 kbId 的 URL
-        if (kbId == null) {
-            KnowledgeBaseEntity first = kbService.getFirst();
-            if (first == null) return "redirect:/config";
-            return "redirect:/image?kbId=" + first.getId();
+        // 1. 检查大模型是否已配置
+        if (!llmService.isAvailable()) {
+            return "redirect:/config#ai-model-section";
         }
 
-        KnowledgeBaseEntity kb = kbService.getById(kbId);
-        if (kb == null) return "redirect:/config";
+        // 2. 检查笔记库是否配置
+        KnowledgeBaseEntity kb = null;
+        if (kbId != null) {
+            kb = kbService.getById(kbId);
+        }
+        if (kb == null) {
+            kb = kbService.getFirst();
+        }
 
-        model.addAttribute("currentKb", kb);
-        model.addAttribute("currentKbId", kb.getId());
-        model.addAttribute("currentKbName", kb.getName());
+        if (kb != null) {
+            model.addAttribute("currentKb", kb);
+            model.addAttribute("currentKbId", kb.getId());
+            model.addAttribute("currentKbName", kb.getName());
+            model.addAttribute("kbReady", true);
+        } else {
+            model.addAttribute("currentKb", null);
+            model.addAttribute("currentKbId", null);
+            model.addAttribute("currentKbName", null);
+            model.addAttribute("kbReady", false);
+        }
 
         List<LlmProfileEntity> allProfiles = llmConfigResolver.getAllProfiles();
         List<LlmProfileEntity> visionModels = allProfiles.stream()
