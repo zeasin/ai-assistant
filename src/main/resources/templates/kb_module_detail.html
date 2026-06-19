@@ -616,7 +616,7 @@ function renderDataTables() {
                 }
             });
             html += '<td class="data-row-actions">';
-            html += '<button class="btn btn-secondary" onclick="window.open(\'/data-editor?kbId=' + KB_ID + '&dir=' + encodeURIComponent(CURRENT_DIR) + '&file=' + encodeURIComponent(dataCurrentFileName) + '&group=' + encodeURIComponent(groupName) + '\', \'_blank\')">详情</button>';
+            html += '<button class="btn btn-secondary" onclick="showDataDetailModal(\'' + esc(dataCurrentFileName) + '\',\'' + esc(groupName) + '\',' + actualIdx + ')">详情</button>';
             html += '<button class="btn btn-secondary" onclick="showDataEditModal(\'' + esc(dataCurrentFileName) + '\',\'' + esc(groupName) + '\',' + actualIdx + ')">编辑</button>';
             html += '<button class="btn btn-danger" onclick="showDataDeleteModal(\'' + esc(dataCurrentFileName) + '\',\'' + esc(groupName) + '\',' + actualIdx + ')">删除</button>';
             html += '</td></tr>';
