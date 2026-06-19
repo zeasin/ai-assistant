@@ -6,10 +6,15 @@
     <title>笔记库</title>
     <style>
         .kb-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(360px,1fr)); gap:16px; }
-        .kb-card { background:#fff; border:1px solid #e1e3e6; border-radius:12px; padding:20px; transition:all .2s; }
+        .kb-card { background:#fff; border:1px solid #e1e3e6; border-radius:12px; padding:20px; transition:all .2s; position:relative; }
         .kb-card:hover { border-color:#d9d0ff; box-shadow:0 4px 16px rgba(0,0,0,0.06); }
         .kb-card .kb-name { font-size:16px; font-weight:600; color:#1a1b1e; margin-bottom:8px; display:flex; align-items:center; gap:6px; }
         .kb-card .kb-path { font-size:12px; color:#909296; margin-bottom:12px; word-break:break-all; font-family:monospace; }
+        .kb-card .kb-card-actions { position:absolute; top:12px; right:12px; display:flex; gap:4px; opacity:0; transition:opacity .15s; }
+        .kb-card:hover .kb-card-actions { opacity:1; }
+        .kb-card .kb-card-actions button { border:none; background:#fff; border:1px solid #e1e3e6; border-radius:6px; padding:4px 8px; font-size:12px; cursor:pointer; color:#5c5f66; }
+        .kb-card .kb-card-actions button:hover { background:#f0edff; color:#7c5cfc; }
+        .kb-card .kb-card-actions button.del:hover { background:#ffe0e0; color:#e03131; }
         .kb-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:12px; }
         .kb-stat { text-align:center; padding:8px; background:#fafafe; border-radius:8px; }
         .kb-stat .num { font-size:20px; font-weight:700; color:#7c5cfc; }
@@ -23,54 +28,230 @@
         .kb-empty { text-align:center; padding:60px 20px; border:2px dashed #d9d0ff; background:#fafafe; border-radius:12px; }
         .kb-empty .icon { font-size:48px; margin-bottom:12px; }
         .kb-empty .text { font-size:16px; font-weight:600; color:#7c5cfc; margin-bottom:8px; }
+        .kb-mgmt-bar { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; padding:12px 16px; background:#fff; border:1px solid #e1e3e6; border-radius:12px; }
+        .kb-mgmt-bar .info { font-size:13px; color:#5c5f66; }
     </style>
 </head>
 <body>
     <div layout:fragment="content">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
             <h1 style="font-size:22px;font-weight:600;margin:0;">📚 笔记库</h1>
-            <a href="/config" class="btn btn-primary">⚙️ 管理笔记库</a>
+            <button class="btn btn-primary" onclick="showAddKbModal()">+ 添加笔记库</button>
         </div>
 
-        <div th:if="${#lists.size(kbInfos) == 0}" class="kb-empty">
+        <div th:if="${#lists.size(kbInfos) == 0}" class="kb-empty" id="emptyState">
             <div class="icon">📚</div>
             <div class="text">尚未配置笔记库</div>
-            <div class="text-muted" style="margin-bottom:16px;">请先添加知识库并配置笔记库路径</div>
-            <a href="/config" class="btn btn-primary">去配置</a>
+            <div class="text-muted" style="margin-bottom:16px;">点击上方「添加笔记库」创建一个</div>
         </div>
 
-        <div th:if="${#lists.size(kbInfos) > 0}" class="kb-grid">
-            <div th:each="kb : ${kbInfos}" class="kb-card">
-                <div class="kb-name">📂 <span th:text="${kb.name}">知识库</span></div>
-                <div class="kb-path" th:text="${kb.notesDir}">路径</div>
-
-                <div class="kb-stats">
-                    <div class="kb-stat">
-                        <div class="num" th:text="${kb.taskCount}">0</div>
-                        <div class="label" th:text="${kb.labels != null ? kb.labels.get('tasks') : '任务'}">任务</div>
+        <div th:if="${#lists.size(kbInfos) > 0}" id="kbGridContainer">
+            <div class="kb-mgmt-bar">
+                <span class="info">共 <strong th:text="${#lists.size(kbInfos)}">0</strong> 个笔记库</span>
+                <button class="btn btn-secondary btn-sm" onclick="refreshKbList()" style="padding:4px 12px;font-size:12px;">🔄 刷新</button>
+            </div>
+            <div class="kb-grid" id="kbGrid">
+                <div th:each="kb : ${kbInfos}" class="kb-card" th:attr="data-kb-id=${kb.id}">
+                    <div class="kb-card-actions">
+                        <button onclick="showEditKbModal(this)" title="编辑">✏️</button>
+                        <button class="del" onclick="deleteKb(this)" title="删除">🗑️</button>
                     </div>
-                    <div class="kb-stat">
-                        <div class="num" th:text="${kb.reminderCount}">0</div>
-                        <div class="label" th:text="${kb.labels != null ? kb.labels.get('reminders') : '提醒'}">提醒</div>
+                    <div class="kb-name">📂 <span th:text="${kb.name}">知识库</span></div>
+                    <div class="kb-path" th:text="${kb.notesDir}">路径</div>
+                    <div class="kb-stats">
+                        <div class="kb-stat"><div class="num" th:text="${kb.taskCount}">0</div><div class="label" th:text="${kb.labels != null ? kb.labels.get('tasks') : '任务'}">任务</div></div>
+                        <div class="kb-stat"><div class="num" th:text="${kb.reminderCount}">0</div><div class="label" th:text="${kb.labels != null ? kb.labels.get('reminders') : '提醒'}">提醒</div></div>
+                        <div class="kb-stat"><div class="num" th:text="${kb.moduleCount}">0</div><div class="label" th:text="${kb.labels != null ? kb.labels.get('modules') : '模块'}">模块</div></div>
+                        <div class="kb-stat"><div class="num">📂</div><div class="label" th:text="${kb.labels != null ? kb.labels.get('notes') : '笔记'}">笔记</div></div>
                     </div>
-                    <div class="kb-stat">
-                        <div class="num" th:text="${kb.moduleCount}">0</div>
-                        <div class="label" th:text="${kb.labels != null ? kb.labels.get('modules') : '模块'}">模块</div>
+                    <div class="kb-actions">
+                        <a th:href="@{/kb/{id}(id=${kb.id})}" class="btn-kb">📊 概览</a>
+                        <a th:href="@{/kb/{id}/modules(id=${kb.id})}" class="btn-outline" th:text="${kb.labels != null ? kb.labels.get('modules') : '模块'}">模块</a>
+                        <a th:href="@{/kb/{id}/notes(id=${kb.id})}" class="btn-outline" th:text="${kb.labels != null ? kb.labels.get('notes') : '笔记'}">笔记</a>
+                        <a th:href="@{/kb/{id}/config(id=${kb.id})}" class="btn-outline">⚙️ 配置</a>
                     </div>
-                    <div class="kb-stat">
-                        <div class="num">📂</div>
-                        <div class="label" th:text="${kb.labels != null ? kb.labels.get('notes') : '笔记'}">笔记</div>
-                    </div>
-                </div>
-
-                <div class="kb-actions">
-                    <a th:href="@{/kb/{id}(id=${kb.id})}" class="btn-kb">📊 概览</a>
-                    <a th:href="@{/kb/{id}/modules(id=${kb.id})}" class="btn-outline" th:text="${kb.labels != null ? kb.labels.get('modules') : '模块'}">模块</a>
-                    <a th:href="@{/kb/{id}/notes(id=${kb.id})}" class="btn-outline" th:text="${kb.labels != null ? kb.labels.get('notes') : '笔记'}">笔记</a>
-                    <a th:href="@{/kb/{id}/config(id=${kb.id})}" class="btn-outline">⚙️ 配置</a>
                 </div>
             </div>
         </div>
+
+        <!-- 添加/编辑笔记库弹窗 -->
+        <div class="modal-overlay" id="kbModal">
+            <div class="modal" style="width:560px;">
+                <h3 id="kbModalTitle">添加笔记库</h3>
+                <input type="hidden" id="kbEditId">
+                <div class="form-row">
+                    <div class="form-group" style="flex:1;">
+                        <label>名称 *</label>
+                        <input type="text" id="kbName" placeholder="如 工作" style="width:100%;">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group" style="flex:1;">
+                        <label>笔记库路径 *</label>
+                        <input type="text" id="kbNotesDir" placeholder="D:\projects\notes" style="width:100%;font-family:monospace;">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group" style="flex:1;">
+                        <label>任务菜单名</label>
+                        <input type="text" id="kbLabelTasks" value="任务" style="width:100%;">
+                    </div>
+                    <div class="form-group" style="flex:1;">
+                        <label>提醒菜单名</label>
+                        <input type="text" id="kbLabelReminders" value="提醒" style="width:100%;">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group" style="flex:1;">
+                        <label>模块菜单名</label>
+                        <input type="text" id="kbLabelModules" value="模块" style="width:100%;">
+                    </div>
+                    <div class="form-group" style="flex:1;">
+                        <label>笔记菜单名</label>
+                        <input type="text" id="kbLabelNotes" value="笔记" style="width:100%;">
+                    </div>
+                    <div class="form-group" style="flex:1;">
+                        <label>配置菜单名</label>
+                        <input type="text" id="kbLabelConfig" value="配置" style="width:100%;">
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button class="btn btn-secondary" onclick="closeKbModal()">取消</button>
+                    <button class="btn btn-primary" onclick="submitKb()">保存</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 删除确认弹窗 -->
+        <div class="modal-overlay" id="deleteKbModal">
+            <div class="modal" style="width:400px;">
+                <h3>确认删除</h3>
+                <p id="deleteKbText" style="font-size:14px;color:#5c5f66;margin:12px 0;"></p>
+                <input type="hidden" id="deleteKbId">
+                <div class="modal-actions">
+                    <button class="btn btn-secondary" onclick="closeModal('deleteKbModal')">取消</button>
+                    <button class="btn btn-danger" onclick="confirmDeleteKb()">删除</button>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            var kbList = [];
+
+            // ====== 弹窗通用 ======
+            function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+            document.querySelectorAll('.modal-overlay').forEach(function(m) {
+                m.addEventListener('click', function(e) { if (e.target === this) this.classList.remove('active'); });
+            });
+            function closeKbModal() { closeModal('kbModal'); }
+
+            // ====== 刷新笔记库列表 ======
+            function refreshKbList() { location.reload(); }
+
+            // ====== 添加弹窗 ======
+            function showAddKbModal() {
+                document.getElementById('kbModalTitle').textContent = '添加笔记库';
+                document.getElementById('kbEditId').value = '';
+                document.getElementById('kbName').value = '';
+                document.getElementById('kbNotesDir').value = '';
+                document.getElementById('kbLabelTasks').value = '任务';
+                document.getElementById('kbLabelReminders').value = '提醒';
+                document.getElementById('kbLabelModules').value = '模块';
+                document.getElementById('kbLabelNotes').value = '笔记';
+                document.getElementById('kbLabelConfig').value = '配置';
+                document.getElementById('kbModal').classList.add('active');
+                setTimeout(function(){ document.getElementById('kbName').focus(); }, 100);
+            }
+
+            // ====== 编辑弹窗 ======
+            function showEditKbModal(btn) {
+                var card = btn.closest('.kb-card');
+                var name = card.querySelector('.kb-name span').textContent;
+                var path = card.querySelector('.kb-path').textContent;
+                var kbId = card.dataset.kbId;
+
+                document.getElementById('kbModalTitle').textContent = '编辑笔记库';
+                document.getElementById('kbEditId').value = kbId;
+                document.getElementById('kbName').value = name;
+                document.getElementById('kbNotesDir').value = path;
+                // Load labels from data attribute / API
+                var kb = kbList.find(function(k) { return k.id == kbId; });
+                if (kb && kb.labels) {
+                    try {
+                        var labels = typeof kb.labels === 'string' ? JSON.parse(kb.labels) : kb.labels;
+                        document.getElementById('kbLabelTasks').value = labels.tasks || '任务';
+                        document.getElementById('kbLabelReminders').value = labels.reminders || '提醒';
+                        document.getElementById('kbLabelModules').value = labels.modules || '模块';
+                        document.getElementById('kbLabelNotes').value = labels.notes || '笔记';
+                        document.getElementById('kbLabelConfig').value = labels.config || '配置';
+                    } catch(e) {}
+                } else {
+                    document.getElementById('kbLabelTasks').value = '任务';
+                    document.getElementById('kbLabelReminders').value = '提醒';
+                    document.getElementById('kbLabelModules').value = '模块';
+                    document.getElementById('kbLabelNotes').value = '笔记';
+                    document.getElementById('kbLabelConfig').value = '配置';
+                }
+                document.getElementById('kbModal').classList.add('active');
+            }
+
+            // ====== 提交保存 ======
+            async function submitKb() {
+                var name = document.getElementById('kbName').value.trim();
+                var notesDir = document.getElementById('kbNotesDir').value.trim();
+                if (!name || !notesDir) { toast('名称和路径不能为空', 'error'); return; }
+
+                var editId = document.getElementById('kbEditId').value;
+                var labels = {
+                    tasks: document.getElementById('kbLabelTasks').value.trim() || '任务',
+                    reminders: document.getElementById('kbLabelReminders').value.trim() || '提醒',
+                    modules: document.getElementById('kbLabelModules').value.trim() || '模块',
+                    notes: document.getElementById('kbLabelNotes').value.trim() || '笔记',
+                    config: document.getElementById('kbLabelConfig').value.trim() || '配置'
+                };
+                var body = { name: name, notesDir: notesDir, labels: JSON.stringify(labels) };
+                if (editId) body.id = editId;
+
+                try {
+                    var r = await fetch('/api/kb/save', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+                    });
+                    var d = await r.json();
+                    if (d.ok) {
+                        toast(editId ? '✅ 笔记库已更新' : '✅ 笔记库已添加');
+                        closeKbModal();
+                        location.reload();
+                    } else {
+                        toast('❌ ' + (d.error || '保存失败'), 'error');
+                    }
+                } catch(e) { toast('❌ 请求失败: ' + e.message, 'error'); }
+            }
+
+            // ====== 删除 ======
+            function deleteKb(btn) {
+                var card = btn.closest('.kb-card');
+                var name = card.querySelector('.kb-name span').textContent;
+                var kbId = card.dataset.kbId;
+                document.getElementById('deleteKbId').value = kbId;
+                document.getElementById('deleteKbText').textContent = '确定删除笔记库「' + name + '」？相关聊天记录和模块不会被删除，仅移除笔记库配置。';
+                document.getElementById('deleteKbModal').classList.add('active');
+            }
+
+            async function confirmDeleteKb() {
+                var id = document.getElementById('deleteKbId').value;
+                try {
+                    var r = await fetch('/api/kb/' + id, { method: 'DELETE' });
+                    var d = await r.json();
+                    if (d.ok) {
+                        toast('🗑️ 笔记库已删除');
+                        closeModal('deleteKbModal');
+                        location.reload();
+                    } else {
+                        toast('❌ ' + (d.error || '删除失败'), 'error');
+                    }
+                } catch(e) { toast('❌ 请求失败: ' + e.message, 'error'); }
+            }
+        </script>
     </div>
 </body>
 </html>
