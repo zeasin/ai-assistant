@@ -128,6 +128,7 @@ public class KnowledgeBaseController {
         model.put("kb", kb);
         model.put("labels", parseLabels(kb.getLabels()));
         model.put("module", mod);
+        model.put("allModules", moduleService.getModulesByKb(id));
         return "kb_module_detail";
     }
 

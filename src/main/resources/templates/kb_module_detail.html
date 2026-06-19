@@ -92,10 +92,20 @@
 
 <th:block th:replace="~{kb_tab_bar :: kb-tabs('modules', ${kb}, ${labels})}" />
 
-<div th:if="${kb != null}" style="font-size:13px;color:#909296;margin-bottom:8px;display:flex;align-items:center;gap:4px;">
-    <a th:href="@{/kb/{id}/modules(id=${kb.id})}" style="color:#7c5cfc;text-decoration:none;" th:text="${labels.get('modules')}">模块</a>
-    <span>›</span>
-    <span th:text="${module.name}">模块名</span>
+<div th:if="${kb != null and allModules != null}" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:20px;">
+    <a th:each="m : ${allModules}"
+       th:href="@{/kb/{id}/modules/{mid}(id=${kb.id}, mid=${m.id})}"
+       th:style="${m.id == module.id} ? 'border-color:#7c5cfc;box-shadow:0 2px 8px rgba(124,92,252,0.12);background:#f0edff;' : ''"
+       style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+              background:#fff;border:1px solid #e1e3e6;border-radius:12px;padding:24px 16px;
+              text-decoration:none;color:#1a1b1e;transition:all .15s;cursor:pointer;
+              box-shadow:0 1px 3px rgba(0,0,0,0.04);"
+       onmouseover="if(!this.style.background||this.style.background==='rgb(255,255,255)'){this.style.borderColor='#7c5cfc';this.style.boxShadow='0 2px 8px rgba(124,92,252,0.12)'}"
+       onmouseout="if(!this.style.background||this.style.background==='rgb(255,255,255)'){this.style.borderColor='#e1e3e6';this.style.boxShadow='0 1px 3px rgba(0,0,0,0.04)'}">
+        <span style="font-size:36px;" th:text="${m.icon}">📦</span>
+        <span style="font-size:14px;font-weight:600;text-align:center;" th:text="${m.name}">名称</span>
+        <span style="font-size:11px;color:#909296;" th:text="'目录: ' + ${m.dir}">目录</span>
+    </a>
 </div>
 
 <div th:unless="${error}">

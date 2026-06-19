@@ -231,14 +231,7 @@ public class ModuleService {
         if (FileUtil.exists(file)) {
             return FileUtil.readText(file);
         }
-        String initialPrompt = mod.getPrompt();
-        if (initialPrompt == null || initialPrompt.isBlank()) {
-            initialPrompt = "你是一个" + mod.getName() + "分析师。分析以下数据，从以下几个维度给出洞察：\n\n"
-                    + "1. 整体概况\n2. 趋势分析\n3. 问题与风险\n4. 优化建议\n5. 下一步行动\n";
-        }
-        FileUtil.writeText(file, initialPrompt);
-        log.info("已为模块 {} 创建提示词文件: {}", mod.getId(), file);
-        return initialPrompt;
+        return "";
     }
 
     public void writePrompt(ModuleDefinition mod, String content) {
