@@ -361,7 +361,7 @@
             if (kbId) {
                 document.querySelectorAll('.nav-inner a').forEach(function(a) {
                     var href = a.getAttribute('href');
-                    if (href === '/chat' || href === '/image') {
+                    if (href === '/chat' || href.startsWith('/image')) {
                         a.href = href + '?kbId=' + kbId;
                     }
                 });

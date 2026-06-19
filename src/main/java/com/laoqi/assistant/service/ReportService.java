@@ -186,11 +186,16 @@ public class ReportService {
         if (r.report != null) {
             String today = TimeUtil.todayStr();
             String wd = TimeUtil.weekdayCn(TimeUtil.now());
-            String title = TimeUtil.greetingEmoji() + " 老齐" + TimeUtil.greetingText() + " · " + today + " · " + wd;
+            String kbLabel = "";
+            if (kbId != null) {
+                var kb = kbService.getById(kbId);
+                if (kb != null) kbLabel = "【" + kb.getName() + "】";
+            }
+            String title = TimeUtil.greetingEmoji() + " 老齐" + TimeUtil.greetingText() + " · " + today + " · " + wd + kbLabel;
             var paras = feishuService.reportToParagraphs(r.report);
             feishuService.sendPost(title, paras);
             saveComprehensiveReport(r.report, kbId);
-            logService.add("日报生成", "成功", "AI 日报已生成并推送");
+            logService.add("日报生成", "成功", "AI 日报已生成并推送" + kbLabel);
         } else {
             log.error("日报生成失败: {}", r.error);
             logService.add("日报生成", "失败", r.error);
