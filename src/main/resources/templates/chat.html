@@ -62,7 +62,7 @@
                     </th:block>
                 </div>
             </div>
-            <span class="toolbar-title">💬 对话</span>
+            <h1 class="toolbar-title">💬 对话</h1>
         </div>
         <div class="toolbar-right">
             <div class="search-box" id="searchBox">
@@ -132,11 +132,11 @@
 
 <style>
 * { scrollbar-width: thin; scrollbar-color: #d0d0d5 #f0f0f5; }
-.chat-app { display:flex; flex-direction:column; margin:-24px; height:calc(100vh - 52px); overflow:hidden; background:#fff; }
-.chat-toolbar { display:flex; align-items:center; justify-content:space-between; padding:10px 16px; border-bottom:1px solid #e1e3e6; background:#fafbfc; flex-shrink:0; gap:12px; flex-wrap:wrap; }
-.toolbar-left { display:flex; align-items:center; gap:12px; }
+.chat-app { display:flex; flex-direction:column; height:calc(100vh - 100px); overflow:hidden; background:#fff; border:1px solid #e1e3e6; border-radius:12px; }
+.chat-toolbar { display:flex; align-items:center; justify-content:space-between; padding:12px 20px; border-bottom:1px solid #e1e3e6; background:#fff; flex-shrink:0; gap:12px; flex-wrap:wrap; }
+.toolbar-left { display:flex; align-items:center; gap:16px; }
 .toolbar-right { display:flex; align-items:center; gap:10px; }
-.toolbar-title { font-size:15px; font-weight:600; color:#1a1b1e; }
+.toolbar-title { font-size:22px; font-weight:600; color:#1a1b1e; }
 
 .kb-selector { position:relative; }
 .kb-selector-btn { display:flex; align-items:center; gap:6px; padding:6px 14px; border:1px solid #e1e3e6; border-radius:8px; background:#fff; color:#1a1b1e; font-size:13px; font-weight:500; cursor:pointer; transition:all .15s; }
