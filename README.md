@@ -200,6 +200,8 @@ v1.0 核心升级——一个实例同时管理多个知识库，完全隔离。
 
 AI 通过 Spring AI 的 `ToolCallingAdvisor` 自动判断何时调用工具，无需手写 ReAct 循环。
 
+**工具自注册**：`ToolRegistry` 统一管理所有工具集，新增工具只需写 `@Component` + `@Tool` 方法，注册到 `ToolRegistry` 即可，无需修改任何 Service。
+
 | 工具 | 功能 | 触发场景 |
 |------|------|---------|
 | `readFile` | 读取笔记库文件内容 | AI 需要了解数据格式或历史内容 |
@@ -463,6 +465,7 @@ src/main/java/com/laoqi/assistant/
 │   ├── LlmConfigResolver.java          # LLM 配置统一解析
 │   ├── NoteAssistantService.java       # AI 编排（ChatClient + @Tool）
 │   ├── NoteTools.java                  # @Tool 声明式工具集（基于当前 KB）
+│   ├── ToolRegistry.java               # 工具自注册中心（自动发现 @Tool Bean）
 │   ├── SessionService.java             # 会话管理 + 语义检索（含 kb_id）
 │   ├── OllamaEmbeddingService.java     # Spring AI Ollama 嵌入
 │   ├── ChatSessionService.java         # Web 聊天会话
@@ -624,7 +627,7 @@ spring:
 | **v0.2** | Java 借助 opencode serve 实现 AI 助理 |
 | **v0.3** | Spring AI 2.0 接管 OpenCode AI 大脑 |
 | **v0.4** | 加入编程 AI（Pi CLI 飞书机器人 + 代码排查），双 AI 助理 |
-| **v1.0**（当前） | **多知识库架构**：一个实例同时管理多个知识库（工作/学习等），数据、对话、记忆、模块完全隔离；连续对话去 session；知识库独立管理模块/任务/提醒；首页多 KB 摘要看板 |
+| **v1.0**（当前） | **多知识库架构**：一个实例同时管理多个知识库（工作/学习等），数据、对话、记忆、模块完全隔离；连续对话去 session；知识库独立管理模块/任务/提醒；首页多 KB 摘要看板；工具自注册（ToolRegistry） |
 
 ### v1.0 核心改动
 
@@ -636,6 +639,7 @@ spring:
 | **日报按 KB 生成** | 定时日报遍历所有 KB 分别生成，手动日报在 KB 概览页触发 |
 | **连续对话** | 去掉多会话管理，按 KB 展示连续聊天记录 |
 | **菜单名可配置** | 每个 KB 可自定义二级菜单名称（如"任务"→"学习计划"） |
+| **工具自注册** | `ToolRegistry` 统一管理 `@Tool` Bean，新增工具无需改 Service |
 
 ### v1.0 vs v0.4 关键升级
 
