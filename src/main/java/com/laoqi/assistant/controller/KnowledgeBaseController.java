@@ -164,11 +164,8 @@ public class KnowledgeBaseController {
         }
 
         Path base = kbDir(kb);
-        String basePath = base.toString();
-        if (!Files.exists(base) || !Files.isDirectory(base)
-                || basePath.contains("\\") || basePath.matches("^[A-Za-z]:.*")) {
-            model.put("error", "笔记库目录不存在或路径无效: " + kb.getNotesDir()
-                    + "（可能是 Windows 路径，请在配置页面重新设置）");
+        if (!Files.exists(base) || !Files.isDirectory(base)) {
+            model.put("error", "笔记库目录不存在或路径无效: " + kb.getNotesDir());
             model.put("dirs", List.of());
             model.put("files", List.of());
             model.put("rel", "");
