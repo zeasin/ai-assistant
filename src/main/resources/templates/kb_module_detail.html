@@ -64,12 +64,12 @@
 <!-- 面包屑 -->
 <div style="margin-bottom:16px;font-size:13px;">
     <a th:href="@{/kb/{id}/notes(id=${kb.id})}" style="color:#7c5cfc;text-decoration:none;">📂 全部目录</a>
-    <th:block th:each="b,iter : ${breadcrumbs}">
+    <th:block th:each="link : ${breadcrumbLinks}">
         <span style="color:#999;"> / </span>
-        <a th:if="${!iter.last}"
-           th:href="@{/kb/{id}/notes(dir=${#strings.listJoin(#strings.arraySplit(currentDir, '/')[0 to iter.index + 1], '/')}, id=${kb.id})}"
-           style="color:#7c5cfc;text-decoration:none;" th:text="${b}"></a>
-        <span th:if="${iter.last}" th:text="${b}" style="font-weight:600;"></span>
+        <a th:if="${link.isLast == 'false'}"
+           th:href="@{/kb/{id}/notes(dir=${link.path}, id=${kb.id})}"
+           style="color:#7c5cfc;text-decoration:none;" th:text="${link.name}"></a>
+        <span th:if="${link.isLast == 'true'}" th:text="${link.name}" style="font-weight:600;"></span>
     </th:block>
 </div>
 
@@ -91,9 +91,10 @@
             </div>
         </div>
         <div id="fileListContainer">
-            <div th:each="f : ${files}" class="file-item" th:attr="data-name=${f.name}, data-isdir=${f.is_dir}">
+            <div th:each="f : ${files}" class="file-item" th:attr="data-name=${f.name}, data-isdir=${f.is_dir}, data-path=${currentDir + '/' + f.name}">
                 <a th:if="${!f.is_dir}"
-                   th:href="@{/kb/{id}/notes/view(path=${currentDir + '/' + f.name})}"
+                   href="javascript:void(0)"
+                   onclick="openFile(this.closest('.file-item').getAttribute('data-path'))"
                    style="text-decoration:none;color:#333;display:flex;align-items:center;gap:8px;flex:1;min-width:0;">
                     <span>📄</span>
                     <span th:text="${f.name}" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">文件名</span>
@@ -201,6 +202,10 @@
 var KB_ID = [[${kb.id}]];
 var CURRENT_DIR = /*[[${currentDir}]]*/ '';
 var fileEditMode = false;
+
+function openFile(path) {
+    window.location.href = '/kb/' + KB_ID + '/notes/view?path=' + encodeURIComponent(path);
+}
 
 function switchTab(name) {
     document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });

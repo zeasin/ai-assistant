@@ -157,6 +157,7 @@ public class KnowledgeBaseController {
         model.put("currentDir", dir);
         model.put("files", listDirContents(target));
         model.put("breadcrumbs", buildBreadcrumbs(dir));
+        model.put("breadcrumbLinks", buildBreadcrumbLinks(dir));
         model.put("parent", parentDir(dir));
 
         // 读取该目录的历史分析报告
@@ -194,6 +195,7 @@ public class KnowledgeBaseController {
         model.put("title", displayName);
         model.put("content", html);
         model.put("parent", parent);
+        model.put("breadcrumbLinks", buildBreadcrumbLinks(parent));
         return "view";
     }
 
@@ -992,7 +994,9 @@ public class KnowledgeBaseController {
         try (var stream = Files.list(dir)) {
             stream.filter(p -> !p.getFileName().toString().startsWith("."))
                     .filter(p -> !IGNORED_DIRS.contains(p.getFileName().toString()))
-                    .sorted(Comparator.comparing(p -> p.getFileName().toString()))
+                    .sorted(Comparator
+                            .comparing((Path p) -> !Files.isDirectory(p))
+                            .thenComparing(p -> p.getFileName().toString()))
                     .forEach(p -> {
                         Map<String, Object> entry = new LinkedHashMap<>();
                         entry.put("name", p.getFileName().toString());
@@ -1016,6 +1020,23 @@ public class KnowledgeBaseController {
     private List<String> buildBreadcrumbs(String dir) {
         if (dir == null || dir.isEmpty()) return List.of();
         return Arrays.asList(dir.split("/"));
+    }
+
+    private List<Map<String, String>> buildBreadcrumbLinks(String dir) {
+        if (dir == null || dir.isEmpty()) return List.of();
+        String[] parts = dir.split("/");
+        List<Map<String, String>> links = new ArrayList<>();
+        StringBuilder path = new StringBuilder();
+        for (int i = 0; i < parts.length; i++) {
+            if (path.length() > 0) path.append("/");
+            path.append(parts[i]);
+            Map<String, String> item = new LinkedHashMap<>();
+            item.put("name", parts[i]);
+            item.put("path", path.toString());
+            item.put("isLast", String.valueOf(i == parts.length - 1));
+            links.add(item);
+        }
+        return links;
     }
 
     private String parentDir(String dir) {
