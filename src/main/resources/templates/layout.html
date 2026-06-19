@@ -334,13 +334,14 @@
         <span class="title">AI 助理</span>
         <a th:classappend="${requestURI == '/chat' or requestURI == '/'} ? 'active' : ''" href="/chat">对话</a>
         <a th:classappend="${#strings.startsWith(requestURI, '/image')} ? 'active' : ''" href="/image">识图</a>
-
+            <a th:classappend="${#strings.startsWith(requestURI, '/datacenter')} ? 'active' : ''" href="/datacenter">数据</a>
         <a th:each="kb : ${kbList}"
            th:href="@{/kb/{id}(id=${kb.id})}"
            th:classappend="${#strings.startsWith(requestURI, '/kb/' + kb.id)} ? 'active' : ''"
            th:text="${kb.name}">知识库</a>
 
         <a th:if="${codingEnabled}" th:classappend="${requestURI == '/coding' ? 'active' : ''}" href="/coding">💻 编程AI</a>
+
         <a th:classappend="${requestURI == '/config' ? 'active' : ''}" href="/config">配置</a>
         <a th:classappend="${requestURI == '/log' ? 'active' : ''}" href="/log">日志</a>
         <a th:classappend="${requestURI == '/help' ? 'active' : ''}" href="/help">帮助</a>

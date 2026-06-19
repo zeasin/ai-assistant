@@ -90,11 +90,11 @@
         </div>
 
         <div class="ds-tabs">
-            <div class="ds-tab active" onclick="switchTab('datasets')">数据集管理</div>
-            <div class="ds-tab" onclick="switchTab('import')">数据导入</div>
-            <div class="ds-tab" onclick="switchTab('browse')">数据浏览</div>
-            <div class="ds-tab" onclick="switchTab('collector')">采集器</div>
-            <div class="ds-tab" onclick="switchTab('help')">帮助</div>
+            <div class="ds-tab active" onclick="switchTab('datasets', this)">数据集管理</div>
+            <div class="ds-tab" onclick="switchTab('import', this)">数据导入</div>
+            <div class="ds-tab" onclick="switchTab('browse', this)">数据浏览</div>
+            <div class="ds-tab" onclick="switchTab('collector', this)">采集器</div>
+            <div class="ds-tab" onclick="switchTab('help', this)">帮助</div>
         </div>
 
         <div class="ds-panel active" id="panel-datasets">
@@ -371,14 +371,22 @@
         async function loadDatasets() {
             try {
                 const res = await fetch('/api/datacenter/datasets');
+                if (!res.ok) {
+                    throw new Error('HTTP ' + res.status + ': ' + res.statusText);
+                }
                 const data = await res.json();
                 if (data.ok) {
                     allDatasets = data.data || [];
                     renderDatasetList(allDatasets);
                     populateDatasetSelects(allDatasets);
+                } else {
+                    document.getElementById('datasetList').innerHTML =
+                        '<div class="empty-state">加载数据集失败: ' + esc(data.error || '未知错误') + '</div>';
                 }
             } catch (e) {
-                toast('加载数据集失败: ' + e.message, 'error');
+                document.getElementById('datasetList').innerHTML =
+                    '<div class="empty-state">⚠️ 加载数据集失败: ' + esc(e.message) + '<br><br><button class="btn btn-primary" onclick="loadDatasets()">重试</button></div>';
+                console.error('loadDatasets error:', e);
             }
         }
 
@@ -422,10 +430,18 @@
             });
         }
 
-        function switchTab(tab) {
+        function switchTab(tab, el) {
             document.querySelectorAll('.ds-tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.ds-panel').forEach(p => p.classList.remove('active'));
-            event.target.classList.add('active');
+            if (el) {
+                el.classList.add('active');
+            } else {
+                document.querySelectorAll('.ds-tab').forEach(t => {
+                    if (t.textContent.includes(tab === 'datasets' ? '管理' : tab === 'import' ? '导入' : tab === 'browse' ? '浏览' : tab === 'collector' ? '采集' : '帮助')) {
+                        t.classList.add('active');
+                    }
+                });
+            }
             document.getElementById('panel-' + tab).classList.add('active');
             if (tab === 'browse') loadBrowseData();
         }
@@ -709,14 +725,16 @@
                 let url = '/api/datacenter/datasets/' + datasetId + '/records';
                 if (keyword) url += '?keyword=' + encodeURIComponent(keyword);
                 const res = await fetch(url);
+                if (!res.ok) throw new Error('HTTP ' + res.status);
                 const data = await res.json();
                 if (data.ok) {
                     renderBrowseTable(data.data, datasetId);
                 } else {
-                    toast(data.error, 'error');
+                    document.getElementById('browseTable').innerHTML = '<div class="empty-state">' + esc(data.error || '加载失败') + '</div>';
                 }
             } catch (e) {
-                toast('加载数据失败: ' + e.message, 'error');
+                document.getElementById('browseTable').innerHTML = '<div class="empty-state">⚠️ 加载数据失败: ' + esc(e.message) + '</div>';
+                console.error('loadBrowseData error:', e);
             }
         }
 
@@ -739,11 +757,11 @@
 
             let h = `<div style="font-size:12px;color:#5c5f66;margin-bottom:8px;display:flex;align-items:center;gap:12px;">`;
             h += `<span>共 ${records.length} 条记录</span>`;
-            h += `<label style="cursor:pointer;"><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this, '${datasetId}')"> 全选</label>`;
+            h += `<label style="cursor:pointer;"><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)"> 全选</label>`;
             h += `<span id="selectedCount" style="color:#7c5cfc;"></span>`;
             h += `</div>`;
             h += '<table class="data-table"><thead><tr>';
-            h += '<th style="width:30px;"><input type="checkbox" id="selectAllHead" onchange="toggleSelectAll(this, \'' + datasetId + '\')"></th>';
+            h += '<th style="width:30px;"><input type="checkbox" id="selectAllHead" onchange="toggleSelectAll(this)"></th>';
             h += '<th class="col-id">ID</th><th class="col-source">来源</th>';
             cols.forEach(c => { h += `<th>${esc(c)}</th>`; });
             h += '<th class="col-actions"></th>';
@@ -765,7 +783,7 @@
             document.getElementById('browseTable').innerHTML = h;
         }
 
-        function toggleSelectAll(cb, datasetId) {
+        function toggleSelectAll(cb) {
             document.querySelectorAll('.record-cb').forEach(c => { c.checked = cb.checked; });
             toggleRecordSelect();
         }
@@ -786,13 +804,7 @@
         }
 
         function switchTabDirect(tab) {
-            document.querySelectorAll('.ds-tab').forEach((t, i) => {
-                t.classList.toggle('active', t.textContent.includes(
-                    tab === 'datasets' ? '管理' : tab === 'import' ? '导入' : '浏览'
-                ));
-            });
-            document.querySelectorAll('.ds-panel').forEach(p => p.classList.remove('active'));
-            document.getElementById('panel-' + tab).classList.add('active');
+            switchTab(tab, null);
         }
 
         async function showExportModal() {
