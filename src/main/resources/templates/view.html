@@ -197,6 +197,29 @@ function buildStyledHtml(source) {
 }
 </script>
 
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/contrib/auto-render.min.js"
+        onload="window.__katexLoaded = true"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var check = setInterval(function() {
+        if (window.__katexLoaded || typeof renderMathInElement !== 'undefined') {
+            clearInterval(check);
+            try {
+                renderMathInElement(document.getElementById('articleContent'), {
+                    delimiters: [
+                        {left: '$$', right: '$$', display: true},
+                        {left: '$', right: '$', display: false}
+                    ],
+                    throwOnError: false
+                });
+            } catch(e) {}
+        }
+    }, 100);
+});
+</script>
+
 </th:block>
 </body>
 </html>
