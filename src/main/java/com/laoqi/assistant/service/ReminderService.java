@@ -41,6 +41,11 @@ public class ReminderService {
     @PostConstruct
     public void init() {
         try {
+            // 迁移旧数据（笔记库路径 → 全局路径）
+            migrateRemindersFromOldPath();
+        } catch (Exception ignored) {}
+
+        try {
             Root root = load();
             if (root.reminders == null) root.reminders = new ArrayList<>();
             boolean hasDailyReport = root.reminders.stream()
@@ -63,56 +68,72 @@ public class ReminderService {
         }
     }
 
-    private Path getRemindersDir() {
-        return getRemindersDir(configService.getNotesDir());
-    }
-
-    private Path getRemindersDir(String notesDir) {
-        Path reminderDir = Paths.get(notesDir, "AI", "提醒");
-        if (!Files.exists(reminderDir)) {
-            try {
-                Files.createDirectories(reminderDir);
-            } catch (Exception e) {
-                log.warn("[提醒] 创建目录失败: {}", reminderDir);
+    // 提醒存储改为全局位置（不再依赖笔记库）
+    private Path getGlobalRemindersFile() {
+        Path dir = appConfig.getConfigDirPath().resolve("AI").resolve("reminders");
+        if (!Files.exists(dir)) {
+            try { Files.createDirectories(dir); } catch (Exception e) {
+                log.warn("[提醒] 创建全局提醒目录失败: {}", dir);
             }
         }
-        return reminderDir;
+        return dir.resolve("reminders_data.json");
     }
 
-    private Path getRemindersFile() {
-        return getRemindersDir().resolve("reminders.json");
+    private void migrateRemindersFromOldPath() {
+        Path globalFile = getGlobalRemindersFile();
+        if (Files.exists(globalFile)) return; // 已迁移
+
+        // 尝试从第一个知识库的旧位置迁移
+        String oldNotesDir = configService.getNotesDirIfExists();
+        if (oldNotesDir == null || oldNotesDir.isEmpty()) return;
+
+        Path oldFile = Paths.get(oldNotesDir, "AI", "提醒", "reminders.json");
+        if (Files.exists(oldFile)) {
+            Root oldRoot = FileUtil.readJson(oldFile, Root.class, null);
+            if (oldRoot != null && oldRoot.reminders != null && !oldRoot.reminders.isEmpty()) {
+                FileUtil.writeJson(globalFile, oldRoot);
+                log.info("[提醒] 已从 {} 迁移 {} 条提醒到全局路径", oldFile, oldRoot.reminders.size());
+            }
+        }
     }
 
-    private Path getRemindersFile(String notesDir) {
-        return getRemindersDir(notesDir).resolve("reminders.json");
+    private Root loadFromGlobal() {
+        return FileUtil.readJson(getGlobalRemindersFile(), Root.class, new Root());
     }
 
+    private void saveToGlobal(Root root) {
+        if (root.reminders == null) root.reminders = new ArrayList<>();
+        if (root.meta == null) root.meta = new LinkedHashMap<>();
+        FileUtil.writeJson(getGlobalRemindersFile(), root);
+    }
+
+    // 兼容旧接口：无参方法使用全局存储
     public Root load() {
-        return load(configService.getNotesDir());
+        return loadFromGlobal();
     }
 
+    // notesDir 参数方法重定向到全局存储
     public Root load(String notesDir) {
-        return FileUtil.readJson(getRemindersFile(notesDir), Root.class, new Root());
+        return loadFromGlobal();
     }
 
     private void save(Root root) {
-        save(configService.getNotesDir(), root);
+        saveToGlobal(root);
     }
 
+    // notesDir 参数方法重定向到全局存储
     private void save(String notesDir, Root root) {
-        if (root.reminders == null) root.reminders = new ArrayList<>();
-        if (root.meta == null) root.meta = new LinkedHashMap<>();
-        FileUtil.writeJson(getRemindersFile(notesDir), root);
+        saveToGlobal(root);
     }
 
     public List<Reminder> getAllReminders() {
-        return getAllReminders(configService.getNotesDir());
+        Root root = loadFromGlobal();
+        if (root.reminders == null) root.reminders = new ArrayList<>();
+        return root.reminders;
     }
 
     public List<Reminder> getAllReminders(String notesDir) {
-        Root root = load(notesDir);
-        if (root.reminders == null) root.reminders = new ArrayList<>();
-        return root.reminders;
+        return getAllReminders();
     }
 
     public List<Reminder> getEnabledReminders() {
@@ -123,7 +144,7 @@ public class ReminderService {
 
     public Reminder addReminder(String name, String message, String type, String time,
                                  String date, String dayOfWeek, String dayOfMonth, String monthDay) {
-        return addReminder(configService.getNotesDir(), name, message, type, time, date, dayOfWeek, dayOfMonth, monthDay);
+        return addReminder("", name, message, type, time, date, dayOfWeek, dayOfMonth, monthDay);
     }
 
     public Reminder addReminder(String notesDir, String name, String message, String type, String time,
@@ -179,7 +200,7 @@ public class ReminderService {
     public boolean updateReminder(String id, String name, String message, String type,
                                     String time, String date, String dayOfWeek, String dayOfMonth,
                                     String monthDay, Boolean enabled) {
-        return updateReminder(configService.getNotesDir(), id, name, message, type, time, date, dayOfWeek, dayOfMonth, monthDay, enabled);
+        return updateReminder("", id, name, message, type, time, date, dayOfWeek, dayOfMonth, monthDay, enabled);
     }
 
     public boolean updateReminder(String notesDir, String id, String name, String message, String type,
@@ -254,7 +275,7 @@ public class ReminderService {
     }
 
     public boolean deleteReminder(String id) {
-        return deleteReminder(configService.getNotesDir(), id);
+        return deleteReminder("", id);
     }
 
     public boolean deleteReminder(String notesDir, String id) {
@@ -271,7 +292,7 @@ public class ReminderService {
     }
 
     public boolean toggleReminder(String id) {
-        return toggleReminder(configService.getNotesDir(), id);
+        return toggleReminder("", id);
     }
 
     public boolean toggleReminder(String notesDir, String id) {
@@ -291,7 +312,7 @@ public class ReminderService {
     }
 
     public void triggerReminder(Reminder r) {
-        triggerReminder(configService.getNotesDir(), r);
+        triggerReminder("", r);
     }
 
     public void triggerReminder(String notesDir, Reminder r) {

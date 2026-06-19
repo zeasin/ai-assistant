@@ -91,6 +91,15 @@ public class ConfigService {
         return dir;
     }
 
+    /** 获取笔记库目录，不存在时返回 null（不抛异常） */
+    public String getNotesDirIfExists() {
+        try {
+            return kbService.getNotesDir();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     public String getNotesDir(Long kbId) {
         String dir = kbService.getNotesDirById(kbId);
         if (dir == null || dir.isEmpty()) {
