@@ -178,7 +178,12 @@ public class ModuleController {
         Path dir = moduleService.getModuleDir(mod);
         Path target = path.isEmpty() ? dir : dir.resolve(path).normalize();
         if (!target.startsWith(dir)) return Map.of("ok", false, "error", "路径越界");
-        if (!Files.exists(target)) return Map.of("ok", true, "tree", null);
+        if (!Files.exists(target)) {
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("ok", true);
+            result.put("tree", null);
+            return result;
+        }
 
         String parentPath = "";
         if (!path.isEmpty()) {

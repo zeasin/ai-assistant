@@ -92,16 +92,15 @@
 
 <th:block th:replace="~{kb_tab_bar :: kb-tabs('modules', ${kb}, ${labels})}" />
 
+<style>.module-card{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:#fff;border:1px solid #e1e3e6;border-radius:12px;padding:24px 16px;text-decoration:none;color:#1a1b1e;transition:all .15s;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.04);}
+.module-card:hover{border-color:#7c5cfc;box-shadow:0 2px 8px rgba(124,92,252,0.12);}
+.module-card.active{border-color:#7c5cfc;background:#f0edff;box-shadow:0 2px 8px rgba(124,92,252,0.12);}</style>
+
 <div th:if="${kb != null and allModules != null}" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:20px;">
     <a th:each="m : ${allModules}"
        th:href="@{/kb/{id}/modules/{mid}(id=${kb.id}, mid=${m.id})}"
-       th:style="${m.id == module.id} ? 'border-color:#7c5cfc;box-shadow:0 2px 8px rgba(124,92,252,0.12);background:#f0edff;' : ''"
-       style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
-              background:#fff;border:1px solid #e1e3e6;border-radius:12px;padding:24px 16px;
-              text-decoration:none;color:#1a1b1e;transition:all .15s;cursor:pointer;
-              box-shadow:0 1px 3px rgba(0,0,0,0.04);"
-       onmouseover="if(!this.style.background||this.style.background==='rgb(255,255,255)'){this.style.borderColor='#7c5cfc';this.style.boxShadow='0 2px 8px rgba(124,92,252,0.12)'}"
-       onmouseout="if(!this.style.background||this.style.background==='rgb(255,255,255)'){this.style.borderColor='#e1e3e6';this.style.boxShadow='0 1px 3px rgba(0,0,0,0.04)'}">
+       class="module-card"
+       th:classappend="${m.id == module.id} ? ' active' : ''">
         <span style="font-size:36px;" th:text="${m.icon}">📦</span>
         <span style="font-size:14px;font-weight:600;text-align:center;" th:text="${m.name}">名称</span>
         <span style="font-size:11px;color:#909296;" th:text="'目录: ' + ${m.dir}">目录</span>
@@ -109,25 +108,7 @@
 </div>
 
 <div th:unless="${error}">
-<div class="card" style="padding:16px 20px;">
-    <div style="display:flex;align-items:center;justify-content:space-between;">
-        <div style="display:flex;align-items:center;gap:12px;">
-            <span style="font-size:28px;" th:text="${module.icon}">📁</span>
-            <div>
-                <h2 style="margin:0;font-size:20px;" th:text="${module.name}">模块名</h2>
-                <div class="text-muted" style="font-size:12px;">
-                    目录：<code th:text="${module.dir}"></code>
-                </div>
-            </div>
-        </div>
-        <div class="quick-actions">
-            <button class="btn btn-secondary" onclick="refreshModuleData()" style="font-size:12px;">🔄 刷新</button>
-            <button class="btn btn-secondary" onclick="exportModuleData()" style="font-size:12px;">📥 导出</button>
-            <a th:href="@{/chat(kbId=${kb.id})}"
-               class="btn btn-primary" style="font-size:12px;text-decoration:none;">💬 AI 对话</a>
-        </div>
-    </div>
-</div>
+
 
 <div class="module-stats" id="moduleStats">
     <div class="stat-card">
@@ -151,7 +132,7 @@
 <div class="tab-bar">
     <button class="tab-btn active" onclick="switchTab('analysis')">🤖 AI分析</button>
     <button class="tab-btn" onclick="switchTab('data')">📊 原始数据</button>
-    <button class="tab-btn" onclick="switchTab('docs')">📄 文档查看</button>
+    <button class="tab-btn" onclick="switchTab('docs')">📄 笔记</button>
     <button class="tab-btn" onclick="switchTab('prompt')">✏️ 提示词</button>
 </div>
 
