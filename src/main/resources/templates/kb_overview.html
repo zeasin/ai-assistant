@@ -7,6 +7,8 @@
 <body>
 <th:block layout:fragment="content">
 
+<th:block th:replace="~{kb_tab_bar :: kb-tabs('overview', ${kb}, ${labels})}" />
+
 <div class="status-bar">
     <div class="status-item">
         <div class="label" th:text="${labels.get('notes')} + '库位置'">笔记库位置</div>
@@ -26,24 +28,6 @@
     </div>
 </div>
 
-<div class="card">
-    <h2>快速入口</h2>
-    <div style="display:flex;gap:12px;flex-wrap:wrap;">
-        <a th:href="@{/planner}" class="btn btn-primary"
-           style="flex:1;min-width:120px;justify-content:center;"
-           th:text="'📋 计划'">计划</a>
-        <a th:href="@{/kb/{id}/modules(id=${kb.id})}" class="btn btn-primary"
-           style="flex:1;min-width:120px;justify-content:center;"
-           th:text="'🤖 ' + ${labels.get('modules')}">模块</a>
-        <a th:href="@{/kb/{id}/notes(id=${kb.id})}" class="btn btn-primary"
-           style="flex:1;min-width:120px;justify-content:center;"
-           th:text="'📄 ' + ${labels.get('notes')}">笔记</a>
-        <a th:href="@{/kb/{id}/config(id=${kb.id})}" class="btn btn-primary"
-           style="flex:1;min-width:120px;justify-content:center;background:#5c5f66;"
-           th:text="'⚙️ ' + ${labels.get('config')}">配置</a>
-    </div>
-</div>
-
 <div class="card" th:if="${!modules.isEmpty()}">
     <h2 th:text="${labels.get('modules')}">模块/科目</h2>
     <div style="display:flex;gap:12px;flex-wrap:wrap;">
@@ -60,26 +44,18 @@
         <h2>📊 AI 综合日报</h2>
         <div class="flex" style="gap:8px;">
             <button class="btn btn-secondary" onclick="openPromptModal()">⚙️ 提示词</button>
-            <button class="btn btn-primary" id="genBtn" onclick="generateReport()">
-                🔄 重新生成
-            </button>
+            <button class="btn btn-primary" id="genBtn" onclick="generateReport()">🔄 重新生成</button>
         </div>
     </div>
-
     <th:block th:if="${report_error != null and !report_error.isEmpty()}">
-    <div class="text-muted mb-2" style="color:#ff6b6b;">
-        ⚠️ <span th:text="${report_error}"></span>
-    </div>
+    <div class="text-muted mb-2" style="color:#ff6b6b;">⚠️ <span th:text="${report_error}"></span></div>
     </th:block>
-
     <div id="reportContent" class="report">
         <th:block th:if="${report != null and !report.isEmpty()}">
             <div th:utext="${report}"></div>
         </th:block>
         <th:block th:unless="${report != null and !report.isEmpty()}">
-            <div class="text-muted">
-                暂无日报数据。点击"重新生成"或等待定时任务（每天 09:00）自动推送。
-            </div>
+            <div class="text-muted">暂无日报数据。点击"重新生成"或等待定时任务自动推送。</div>
         </th:block>
     </div>
 </div>
@@ -90,7 +66,6 @@
             <h3 style="margin:0;">⚙️ 日报生成提示词</h3>
             <button class="btn btn-secondary" onclick="closePromptModal()" style="padding:4px 12px;">✕</button>
         </div>
-        <div class="text-muted mb-2" style="font-size:12px;">可用变量：<code>{date}</code> 日期，<code>{weekday}</code> 星期</div>
         <textarea id="promptContent" rows="12" style="width:100%;padding:10px;border:1px solid #e1e3e6;border-radius:8px;font-size:13px;font-family:monospace;resize:vertical;box-sizing:border-box;"></textarea>
         <div class="flex" style="gap:8px;margin-top:12px;justify-content:flex-end;">
             <button class="btn btn-secondary" onclick="closePromptModal()">取消</button>
@@ -103,56 +78,23 @@
 const KB_ID = [[${kb.id}]];
 
 function generateReport() {
-    const btn = document.getElementById('genBtn');
+    var btn = document.getElementById('genBtn');
     btn.disabled = true; btn.textContent = '⏳ 生成中...';
-
     fetch('/kb/' + KB_ID + '/api/generate', { method: 'POST' })
         .then(r => r.json())
-        .then(data => {
-            if (data.ok) {
-                setTimeout(() => location.reload(), 500);
-            } else {
-                toast('生成失败：' + (data.error || '未知错误'), 'error');
-                btn.disabled = false; btn.textContent = '🔄 重新生成';
-            }
-        })
-        .catch(() => {
-            toast('请求失败，请检查服务状态', 'error');
-            btn.disabled = false; btn.textContent = '🔄 重新生成';
-        });
+        .then(data => { if (data.ok) setTimeout(() => location.reload(), 500); else { toast('生成失败：' + (data.error || ''), 'error'); btn.disabled = false; btn.textContent = '🔄 重新生成'; } })
+        .catch(() => { toast('请求失败', 'error'); btn.disabled = false; btn.textContent = '🔄 重新生成'; });
 }
 
 function openPromptModal() {
-    fetch('/kb/' + KB_ID + '/api/report/prompt')
-        .then(r => r.json())
-        .then(data => {
-            if (data.ok) {
-                document.getElementById('promptContent').value = data.prompt;
-                document.getElementById('promptModal').style.display = 'flex';
-            }
-        });
-}
-
-function closePromptModal() {
-    document.getElementById('promptModal').style.display = 'none';
-}
-
-function savePrompt() {
-    const prompt = document.getElementById('promptContent').value;
-    fetch('/kb/' + KB_ID + '/api/report/prompt', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: prompt })
-    })
-    .then(r => r.json())
-    .then(data => {
-        if (data.ok) {
-            toast('✅ 提示词已保存');
-            closePromptModal();
-        } else {
-            toast('保存失败', 'error');
-        }
+    fetch('/kb/' + KB_ID + '/api/report/prompt').then(r => r.json()).then(data => {
+        if (data.ok) { document.getElementById('promptContent').value = data.prompt; document.getElementById('promptModal').style.display = 'flex'; }
     });
+}
+function closePromptModal() { document.getElementById('promptModal').style.display = 'none'; }
+function savePrompt() {
+    fetch('/kb/' + KB_ID + '/api/report/prompt', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: document.getElementById('promptContent').value }) })
+        .then(r => r.json()).then(data => { if (data.ok) { toast('✅ 提示词已保存'); closePromptModal(); } });
 }
 </script>
 

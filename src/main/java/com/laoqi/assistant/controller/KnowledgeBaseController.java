@@ -151,7 +151,31 @@ public class KnowledgeBaseController {
         model.put("kb", kb);
         model.put("labels", parseLabels(kb.getLabels()));
 
+        if (kb.getNotesDir() == null || kb.getNotesDir().isBlank()) {
+            model.put("error", "未配置笔记库路径，请先在配置页面设置笔记库目录");
+            model.put("dirs", List.of());
+            model.put("files", List.of());
+            model.put("rel", "");
+            model.put("parent", "");
+            model.put("breadcrumbs", List.of());
+            model.put("breadcrumbPaths", List.of());
+            return "kb_browse";
+        }
+
         Path base = kbDir(kb);
+        String basePath = base.toString();
+        if (!Files.exists(base) || !Files.isDirectory(base)
+                || basePath.contains("\\") || basePath.matches("^[A-Za-z]:.*")) {
+            model.put("error", "笔记库目录不存在或路径无效: " + kb.getNotesDir()
+                    + "（可能是 Windows 路径，请在配置页面重新设置）");
+            model.put("dirs", List.of());
+            model.put("files", List.of());
+            model.put("rel", "");
+            model.put("parent", "");
+            model.put("breadcrumbs", List.of());
+            model.put("breadcrumbPaths", List.of());
+            return "kb_browse";
+        }
         Path target = safeResolve(base, dir);
         if (!Files.isDirectory(target)) {
             model.put("error", "目录不存在");
