@@ -328,13 +328,14 @@
 </div>
 
 <script>
-let currentType = 'customer';
 let currentFile = null;
 let currentGroup = null;
 let allData = {};
 let tableColumns = [];
 let currentRowData = null;
 let columnSettings = {};
+let kbId = null;
+let kbDir = '';
 
 // 检测并按照时间字段倒序排列
 function compareByTime(a, b) {
@@ -365,33 +366,33 @@ function compareByTime(a, b) {
 
 document.addEventListener('DOMContentLoaded', function() {
     var params = new URLSearchParams(window.location.search);
-    var typeParam = params.get('type');
+    var kbIdParam = params.get('kbId');
+    var dirParam = params.get('dir');
     var dataParam = params.get('data');
-    
-    if (typeParam) {
-        currentType = typeParam;
-    }
-    if (dataParam) {
-        currentFile = dataParam;
-    }
-    
-    if (!typeParam || !dataParam) {
-        document.getElementById('data-source-info').textContent = '请通过看板页面的「编辑」按钮进入';
-        document.getElementById('data-container').innerHTML = '<div class="empty-state"><div class="icon">📋</div><div>此页面需要通过参数指定数据源</div><div style="margin-top:12px;font-size:13px;color:#909296;">请从客户、运营等看板页面的原始数据区域点击「✏️ 编辑」按钮进入</div></div>';
+    var groupParam = params.get('group');
+
+    if (!kbIdParam || !dataParam) {
+        document.getElementById('data-source-info').textContent = '缺少必要参数';
+        document.getElementById('data-container').innerHTML = '<div class="empty-state"><div class="icon">📋</div><div>此页面需要通过参数指定数据源</div></div>';
         return;
     }
-    
+
+    kbId = kbIdParam;
+    kbDir = dirParam || '';
+    currentFile = dataParam;
+    currentGroup = groupParam || '';
+
     loadData();
-    
+
     document.getElementById('btn-edit-from-detail').addEventListener('click', function() {
         if (currentRowData && currentRowData.row) {
             closeModal('modal-detail');
             showEditModal(currentRowData.row, currentRowData.groupName);
         }
     });
-    
+
     document.getElementById('btn-confirm-delete').addEventListener('click', confirmDelete);
-    
+
     document.getElementById('search-input').addEventListener('input', function(e) {
         renderAllTables();
     });
@@ -400,93 +401,54 @@ document.addEventListener('DOMContentLoaded', function() {
 async function loadData() {
     var container = document.getElementById('data-container');
     container.innerHTML = '<div class="loading-state">⏳ 加载中...</div>';
-    
+
     try {
-        var response = await fetch('/api/data/list?type=' + currentType + '&includeData=true');
-        var result = await response.json();
-        
-        if (!result.ok) {
-            container.innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><div>' + (result.error || '加载失败') + '</div></div>';
-            return;
+        await loadKbData();
         }
-        
-        allData = result;
-        
-        if (result.fileCount === 0) {
-            container.innerHTML = '<div class="empty-state"><div class="icon">📁</div><div>目录为空，暂无数据文件</div></div>';
-            return;
-        }
-        
-        if (!currentFile && result.dataGroups && result.dataGroups.length > 0) {
-            currentFile = result.dataGroups[0].fileName;
-        }
-        
-        var fileLabel = currentFile;
-        if (allData.dataGroups) {
-            var fileInfo = allData.dataGroups.find(function(f) { return f.fileName === currentFile; });
-            if (fileInfo) {
-                fileLabel = currentFile;
-            }
-        }
-        document.getElementById('data-source-info').textContent = '数据来源：' + fileLabel + ' | 直接编辑 JSON 数据，无需 AI 参与';
-        
-        await loadAllGroups();
     } catch (e) {
         container.innerHTML = '<div class="empty-state"><div class="icon">❌</div><div>加载失败: ' + e.message + '</div></div>';
     }
 }
 
-async function loadAllGroups() {
+async function loadKbData() {
     var container = document.getElementById('data-container');
-    container.innerHTML = '<div class="loading-state">⏳ 加载数据...</div>';
-    
-    try {
-        var fileData = allData.dataGroups.find(function(f) { return f.fileName === currentFile; });
-        if (!fileData || !fileData.groups) {
-            container.innerHTML = '<div class="empty-state"><div class="icon">📋</div><div>无法读取数据结构</div></div>';
-            return;
-        }
-        
-        var arrayGroups = [];
-        Object.keys(fileData.groups).forEach(function(groupName) {
-            if (fileData.groups[groupName].type === 'array') {
-                arrayGroups.push(groupName);
-            }
-        });
-        
-        if (arrayGroups.length === 0) {
-            container.innerHTML = '<div class="empty-state"><div class="icon">📋</div><div>暂无数组类型的数据分组</div></div>';
-            return;
-        }
-        
-        allData.groupData = {};
-        for (var i = 0; i < arrayGroups.length; i++) {
-            var groupName = arrayGroups[i];
-            var response = await fetch('/api/data/group?type=' + currentType + '&fileName=' + encodeURIComponent(currentFile) + '&group=' + encodeURIComponent(groupName));
-            var groupResult = await response.json();
-            if (groupResult.ok && Array.isArray(groupResult.data)) {
-                allData.groupData[groupName] = groupResult.data;
-                allData.groupData[groupName].sort(compareByTime);
-            }
-        }
-        
-        // 加载列设置
-        try {
-            var settingsResp = await fetch('/api/data/column-settings?type=' + currentType);
-            if (settingsResp.ok) {
-                var settingsData = await settingsResp.json();
-                if (settingsData.ok && settingsData.settings) {
-                    columnSettings = settingsData.settings;
-                }
-            }
-        } catch (e) {
-            console.warn('加载列设置失败:', e);
-        }
-
-        renderAllTables();
-    } catch (e) {
-        container.innerHTML = '<div class="empty-state"><div class="icon">❌</div><div>加载失败: ' + e.message + '</div></div>';
+    var readResp = await fetch('/kb/' + kbId + '/api/data/read?dir=' + encodeURIComponent(kbDir) + '&file=' + encodeURIComponent(currentFile));
+    var readResult = await readResp.json();
+    if (!readResult.ok || !readResult.data) {
+        container.innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><div>无法读取数据</div></div>';
+        return;
     }
+    allData = { dataGroups: [{ fileName: currentFile, groups: readResult.data.groups }] };
+    document.getElementById('data-source-info').textContent = '数据来源：' + kbDir + '/' + currentFile + '.json';
+    await loadKbGroups(readResult.data.groups);
+}
+
+async function loadKbGroups(groups) {
+    var container = document.getElementById('data-container');
+    var arrayGroups = Object.keys(groups).filter(function(g) { return groups[g].type === 'array'; });
+    if (arrayGroups.length === 0) {
+        container.innerHTML = '<div class="empty-state"><div class="icon">📋</div><div>暂无数组类型数据</div></div>';
+        return;
+    }
+    allData.groupData = {};
+    for (var i = 0; i < arrayGroups.length; i++) {
+        var groupName = arrayGroups[i];
+        var resp = await fetch('/kb/' + kbId + '/api/data/group?dir=' + encodeURIComponent(kbDir) + '&file=' + encodeURIComponent(currentFile) + '&group=' + encodeURIComponent(groupName));
+        var result = await resp.json();
+        if (result.ok && Array.isArray(result.data)) {
+            allData.groupData[groupName] = result.data;
+            allData.groupData[groupName].sort(compareByTime);
+        }
+    }
+    var typeKey = kbId + '_' + kbDir;
+    try {
+        var settingsResp = await fetch('/api/data/column-settings?type=' + encodeURIComponent(typeKey));
+        if (settingsResp.ok) {
+            var settingsData = await settingsResp.json();
+            if (settingsData.ok && settingsData.settings) columnSettings = settingsData.settings;
+        }
+    } catch (e) {}
+    renderAllTables();
 }
 
 function renderAllTables() {
@@ -750,14 +712,13 @@ async function submitEdit(event) {
     
     try {
         var params = new URLSearchParams({
-            fileName: document.getElementById('edit-fileName').value,
+            dir: kbDir,
+            file: document.getElementById('edit-fileName').value,
             group: document.getElementById('edit-group').value,
             idField: document.getElementById('edit-idField').value,
-            idValue: document.getElementById('edit-idValue').value,
-            type: currentType
+            idValue: document.getElementById('edit-idValue').value
         });
-        
-        var response = await fetch('/api/data/update?' + params.toString(), {
+        var response = await fetch('/kb/' + kbId + '/api/data/update?' + params.toString(), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(updates)
@@ -818,12 +779,11 @@ async function submitAdd(event) {
         }
         
         var params = new URLSearchParams({
-            fileName: document.getElementById('add-fileName').value,
-            group: document.getElementById('add-group').value,
-            type: currentType
+            dir: kbDir,
+            file: document.getElementById('add-fileName').value,
+            group: document.getElementById('add-group').value
         });
-        
-        var response = await fetch('/api/data/add?' + params.toString(), {
+        var response = await fetch('/kb/' + kbId + '/api/data/add?' + params.toString(), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(record)
@@ -869,14 +829,13 @@ async function confirmDelete() {
     
     try {
         var params = new URLSearchParams({
-            fileName: document.getElementById('delete-fileName').value,
+            dir: kbDir,
+            file: document.getElementById('delete-fileName').value,
             group: document.getElementById('delete-group').value,
             idField: document.getElementById('delete-idField').value,
-            idValue: document.getElementById('delete-idValue').value,
-            type: currentType
+            idValue: document.getElementById('delete-idValue').value
         });
-        
-        var response = await fetch('/api/data/delete?' + params.toString(), {
+        var response = await fetch('/kb/' + kbId + '/api/data/delete?' + params.toString(), {
             method: 'POST'
         });
         
@@ -966,7 +925,8 @@ async function saveColumnSettings(tableId, btn) {
     columnSettings[tableId] = selected;
 
     try {
-        var resp = await fetch('/api/data/column-settings?type=' + currentType, {
+        var typeKey = isKbMode ? (kbId + '_' + kbDir) : currentType;
+        var resp = await fetch('/api/data/column-settings?type=' + encodeURIComponent(typeKey), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(columnSettings)

@@ -527,7 +527,21 @@ public class KnowledgeBaseController {
         KnowledgeBaseEntity kb = kbService.getById(id);
         if (kb == null) return Map.of("ok", false, "error", "知识库不存在");
         Path dataDir = safeResolve(kbDir(kb), dir).resolve("data");
-        return Map.of("ok", true, "data", directoryDataService.getFileData(dataDir, file));
+        Map<String, Object> fileData = directoryDataService.getFileData(dataDir, file);
+        if (fileData == null) return Map.of("ok", false, "error", "文件不存在");
+        return Map.of("ok", true, "data", fileData);
+    }
+
+    @ResponseBody
+    @GetMapping("/kb/{id}/api/data/group")
+    public Map<String, Object> readGroupData(@PathVariable Long id, @RequestParam String dir,
+                                             @RequestParam String file, @RequestParam String group) {
+        KnowledgeBaseEntity kb = kbService.getById(id);
+        if (kb == null) return Map.of("ok", false, "error", "知识库不存在");
+        Path dataDir = safeResolve(kbDir(kb), dir).resolve("data");
+        Map<String, Object> result = directoryDataService.getGroupData(dataDir, file, group);
+        if (result == null) return Map.of("ok", false, "error", "分组不存在");
+        return Map.of("ok", true, "count", result.getOrDefault("count", 0), "data", result.getOrDefault("data", List.of()));
     }
 
     @ResponseBody

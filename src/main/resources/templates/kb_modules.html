@@ -108,9 +108,9 @@
     </div>
 </div>
 
-<script>
+<script th:inline="javascript">
 var KB_ID = [[${kb.id}]];
-var CURRENT_DIR = /*[[${currentDir}]]*/ '';
+var CURRENT_DIR = [[${currentDir}]];
 var dirData = [];
 var isEditing = false;
 var dragItem = null;
