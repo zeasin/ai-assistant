@@ -2,277 +2,278 @@
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{layout}">
 <head>
-    <title th:text="${kb.name} + ' - ' + ${labels.get('modules')}">模块管理</title>
+    <title th:text="${kb.name} + ' - 笔记目录'">笔记目录</title>
 </head>
 <body>
 <th:block layout:fragment="content">
 
-<th:block th:replace="~{kb_tab_bar :: kb-tabs('modules', ${kb}, ${labels})}" />
+<th:block th:replace="~{kb_tab_bar :: kb-tabs('notes', ${kb}, ${labels})}" />
 
-<div th:if="${kbModules.isEmpty()}">
-    <div class="text-muted" style="text-align:center;padding:32px;">
-        暂未配置模块
-    </div>
-</div>
+<!-- 目录列表视图 -->
+<div th:if="${currentDir == null || currentDir.isEmpty()}">
+    <div class="card">
+        <div class="flex" style="justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <h2 style="margin:0;">📂 笔记目录</h2>
+            <button class="btn btn-secondary" id="editDirBtn" style="font-size:12px;">✏️ 编辑排序</button>
+        </div>
 
-<div th:unless="${kbModules.isEmpty()}" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:20px;">
-    <a th:each="m : ${kbModules}"
-        th:href="@{/kb/{kid}/modules/{mid}(kid=${kb.id}, mid=${m.id})}"
-       style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
-              background:#fff;border:1px solid #e1e3e6;border-radius:12px;padding:24px 16px;
-              text-decoration:none;color:#1a1b1e;transition:all .15s;cursor:pointer;
-              box-shadow:0 1px 3px rgba(0,0,0,0.04);"
-       onmouseover="this.style.borderColor='#7c5cfc';this.style.boxShadow='0 2px 8px rgba(124,92,252,0.12)'"
-       onmouseout="this.style.borderColor='#e1e3e6';this.style.boxShadow='0 1px 3px rgba(0,0,0,0.04)'">
-        <span style="font-size:36px;" th:text="${m.icon}">📦</span>
-        <span style="font-size:14px;font-weight:600;text-align:center;" th:text="${m.name}">名称</span>
-        <span style="font-size:11px;color:#909296;" th:text="'目录: ' + ${m.dir}">目录</span>
-        <span class="file-count" th:attr="data-mid=${m.id}" style="font-size:11px;color:#909296;">加载中...</span>
-    </a>
-</div>
+        <div id="dirToolbar" style="display:none;margin-bottom:12px;padding:12px;background:#f9f9fb;border-radius:8px;">
+            <div class="text-muted" style="font-size:12px;margin-bottom:8px;">拖拽排序，点击 👁️ 隐藏目录</div>
+            <button class="btn btn-primary" onclick="saveDirSettings()" style="font-size:12px;">💾 保存排序</button>
+        </div>
 
-<hr style="border:none;border-top:1px solid #e1e3e6;margin:24px 0;">
-
-<div class="card">
-    <h2 id="moduleFormTitle">添加模块</h2>
-
-    <div id="modulesContainer" style="margin-bottom:16px;">
-        <div class="text-muted" style="font-size:13px;padding:12px 0;" id="modulesEmpty">暂无模块，请添加。</div>
-        <div id="modulesList"></div>
-    </div>
-
-    <div style="border-top:1px solid #e1e3e6;padding-top:16px;">
-        <div class="form-row" style="gap:8px;flex-wrap:wrap;">
-            <div class="form-group" style="flex:0 0 140px;">
-                <label style="font-size:12px;">模块ID</label>
-                <input type="text" id="newModuleId" placeholder="如 projects" style="width:100%;padding:8px 10px;border:1px solid #e1e3e6;border-radius:6px;font-size:13px;font-family:monospace;">
-            </div>
-            <div class="form-group" style="flex:0 0 120px;">
-                <label style="font-size:12px;">名称</label>
-                <input type="text" id="newModuleName" placeholder="如 项目" style="width:100%;padding:8px 10px;border:1px solid #e1e3e6;border-radius:6px;font-size:13px;">
-            </div>
-            <div class="form-group" style="flex:0 0 160px;">
-                <label style="font-size:12px;">目录</label>
-                <input type="text" id="newModuleDir" placeholder="如 项目" style="width:100%;padding:8px 10px;border:1px solid #e1e3e6;border-radius:6px;font-size:13px;font-family:monospace;">
-            </div>
-            <div class="form-group" style="flex:0 0 70px;">
-                <label style="font-size:12px;">图标</label>
-                <input type="text" id="newModuleIcon" value="📦" style="width:100%;padding:8px 10px;border:1px solid #e1e3e6;border-radius:6px;font-size:13px;">
-            </div>
-            <div class="form-group" style="flex:1;min-width:200px;">
-                <label style="font-size:12px;">提示词</label>
-                <input type="text" id="newModulePrompt" placeholder="AI 分析提示词" style="width:100%;padding:8px 10px;border:1px solid #e1e3e6;border-radius:6px;font-size:13px;">
-            </div>
-            <div class="form-group" style="flex:1;min-width:160px;">
-                <label style="font-size:12px;">数据文件（逗号分隔）</label>
-                <input type="text" id="newModuleDataFiles" placeholder="如 BUG记录.json,项目日志.json" style="width:100%;padding:8px 10px;border:1px solid #e1e3e6;border-radius:6px;font-size:13px;font-family:monospace;">
+        <div th:if="${!topDirs.isEmpty()}" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;">
+            <div th:each="d : ${topDirs}" class="dir-item" th:attr="data-dir=${d}"
+                 draggable="true" style="display:flex;align-items:center;gap:10px;padding:16px;background:#f5f6f8;
+                        border-radius:10px;transition:all .15s;">
+                <span class="dir-handle" style="display:none;cursor:move;color:#999;font-size:18px;">⋮⋮</span>
+                <a th:href="@{/kb/{id}/notes(dir=${d}, id=${kb.id})}" style="text-decoration:none;color:inherit;flex:1;display:flex;align-items:center;gap:10px;">
+                    <span style="font-size:24px;">📁</span>
+                    <span style="font-size:14px;font-weight:500;" th:text="${d}">目录名</span>
+                </a>
+                <button class="dir-hide-btn btn btn-secondary" style="display:none;padding:2px 8px;font-size:11px;"
+                        th:attr="data-dir=${d}">👁️ 隐藏</button>
             </div>
         </div>
-        <div class="flex" style="gap:8px;margin-top:8px;">
-            <button class="btn btn-primary" id="moduleSubmitBtn" onclick="submitModule()">添加模块</button>
-            <button class="btn btn-secondary" id="moduleCancelBtn" onclick="cancelEditModule()" style="display:none;">取消</button>
-            <span id="modulesStatus" class="text-muted" style="margin-left:4px;"></span>
+
+        <div th:if="${topDirs.isEmpty()}" class="text-muted" style="padding:40px;text-align:center;">
+            笔记库为空，请先添加笔记文件
+        </div>
+    </div>
+</div>
+
+<!-- 目录详情视图 -->
+<div th:if="${currentDir != null && !currentDir.isEmpty()}">
+    <!-- 面包屑 -->
+    <div style="margin-bottom:16px;font-size:13px;">
+        <a th:href="@{/kb/{id}/notes(id=${kb.id})}" style="color:#7c5cfc;text-decoration:none;">📂 全部目录</a>
+        <span style="color:#999;"> / </span>
+        <span th:text="${currentDir}" style="font-weight:600;">当前目录</span>
+    </div>
+
+    <div style="display:flex;gap:20px;">
+        <!-- 左侧：文件列表 -->
+        <div style="flex:1;">
+            <div class="card">
+                <div class="flex" style="justify-content:space-between;align-items:center;">
+                    <h2 th:text="'📁 ' + ${currentDir}" style="margin:0;">目录名</h2>
+                    <button class="btn btn-primary" onclick="openAnalyzeModal()">🤖 AI 分析</button>
+                </div>
+                <div style="margin-top:12px;">
+                    <div th:each="f : ${files}" style="padding:8px 0;border-bottom:1px solid #f0f0f0;">
+                        <a th:if="${!f.is_dir}"
+                           th:href="@{/kb/{id}/notes/view(path=${currentDir + '/' + f.name})}"
+                           style="text-decoration:none;color:#333;">
+                            <span>📄</span> <span th:text="${f.name}">文件名</span>
+                        </a>
+                        <a th:if="${f.is_dir}"
+                           th:href="@{/kb/{id}/notes(dir=${currentDir + '/' + f.name}, id=${kb.id})}"
+                           style="text-decoration:none;color:#333;">
+                            <span>📁</span> <span th:text="${f.name}">目录名</span>
+                        </a>
+                        <span class="text-muted" style="font-size:12px;margin-left:8px;" th:text="${f.modified}"></span>
+                    </div>
+                    <div th:if="${files.isEmpty()}" class="text-muted" style="padding:20px;text-align:center;">
+                        目录为空
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧：AI 分析结果 + 原始数据 -->
+        <div style="flex:0 0 420px;">
+            <!-- AI 分析报告 -->
+            <div class="card" th:if="${latestReport != null}"
+                 style="background:linear-gradient(135deg,#f0edff,#fafafe);border:1px solid #d9d0ff;margin-bottom:16px;">
+                <h2 style="margin-bottom:8px;">📊 AI 分析报告</h2>
+                <div class="report" th:utext="${latestReport}"></div>
+            </div>
+
+            <!-- 原始数据 (JSON) -->
+            <div class="card" th:if="${jsonFiles != null && !jsonFiles.isEmpty()}">
+                <h2 style="margin-bottom:8px;">📋 原始数据</h2>
+                <div th:each="jf : ${jsonFiles}" style="padding:8px 0;border-bottom:1px solid #f0f0f0;">
+                    <a href="#" th:attr="data-file=${jf.fileName}"
+                       onclick="loadJsonData(this.getAttribute('data-file'));return false;"
+                       style="text-decoration:none;color:#7c5cfc;font-weight:500;"
+                       th:text="${jf.fileName}">文件名</a>
+                    <span class="text-muted" style="font-size:11px;margin-left:6px;">.json</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- AI 分析弹窗 -->
+<div id="analyzeModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;
+     background:rgba(0,0,0,0.5);z-index:1000;justify-content:center;align-items:center;">
+    <div style="background:#fff;border-radius:12px;padding:24px;width:90%;max-width:700px;max-height:80vh;overflow-y:auto;">
+        <h3 style="margin:0 0 16px;">🤖 AI 分析 - <span id="analyzeDirName"></span></h3>
+        <textarea id="analyzePrompt" rows="4" placeholder="输入分析提示词（可留空，AI 将自行决定分析内容）"
+            style="width:100%;padding:10px;border:1px solid #e1e3e6;border-radius:8px;font-size:13px;
+                   font-family:monospace;resize:vertical;box-sizing:border-box;"></textarea>
+        <div id="analyzeResult" style="margin-top:12px;display:none;">
+            <div style="max-height:400px;overflow-y:auto;padding:12px;background:#f9f9fb;border-radius:8px;"
+                 id="analyzeResultContent"></div>
+        </div>
+        <div class="flex" style="gap:8px;margin-top:12px;justify-content:flex-end;">
+            <button class="btn btn-secondary" onclick="closeAnalyzeModal()">取消</button>
+            <button class="btn btn-primary" id="analyzeBtn" onclick="startAnalysis()">🚀 开始分析</button>
         </div>
     </div>
 </div>
 
 <script>
-const KB_ID = [[${kb.id}]];
+var KB_ID = [[${kb.id}]];
+var CURRENT_DIR = /*[[${currentDir}]]*/ '';
+var dirSortOrder = [];
+var dirHidden = [];
 
-let modulesList = [];
-let moduleEditingId = null;
+function toggleEditDirs() {
+    var toolbar = document.getElementById('dirToolbar');
+    var isHidden = toolbar.style.display === 'none';
+    toolbar.style.display = isHidden ? 'block' : 'none';
 
-function loadModules() {
-    fetch('/api/config/modules?kbId=' + KB_ID)
-        .then(r => r.json())
-        .then(data => {
-            if (data.ok) {
-                modulesList = data.modules || [];
-                renderModules();
-            }
-        })
-        .catch(() => {});
-}
-
-function renderModules() {
-    const container = document.getElementById('modulesList');
-    const empty = document.getElementById('modulesEmpty');
-    if (!modulesList.length) {
-        container.innerHTML = '';
-        empty.style.display = 'block';
-        return;
-    }
-    empty.style.display = 'none';
-
-    let html = '<table class="log-table"><thead><tr>' +
-        '<th>模块ID</th><th>名称</th><th>图标</th><th>目录</th><th>提示词</th><th>数据文件</th><th>排序</th><th>操作</th>' +
-        '</tr></thead><tbody>';
-    modulesList.forEach(function(m, idx) {
-        const files = (m.dataFiles || []).join(', ');
-        html += '<tr id="mod-row-' + idx + '">';
-        html += '<td><code>' + escapeHtml(m.id) + '</code></td>';
-        html += '<td><strong>' + escapeHtml(m.name) + '</strong></td>';
-        html += '<td style="font-size:18px;">' + (m.icon || '📦') + '</td>';
-        html += '<td><code>' + escapeHtml(m.dir) + '</code></td>';
-        html += '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:#5c5f66;">' + escapeHtml((m.prompt || '').substring(0, 60)) + '</td>';
-        html += '<td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;"><code>' + escapeHtml(files) + '</code></td>';
-        html += '<td style="white-space:nowrap;">';
-        if (idx > 0) html += '<button class="btn btn-secondary" onclick="moveModule(' + idx + ', -1)" style="padding:2px 8px;font-size:11px;">↑</button>';
-        if (idx < modulesList.length - 1) html += '<button class="btn btn-secondary" onclick="moveModule(' + idx + ', 1)" style="padding:2px 8px;font-size:11px;">↓</button>';
-        html += '</td>';
-        html += '<td>';
-        html += '<button class="btn btn-secondary" onclick="editModule(' + idx + ')" style="padding:2px 8px;font-size:11px;margin-right:4px;">编辑</button>';
-        html += '<button class="btn btn-secondary" onclick="deleteModule(' + idx + ')" style="padding:2px 8px;font-size:11px;color:#ef4444;">删除</button>';
-        html += '</td></tr>';
+    document.querySelectorAll('.dir-item').forEach(function(el) {
+        el.querySelector('.dir-handle').style.display = isHidden ? 'inline' : 'none';
+        el.querySelector('.dir-hide-btn').style.display = isHidden ? 'inline' : 'none';
     });
-    html += '</tbody></table>';
-    container.innerHTML = html;
 }
 
-function resetModuleForm() {
-    document.getElementById('newModuleId').value = '';
-    document.getElementById('newModuleName').value = '';
-    document.getElementById('newModuleDir').value = '';
-    document.getElementById('newModuleIcon').value = '📦';
-    document.getElementById('newModulePrompt').value = '';
-    document.getElementById('newModuleDataFiles').value = '';
-    document.getElementById('moduleFormTitle').textContent = '添加模块';
-    document.getElementById('moduleSubmitBtn').textContent = '添加模块';
-    document.getElementById('moduleCancelBtn').style.display = 'none';
-    document.getElementById('modulesStatus').textContent = '';
-    moduleEditingId = null;
+function hideDir(name) {
+    dirHidden.push(name);
+    document.querySelector('.dir-item[data-dir="' + name + '"]').style.display = 'none';
 }
 
-function escapeHtml(s) {
-    if (!s) return '';
-    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+function saveDirSettings() {
+    var items = document.querySelectorAll('.dir-item');
+    var order = [];
+    items.forEach(function(el) {
+        var d = el.getAttribute('data-dir');
+        if (dirHidden.indexOf(d) === -1) order.push(d);
+    });
+
+    fetch('/kb/' + KB_ID + '/api/dir-settings', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({sort: order, hidden: dirHidden})
+    }).then(function(r) { return r.json(); })
+      .then(function(data) {
+          if (data.ok) {
+              toast('✅ 已保存');
+              setTimeout(function() { location.reload(); }, 500);
+          }
+      });
 }
 
-async function submitModule() {
-    const moduleId = document.getElementById('newModuleId').value.trim();
-    const name = document.getElementById('newModuleName').value.trim();
-    const status = document.getElementById('modulesStatus');
-    if (!moduleId) { status.textContent = '❌ 请输入模块ID'; status.style.color = '#ef4444'; return; }
-    if (!name) { status.textContent = '❌ 请输入模块名称'; status.style.color = '#ef4444'; return; }
+// AI 分析
+function openAnalyzeModal() {
+    document.getElementById('analyzeDirName').textContent = CURRENT_DIR;
+    document.getElementById('analyzePrompt').value = '';
+    document.getElementById('analyzeResult').style.display = 'none';
+    document.getElementById('analyzeBtn').disabled = false;
+    document.getElementById('analyzeBtn').textContent = '🚀 开始分析';
+    document.getElementById('analyzeModal').style.display = 'flex';
+}
 
-    const dataFiles = document.getElementById('newModuleDataFiles').value.trim();
-    const files = dataFiles ? dataFiles.split(',').map(function(s) { return s.trim(); }).filter(function(s) { return s; }) : [];
+function closeAnalyzeModal() {
+    document.getElementById('analyzeModal').style.display = 'none';
+}
 
-    const payload = {
-        moduleId: moduleId,
-        name: name,
-        dir: document.getElementById('newModuleDir').value.trim() || moduleId,
-        icon: document.getElementById('newModuleIcon').value.trim() || '📦',
-        prompt: document.getElementById('newModulePrompt').value.trim() || '',
-        dataFiles: files,
-        kbId: KB_ID,
+function startAnalysis() {
+    var btn = document.getElementById('analyzeBtn');
+    btn.disabled = true; btn.textContent = '⏳ 分析中...';
+    var resultDiv = document.getElementById('analyzeResult');
+    var resultContent = document.getElementById('analyzeResultContent');
+    resultDiv.style.display = 'block';
+    resultContent.innerHTML = '<span class="text-muted">AI 正在探索目录并分析内容...</span>';
+
+    var prompt = document.getElementById('analyzePrompt').value;
+    var url = '/kb/' + KB_ID + '/api/analyze-dir?dir=' + encodeURIComponent(CURRENT_DIR)
+              + '&prompt=' + encodeURIComponent(prompt);
+
+    var evtSource = new EventSource(url);
+    evtSource.onmessage = function(e) {
+        var data = JSON.parse(e.data);
+        if (data.type === 'text') {
+            resultContent.innerHTML = data.content.replace(/\n/g, '<br>');
+            btn.textContent = '✅ 分析完成';
+            setTimeout(function() { location.reload(); }, 1000);
+        } else if (data.type === 'error') {
+            resultContent.innerHTML = '<span style="color:red;">' + data.content + '</span>';
+            btn.disabled = false; btn.textContent = '🚀 重新分析';
+        } else if (data.type === 'done') {
+            evtSource.close();
+        }
     };
-
-    try {
-        const res = await fetch('/api/config/modules', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(payload),
-        });
-        const data = await res.json();
-        if (data.ok) {
-            status.textContent = moduleEditingId !== null ? '✅ 已更新' : '✅ 已添加';
-            status.style.color = '#10b981';
-            resetModuleForm();
-            loadModules();
-            setTimeout(() => status.textContent = '', 3000);
-        } else {
-            status.textContent = '❌ ' + (data.error || '保存失败');
-            status.style.color = '#ef4444';
-        }
-    } catch (e) {
-        status.textContent = '❌ 请求失败';
-        status.style.color = '#ef4444';
-    }
+    evtSource.onerror = function() {
+        evtSource.close();
+        btn.disabled = false; btn.textContent = '🚀 重新分析';
+    };
 }
 
-function editModule(idx) {
-    const m = modulesList[idx];
-    if (!m) return;
-    document.getElementById('newModuleId').value = m.id;
-    document.getElementById('newModuleName').value = m.name;
-    document.getElementById('newModuleDir').value = m.dir || '';
-    document.getElementById('newModuleIcon').value = m.icon || '📦';
-    document.getElementById('newModulePrompt').value = m.prompt || '';
-    document.getElementById('newModuleDataFiles').value = (m.dataFiles || []).join(', ');
-    document.getElementById('moduleFormTitle').textContent = '编辑模块: ' + m.id;
-    document.getElementById('moduleSubmitBtn').textContent = '保存修改';
-    document.getElementById('moduleCancelBtn').style.display = 'inline-block';
-    moduleEditingId = m.id;
-}
-
-function cancelEditModule() {
-    resetModuleForm();
-}
-
-async function deleteModule(idx) {
-    const m = modulesList[idx];
-    if (!m) return;
-    if (!confirm('确定删除模块「' + m.name + '」？')) return;
-    const status = document.getElementById('modulesStatus');
-    try {
-        const res = await fetch('/api/config/modules/' + encodeURIComponent(m.id), { method: 'DELETE' });
-        const data = await res.json();
-        if (data.ok) {
-            status.textContent = '✅ 已删除';
-            status.style.color = '#10b981';
-            if (moduleEditingId === m.id) resetModuleForm();
-            loadModules();
-            setTimeout(() => status.textContent = '', 3000);
-        } else {
-            status.textContent = '❌ ' + (data.error || '删除失败');
-            status.style.color = '#ef4444';
-        }
-    } catch (e) {
-        status.textContent = '❌ 请求失败';
-        status.style.color = '#ef4444';
-    }
-}
-
-async function moveModule(idx, direction) {
-    const newIdx = idx + direction;
-    if (newIdx < 0 || newIdx >= modulesList.length) return;
-    var arr = modulesList.map(function(m) { return m.id; });
-    var item = arr.splice(idx, 1)[0];
-    arr.splice(newIdx, 0, item);
-    try {
-        const res = await fetch('/api/config/modules/reorder', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(arr),
-        });
-        const data = await res.json();
-        if (data.ok) {
-            loadModules();
-        }
-    } catch (e) {}
-}
-
-loadModules();
-
-fetch('/kb/' + KB_ID + '/api/file-counts')
-    .then(r => r.json())
-    .then(data => {
-        document.querySelectorAll('.file-count').forEach(function(el) {
-            var mid = el.getAttribute('data-mid');
-            var fc = data[mid];
-            if (fc) {
-                el.textContent = fc.total + ' 文件 \u00b7 ' + fc.data + ' 数据';
-            } else {
-                el.textContent = '0 文件 \u00b7 0 数据';
+// JSON 数据管理
+function loadJsonData(fileName) {
+    fetch('/kb/' + KB_ID + '/api/data/read?dir=' + encodeURIComponent(CURRENT_DIR) + '&file=' + encodeURIComponent(fileName))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.ok) {
+                var groups = data.data.groups;
+                var html = '<h3>' + fileName + '</h3>';
+                for (var g in groups) {
+                    html += '<div style="margin:8px 0;"><strong>' + g + '</strong> (' + groups[g].count + ' 条)</div>';
+                }
+                document.getElementById('analyzeResultContent').innerHTML = html;
+                document.getElementById('analyzeResult').style.display = 'block';
+                document.getElementById('analyzeModal').style.display = 'flex';
             }
         });
-    })
-    .catch(function() {
-        document.querySelectorAll('.file-count').forEach(function(el) {
-            el.textContent = '--';
-        });
+}
+
+// 拖拽排序
+document.addEventListener('DOMContentLoaded', function() {
+    // 编辑排序按钮
+    var editBtn = document.getElementById('editDirBtn');
+    if (editBtn) {
+        editBtn.addEventListener('click', toggleEditDirs);
+    }
+
+    var container = document.querySelector('.dir-item')?.parentElement;
+    if (!container) return;
+
+    var dragItem = null;
+
+    container.addEventListener('dragstart', function(e) {
+        dragItem = e.target.closest('.dir-item');
+        if (dragItem) dragItem.style.opacity = '0.5';
     });
+
+    container.addEventListener('dragend', function(e) {
+        if (dragItem) dragItem.style.opacity = '1';
+        dragItem = null;
+    });
+
+    container.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        var target = e.target.closest('.dir-item');
+        if (target && target !== dragItem) {
+            var rect = target.getBoundingClientRect();
+            var midY = rect.top + rect.height / 2;
+            if (e.clientY < midY) {
+                container.insertBefore(dragItem, target);
+            } else {
+                container.insertBefore(dragItem, target.nextSibling);
+            }
+        }
+    });
+
+    // 隐藏按钮事件委托
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('dir-hide-btn')) {
+            hideDir(e.target.getAttribute('data-dir'));
+        }
+    });
+});
 </script>
 
 </th:block>

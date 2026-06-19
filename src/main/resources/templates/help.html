@@ -43,7 +43,7 @@ java -jar target/ai-assistant-1.0.0.jar
         <tr><td>🗂️ 数据</td><td><code>/datacenter</code></td><td>数据中心，多数据集管理、Schema 定义、Excel/JSON 导入导出</td></tr>
         <tr><td>📋 计划</td><td><code>/planner</code></td><td>任务看板 + 定时提醒统一管理，按笔记库隔离</td></tr>
         <tr><td>📚 笔记库</td><td><code>/kb</code></td><td>笔记库列表，创建/管理多个笔记库</td></tr>
-        <tr><td style="padding-left:24px;">📂 笔记库详情</td><td><code>/kb/{id}</code></td><td>单个笔记库概览、模块、笔记、AI 指南、日报</td></tr>
+        <tr><td style="padding-left:24px;">📂 笔记库详情</td><td><code>/kb/{id}</code></td><td>单个笔记库概览、笔记目录、AI 指南、日报</td></tr>
         <tr><td>💻 编程AI</td><td><code>/coding</code></td><td>独立飞书机器人 + Pi CLI 代码自动排查（可选开启）</td></tr>
         <tr><td>⚙️ 配置</td><td><code>/config</code></td><td>系统配置：多 LLM 模型、语义向量模型、飞书、字段标签等</td></tr>
         <tr><td>📝 日志</td><td><code>/log</code></td><td>操作日志查看</td></tr>
@@ -53,7 +53,7 @@ java -jar target/ai-assistant-1.0.0.jar
 <!-- 多笔记库系统 -->
 <div class="card">
     <h2>📚 多笔记库系统</h2>
-    <p class="text-muted mb-2">v1.0 核心架构——一个实例同时管理多个笔记库（如工作、学习），数据、对话、记忆、模块完全隔离。</p>
+    <p class="text-muted mb-2">v1.0 核心架构——一个实例同时管理多个笔记库（如工作、学习），数据、对话、目录、任务完全隔离。</p>
     <h3 style="font-size:13px;font-weight:600;margin:12px 0 8px;color:#5c5f66;">导航结构</h3>
     <pre style="background:#1e1e2e;color:#cdd6f4;padding:12px 14px;border-radius:6px;font-size:12px;line-height:1.6;overflow-x:auto;margin:0;">[AI 助理]  💬 对话  🖼️ 识图  🗂️ 数据  📋 计划  📚 笔记库▾  💻 编程AI  ⚙️ 配置  📝 日志
                                          │
@@ -65,7 +65,7 @@ java -jar target/ai-assistant-1.0.0.jar
     <h3 style="font-size:13px;font-weight:600;margin:12px 0 8px;color:#5c5f66;">每个笔记库独立管理</h3>
     <ul style="padding-left:20px;margin:8px 0;">
         <li style="font-size:13px;line-height:1.7;color:#333;margin-bottom:3px;"><strong>笔记库目录</strong> — 各笔记库可配置不同的笔记存储路径</li>
-        <li style="font-size:13px;line-height:1.7;color:#333;margin-bottom:3px;"><strong>模块/科目</strong> — 工作笔记库叫"模块"，学习笔记库叫"科目"</li>
+        <li style="font-size:13px;line-height:1.7;color:#333;margin-bottom:3px;"><strong>笔记目录</strong> — 笔记库根目录下的一级目录自动识别为笔记分区</li>
         <li style="font-size:13px;line-height:1.7;color:#333;margin-bottom:3px;"><strong>任务/提醒</strong> — 任务看板和定时提醒按笔记库隔离</li>
         <li style="font-size:13px;line-height:1.7;color:#333;margin-bottom:3px;"><strong>聊天历史</strong> — AI 对话记录按笔记库独立保存</li>
         <li style="font-size:13px;line-height:1.7;color:#333;margin-bottom:3px;"><strong>AI 分析</strong> — 日报生成、数据洞察等按笔记库独立运行</li>
@@ -74,7 +74,7 @@ java -jar target/ai-assistant-1.0.0.jar
     <table class="log-table">
         <tr><th>维度</th><th>隔离方式</th></tr>
         <tr><td>聊天历史</td><td>sessions.kb_id + 向量召回限定 kb_id</td></tr>
-        <tr><td>模块/科目</td><td>modules.kb_id 过滤</td></tr>
+        <tr><td>笔记目录</td><td>笔记库根目录自动扫描，支持排序/隐藏</td></tr>
         <tr><td>AI 记忆</td><td>{notesDir}/AI/记忆/ 隔离</td></tr>
         <tr><td>任务/提醒</td><td>{notesDir}/AI/任务/ + AI/提醒/ 隔离</td></tr>
         <tr><td>文件操作</td><td>NoteTools 路径基于当前笔记库</td></tr>
@@ -125,14 +125,14 @@ java -jar target/ai-assistant-1.0.0.jar
 <!-- 笔记库详情 -->
 <div class="card">
     <h2>📂 笔记库详情（/kb/{id}）</h2>
-    <p class="text-muted mb-2">每个笔记库拥有独立的模块、笔记浏览、任务提醒、AI 指南、日报等功能。</p>
-    <h3 style="font-size:13px;font-weight:600;margin:12px 0 8px;color:#5c5f66;">模块/科目</h3>
-    <p style="font-size:13px;line-height:1.7;color:#333;margin:0 0 8px;">每个笔记库独立管理自己的模块（工作笔记库叫"模块"，学习笔记库叫"科目"），每个模块对应笔记库中的一个目录。</p>
+    <p class="text-muted mb-2">每个笔记库拥有独立的笔记目录浏览、AI 分析、任务提醒、AI 指南、日报等功能。</p>
+    <h3 style="font-size:13px;font-weight:600;margin:12px 0 8px;color:#5c5f66;">笔记目录</h3>
+    <p style="font-size:13px;line-height:1.7;color:#333;margin:0 0 8px;">笔记库根目录下的一级目录自动识别为笔记分区，进入后可浏览文件、进行 AI 分析。</p>
     <ul style="padding-left:20px;margin:8px 0;">
-        <li style="font-size:13px;line-height:1.7;color:#333;margin-bottom:3px;"><strong>数据表格</strong> — 查看、新增、编辑、删除记录（支持 JSON 嵌套结构）</li>
-        <li style="font-size:13px;line-height:1.7;color:#333;margin-bottom:3px;"><strong>文档浏览</strong> — 模块目录下的 Markdown 文件树，在线预览</li>
-        <li style="font-size:13px;line-height:1.7;color:#333;margin-bottom:3px;"><strong>AI 分析</strong> — SSE 流式分析模块数据并生成洞察报告</li>
-        <li style="font-size:13px;line-height:1.7;color:#333;margin-bottom:3px;"><strong>列设置</strong> — 自定义表格列显示名称、顺序和可见性</li>
+        <li style="font-size:13px;line-height:1.7;color:#333;margin-bottom:3px;"><strong>目录列表</strong> — 展示根目录下一级目录，支持拖拽排序和隐藏</li>
+        <li style="font-size:13px;line-height:1.7;color:#333;margin-bottom:3px;"><strong>文件浏览</strong> — 目录下的 Markdown 文件列表，在线预览</li>
+        <li style="font-size:13px;line-height:1.7;color:#333;margin-bottom:3px;"><strong>AI 分析</strong> — SSE 流式分析目录内容并生成洞察报告，支持自定义提示词</li>
+        <li style="font-size:13px;line-height:1.7;color:#333;margin-bottom:3px;"><strong>原始数据</strong> — 目录下 data/ 中的 JSON 数据文件管理</li>
     </ul>
     <h3 style="font-size:13px;font-weight:600;margin:12px 0 8px;color:#5c5f66;">笔记浏览</h3>
     <ul style="padding-left:20px;margin:8px 0;">
@@ -179,7 +179,7 @@ java -jar target/ai-assistant-1.0.0.jar
         <li style="font-size:13px;line-height:1.7;color:#333;margin-bottom:3px;"><strong>JSON 导入</strong> — 直接粘贴或上传 JSON 数据</li>
         <li style="font-size:13px;line-height:1.7;color:#333;margin-bottom:3px;"><strong>URL 导入</strong> — AI 自动访问 URL 并提取结构化数据</li>
         <li style="font-size:13px;line-height:1.7;color:#333;margin-bottom:3px;">记录浏览、搜索、删除，自动 MD5 去重</li>
-        <li style="font-size:13px;line-height:1.7;color:#333;margin-bottom:3px;">可将数据集导出到笔记库模块</li>
+        <li style="font-size:13px;line-height:1.7;color:#333;margin-bottom:3px;">可将数据集导出到笔记库目录</li>
     </ul>
 </div>
 

@@ -35,11 +35,6 @@
         <div class="value" style="font-size:16px;" th:text="${#lists.size(kbList)} + ' 个'">0 个</div>
         <div class="text-muted" style="font-size:11px;margin-top:2px;">在导航栏知识库菜单中管理</div>
     </div>
-    <div class="status-item">
-        <div class="label">模块总数</div>
-        <div class="value" style="font-size:16px;" th:text="${#lists.size(modules)}">0</div>
-        <div class="text-muted" style="font-size:11px;margin-top:2px;">所有知识库的模块合计</div>
-    </div>
 </div>
 
 <div class="card">
@@ -55,7 +50,6 @@
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;font-size:13px;">
         <div><span class="text-muted">版本：</span>v1.0</div>
         <div><span class="text-muted">知识库：</span><span th:text="${#lists.size(kbList)}">0</span> 个</div>
-        <div><span class="text-muted">模块总数：</span><span th:text="${#lists.size(modules)}">0</span> 个</div>
         <div th:if="${#lists.size(llm_models) > 0}"><span class="text-muted">当前模型：</span><span th:text="${llm_models[0].name}">DeepSeek</span></div>
         <div><span class="text-muted">语义检索：</span>
             <span th:if="${ollama_available}" style="color:#2b8a3e;">● 在线</span>

@@ -14,6 +14,7 @@ public class KnowledgeBaseEntity {
     private String labels;
     private Integer sortOrder;
     private String createdAt;
+    private String dirSettings;
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -27,4 +28,6 @@ public class KnowledgeBaseEntity {
     public void setSortOrder(Integer sortOrder) { this.sortOrder = sortOrder; }
     public String getCreatedAt() { return createdAt; }
     public void setCreatedAt(String createdAt) { this.createdAt = createdAt; }
+    public String getDirSettings() { return dirSettings; }
+    public void setDirSettings(String dirSettings) { this.dirSettings = dirSettings; }
 }

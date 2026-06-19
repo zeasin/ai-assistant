@@ -159,40 +159,19 @@ public class SessionService {
 
             stmt.execute("""
                 CREATE TABLE IF NOT EXISTS knowledge_bases (
-                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                    name        TEXT NOT NULL,
-                    notes_dir   TEXT NOT NULL,
-                    labels      TEXT NOT NULL DEFAULT '{}',
-                    sort_order  INTEGER NOT NULL DEFAULT 0,
-                    created_at  TEXT NOT NULL
+                    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name         TEXT NOT NULL,
+                    notes_dir    TEXT NOT NULL,
+                    labels       TEXT NOT NULL DEFAULT '{}',
+                    sort_order   INTEGER NOT NULL DEFAULT 0,
+                    created_at   TEXT NOT NULL,
+                    dir_settings TEXT NOT NULL DEFAULT ''
                 )
                 """);
+            try { stmt.execute("ALTER TABLE knowledge_bases ADD COLUMN dir_settings TEXT NOT NULL DEFAULT ''"); } catch (Exception ignored) {}
             log.info("Table knowledge_bases initialized");
 
-            stmt.execute("""
-                CREATE TABLE IF NOT EXISTS modules (
-                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                    module_id   TEXT NOT NULL UNIQUE,
-                    name        TEXT NOT NULL,
-                    dir         TEXT NOT NULL,
-                    icon        TEXT NOT NULL DEFAULT '📦',
-                    prompt      TEXT NOT NULL DEFAULT '',
-                    data_files  TEXT NOT NULL DEFAULT '[]',
-                    sort_order  INTEGER NOT NULL DEFAULT 0,
-                    kb_id       INTEGER NOT NULL DEFAULT 1
-                )
-                """);
-            log.info("Table modules initialized");
-            // 迁移：为 modules 补充 kb_id 列（兼容旧数据库）
-            try { stmt.execute("ALTER TABLE modules ADD COLUMN kb_id INTEGER NOT NULL DEFAULT 1"); } catch (Exception ignored) {}
-            stmt.execute("CREATE INDEX IF NOT EXISTS idx_modules_kb ON modules(kb_id)");
             // 迁移：从 config.json 迁移第一条知识库
-            try {
-                stmt.execute("SELECT COUNT(*) FROM knowledge_bases");
-                // 表已存在，尝试迁移
-            } catch (Exception e2) {
-                // 表可能刚创建，不管
-            }
 
             // 识图分析记录表
             stmt.execute("""

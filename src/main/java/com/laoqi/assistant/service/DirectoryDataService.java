@@ -12,9 +12,9 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
-public class ModuleDataService {
+public class DirectoryDataService {
 
-    private static final Logger log = LoggerFactory.getLogger(ModuleDataService.class);
+    private static final Logger log = LoggerFactory.getLogger(DirectoryDataService.class);
     private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
 
     public List<FileInfo> listJsonFiles(Path dataDir) {

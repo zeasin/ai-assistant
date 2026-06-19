@@ -3,10 +3,8 @@ package com.laoqi.assistant.controller;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.laoqi.assistant.config.AppConfig;
 import com.laoqi.assistant.entity.KnowledgeBaseEntity;
-import com.laoqi.assistant.model.ModuleDefinition;
 import com.laoqi.assistant.service.ConfigService;
 import com.laoqi.assistant.service.KnowledgeBaseService;
-import com.laoqi.assistant.service.ModuleService;
 import com.laoqi.assistant.service.OllamaEmbeddingService;
 import com.laoqi.assistant.util.FileUtil;
 import jakarta.servlet.http.HttpServletRequest;
@@ -14,7 +12,6 @@ import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ModelAttribute;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,16 +24,14 @@ public class GlobalModelAdvice {
     private final AppConfig appConfig;
     private final ConfigService configService;
     private final KnowledgeBaseService kbService;
-    private final ModuleService moduleService;
     private final OllamaEmbeddingService ollamaEmbeddingService;
 
     public GlobalModelAdvice(AppConfig appConfig, ConfigService configService,
-                             KnowledgeBaseService kbService, ModuleService moduleService,
+                             KnowledgeBaseService kbService,
                              OllamaEmbeddingService ollamaEmbeddingService) {
         this.appConfig = appConfig;
         this.configService = configService;
         this.kbService = kbService;
-        this.moduleService = moduleService;
         this.ollamaEmbeddingService = ollamaEmbeddingService;
     }
 
@@ -50,11 +45,6 @@ public class GlobalModelAdvice {
         return configService.load().getKeyLabels();
     }
 
-    @ModelAttribute("modules")
-    public List<ModuleDefinition> modules() {
-        return moduleService.getModules();
-    }
-
     @ModelAttribute("kbList")
     public List<KbNavItem> kbList() {
         List<KnowledgeBaseEntity> all = kbService.getAll();
@@ -64,7 +54,6 @@ public class GlobalModelAdvice {
             item.id = kb.getId();
             item.name = kb.getName();
             item.labels = parseLabels(kb.getLabels());
-            item.modules = moduleService.getModulesByKb(kb.getId());
             result.add(item);
         }
         return result;
@@ -112,7 +101,6 @@ public class GlobalModelAdvice {
         Map<String, String> labels = new LinkedHashMap<>();
         labels.put("tasks", "任务");
         labels.put("reminders", "提醒");
-        labels.put("modules", "模块");
         labels.put("notes", "笔记");
         labels.put("config", "配置");
         return labels;
@@ -122,6 +110,5 @@ public class GlobalModelAdvice {
         public Long id;
         public String name;
         public Map<String, String> labels;
-        public List<ModuleDefinition> modules;
     }
 }

@@ -5,9 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.laoqi.assistant.datacenter.model.*;
 import com.laoqi.assistant.service.LlmService;
 
-import com.laoqi.assistant.service.ModuleService;
 import com.laoqi.assistant.service.ConfigService;
-import com.laoqi.assistant.model.ModuleDefinition;
 import com.laoqi.assistant.util.FileUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,18 +29,15 @@ public class DataSetController {
     private final DataSetService dataSetService;
     private final DataSetImportService importService;
     private final LlmService llmService;
-    private final ModuleService moduleService;
     private final ConfigService configService;
 
     public DataSetController(DataSetService dataSetService,
                              DataSetImportService importService,
                              LlmService llmService,
-                             ModuleService moduleService,
                              ConfigService configService) {
         this.dataSetService = dataSetService;
         this.importService = importService;
         this.llmService = llmService;
-        this.moduleService = moduleService;
         this.configService = configService;
     }
 
@@ -298,22 +293,36 @@ public class DataSetController {
         return "[]";
     }
 
-    @GetMapping("/modules")
-    public ResponseEntity<Map<String, Object>> getModules() {
-        List<ModuleDefinition> modules = moduleService.getModules();
-        List<Map<String, String>> result = new ArrayList<>();
-        for (ModuleDefinition mod : modules) {
-            result.add(Map.of(
-                "id", mod.getId() != null ? mod.getId() : "",
-                "name", mod.getName() != null ? mod.getName() : "",
-                "dir", mod.getDir() != null ? mod.getDir() : ""
-            ));
+    @GetMapping("/directories")
+    public ResponseEntity<Map<String, Object>> getDirectories(@RequestParam(required = false) Long kbId) {
+        try {
+            String notesDir = configService.getNotesDir(kbId);
+            Path baseDir = java.nio.file.Paths.get(notesDir);
+            List<Map<String, String>> result = new ArrayList<>();
+            
+            if (java.nio.file.Files.exists(baseDir)) {
+                try (var stream = java.nio.file.Files.list(baseDir)) {
+                    stream.filter(p -> java.nio.file.Files.isDirectory(p))
+                        .filter(p -> !p.getFileName().toString().startsWith("."))
+                        .filter(p -> !p.getFileName().toString().equals("AI"))
+                        .sorted()
+                        .forEach(p -> {
+                            result.add(Map.of(
+                                "name", p.getFileName().toString(),
+                                "path", p.getFileName().toString()
+                            ));
+                        });
+                }
+            }
+            
+            return ResponseEntity.ok(Map.of("ok", true, "data", result));
+        } catch (Exception e) {
+            return ResponseEntity.ok(Map.of("ok", false, "error", e.getMessage()));
         }
-        return ResponseEntity.ok(Map.of("ok", true, "data", result));
     }
 
     @PostMapping("/datasets/{id}/export")
-    public ResponseEntity<Map<String, Object>> exportToModule(
+    public ResponseEntity<Map<String, Object>> exportToDirectory(
             @PathVariable String id,
             @RequestBody Map<String, Object> body) {
         try {
@@ -322,14 +331,9 @@ public class DataSetController {
                 return ResponseEntity.ok(Map.of("ok", false, "error", "数据集不存在"));
             }
 
-            String moduleId = (String) body.get("moduleId");
-            if (moduleId == null || moduleId.isEmpty()) {
-                return ResponseEntity.ok(Map.of("ok", false, "error", "请选择目标模块"));
-            }
-
-            ModuleDefinition mod = moduleService.getModule(moduleId);
-            if (mod == null) {
-                return ResponseEntity.ok(Map.of("ok", false, "error", "模块不存在: " + moduleId));
+            String dir = (String) body.get("dir");
+            if (dir == null || dir.isEmpty()) {
+                return ResponseEntity.ok(Map.of("ok", false, "error", "请选择目标目录"));
             }
 
             List<Map<String, Object>> allRecords = dataSetService.loadRecords(id);
@@ -352,10 +356,13 @@ public class DataSetController {
 
             String customPrompt = (String) body.get("prompt");
 
-            Path dataDir = moduleService.getModuleDataDir(mod);
-            String sampleData = readSampleData(dataDir, mod);
+            String notesDir = configService.getNotesDir(null);
+            Path dataDir = java.nio.file.Paths.get(notesDir).resolve(dir).resolve("data");
+            java.nio.file.Files.createDirectories(dataDir);
+            
+            String sampleData = readSampleData(dataDir);
 
-            String prompt = buildExportPrompt(records, ds, mod, sampleData, customPrompt);
+            String prompt = buildExportPrompt(records, ds, dir, sampleData, customPrompt);
 
             String rawResponse = doAiChat("你是一个数据格式转换助手。严格按照现有格式和JSON结构输出。", prompt);
             String jsonData = extractJsonFromResponse(rawResponse);
@@ -369,8 +376,8 @@ public class DataSetController {
                 "ok", true,
                 "count", records.size(),
                 "file", fileName,
-                "module", mod.getName(),
-                "message", "成功导出 " + records.size() + " 条记录到 " + mod.getName()
+                "directory", dir,
+                "message", "成功导出 " + records.size() + " 条记录到 " + dir
             ));
 
         } catch (Exception e) {
@@ -378,22 +385,9 @@ public class DataSetController {
         }
     }
 
-    private String readSampleData(Path dataDir, ModuleDefinition mod) {
+    private String readSampleData(Path dataDir) {
         StringBuilder sb = new StringBuilder();
-        if (mod.getDataFiles() != null) {
-            for (String fileName : mod.getDataFiles()) {
-                Path file = dataDir.resolve(fileName);
-                if (FileUtil.exists(file)) {
-                    String content = FileUtil.readText(file);
-                    if (!content.isEmpty()) {
-                        sb.append("--- ").append(fileName).append(" ---\n");
-                        sb.append(content, 0, Math.min(content.length(), 2000));
-                        sb.append("\n\n");
-                    }
-                }
-            }
-        }
-        if (sb.isEmpty() && FileUtil.exists(dataDir)) {
+        if (java.nio.file.Files.exists(dataDir)) {
             try (var files = java.nio.file.Files.list(dataDir)) {
                 files.filter(p -> p.toString().endsWith(".json"))
                     .limit(2)
@@ -409,7 +403,7 @@ public class DataSetController {
     }
 
     private String buildExportPrompt(List<Map<String, Object>> records, DataSet ds,
-                                      ModuleDefinition mod, String sampleData, String customPrompt) {
+                                      String dir, String sampleData, String customPrompt) {
         StringBuilder sb = new StringBuilder();
 
         if (customPrompt != null && !customPrompt.isBlank()) {
@@ -418,8 +412,7 @@ public class DataSetController {
             sb.append("请将以下数据转换为业务数据格式。\n\n");
         }
 
-        sb.append("目标模块: ").append(mod.getName()).append("\n");
-        sb.append("目标目录: ").append(mod.getDir()).append("/data/\n\n");
+        sb.append("目标目录: ").append(dir).append("/data/\n\n");
 
         if (!sampleData.isEmpty()) {
             sb.append("现有业务数据格式样例（请保持一致）：\n");

@@ -22,21 +22,6 @@
         <div class="label" th:text="${labels.get('reminders')}">提醒</div>
         <div class="value" style="font-size:28px;" th:text="${reminderCount}">0</div>
     </div>
-    <div class="status-item">
-        <div class="label" th:text="${labels.get('modules')}">模块</div>
-        <div class="value" style="font-size:28px;" th:text="${modules.size()}">0</div>
-    </div>
-</div>
-
-<div class="card" th:if="${!modules.isEmpty()}">
-    <h2 th:text="${labels.get('modules')}">模块/科目</h2>
-    <div style="display:flex;gap:12px;flex-wrap:wrap;">
-        <a th:each="m : ${modules}"
-           th:href="@{/kb/{id}/modules/{mid}(id=${kb.id}, mid=${m.id})}"
-           class="btn btn-secondary"
-           style="flex:0 0 auto;padding:12px 20px;font-size:15px;"
-           th:text="${m.icon + ' ' + m.name}">模块</a>
-    </div>
 </div>
 
 <div class="card">

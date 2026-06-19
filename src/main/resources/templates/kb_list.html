@@ -61,13 +61,11 @@
                     <div class="kb-stats">
                         <div class="kb-stat"><div class="num" th:text="${kb.taskCount}">0</div><div class="label" th:text="${kb.labels != null ? kb.labels.get('tasks') : '任务'}">任务</div></div>
                         <div class="kb-stat"><div class="num" th:text="${kb.reminderCount}">0</div><div class="label" th:text="${kb.labels != null ? kb.labels.get('reminders') : '提醒'}">提醒</div></div>
-                        <div class="kb-stat"><div class="num" th:text="${kb.moduleCount}">0</div><div class="label" th:text="${kb.labels != null ? kb.labels.get('modules') : '模块'}">模块</div></div>
                         <div class="kb-stat"><div class="num">📂</div><div class="label" th:text="${kb.labels != null ? kb.labels.get('notes') : '笔记'}">笔记</div></div>
                     </div>
                     <div class="kb-actions">
                         <a th:href="@{/kb/{id}(id=${kb.id})}" class="btn-kb">📊 概览</a>
-                        <a th:href="@{/kb/{id}/modules(id=${kb.id})}" class="btn-outline" th:text="${kb.labels != null ? kb.labels.get('modules') : '模块'}">模块</a>
-                        <a th:href="@{/kb/{id}/notes(id=${kb.id})}" class="btn-outline" th:text="${kb.labels != null ? kb.labels.get('notes') : '笔记'}">笔记</a>
+                        <a th:href="@{/kb/{id}/notes(id=${kb.id})}" class="btn-outline" th:text="'📂 ' + ${kb.labels != null ? kb.labels.get('notes') : '笔记'}">📂 笔记</a>
                         <a th:href="@{/kb/{id}/config(id=${kb.id})}" class="btn-outline">⚙️ 配置</a>
                     </div>
                 </div>
@@ -102,10 +100,6 @@
                     </div>
                 </div>
                 <div class="form-row">
-                    <div class="form-group" style="flex:1;">
-                        <label>模块菜单名</label>
-                        <input type="text" id="kbLabelModules" value="模块" style="width:100%;">
-                    </div>
                     <div class="form-group" style="flex:1;">
                         <label>笔记菜单名</label>
                         <input type="text" id="kbLabelNotes" value="笔记" style="width:100%;">
@@ -156,7 +150,6 @@
                 document.getElementById('kbNotesDir').value = '';
                 document.getElementById('kbLabelTasks').value = '任务';
                 document.getElementById('kbLabelReminders').value = '提醒';
-                document.getElementById('kbLabelModules').value = '模块';
                 document.getElementById('kbLabelNotes').value = '笔记';
                 document.getElementById('kbLabelConfig').value = '配置';
                 document.getElementById('kbModal').classList.add('active');
@@ -181,14 +174,12 @@
                         var labels = typeof kb.labels === 'string' ? JSON.parse(kb.labels) : kb.labels;
                         document.getElementById('kbLabelTasks').value = labels.tasks || '任务';
                         document.getElementById('kbLabelReminders').value = labels.reminders || '提醒';
-                        document.getElementById('kbLabelModules').value = labels.modules || '模块';
                         document.getElementById('kbLabelNotes').value = labels.notes || '笔记';
                         document.getElementById('kbLabelConfig').value = labels.config || '配置';
                     } catch(e) {}
                 } else {
                     document.getElementById('kbLabelTasks').value = '任务';
                     document.getElementById('kbLabelReminders').value = '提醒';
-                    document.getElementById('kbLabelModules').value = '模块';
                     document.getElementById('kbLabelNotes').value = '笔记';
                     document.getElementById('kbLabelConfig').value = '配置';
                 }
@@ -205,7 +196,6 @@
                 var labels = {
                     tasks: document.getElementById('kbLabelTasks').value.trim() || '任务',
                     reminders: document.getElementById('kbLabelReminders').value.trim() || '提醒',
-                    modules: document.getElementById('kbLabelModules').value.trim() || '模块',
                     notes: document.getElementById('kbLabelNotes').value.trim() || '笔记',
                     config: document.getElementById('kbLabelConfig').value.trim() || '配置'
                 };
@@ -233,7 +223,7 @@
                 var name = card.querySelector('.kb-name span').textContent;
                 var kbId = card.dataset.kbId;
                 document.getElementById('deleteKbId').value = kbId;
-                document.getElementById('deleteKbText').textContent = '确定删除笔记库「' + name + '」？相关聊天记录和模块不会被删除，仅移除笔记库配置。';
+                document.getElementById('deleteKbText').textContent = '确定删除笔记库「' + name + '」？相关聊天记录和配置不会被删除，仅移除笔记库配置。';
                 document.getElementById('deleteKbModal').classList.add('active');
             }
 

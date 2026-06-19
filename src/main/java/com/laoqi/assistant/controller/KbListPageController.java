@@ -2,7 +2,6 @@ package com.laoqi.assistant.controller;
 
 import com.laoqi.assistant.entity.KnowledgeBaseEntity;
 import com.laoqi.assistant.service.KnowledgeBaseService;
-import com.laoqi.assistant.service.ModuleService;
 import com.laoqi.assistant.service.ReminderService;
 import com.laoqi.assistant.service.TaskService;
 import org.springframework.stereotype.Controller;
@@ -18,14 +17,12 @@ import java.util.Map;
 public class KbListPageController {
 
     private final KnowledgeBaseService kbService;
-    private final ModuleService moduleService;
     private final TaskService taskService;
     private final ReminderService reminderService;
 
-    public KbListPageController(KnowledgeBaseService kbService, ModuleService moduleService,
+    public KbListPageController(KnowledgeBaseService kbService,
                                  TaskService taskService, ReminderService reminderService) {
         this.kbService = kbService;
-        this.moduleService = moduleService;
         this.taskService = taskService;
         this.reminderService = reminderService;
     }
@@ -57,13 +54,6 @@ public class KbListPageController {
                 info.put("reminderCount", 0);
             }
 
-            try {
-                int moduleCount = moduleService.getModulesByKb(kb.getId()).size();
-                info.put("moduleCount", moduleCount);
-            } catch (Exception e) {
-                info.put("moduleCount", 0);
-            }
-
             info.put("labels", parseLabels(kb.getLabels()));
             kbInfos.add(info);
         }
@@ -76,7 +66,6 @@ public class KbListPageController {
         Map<String, String> labels = new LinkedHashMap<>();
         labels.put("tasks", "任务");
         labels.put("reminders", "提醒");
-        labels.put("modules", "模块");
         labels.put("notes", "笔记");
         labels.put("config", "配置");
         return labels;

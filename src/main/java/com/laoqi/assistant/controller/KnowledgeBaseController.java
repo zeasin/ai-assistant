@@ -3,22 +3,25 @@ package com.laoqi.assistant.controller;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.laoqi.assistant.config.AppConfig;
 import com.laoqi.assistant.entity.KnowledgeBaseEntity;
-import com.laoqi.assistant.model.ModuleDefinition;
 import com.laoqi.assistant.model.ReminderData.Reminder;
 import com.laoqi.assistant.model.TaskData.TaskItem;
+import com.laoqi.assistant.service.AgentAnalysisService;
 import com.laoqi.assistant.service.ConfigService;
+import com.laoqi.assistant.service.DirectoryDataService;
 import com.laoqi.assistant.service.KnowledgeBaseService;
 import com.laoqi.assistant.service.LogService;
-import com.laoqi.assistant.service.ModuleService;
 import com.laoqi.assistant.service.ReportService;
 import com.laoqi.assistant.service.TaskService;
 import com.laoqi.assistant.service.ReminderService;
 import com.laoqi.assistant.util.FileUtil;
 import com.laoqi.assistant.util.MarkdownUtil;
+import com.laoqi.assistant.util.TimeUtil;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
 import java.nio.file.*;
@@ -35,25 +38,33 @@ public class KnowledgeBaseController {
             ".git", ".obsidian", "__pycache__", ".DS_Store",
             ".claude", ".playwright-mcp", ".sisyphus");
 
+    private final ObjectMapper mapper = new ObjectMapper();
+    private final java.util.concurrent.ExecutorService analysisExecutor =
+            java.util.concurrent.Executors.newSingleThreadExecutor();
+
     private final KnowledgeBaseService kbService;
-    private final ModuleService moduleService;
     private final LogService logService;
     private final TaskService taskService;
     private final ReminderService reminderService;
     private final ReportService reportService;
     private final ConfigService configService;
+    private final AgentAnalysisService agentAnalysisService;
+    private final DirectoryDataService directoryDataService;
 
-    public KnowledgeBaseController(KnowledgeBaseService kbService, ModuleService moduleService,
+    public KnowledgeBaseController(KnowledgeBaseService kbService,
                                    LogService logService, TaskService taskService,
                                    ReminderService reminderService, ReportService reportService,
-                                   ConfigService configService) {
+                                   ConfigService configService,
+                                   AgentAnalysisService agentAnalysisService,
+                                   DirectoryDataService directoryDataService) {
         this.kbService = kbService;
-        this.moduleService = moduleService;
         this.logService = logService;
         this.taskService = taskService;
         this.reminderService = reminderService;
         this.reportService = reportService;
         this.configService = configService;
+        this.agentAnalysisService = agentAnalysisService;
+        this.directoryDataService = directoryDataService;
     }
 
     private Path kbDir(KnowledgeBaseEntity kb) {
@@ -76,7 +87,6 @@ public class KnowledgeBaseController {
 
         model.put("kb", kb);
         model.put("labels", parseLabels(kb.getLabels()));
-        model.put("modules", moduleService.getModulesByKb(id));
 
         long activeTaskCount = taskService.getAllTasks(kb.getNotesDir()).stream()
                 .filter(t -> !"done".equals(t.status))
@@ -107,44 +117,11 @@ public class KnowledgeBaseController {
 
     // 任务/提醒页面已迁移到 /planner
 
-    @GetMapping("/kb/{id}/modules")
-    public String modulesPage(@PathVariable Long id, Map<String, Object> model) {
-        KnowledgeBaseEntity kb = kbService.getById(id);
-        if (kb == null) return "redirect:/config";
-        model.put("kb", kb);
-        model.put("labels", parseLabels(kb.getLabels()));
-        List<ModuleDefinition> modules = moduleService.getModulesByKb(id);
-        model.put("kbModules", modules);
-        return "kb_modules";
-    }
-
-    @GetMapping("/kb/{id}/modules/{moduleId}")
-    public String moduleDetail(@PathVariable Long id, @PathVariable String moduleId,
-                                Map<String, Object> model) {
-        KnowledgeBaseEntity kb = kbService.getById(id);
-        if (kb == null) return "redirect:/config";
-        ModuleDefinition mod = moduleService.getModule(moduleId);
-        if (mod == null) return "redirect:/kb/" + id + "/modules";
-        model.put("kb", kb);
-        model.put("labels", parseLabels(kb.getLabels()));
-        model.put("module", mod);
-        model.put("allModules", moduleService.getModulesByKb(id));
-        return "kb_module_detail";
-    }
-
-    @GetMapping("/kb/{id}/api/file-counts")
-    @ResponseBody
-    public Map<String, Object> fileCounts(@PathVariable Long id) {
-        Map<String, Object> result = new java.util.HashMap<>();
-        List<ModuleDefinition> modules = moduleService.getModulesByKb(id);
-        for (ModuleDefinition m : modules) {
-            result.put(m.getId(), moduleService.getFileCounts(m));
-        }
-        return result;
-    }
+    // ========== 目录分析 ==========
 
     @GetMapping("/kb/{id}/notes")
-    public String notes(@PathVariable Long id, @RequestParam(required = false, defaultValue = "") String dir,
+    public String notes(@PathVariable Long id,
+                        @RequestParam(required = false, defaultValue = "") String dir,
                         Map<String, Object> model) {
         KnowledgeBaseEntity kb = kbService.getById(id);
         if (kb == null) return "redirect:/config";
@@ -153,85 +130,40 @@ public class KnowledgeBaseController {
         model.put("labels", parseLabels(kb.getLabels()));
 
         if (kb.getNotesDir() == null || kb.getNotesDir().isBlank()) {
-            model.put("error", "未配置笔记库路径，请先在配置页面设置笔记库目录");
-            model.put("dirs", List.of());
-            model.put("files", List.of());
-            model.put("rel", "");
-            model.put("parent", "");
-            model.put("breadcrumbs", List.of());
-            model.put("breadcrumbPaths", List.of());
-            return "kb_browse";
+            model.put("error", "未配置笔记库路径");
+            return "kb_modules";
         }
 
         Path base = kbDir(kb);
-        if (!Files.exists(base) || !Files.isDirectory(base)) {
-            model.put("error", "笔记库目录不存在或路径无效: " + kb.getNotesDir());
-            model.put("dirs", List.of());
-            model.put("files", List.of());
-            model.put("rel", "");
-            model.put("parent", "");
-            model.put("breadcrumbs", List.of());
-            model.put("breadcrumbPaths", List.of());
-            return "kb_browse";
+
+        // dir 为空 → 显示一级目录列表
+        if (dir.isEmpty()) {
+            model.put("topDirs", listTopDirs(base, kb.getDirSettings()));
+            model.put("currentDir", "");
+            return "kb_modules";
         }
+
+        // dir 不为空 → 显示目录内容 + AI 分析
         Path target = safeResolve(base, dir);
         if (!Files.isDirectory(target)) {
-            model.put("error", "目录不存在");
-            model.put("dirs", List.of());
-            model.put("files", List.of());
-            model.put("rel", "");
-            model.put("parent", "");
-            model.put("breadcrumbs", List.of());
-            model.put("breadcrumbPaths", List.of());
-            return "kb_browse";
+            return "redirect:/kb/" + id + "/notes";
         }
 
-        List<Map<String, Object>> dirs = new ArrayList<>();
-        List<Map<String, Object>> files = new ArrayList<>();
+        model.put("topDirs", listTopDirs(base, kb.getDirSettings()));
+        model.put("currentDir", dir);
+        model.put("files", listDirContents(target));
+        model.put("breadcrumbs", buildBreadcrumbs(dir));
+        model.put("parent", parentDir(dir));
 
-        try (var stream = Files.list(target)) {
-            stream.filter(p -> !p.getFileName().toString().startsWith("."))
-                    .filter(p -> !IGNORED_DIRS.contains(p.getFileName().toString()))
-                    .sorted(Comparator.comparing(p -> p.getFileName().toString()))
-                    .forEach(p -> {
-                        Map<String, Object> entry = new LinkedHashMap<>();
-                        entry.put("name", p.getFileName().toString());
-                        try {
-                            entry.put("modified", java.time.LocalDateTime
-                                    .ofInstant(Files.getLastModifiedTime(p).toInstant(),
-                                            ZoneId.of("Asia/Shanghai"))
-                                    .format(java.time.format.DateTimeFormatter.ofPattern("MM-dd HH:mm")));
-                        } catch (IOException e) {
-                            entry.put("modified", "");
-                        }
-                        entry.put("is_dir", Files.isDirectory(p));
-                        if (Files.isDirectory(p)) dirs.add(entry);
-                        else files.add(entry);
-                    });
-        } catch (DirectoryIteratorException e) {
-            log.error("遍历目录失败: target={}", target, e);
-            model.put("error", "读取目录失败: " + e.getCause().getMessage());
-        } catch (IOException e) {
-            log.error("读取目录失败: target={}", target, e);
-            model.put("error", "读取目录失败: " + e.getMessage());
-        }
+        // 读取该目录的历史分析报告
+        Path analysisDir = target.resolve("AI分析");
+        model.put("latestReport", readLatestReport(analysisDir));
 
-        String rel = dir != null && !dir.isEmpty() ? dir : "";
-        String parent = rel.contains("/") ? rel.substring(0, rel.lastIndexOf('/')) : "";
-        String[] parts = rel.isEmpty() ? new String[0] : rel.split("/");
-        List<String> breadcrumbs = Arrays.asList(parts);
-        List<String> breadcrumbPaths = new ArrayList<>();
-        for (int i = 0; i < parts.length; i++) {
-            breadcrumbPaths.add(String.join("/", Arrays.copyOf(parts, i + 1)));
-        }
+        // 读取 JSON 数据文件列表
+        Path dataDir = target.resolve("data");
+        model.put("jsonFiles", directoryDataService.listJsonFiles(dataDir));
 
-        model.put("dirs", dirs);
-        model.put("files", files);
-        model.put("rel", rel);
-        model.put("parent", parent);
-        model.put("breadcrumbs", breadcrumbs);
-        model.put("breadcrumbPaths", breadcrumbPaths);
-        return "kb_browse";
+        return "kb_module_detail";
     }
 
     @GetMapping("/kb/{id}/notes/view")
@@ -261,13 +193,79 @@ public class KnowledgeBaseController {
         return "view";
     }
 
-    @GetMapping("/kb/{id}/config")
-    public String config(@PathVariable Long id, Map<String, Object> model) {
+    // ========== 目录分析 API ==========
+
+    @GetMapping("/kb/{id}/api/analyze-dir")
+    public SseEmitter analyzeDir(@PathVariable Long id,
+                                 @RequestParam String dir,
+                                 @RequestParam(required = false, defaultValue = "") String prompt) {
+        SseEmitter emitter = new SseEmitter(300_000L);
         KnowledgeBaseEntity kb = kbService.getById(id);
-        if (kb == null) return "redirect:/config";
-        model.put("kb", kb);
-        model.put("labels", parseLabels(kb.getLabels()));
-        return "kb_ai_guide";
+        if (kb == null) {
+            try {
+                emitter.send(SseEmitter.event().data(mapper.writeValueAsString(
+                        Map.of("type", "error", "content", "知识库不存在"))));
+                emitter.complete();
+            } catch (Exception ignored) {}
+            return emitter;
+        }
+
+        Path scopeDir = safeResolve(kbDir(kb), dir);
+
+        analysisExecutor.execute(() -> {
+            try {
+                emitter.send(SseEmitter.event().data(mapper.writeValueAsString(
+                        Map.of("type", "status", "content", "⏳ AI 正在分析 " + dir + "..."))));
+
+                String systemPrompt = "你是一个数据分析助手。你拥有文件操作工具，可以自主读取目录下的文件。\n"
+                    + "请先用 listDir 探索目录结构，用 readFile 读取相关文件（JSON 数据、Markdown 文档等），"
+                    + "然后给出分析结果。用中文回复。";
+
+                String result = agentAnalysisService.analyze(scopeDir, prompt, systemPrompt);
+
+                // 保存分析结果
+                Path analysisDir = scopeDir.resolve("AI分析");
+                java.nio.file.Files.createDirectories(analysisDir);
+                FileUtil.writeText(analysisDir.resolve(TimeUtil.todayStr() + ".md"), result);
+
+                emitter.send(SseEmitter.event().data(mapper.writeValueAsString(
+                        Map.of("type", "text", "content", result))));
+                emitter.send(SseEmitter.event().data(mapper.writeValueAsString(
+                        Map.of("type", "done"))));
+                emitter.complete();
+            } catch (Exception e) {
+                try {
+                    emitter.send(SseEmitter.event().data(mapper.writeValueAsString(
+                            Map.of("type", "error", "content", "AI 分析失败: " + e.getMessage()))));
+                    emitter.complete();
+                } catch (Exception ignored) {}
+            }
+        });
+        return emitter;
+    }
+
+    @ResponseBody
+    @PostMapping("/kb/{id}/api/dir-settings")
+    public Map<String, Object> saveDirSettings(@PathVariable Long id,
+                                               @RequestBody Map<String, Object> body) {
+        KnowledgeBaseEntity kb = kbService.getById(id);
+        if (kb == null) return Map.of("ok", false, "error", "知识库不存在");
+        try {
+            kb.setDirSettings(mapper.writeValueAsString(body));
+            kbService.save(Map.of("id", id, "dirSettings", kb.getDirSettings()));
+            return Map.of("ok", true);
+        } catch (Exception e) {
+            return Map.of("ok", false, "error", e.getMessage());
+        }
+    }
+
+    @ResponseBody
+    @GetMapping("/kb/{id}/api/dir-settings")
+    public Map<String, Object> getDirSettings(@PathVariable Long id) {
+        KnowledgeBaseEntity kb = kbService.getById(id);
+        if (kb == null) return Map.of("ok", false);
+        Map<String, Object> settings = parseDirSettings(kb.getDirSettings());
+        return Map.of("ok", true, "settings", settings);
     }
 
     // ========== 笔记 API ==========
@@ -312,6 +310,70 @@ public class KnowledgeBaseController {
         } catch (IOException e) {
             return Map.of("ok", false, "error", "删除失败: " + e.getMessage());
         }
+    }
+
+    // ========== JSON 数据管理 API ==========
+
+    @ResponseBody
+    @GetMapping("/kb/{id}/api/data/list")
+    public Map<String, Object> listJsonData(@PathVariable Long id, @RequestParam String dir) {
+        KnowledgeBaseEntity kb = kbService.getById(id);
+        if (kb == null) return Map.of("ok", false, "error", "知识库不存在");
+        Path dataDir = safeResolve(kbDir(kb), dir).resolve("data");
+        return Map.of("ok", true, "files", directoryDataService.listJsonFiles(dataDir));
+    }
+
+    @ResponseBody
+    @GetMapping("/kb/{id}/api/data/read")
+    public Map<String, Object> readJsonData(@PathVariable Long id, @RequestParam String dir,
+                                            @RequestParam String file) {
+        KnowledgeBaseEntity kb = kbService.getById(id);
+        if (kb == null) return Map.of("ok", false, "error", "知识库不存在");
+        Path dataDir = safeResolve(kbDir(kb), dir).resolve("data");
+        return Map.of("ok", true, "data", directoryDataService.getFileData(dataDir, file));
+    }
+
+    @ResponseBody
+    @PostMapping("/kb/{id}/api/data/add")
+    public Map<String, Object> addRecord(@PathVariable Long id, @RequestParam String dir,
+                                         @RequestParam String file, @RequestParam String group,
+                                         @RequestBody Map<String, Object> record) {
+        KnowledgeBaseEntity kb = kbService.getById(id);
+        if (kb == null) return Map.of("ok", false, "error", "知识库不存在");
+        Path dataDir = safeResolve(kbDir(kb), dir).resolve("data");
+        return directoryDataService.addRecord(dataDir, file, group, record, null);
+    }
+
+    @ResponseBody
+    @PostMapping("/kb/{id}/api/data/update")
+    public Map<String, Object> updateRecord(@PathVariable Long id, @RequestParam String dir,
+                                            @RequestParam String file, @RequestParam String group,
+                                            @RequestParam String idField, @RequestParam String idValue,
+                                            @RequestBody Map<String, Object> updates) {
+        KnowledgeBaseEntity kb = kbService.getById(id);
+        if (kb == null) return Map.of("ok", false, "error", "知识库不存在");
+        Path dataDir = safeResolve(kbDir(kb), dir).resolve("data");
+        return directoryDataService.updateRecord(dataDir, file, group, idField, idValue, updates);
+    }
+
+    @ResponseBody
+    @PostMapping("/kb/{id}/api/data/delete")
+    public Map<String, Object> deleteRecord(@PathVariable Long id, @RequestParam String dir,
+                                            @RequestParam String file, @RequestParam String group,
+                                            @RequestParam String idField, @RequestParam String idValue) {
+        KnowledgeBaseEntity kb = kbService.getById(id);
+        if (kb == null) return Map.of("ok", false, "error", "知识库不存在");
+        Path dataDir = safeResolve(kbDir(kb), dir).resolve("data");
+        return directoryDataService.deleteRecord(dataDir, file, group, idField, idValue);
+    }
+
+    @GetMapping("/kb/{id}/config")
+    public String config(@PathVariable Long id, Map<String, Object> model) {
+        KnowledgeBaseEntity kb = kbService.getById(id);
+        if (kb == null) return "redirect:/config";
+        model.put("kb", kb);
+        model.put("labels", parseLabels(kb.getLabels()));
+        return "kb_ai_guide";
     }
 
     // ========== KB 范围的任务 API ==========
@@ -674,9 +736,120 @@ public class KnowledgeBaseController {
         Map<String, String> labels = new HashMap<>();
         labels.put("tasks", "任务");
         labels.put("reminders", "提醒");
-        labels.put("modules", "模块");
         labels.put("notes", "笔记");
         labels.put("config", "配置");
         return labels;
+    }
+
+    // ========== 辅助方法 ==========
+
+    private List<String> listTopDirs(Path base, String dirSettings) {
+        Set<String> defaultIgnored = Set.of(".git", ".obsidian", "__pycache__", ".DS_Store",
+                ".claude", ".playwright-mcp", ".sisyphus", "AI");
+
+        List<String> allDirs;
+        try (var stream = Files.list(base)) {
+            allDirs = stream.filter(Files::isDirectory)
+                    .filter(p -> !p.getFileName().toString().startsWith("."))
+                    .filter(p -> !defaultIgnored.contains(p.getFileName().toString()))
+                    .map(p -> p.getFileName().toString())
+                    .sorted()
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            return List.of();
+        }
+
+        // 解析用户设置
+        Map<String, Object> settings = parseDirSettings(dirSettings);
+        @SuppressWarnings("unchecked")
+        List<String> hidden = (List<String>) settings.getOrDefault("hidden", List.of());
+        @SuppressWarnings("unchecked")
+        List<String> sort = (List<String>) settings.getOrDefault("sort", List.of());
+
+        // 隐藏
+        allDirs = allDirs.stream()
+                .filter(d -> !hidden.contains(d))
+                .collect(Collectors.toList());
+
+        // 排序：按 sort 列表顺序，未在 sort 中的追加到末尾
+        if (!sort.isEmpty()) {
+            Map<String, Integer> order = new HashMap<>();
+            for (int i = 0; i < sort.size(); i++) order.put(sort.get(i), i);
+            allDirs.sort(Comparator.comparingInt(d -> order.getOrDefault(d, 999)));
+        }
+
+        return allDirs;
+    }
+
+    private List<Map<String, Object>> listDirContents(Path dir) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        try (var stream = Files.list(dir)) {
+            stream.filter(p -> !p.getFileName().toString().startsWith("."))
+                    .filter(p -> !IGNORED_DIRS.contains(p.getFileName().toString()))
+                    .sorted(Comparator.comparing(p -> p.getFileName().toString()))
+                    .forEach(p -> {
+                        Map<String, Object> entry = new LinkedHashMap<>();
+                        entry.put("name", p.getFileName().toString());
+                        try {
+                            entry.put("modified", java.time.LocalDateTime
+                                    .ofInstant(Files.getLastModifiedTime(p).toInstant(),
+                                            ZoneId.of("Asia/Shanghai"))
+                                    .format(java.time.format.DateTimeFormatter.ofPattern("MM-dd HH:mm")));
+                        } catch (IOException e) {
+                            entry.put("modified", "");
+                        }
+                        entry.put("is_dir", Files.isDirectory(p));
+                        result.add(entry);
+                    });
+        } catch (Exception e) {
+            log.error("遍历目录失败: {}", dir, e);
+        }
+        return result;
+    }
+
+    private List<String> buildBreadcrumbs(String dir) {
+        if (dir == null || dir.isEmpty()) return List.of();
+        return Arrays.asList(dir.split("/"));
+    }
+
+    private String parentDir(String dir) {
+        if (dir == null || dir.isEmpty()) return "";
+        int lastSlash = dir.lastIndexOf('/');
+        return lastSlash > 0 ? dir.substring(0, lastSlash) : "";
+    }
+
+    private String readLatestReport(Path analysisDir) {
+        if (!Files.exists(analysisDir)) return null;
+
+        // 优先读取当天
+        String date = TimeUtil.todayStr();
+        Path todayFile = analysisDir.resolve(date + ".md");
+        if (FileUtil.exists(todayFile)) {
+            return MarkdownUtil.toHtml(FileUtil.readText(todayFile));
+        }
+
+        // 否则读取最新的
+        try (var stream = Files.list(analysisDir)) {
+            Path latest = stream
+                    .filter(p -> p.getFileName().toString().endsWith(".md"))
+                    .filter(p -> !p.getFileName().toString().startsWith("."))
+                    .sorted(Comparator.reverseOrder())
+                    .findFirst()
+                    .orElse(null);
+            if (latest != null) {
+                return MarkdownUtil.toHtml(FileUtil.readText(latest));
+            }
+        } catch (Exception ignored) {}
+        return null;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> parseDirSettings(String dirSettings) {
+        if (dirSettings == null || dirSettings.isBlank()) return Map.of();
+        try {
+            return FileUtil.readJson(dirSettings, new TypeReference<>() {}, Map.of());
+        } catch (Exception e) {
+            return Map.of();
+        }
     }
 }

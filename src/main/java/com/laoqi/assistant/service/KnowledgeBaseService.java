@@ -44,7 +44,7 @@ public class KnowledgeBaseService {
             KnowledgeBaseEntity kb = new KnowledgeBaseEntity();
             kb.setName("工作");
             kb.setNotesDir(notesDir);
-            kb.setLabels("{\"tasks\":\"任务\",\"reminders\":\"提醒\",\"modules\":\"模块\",\"notes\":\"笔记\",\"config\":\"配置\"}");
+            kb.setLabels("{\"tasks\":\"任务\",\"reminders\":\"提醒\",\"notes\":\"笔记\",\"config\":\"配置\"}");
             kb.setSortOrder(0);
             kb.setCreatedAt(TimeUtil.nowStr());
             kbDbService.save(kb);
