@@ -1,7 +1,6 @@
 package com.laoqi.assistant.service;
 
 import com.laoqi.assistant.config.AppConfig;
-import com.laoqi.assistant.model.Config;
 import com.laoqi.assistant.util.FileUtil;
 import com.laoqi.assistant.util.MarkdownUtil;
 import com.laoqi.assistant.util.TimeUtil;
@@ -9,7 +8,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
@@ -23,7 +21,7 @@ public class ReportService {
     private final AppConfig appConfig;
     private final FeishuService feishuService;
     private final LogService logService;
-    private final LlmService llmService;
+    private final AgentAnalysisService agentAnalysisService;
     private final ConfigService configService;
     private final KnowledgeBaseService kbService;
 
@@ -34,13 +32,13 @@ public class ReportService {
     public ReportService(AppConfig appConfig,
                           FeishuService feishuService,
                           LogService logService,
-                          LlmService llmService,
+                          AgentAnalysisService agentAnalysisService,
                           ConfigService configService,
                           KnowledgeBaseService kbService) {
         this.appConfig = appConfig;
         this.feishuService = feishuService;
         this.logService = logService;
-        this.llmService = llmService;
+        this.agentAnalysisService = agentAnalysisService;
         this.configService = configService;
         this.kbService = kbService;
     }
@@ -114,24 +112,26 @@ public class ReportService {
     public ReportResult generate(Long kbId) {
         ReportResult result = new ReportResult();
         try {
+            String notesDir = kbService.getNotesDirById(kbId);
+            Path kbDir = Paths.get(notesDir);
+
             String prompt = readPrompt(kbId);
             prompt = prompt.replace("{date}", TimeUtil.todayStr());
             prompt = prompt.replace("{weekday}", TimeUtil.weekdayCn(TimeUtil.now()));
 
-            String report;
-            if (!llmService.isAvailable()) {
+            if (!agentAnalysisService.isAvailable()) {
                 result.error = "LLM API Key 未配置";
                 latestReport = "";
                 latestError = result.error;
                 return result;
             }
-            // 收集笔记库上下文
-            String context = collectNoteContext(kbId);
-            String fullPrompt = prompt;
-            if (context != null && !context.isEmpty()) {
-                fullPrompt += "\n\n以下是我的工作笔记和记忆文件内容，请基于这些内容生成日报：\n\n" + context;
-            }
-            report = llmService.chat("你是一个日报生成助手，根据工作笔记生成综合日报。请用中文回复。", fullPrompt);
+
+            String systemPrompt = "你是一个日报生成助手。你拥有文件操作工具，可以自主读取笔记库中的文件。\n"
+                + "请先用 listDir 探索目录结构，用 searchFiles 搜索相关文件，"
+                + "用 readFile 读取需要的内容（AGENTS.md、记忆文件、工作日报、笔记文档等），"
+                + "然后根据提示词生成今日综合日报。用中文回复。";
+
+            String report = agentAnalysisService.analyze(kbDir, prompt, systemPrompt);
 
             if (report != null && !report.isEmpty()) {
                 result.report = report;
@@ -200,70 +200,6 @@ public class ReportService {
             log.error("日报生成失败: {}", r.error);
             logService.add("日报生成", "失败", r.error);
         }
-    }
-
-    /**
-     * 收集笔记库上下文，供 LLM 直连模式使用。
-     * 读取 AGENTS.md、AI/记忆/ 目录下的文件，以及今天的工作日报。
-     */
-    private String collectNoteContext() {
-        return collectNoteContext((Long) null);
-    }
-
-    private String collectNoteContext(Long kbId) {
-        StringBuilder sb = new StringBuilder();
-        String notesDir;
-        try {
-            notesDir = kbService.getNotesDirById(kbId);
-        } catch (Exception e) {
-            return "";
-        }
-        Path base = Paths.get(notesDir);
-
-        // 1. AGENTS.md
-        Path agents = base.resolve("AGENTS.md");
-        if (FileUtil.exists(agents)) {
-            String content = FileUtil.readText(agents);
-            if (!content.isBlank()) {
-                sb.append("--- AGENTS.md ---\n");
-                sb.append(content, 0, Math.min(content.length(), 3000));
-                sb.append("\n\n");
-            }
-        }
-
-        // 2. AI/记忆/ 目录下的文件
-        Path memoryDir = base.resolve("AI").resolve("记忆");
-        if (Files.exists(memoryDir)) {
-            try (var files = Files.list(memoryDir)) {
-                files.filter(Files::isRegularFile)
-                        .filter(p -> p.toString().endsWith(".md") || p.toString().endsWith(".txt"))
-                        .forEach(p -> {
-                            String content = FileUtil.readText(p);
-                            if (!content.isBlank()) {
-                                sb.append("--- 记忆/").append(p.getFileName()).append(" ---\n");
-                                sb.append(content, 0, Math.min(content.length(), 2000));
-                                sb.append("\n\n");
-                            }
-                        });
-            } catch (Exception ignored) {}
-        }
-
-        // 3. 今天的工作日报（工作/日报/{date}.md）
-        Path dailyDir = base.resolve("工作").resolve("日报");
-        if (Files.exists(dailyDir)) {
-            String date = TimeUtil.todayStr();
-            Path todayNote = dailyDir.resolve(date + ".md");
-            if (FileUtil.exists(todayNote)) {
-                String content = FileUtil.readText(todayNote);
-                if (!content.isBlank()) {
-                    sb.append("--- 今日工作记录 ---\n");
-                    sb.append(content, 0, Math.min(content.length(), 4000));
-                    sb.append("\n\n");
-                }
-            }
-        }
-
-        return sb.toString();
     }
 
     public void saveComprehensiveReport(String report) {

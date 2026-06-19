@@ -23,6 +23,7 @@ public class NoteTools {
 
     private static final Logger log = LoggerFactory.getLogger(NoteTools.class);
     private static final ThreadLocal<Long> CURRENT_KB_ID = new ThreadLocal<>();
+    private static final ThreadLocal<Path> CURRENT_SCOPE = new ThreadLocal<>();
 
     private final ConfigService configService;
     private final KnowledgeBaseService kbService;
@@ -48,7 +49,17 @@ public class NoteTools {
         CURRENT_KB_ID.remove();
     }
 
+    public static void setScope(Path scopeDir) {
+        CURRENT_SCOPE.set(scopeDir);
+    }
+
+    public static void clearScope() {
+        CURRENT_SCOPE.remove();
+    }
+
     private Path baseDir() {
+        Path scope = CURRENT_SCOPE.get();
+        if (scope != null) return scope;
         Long kbId = CURRENT_KB_ID.get();
         String dir = kbService.getNotesDirById(kbId);
         return Path.of(dir);
