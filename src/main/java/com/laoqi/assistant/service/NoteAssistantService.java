@@ -18,7 +18,7 @@ public class NoteAssistantService {
     private static final Logger log = LoggerFactory.getLogger(NoteAssistantService.class);
 
     private final LlmConfigResolver configResolver;
-    private final NoteTools noteTools;
+    private final ToolRegistry toolRegistry;
     private final SessionService sessionService;
 
     private volatile ChatClient defaultClient;
@@ -26,9 +26,9 @@ public class NoteAssistantService {
     private final ConcurrentHashMap<String, ChatClient> modelClients = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, String> modelConfigKeys = new ConcurrentHashMap<>();
 
-    public NoteAssistantService(LlmConfigResolver configResolver, NoteTools noteTools, SessionService sessionService) {
+    public NoteAssistantService(LlmConfigResolver configResolver, ToolRegistry toolRegistry, SessionService sessionService) {
         this.configResolver = configResolver;
-        this.noteTools = noteTools;
+        this.toolRegistry = toolRegistry;
         this.sessionService = sessionService;
     }
 
@@ -208,7 +208,7 @@ public class NoteAssistantService {
                 .build();
 
         return ChatClient.builder(chatModel)
-                .defaultTools(noteTools)
+                .defaultTools(toolRegistry.getToolArray())
                 .build();
     }
 
@@ -237,7 +237,7 @@ public class NoteAssistantService {
                 .build();
 
         return ChatClient.builder(chatModel)
-                .defaultTools(noteTools)
+                .defaultTools(toolRegistry.getToolArray())
                 .build();
     }
 

@@ -18,16 +18,16 @@ public class AgentAnalysisService {
     private static final Logger log = LoggerFactory.getLogger(AgentAnalysisService.class);
 
     private final LlmConfigResolver configResolver;
-    private final NoteTools noteTools;
+    private final ToolRegistry toolRegistry;
 
     private volatile ChatClient defaultClient;
     private volatile String cachedConfigKey = "";
     private final ConcurrentHashMap<String, ChatClient> modelClients = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, String> modelConfigKeys = new ConcurrentHashMap<>();
 
-    public AgentAnalysisService(LlmConfigResolver configResolver, NoteTools noteTools) {
+    public AgentAnalysisService(LlmConfigResolver configResolver, ToolRegistry toolRegistry) {
         this.configResolver = configResolver;
-        this.noteTools = noteTools;
+        this.toolRegistry = toolRegistry;
     }
 
     public boolean isAvailable() {
@@ -135,7 +135,7 @@ public class AgentAnalysisService {
                 .build();
 
         return ChatClient.builder(chatModel)
-                .defaultTools(noteTools)
+                .defaultTools(toolRegistry.getToolArray())
                 .build();
     }
 
@@ -164,7 +164,7 @@ public class AgentAnalysisService {
                 .build();
 
         return ChatClient.builder(chatModel)
-                .defaultTools(noteTools)
+                .defaultTools(toolRegistry.getToolArray())
                 .build();
     }
 }
