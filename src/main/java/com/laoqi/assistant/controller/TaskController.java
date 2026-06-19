@@ -33,8 +33,7 @@ public class TaskController {
             @RequestParam(required = false, defaultValue = "mid") String priority,
             @RequestParam(required = false, defaultValue = "") String dueDate) {
         try {
-            String notesDir = configService.getNotesDir(kbId);
-            TaskItem task = taskService.addTask(notesDir, title, description, priority, dueDate);
+            TaskItem task = taskService.addTask(title, description, priority, dueDate, kbId);
             logService.add("任务看板", "成功", "添加任务: " + title);
             return Map.of("ok", true, "task", task);
         } catch (Exception e) {
@@ -53,8 +52,7 @@ public class TaskController {
             @RequestParam(required = false) String priority,
             @RequestParam(required = false) String dueDate) {
         try {
-            String notesDir = configService.getNotesDir(kbId);
-            TaskItem task = taskService.updateTask(notesDir, id, title, description, status, priority, dueDate);
+            TaskItem task = taskService.updateTask(id, title, description, status, priority, dueDate, kbId);
             if (task == null) {
                 return Map.of("ok", false, "error", "任务不存在");
             }
@@ -71,8 +69,7 @@ public class TaskController {
             @RequestParam(required = false) Long kbId,
             @RequestParam String id) {
         try {
-            String notesDir = configService.getNotesDir(kbId);
-            boolean ok = taskService.deleteTask(notesDir, id);
+            boolean ok = taskService.deleteTask(id, kbId);
             if (ok) {
                 logService.add("任务看板", "成功", "删除任务: " + id);
             }

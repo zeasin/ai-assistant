@@ -28,8 +28,7 @@ public class ReminderController {
     @GetMapping("/api/reminders")
     @ResponseBody
     public List<Map<String, Object>> getReminders(@RequestParam(required = false) Long kbId) {
-        String notesDir = configService.getNotesDir(kbId);
-        return reminderService.getAllReminders(notesDir).stream()
+        return reminderService.getAllReminders().stream()
                 .map(r -> {
                     Map<String, Object> m = new java.util.LinkedHashMap<>();
                     m.put("id", r.id);
@@ -63,9 +62,8 @@ public class ReminderController {
             @RequestParam(required = false, defaultValue = "") String dayOfMonth,
             @RequestParam(required = false, defaultValue = "") String monthDay) {
         try {
-            String notesDir = configService.getNotesDir(kbId);
-            Reminder r = reminderService.addReminder(notesDir, name, message, type, time,
-                    date, dayOfWeek, dayOfMonth, monthDay);
+            Reminder r = reminderService.addReminder(name, message, type, time,
+                    date, dayOfWeek, dayOfMonth, monthDay, kbId);
             logService.add("提醒管理", "成功", "添加提醒: " + name);
             return Map.of("ok", true, "reminder", r);
         } catch (Exception e) {
@@ -88,9 +86,8 @@ public class ReminderController {
             @RequestParam(required = false) String monthDay,
             @RequestParam(required = false) Boolean enabled) {
         try {
-            String notesDir = configService.getNotesDir(kbId);
-            boolean ok = reminderService.updateReminder(notesDir, id, name, message, type, time,
-                    date, dayOfWeek, dayOfMonth, monthDay, enabled);
+            boolean ok = reminderService.updateReminder(id, name, message, type, time,
+                    date, dayOfWeek, dayOfMonth, monthDay, enabled, kbId);
             if (!ok) {
                 return Map.of("ok", false, "error", "提醒不存在");
             }
@@ -107,8 +104,7 @@ public class ReminderController {
             @RequestParam(required = false) Long kbId,
             @RequestParam String id) {
         try {
-            String notesDir = configService.getNotesDir(kbId);
-            boolean ok = reminderService.deleteReminder(notesDir, id);
+            boolean ok = reminderService.deleteReminder(id, kbId);
             if (ok) {
                 logService.add("提醒管理", "成功", "删除提醒");
             }
@@ -124,8 +120,7 @@ public class ReminderController {
             @RequestParam(required = false) Long kbId,
             @RequestParam String id) {
         try {
-            String notesDir = configService.getNotesDir(kbId);
-            boolean ok = reminderService.toggleReminder(notesDir, id);
+            boolean ok = reminderService.toggleReminder(id, kbId);
             if (ok) {
                 logService.add("提醒管理", ok ? "启用" : "禁用", "切换提醒状态");
             }
@@ -141,13 +136,12 @@ public class ReminderController {
             @RequestParam(required = false) Long kbId,
             @RequestParam String id) {
         try {
-            String notesDir = configService.getNotesDir(kbId);
-            List<Reminder> reminders = reminderService.getAllReminders(notesDir);
+            List<Reminder> reminders = reminderService.getAllReminders();
             Reminder r = reminders.stream().filter(x -> x.id.equals(id)).findFirst().orElse(null);
             if (r == null) {
                 return Map.of("ok", false, "error", "提醒不存在");
             }
-            reminderService.triggerReminder(notesDir, r);
+            reminderService.triggerReminder(r, kbId);
             logService.add("提醒管理", "成功", "手动触发: " + r.name);
             return Map.of("ok", true);
         } catch (Exception e) {

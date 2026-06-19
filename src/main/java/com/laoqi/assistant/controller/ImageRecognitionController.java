@@ -14,8 +14,10 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.sql.DataSource;
 import java.io.IOException;
 import java.nio.file.*;
+import java.sql.*;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -33,26 +35,27 @@ public class ImageRecognitionController {
     private final LlmService llmService;
     private final LogService logService;
     private final LlmConfigResolver llmConfigResolver;
+    private final DataSource dataSource;
 
     public ImageRecognitionController(AppConfig appConfig,
                                        KnowledgeBaseService kbService,
                                        LlmService llmService, LogService logService,
-                                       LlmConfigResolver llmConfigResolver) {
+                                       LlmConfigResolver llmConfigResolver,
+                                       DataSource dataSource) {
         this.appConfig = appConfig;
         this.kbService = kbService;
         this.llmService = llmService;
         this.logService = logService;
         this.llmConfigResolver = llmConfigResolver;
+        this.dataSource = dataSource;
     }
 
     @GetMapping
     public String page(@RequestParam(required = false) Long kbId, Model model) {
-        // 1. 检查大模型是否已配置
         if (!llmService.isAvailable()) {
             return "redirect:/config#ai-model-section";
         }
 
-        // 2. 检查笔记库是否配置
         KnowledgeBaseEntity kb = null;
         if (kbId != null) {
             kb = kbService.getById(kbId);
@@ -81,7 +84,91 @@ public class ImageRecognitionController {
         return "image";
     }
 
-    /** 列出指定 KB 当前目录下的图片文件（仅当前层，不递归） */
+    // ========== SQLite CRUD ==========
+
+    private long insertAnalysis(String imageName, String imagePath, String imageType,
+                                 String prompt, String model, String source, Long kbId) {
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement ps = conn.prepareStatement(
+                     "INSERT INTO image_analyses (image_name, image_path, image_type, prompt, model, source, kb_id, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)",
+                     Statement.RETURN_GENERATED_KEYS)) {
+            ps.setString(1, imageName);
+            ps.setString(2, imagePath);
+            ps.setString(3, imageType);
+            ps.setString(4, prompt);
+            ps.setString(5, model);
+            ps.setString(6, source);
+            if (kbId != null) {
+                ps.setLong(7, kbId);
+            } else {
+                ps.setNull(7, Types.INTEGER);
+            }
+            ps.setString(8, java.time.LocalDateTime.now()
+                    .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+            ps.executeUpdate();
+            ResultSet rs = ps.getGeneratedKeys();
+            if (rs.next()) {
+                return rs.getLong(1);
+            }
+        } catch (SQLException e) {
+            log.error("[识图] 插入记录失败", e);
+        }
+        return -1;
+    }
+
+    private void updateAnalysisResult(long id, String result, String status) {
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement ps = conn.prepareStatement(
+                     "UPDATE image_analyses SET result=?, status=?, completed_at=? WHERE id=?")) {
+            ps.setString(1, result);
+            ps.setString(2, status);
+            ps.setString(3, java.time.LocalDateTime.now()
+                    .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+            ps.setLong(4, id);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            log.error("[识图] 更新记录失败", e);
+        }
+    }
+
+    private List<Map<String, Object>> getAnalysesFromDb(int limit) {
+        List<Map<String, Object>> list = new ArrayList<>();
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement ps = conn.prepareStatement(
+                     "SELECT * FROM image_analyses ORDER BY id DESC LIMIT ?")) {
+            ps.setInt(1, limit);
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("id", rs.getLong("id"));
+                m.put("imageName", rs.getString("image_name"));
+                m.put("imagePath", rs.getString("image_path"));
+                m.put("imageType", rs.getString("image_type"));
+                m.put("prompt", rs.getString("prompt"));
+                m.put("result", rs.getString("result"));
+                m.put("model", rs.getString("model"));
+                m.put("source", rs.getString("source"));
+                m.put("status", rs.getString("status"));
+                m.put("createdAt", rs.getString("created_at"));
+                m.put("completedAt", rs.getString("completed_at"));
+                list.add(m);
+            }
+        } catch (SQLException e) {
+            log.error("[识图] 查询历史失败", e);
+        }
+        return list;
+    }
+
+    // ========== API ==========
+
+    @GetMapping("/api/history")
+    @ResponseBody
+    public Map<String, Object> getHistory(
+            @RequestParam(required = false, defaultValue = "20") int limit) {
+        return Map.of("ok", true, "analyses", getAnalysesFromDb(limit));
+    }
+
+    /** 列出指定 KB 当前目录下的图片文件 */
     @GetMapping("/api/images")
     @ResponseBody
     public Map<String, Object> listImages(@RequestParam(required = false, defaultValue = "0") Long kbId,
@@ -140,7 +227,7 @@ public class ImageRecognitionController {
         }
     }
 
-    /** 获取指定 KB 的完整目录树（嵌套结构，含根节点） */
+    /** 获取指定 KB 的完整目录树 */
     @GetMapping("/api/dir-tree")
     @ResponseBody
     public Map<String, Object> getDirTree(@RequestParam Long kbId) {
@@ -148,7 +235,6 @@ public class ImageRecognitionController {
         if (basePath == null) {
             return Map.of("ok", false, "error", "知识库不存在");
         }
-        // 根节点
         Map<String, Object> root = new LinkedHashMap<>();
         root.put("name", "根目录");
         root.put("path", "");
@@ -172,7 +258,7 @@ public class ImageRecognitionController {
                         result.add(node);
                     });
         } catch (IOException e) {
-            // skip inaccessible directories
+            // skip
         }
         return result;
     }
@@ -187,7 +273,6 @@ public class ImageRecognitionController {
             return Map.of("ok", false, "error", "知识库不存在");
         }
         Path targetDir = dir.isEmpty() ? basePath : basePath.resolve(dir);
-
         if (!Files.isDirectory(targetDir)) {
             return Map.of("ok", false, "error", "目录不存在");
         }
@@ -206,7 +291,6 @@ public class ImageRecognitionController {
         } catch (IOException e) {
             return Map.of("ok", false, "error", e.getMessage());
         }
-
         return Map.of("ok", true, "subdirs", subdirs);
     }
 
@@ -230,8 +314,11 @@ public class ImageRecognitionController {
                     modelName, fileName, imageType, imageBytes.length / 1024,
                     userPrompt.length() > 60 ? userPrompt.substring(0, 60) + "..." : userPrompt);
 
+            // 创建 pending 记录
+            long recordId = insertAnalysis(fileName, "", imageType, userPrompt, modelName, "upload", null);
+
             if (!llmService.isAvailable()) {
-                log.warn("识图失败: LLM API Key 未配置");
+                if (recordId > 0) updateAnalysisResult(recordId, "LLM API Key 未配置", "failed");
                 return Map.of("ok", false, "error", "LLM API Key 未配置");
             }
             String base64Image = Base64.getEncoder().encodeToString(imageBytes);
@@ -242,13 +329,14 @@ public class ImageRecognitionController {
             String imageUrl = "data:" + imageType + ";base64," + base64Image;
             String result = (reply != null && !reply.isEmpty()) ? reply : "(AI 未返回结果)";
 
+            // 更新记录
+            if (recordId > 0) updateAnalysisResult(recordId, result, "completed");
+
             log.info("识图成功: model={}, file={}, 耗时={}ms, 响应长度={}chars",
                     modelName, fileName, elapsed, result.length());
-            log.debug("识图响应内容 (前200字): {}",
-                    result.length() > 200 ? result.substring(0, 200) + "..." : result);
 
             logService.add("识图分析", "成功", "上传图片识别");
-            return Map.of("ok", true, "image_url", imageUrl, "result", result);
+            return Map.of("ok", true, "image_url", imageUrl, "result", result, "recordId", recordId);
         } catch (Exception e) {
             long elapsed = System.currentTimeMillis() - startMs;
             log.error("识图失败: model={}, 耗时={}ms, 错误={}", modelName, elapsed, e.getMessage());
@@ -281,8 +369,11 @@ public class ImageRecognitionController {
                     modelName, filePath, imageType, imageBytes.length / 1024,
                     prompt.length() > 60 ? prompt.substring(0, 60) + "..." : prompt);
 
+            // 创建 pending 记录
+            long recordId = insertAnalysis(file.getFileName().toString(), filePath, imageType, prompt, modelName, "kb", kbId);
+
             if (!llmService.isAvailable()) {
-                log.warn("识图失败: LLM API Key 未配置");
+                if (recordId > 0) updateAnalysisResult(recordId, "LLM API Key 未配置", "failed");
                 return Map.of("ok", false, "error", "LLM API Key 未配置");
             }
             String base64Image = Base64.getEncoder().encodeToString(imageBytes);
@@ -294,13 +385,14 @@ public class ImageRecognitionController {
                     + "&kbId=" + kbId;
             String result = (reply != null && !reply.isEmpty()) ? reply : "(AI 未返回结果)";
 
+            // 更新记录
+            if (recordId > 0) updateAnalysisResult(recordId, result, "completed");
+
             log.info("识图成功: model={}, file={}, 耗时={}ms, 响应长度={}chars",
                     modelName, filePath, elapsed, result.length());
-            log.debug("识图响应内容 (前200字): {}",
-                    result.length() > 200 ? result.substring(0, 200) + "..." : result);
 
             logService.add("识图分析", "成功", filePath);
-            return Map.of("ok", true, "image_url", imageUrl, "result", result);
+            return Map.of("ok", true, "image_url", imageUrl, "result", result, "recordId", recordId);
         } catch (Exception e) {
             long elapsed = System.currentTimeMillis() - startMs;
             log.error("识图失败: model={}, file={}, 耗时={}ms, 错误={}", modelName, filePath, elapsed, e.getMessage());

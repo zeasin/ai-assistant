@@ -7,13 +7,6 @@
 <body>
 <th:block layout:fragment="content">
 
-<!-- 笔记库未配置横幅 -->
-<div th:unless="${kbReady}" class="port-banner" style="margin-bottom:16px;">
-    <span>⚠️ 尚未配置笔记库</span>
-    <span style="flex:1;">请先在<a href="/config" style="color:#7c5cfc;font-weight:600;">配置页面</a>中添加知识库并设置笔记库路径。</span>
-    <button class="port-close" onclick="this.parentElement.remove()">✕</button>
-</div>
-
 <style>
 .sr-card { background:#fff; border:1px solid #e1e3e6; border-radius:12px; padding:20px; margin-bottom:16px; }
 .sr-card h3 { font-size:15px; font-weight:600; margin:0 0 12px; color:#1a1b1e; display:flex; align-items:center; gap:6px; }
@@ -85,6 +78,7 @@
 <div class="sr-tab-bar">
     <button class="sr-tab-btn active" data-tab="upload">📤 上传图片</button>
     <button th:if="${#lists.size(kbList) > 0}" class="sr-tab-btn" data-tab="browse">📚 知识库图片</button>
+    <button class="sr-tab-btn" data-tab="history">📋 分析历史</button>
 </div>
 
 <div id="panelUpload" class="sr-card" style="border-radius:0 0 12px 12px;border-top:none;">
@@ -145,6 +139,14 @@
                 </select>
                 <button class="btn btn-primary" id="browseBtn" style="white-space:nowrap;" disabled>🔍 识别选中</button>
             </div>
+        </div>
+    </div>
+</div>
+
+<div id="panelHistory" style="display:none;">
+    <div class="sr-card" style="border-radius:0 0 12px 12px;border-top:none;">
+        <div id="historyList" style="max-height:500px;overflow-y:auto;">
+            <div class="sr-loading">加载中...</div>
         </div>
     </div>
 </div>
@@ -255,10 +257,56 @@ function switchTab(tab) {
     });
     document.getElementById('panelUpload').style.display = tab === 'upload' ? 'block' : 'none';
     document.getElementById('panelBrowse').style.display = tab === 'browse' ? 'block' : 'none';
+    document.getElementById('panelHistory').style.display = tab === 'history' ? 'block' : 'none';
     if (tab === 'browse') {
         if (allImages.length === 0) loadImages();
         if (document.getElementById('dirTree').children.length <= 1) loadDirTree();
     }
+    if (tab === 'history') {
+        loadHistory();
+    }
+}
+
+async function loadHistory() {
+    var container = document.getElementById('historyList');
+    container.innerHTML = '<div class="sr-loading">加载中...</div>';
+    try {
+        var resp = await fetch('/image/api/history?limit=50');
+        var data = await resp.json();
+        if (!data.ok || !data.analyses || data.analyses.length === 0) {
+            container.innerHTML = '<div class="sr-empty">暂无分析记录</div>';
+            return;
+        }
+        var html = '';
+        for (var i = 0; i < data.analyses.length; i++) {
+            var a = data.analyses[i];
+            var statusBadge = a.status === 'completed' ? '<span style="color:#2b8a3e;">✅ 完成</span>'
+                : a.status === 'failed' ? '<span style="color:#e03131;">❌ 失败</span>'
+                : '<span style="color:#f59e0b;">⏳ 处理中</span>';
+            html += '<div style="padding:12px 16px;border-bottom:1px solid #e1e3e6;cursor:pointer;" onclick="showHistoryDetail(' + a.id + ')">';
+            html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">';
+            html += '<span style="font-weight:500;font-size:14px;">📷 ' + escapeHtml(a.imageName) + '</span>';
+            html += '<span style="font-size:12px;color:#909296;">' + (a.createdAt || '') + '</span>';
+            html += '</div>';
+            html += '<div style="font-size:12px;color:#5c5f66;margin-bottom:4px;">提示词: ' + escapeHtml((a.prompt || '').substring(0, 80)) + '</div>';
+            html += '<div style="display:flex;gap:8px;align-items:center;">';
+            html += statusBadge;
+            if (a.model) html += '<span style="font-size:11px;color:#909296;">模型: ' + escapeHtml(a.model) + '</span>';
+            html += '</div></div>';
+        }
+        container.innerHTML = html;
+    } catch(e) {
+        container.innerHTML = '<div class="sr-empty">加载失败</div>';
+    }
+}
+
+async function showHistoryDetail(id) {
+    toast('加载详情...', 'success');
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 function getKbId() {

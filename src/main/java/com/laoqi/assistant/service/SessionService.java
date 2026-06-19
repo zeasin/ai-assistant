@@ -193,6 +193,62 @@ public class SessionService {
             } catch (Exception e2) {
                 // 表可能刚创建，不管
             }
+
+            // 识图分析记录表
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS image_analyses (
+                    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                    image_name   TEXT NOT NULL,
+                    image_path   TEXT DEFAULT '',
+                    image_type   TEXT NOT NULL,
+                    prompt       TEXT NOT NULL,
+                    result       TEXT DEFAULT '',
+                    model        TEXT DEFAULT '',
+                    source       TEXT NOT NULL DEFAULT 'upload',
+                    kb_id        INTEGER DEFAULT NULL,
+                    status       TEXT NOT NULL DEFAULT 'pending',
+                    created_at   TEXT NOT NULL,
+                    completed_at TEXT DEFAULT ''
+                )
+                """);
+            log.info("Table image_analyses initialized");
+
+            // 任务表
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS tasks (
+                    id          TEXT PRIMARY KEY,
+                    title       TEXT NOT NULL,
+                    description TEXT DEFAULT '',
+                    status      TEXT NOT NULL DEFAULT 'pending',
+                    priority    TEXT NOT NULL DEFAULT 'mid',
+                    due_date    TEXT DEFAULT '',
+                    created_at  TEXT NOT NULL,
+                    updated_at  TEXT NOT NULL,
+                    kb_id       INTEGER DEFAULT NULL
+                )
+                """);
+            log.info("Table tasks initialized");
+
+            // 提醒表
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS reminders (
+                    id             TEXT PRIMARY KEY,
+                    name           TEXT NOT NULL,
+                    message        TEXT DEFAULT '',
+                    type           TEXT NOT NULL,
+                    time           TEXT DEFAULT '09:00',
+                    date           TEXT DEFAULT '',
+                    day_of_week    INTEGER DEFAULT 0,
+                    day_of_month   INTEGER DEFAULT 1,
+                    month_day      TEXT DEFAULT '',
+                    enabled        INTEGER DEFAULT 1,
+                    created_at     TEXT NOT NULL,
+                    last_triggered TEXT DEFAULT '',
+                    kb_id          INTEGER DEFAULT NULL
+                )
+                """);
+            log.info("Table reminders initialized");
+
         } catch (SQLException e) {
             throw new RuntimeException("Failed to create new tables", e);
         }

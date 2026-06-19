@@ -27,9 +27,8 @@ public class PlannerPageController {
     @GetMapping("/planner")
     public String plannerPage(Model model) {
         try {
-            String notesDir = configService.getNotesDir();
-            var tasks = taskService.getAllTasks(notesDir);
-            var reminders = reminderService.getAllReminders(notesDir);
+            var tasks = taskService.getAllTasks();
+            var reminders = reminderService.getAllReminders();
 
             List<Map<String, Object>> displayList = reminders.stream()
                     .map(r -> {

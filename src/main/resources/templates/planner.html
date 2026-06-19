@@ -123,6 +123,13 @@
                         <option value="done">✅ 已完成</option>
                     </select>
                 </div>
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label>关联笔记库（可选）</label>
+                    <select id="task-kbId" style="width:100%;">
+                        <option value="">不关联（仅保存到本地）</option>
+                        <option th:each="kb : ${kbList}" th:value="${kb.id}" th:text="${kb.name}">笔记库</option>
+                    </select>
+                </div>
                 <div class="modal-actions">
                     <button class="btn btn-secondary" onclick="closeModal('task-modal')">取消</button>
                     <button class="btn btn-primary" onclick="saveTask()">保存</button>
@@ -153,6 +160,13 @@
                     <div class="form-group" id="reminder-once-group" style="flex:1;display:none;"><label>日期</label><input type="date" id="reminder-date" style="width:100%;"></div>
                     <div class="form-group" id="reminder-monthly-group" style="flex:1;display:none;"><label>几号</label><input type="number" id="reminder-dayOfMonth" min="1" max="31" placeholder="1-31" style="width:100%;"></div>
                     <div class="form-group" id="reminder-yearly-group" style="flex:2;display:none;"><label>几月几号</label><div style="display:flex;gap:8px;align-items:center;"><input type="number" id="reminder-yearMonth" min="1" max="12" placeholder="月" style="width:60px;"><span>月</span><input type="number" id="reminder-yearDay" min="1" max="31" placeholder="日" style="width:60px;"><span>日</span></div></div>
+                </div>
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label>关联笔记库（可选）</label>
+                    <select id="reminder-kbId" style="width:100%;">
+                        <option value="">不关联（仅保存到本地）</option>
+                        <option th:each="kb : ${kbList}" th:value="${kb.id}" th:text="${kb.name}">笔记库</option>
+                    </select>
                 </div>
                 <div class="modal-actions">
                     <button class="btn btn-secondary" onclick="closeModal('reminder-modal')">取消</button>
@@ -286,7 +300,9 @@
                 var desc = document.getElementById('task-description').value.trim();
                 var pri = document.getElementById('task-priority').value;
                 var due = document.getElementById('task-dueDate').value;
+                var kbId = document.getElementById('task-kbId').value;
                 var fd = new URLSearchParams();
+                if (kbId) fd.append('kbId', kbId);
                 if (isTaskEdit) {
                     fd.append('id',id); fd.append('title',title); fd.append('description',desc);
                     fd.append('priority',pri); fd.append('dueDate',due);
@@ -412,8 +428,10 @@
                 var ym = document.getElementById('reminder-yearMonth').value;
                 var yd = document.getElementById('reminder-yearDay').value;
                 var md = (ym&&yd)?ym+'-'+yd:'';
+                var kbId = document.getElementById('reminder-kbId').value;
                 var fd = new URLSearchParams();
                 if (id) fd.append('id',id);
+                if (kbId) fd.append('kbId', kbId);
                 fd.append('name',name); fd.append('message',msg); fd.append('type',type); fd.append('time',time);
                 if (type==='once') fd.append('date',date);
                 else if (type==='weekly') fd.append('dayOfWeek',dow);

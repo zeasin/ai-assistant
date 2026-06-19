@@ -10,9 +10,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import javax.sql.DataSource;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.sql.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -31,24 +33,74 @@ public class ReminderService {
     private final AppConfig appConfig;
     private final FeishuService feishuService;
     private final ConfigService configService;
+    private final DataSource dataSource;
 
-    public ReminderService(AppConfig appConfig, FeishuService feishuService, ConfigService configService) {
+    public ReminderService(AppConfig appConfig, FeishuService feishuService,
+                           ConfigService configService, DataSource dataSource) {
         this.appConfig = appConfig;
         this.feishuService = feishuService;
         this.configService = configService;
+        this.dataSource = dataSource;
     }
 
     @PostConstruct
     public void init() {
-        try {
-            // 迁移旧数据（笔记库路径 → 全局路径）
-            migrateRemindersFromOldPath();
-        } catch (Exception ignored) {}
+        migrateFromJson();
+        ensureDefaultReminder();
+    }
 
+    private void migrateFromJson() {
         try {
-            Root root = load();
-            if (root.reminders == null) root.reminders = new ArrayList<>();
-            boolean hasDailyReport = root.reminders.stream()
+            Path globalFile = getGlobalRemindersFile();
+            if (!Files.exists(globalFile)) {
+                // 尝试从笔记库迁移
+                migrateFromNoteLibrary();
+            }
+
+            if (!Files.exists(globalFile)) return;
+
+            List<Reminder> existing = getAllRemindersFromDb();
+            if (!existing.isEmpty()) {
+                log.info("[提醒迁移] SQLite 中已有提醒，跳过迁移");
+                return;
+            }
+
+            Root root = FileUtil.readJson(globalFile, Root.class, new Root());
+            if (root.reminders == null || root.reminders.isEmpty()) return;
+
+            int count = 0;
+            for (Reminder r : root.reminders) {
+                insertReminderToDb(r, null);
+                count++;
+            }
+            log.info("[提醒迁移] 从 JSON 迁移 {} 条提醒到 SQLite", count);
+        } catch (Exception e) {
+            log.warn("[提醒迁移] 迁移失败: {}", e.getMessage());
+        }
+    }
+
+    private void migrateFromNoteLibrary() {
+        try {
+            String notesDir = configService.getNotesDirIfExists();
+            if (notesDir == null || notesDir.isEmpty()) return;
+
+            Path oldFile = Paths.get(notesDir, "AI", "提醒", "reminders.json");
+            if (Files.exists(oldFile)) {
+                Root oldRoot = FileUtil.readJson(oldFile, Root.class, null);
+                if (oldRoot != null && oldRoot.reminders != null && !oldRoot.reminders.isEmpty()) {
+                    FileUtil.writeJson(getGlobalRemindersFile(), oldRoot);
+                    log.info("[提醒迁移] 从笔记库迁移 {} 条提醒", oldRoot.reminders.size());
+                }
+            }
+        } catch (Exception e) {
+            log.warn("[提醒迁移] 从笔记库迁移失败: {}", e.getMessage());
+        }
+    }
+
+    private void ensureDefaultReminder() {
+        try {
+            List<Reminder> existing = getAllRemindersFromDb();
+            boolean hasDailyReport = existing.stream()
                     .anyMatch(r -> "daily-report-reminder".equals(r.id));
             if (!hasDailyReport) {
                 Reminder r = new Reminder();
@@ -59,8 +111,7 @@ public class ReminderService {
                 r.time = "18:00";
                 r.enabled = true;
                 r.createdAt = LocalDateTime.now(TZ).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
-                root.reminders.add(r);
-                save(root);
+                insertReminderToDb(r, null);
                 log.info("[提醒] 已创建默认下班日报提醒");
             }
         } catch (Exception e) {
@@ -68,7 +119,6 @@ public class ReminderService {
         }
     }
 
-    // 提醒存储改为全局位置（不再依赖笔记库）
     private Path getGlobalRemindersFile() {
         Path dir = appConfig.getConfigDirPath().resolve("AI").resolve("reminders");
         if (!Files.exists(dir)) {
@@ -79,119 +129,168 @@ public class ReminderService {
         return dir.resolve("reminders_data.json");
     }
 
-    private void migrateRemindersFromOldPath() {
-        Path globalFile = getGlobalRemindersFile();
-        if (Files.exists(globalFile)) return; // 已迁移
+    // ========== SQLite CRUD ==========
 
-        // 尝试从第一个知识库的旧位置迁移
-        String oldNotesDir = configService.getNotesDirIfExists();
-        if (oldNotesDir == null || oldNotesDir.isEmpty()) return;
-
-        Path oldFile = Paths.get(oldNotesDir, "AI", "提醒", "reminders.json");
-        if (Files.exists(oldFile)) {
-            Root oldRoot = FileUtil.readJson(oldFile, Root.class, null);
-            if (oldRoot != null && oldRoot.reminders != null && !oldRoot.reminders.isEmpty()) {
-                FileUtil.writeJson(globalFile, oldRoot);
-                log.info("[提醒] 已从 {} 迁移 {} 条提醒到全局路径", oldFile, oldRoot.reminders.size());
+    private List<Reminder> getAllRemindersFromDb() {
+        List<Reminder> reminders = new ArrayList<>();
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement ps = conn.prepareStatement("SELECT * FROM reminders ORDER BY created_at DESC")) {
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                reminders.add(mapRowToReminder(rs));
             }
+        } catch (SQLException e) {
+            log.error("[提醒] 查询失败", e);
+        }
+        return reminders;
+    }
+
+    private void insertReminderToDb(Reminder r, Long kbId) {
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement ps = conn.prepareStatement(
+                     "INSERT OR REPLACE INTO reminders (id, name, message, type, time, date, day_of_week, day_of_month, month_day, enabled, created_at, last_triggered, kb_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
+            ps.setString(1, r.id);
+            ps.setString(2, r.name);
+            ps.setString(3, r.message);
+            ps.setString(4, r.type);
+            ps.setString(5, r.time);
+            ps.setString(6, r.date);
+            ps.setString(7, r.dayOfWeek);
+            ps.setString(8, r.dayOfMonth);
+            ps.setString(9, r.monthDay);
+            ps.setInt(10, r.enabled ? 1 : 0);
+            ps.setString(11, r.createdAt);
+            ps.setString(12, r.lastTriggered);
+            if (kbId != null) {
+                ps.setLong(13, kbId);
+            } else {
+                ps.setNull(13, Types.INTEGER);
+            }
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            log.error("[提醒] 插入失败", e);
         }
     }
 
-    private Root loadFromGlobal() {
-        return FileUtil.readJson(getGlobalRemindersFile(), Root.class, new Root());
+    private Reminder mapRowToReminder(ResultSet rs) throws SQLException {
+        Reminder r = new Reminder();
+        r.id = rs.getString("id");
+        r.name = rs.getString("name");
+        r.message = rs.getString("message");
+        r.type = rs.getString("type");
+        r.time = rs.getString("time");
+        r.date = rs.getString("date");
+        r.dayOfWeek = rs.getString("day_of_week");
+        r.dayOfMonth = rs.getString("day_of_month");
+        r.monthDay = rs.getString("month_day");
+        r.enabled = rs.getInt("enabled") == 1;
+        r.createdAt = rs.getString("created_at");
+        r.lastTriggered = rs.getString("last_triggered");
+        return r;
     }
 
-    private void saveToGlobal(Root root) {
-        if (root.reminders == null) root.reminders = new ArrayList<>();
-        if (root.meta == null) root.meta = new LinkedHashMap<>();
-        FileUtil.writeJson(getGlobalRemindersFile(), root);
+    private Reminder getReminderFromDb(String id) {
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement ps = conn.prepareStatement("SELECT * FROM reminders WHERE id = ?")) {
+            ps.setString(1, id);
+            ResultSet rs = ps.executeQuery();
+            if (rs.next()) {
+                return mapRowToReminder(rs);
+            }
+        } catch (SQLException e) {
+            log.error("[提醒] 查询失败", e);
+        }
+        return null;
     }
 
-    // 兼容旧接口：无参方法使用全局存储
-    public Root load() {
-        return loadFromGlobal();
+    private void updateReminderInDb(Reminder r) {
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement ps = conn.prepareStatement(
+                     "UPDATE reminders SET name=?, message=?, type=?, time=?, date=?, day_of_week=?, day_of_month=?, month_day=?, enabled=?, last_triggered=? WHERE id=?")) {
+            ps.setString(1, r.name);
+            ps.setString(2, r.message);
+            ps.setString(3, r.type);
+            ps.setString(4, r.time);
+            ps.setString(5, r.date);
+            ps.setString(6, r.dayOfWeek);
+            ps.setString(7, r.dayOfMonth);
+            ps.setString(8, r.monthDay);
+            ps.setInt(9, r.enabled ? 1 : 0);
+            ps.setString(10, r.lastTriggered);
+            ps.setString(11, r.id);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            log.error("[提醒] 更新失败", e);
+        }
     }
 
-    // notesDir 参数方法重定向到全局存储
-    public Root load(String notesDir) {
-        return loadFromGlobal();
+    private void deleteReminderFromDb(String id) {
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement ps = conn.prepareStatement("DELETE FROM reminders WHERE id = ?")) {
+            ps.setString(1, id);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            log.error("[提醒] 删除失败", e);
+        }
     }
 
-    private void save(Root root) {
-        saveToGlobal(root);
-    }
-
-    // notesDir 参数方法重定向到全局存储
-    private void save(String notesDir, Root root) {
-        saveToGlobal(root);
-    }
+    // ========== Public API ==========
 
     public List<Reminder> getAllReminders() {
-        Root root = loadFromGlobal();
-        if (root.reminders == null) root.reminders = new ArrayList<>();
-        return root.reminders;
+        return getAllRemindersFromDb();
     }
 
     public List<Reminder> getAllReminders(String notesDir) {
-        return getAllReminders();
+        return getAllRemindersFromDb();
     }
 
     public List<Reminder> getEnabledReminders() {
-        return getAllReminders().stream()
+        return getAllRemindersFromDb().stream()
                 .filter(r -> r.enabled)
                 .collect(Collectors.toList());
     }
 
     public Reminder addReminder(String name, String message, String type, String time,
                                  String date, String dayOfWeek, String dayOfMonth, String monthDay) {
-        return addReminder("", name, message, type, time, date, dayOfWeek, dayOfMonth, monthDay);
+        return addReminderInternal(name, message, type, time, date, dayOfWeek, dayOfMonth, monthDay, null);
     }
 
     public Reminder addReminder(String notesDir, String name, String message, String type, String time,
                                  String date, String dayOfWeek, String dayOfMonth, String monthDay) {
-        Root root = load(notesDir);
-        if (root.reminders == null) root.reminders = new ArrayList<>();
-        if (root.meta == null) root.meta = new LinkedHashMap<>();
+        return addReminderInternal(name, message, type, time, date, dayOfWeek, dayOfMonth, monthDay, null);
+    }
 
+    public Reminder addReminder(String name, String message, String type, String time,
+                                 String date, String dayOfWeek, String dayOfMonth, String monthDay, Long kbId) {
+        return addReminderInternal(name, message, type, time, date, dayOfWeek, dayOfMonth, monthDay, kbId);
+    }
+
+    private Reminder addReminderInternal(String name, String message, String type, String time,
+                                 String date, String dayOfWeek, String dayOfMonth, String monthDay, Long kbId) {
         Reminder r = new Reminder();
         r.id = "R" + System.currentTimeMillis();
         r.name = name;
         r.message = message;
         r.type = type;
         r.time = normalizeTime(time);
-        // 根据提醒类型只设置相关的字段，其他字段置空
+
         if ("once".equals(type)) {
             r.date = date;
-            r.dayOfWeek = null;
-            r.dayOfMonth = null;
-            r.monthDay = null;
         } else if ("weekly".equals(type)) {
-            r.date = null;
             r.dayOfWeek = dayOfWeek;
-            r.dayOfMonth = null;
-            r.monthDay = null;
         } else if ("monthly".equals(type)) {
-            r.date = null;
-            r.dayOfWeek = null;
             r.dayOfMonth = dayOfMonth;
-            r.monthDay = null;
         } else if ("yearly".equals(type)) {
-            r.date = null;
-            r.dayOfWeek = null;
-            r.dayOfMonth = null;
             r.monthDay = monthDay;
-        } else { // daily
-            r.date = null;
-            r.dayOfWeek = null;
-            r.dayOfMonth = null;
-            r.monthDay = null;
         }
         r.enabled = true;
         r.createdAt = LocalDateTime.now(TZ).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
 
-        root.reminders.add(r);
-        root.meta.put("lastUpdated", LocalDate.now(TZ).toString());
-        save(notesDir, root);
+        insertReminderToDb(r, kbId);
+
+        if (kbId != null) {
+            syncToNoteLibrary(kbId);
+        }
 
         log.info("[提醒] 新增提醒: {} ({})", name, type);
         return r;
@@ -200,65 +299,76 @@ public class ReminderService {
     public boolean updateReminder(String id, String name, String message, String type,
                                     String time, String date, String dayOfWeek, String dayOfMonth,
                                     String monthDay, Boolean enabled) {
-        return updateReminder("", id, name, message, type, time, date, dayOfWeek, dayOfMonth, monthDay, enabled);
+        return updateReminderInternal(id, name, message, type, time, date, dayOfWeek, dayOfMonth, monthDay, enabled, null);
     }
 
     public boolean updateReminder(String notesDir, String id, String name, String message, String type,
                                     String time, String date, String dayOfWeek, String dayOfMonth,
                                     String monthDay, Boolean enabled) {
-        Root root = load(notesDir);
-        if (root.reminders == null) return false;
+        return updateReminderInternal(id, name, message, type, time, date, dayOfWeek, dayOfMonth, monthDay, enabled, null);
+    }
 
-        for (Reminder r : root.reminders) {
-            if (r.id.equals(id)) {
-                if (name != null) r.name = name;
-                if (message != null) r.message = message;
-                if (type != null) r.type = type;
-                if (time != null) {
-                    r.time = normalizeTime(time);
-                    r.lastTriggered = null; // 改时间后重置触发状态
-                }
-                
-                // 根据提醒类型只设置相关的字段，其他字段置空
-                String reminderType = (type != null) ? type : r.type;
-                if ("once".equals(reminderType)) {
-                    if (date != null) {
-                        r.date = date;
-                        r.lastTriggered = null;
-                    }
-                    r.dayOfWeek = null;
-                    r.dayOfMonth = null;
-                    r.monthDay = null;
-                } else if ("weekly".equals(reminderType)) {
-                    r.date = null;
-                    if (dayOfWeek != null) r.dayOfWeek = dayOfWeek;
-                    r.dayOfMonth = null;
-                    r.monthDay = null;
-                } else if ("monthly".equals(reminderType)) {
-                    r.date = null;
-                    r.dayOfWeek = null;
-                    if (dayOfMonth != null) r.dayOfMonth = dayOfMonth;
-                    r.monthDay = null;
-                } else if ("yearly".equals(reminderType)) {
-                    r.date = null;
-                    r.dayOfWeek = null;
-                    r.dayOfMonth = null;
-                    if (monthDay != null) r.monthDay = monthDay;
-                } else { // daily
-                    r.date = null;
-                    r.dayOfWeek = null;
-                    r.dayOfMonth = null;
-                    r.monthDay = null;
-                }
-                
-                if (enabled != null) r.enabled = enabled;
-                root.meta.put("lastUpdated", LocalDate.now(TZ).toString());
-                save(root);
-                log.info("[提醒] 更新提醒: {} ({})", r.name, type);
-                return true;
-            }
+    public boolean updateReminder(String id, String name, String message, String type,
+                                    String time, String date, String dayOfWeek, String dayOfMonth,
+                                    String monthDay, Boolean enabled, Long kbId) {
+        return updateReminderInternal(id, name, message, type, time, date, dayOfWeek, dayOfMonth, monthDay, enabled, kbId);
+    }
+
+    private boolean updateReminderInternal(String id, String name, String message, String type,
+                                    String time, String date, String dayOfWeek, String dayOfMonth,
+                                    String monthDay, Boolean enabled, Long kbId) {
+        Reminder r = getReminderFromDb(id);
+        if (r == null) return false;
+
+        if (name != null) r.name = name;
+        if (message != null) r.message = message;
+        if (type != null) r.type = type;
+        if (time != null) {
+            r.time = normalizeTime(time);
+            r.lastTriggered = null;
         }
-        return false;
+
+        String reminderType = (type != null) ? type : r.type;
+        if ("once".equals(reminderType)) {
+            if (date != null) {
+                r.date = date;
+                r.lastTriggered = null;
+            }
+            r.dayOfWeek = null;
+            r.dayOfMonth = null;
+            r.monthDay = null;
+        } else if ("weekly".equals(reminderType)) {
+            r.date = null;
+            if (dayOfWeek != null) r.dayOfWeek = dayOfWeek;
+            r.dayOfMonth = null;
+            r.monthDay = null;
+        } else if ("monthly".equals(reminderType)) {
+            r.date = null;
+            r.dayOfWeek = null;
+            if (dayOfMonth != null) r.dayOfMonth = dayOfMonth;
+            r.monthDay = null;
+        } else if ("yearly".equals(reminderType)) {
+            r.date = null;
+            r.dayOfWeek = null;
+            r.dayOfMonth = null;
+            if (monthDay != null) r.monthDay = monthDay;
+        } else {
+            r.date = null;
+            r.dayOfWeek = null;
+            r.dayOfMonth = null;
+            r.monthDay = null;
+        }
+
+        if (enabled != null) r.enabled = enabled;
+
+        updateReminderInDb(r);
+
+        if (kbId != null) {
+            syncToNoteLibrary(kbId);
+        }
+
+        log.info("[提醒] 更新提醒: {} ({})", r.name, type);
+        return true;
     }
 
     private String normalizeTime(String time) {
@@ -275,47 +385,64 @@ public class ReminderService {
     }
 
     public boolean deleteReminder(String id) {
-        return deleteReminder("", id);
+        return deleteReminderInternal(id, null);
     }
 
     public boolean deleteReminder(String notesDir, String id) {
-        Root root = load(notesDir);
-        if (root.reminders == null) return false;
+        return deleteReminderInternal(id, null);
+    }
 
-        boolean removed = root.reminders.removeIf(r -> r.id.equals(id));
-        if (removed) {
-            root.meta.put("lastUpdated", LocalDate.now(TZ).toString());
-            save(notesDir, root);
-            log.info("[提醒] 删除提醒: {}", id);
+    public boolean deleteReminder(String id, Long kbId) {
+        return deleteReminderInternal(id, kbId);
+    }
+
+    private boolean deleteReminderInternal(String id, Long kbId) {
+        deleteReminderFromDb(id);
+
+        if (kbId != null) {
+            syncToNoteLibrary(kbId);
         }
-        return removed;
+
+        log.info("[提醒] 删除提醒: {}", id);
+        return true;
     }
 
     public boolean toggleReminder(String id) {
-        return toggleReminder("", id);
+        return toggleReminderInternal(id, null);
     }
 
     public boolean toggleReminder(String notesDir, String id) {
-        Root root = load(notesDir);
-        if (root.reminders == null) return false;
+        return toggleReminderInternal(id, null);
+    }
 
-        for (Reminder r : root.reminders) {
-            if (r.id.equals(id)) {
-                r.enabled = !r.enabled;
-                root.meta.put("lastUpdated", LocalDate.now(TZ).toString());
-                save(notesDir, root);
-                log.info("[提醒] {}提醒: {}", r.enabled ? "启用" : "禁用", r.name);
-                return true;
-            }
+    public boolean toggleReminder(String id, Long kbId) {
+        return toggleReminderInternal(id, kbId);
+    }
+
+    private boolean toggleReminderInternal(String id, Long kbId) {
+        Reminder r = getReminderFromDb(id);
+        if (r == null) return false;
+
+        r.enabled = !r.enabled;
+        updateReminderInDb(r);
+
+        if (kbId != null) {
+            syncToNoteLibrary(kbId);
         }
-        return false;
+
+        log.info("[提醒] {}提醒: {}", r.enabled ? "启用" : "禁用", r.name);
+        return true;
     }
 
     public void triggerReminder(Reminder r) {
-        triggerReminder("", r);
+        triggerReminder(r, null);
     }
 
     public void triggerReminder(String notesDir, Reminder r) {
+        triggerReminder(r, null);
+    }
+
+    public void triggerReminder(Reminder r, Long kbId) {
         if (r == null || !r.enabled) return;
 
         try {
@@ -330,16 +457,8 @@ public class ReminderService {
                 return;
             }
 
-            Root root = load(notesDir);
-            if (root.reminders != null) {
-                for (Reminder rem : root.reminders) {
-                    if (rem.id.equals(r.id)) {
-                        rem.lastTriggered = LocalDateTime.now(TZ).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
-                        break;
-                    }
-                }
-            }
-            save(notesDir, root);
+            r.lastTriggered = LocalDateTime.now(TZ).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+            updateReminderInDb(r);
 
             log.info("[提醒] 触发提醒: {}", r.name);
         } catch (Exception e) {
@@ -355,13 +474,8 @@ public class ReminderService {
         String currentMonth = String.valueOf(now.getMonthValue());
         String currentDayOfMonth = String.valueOf(now.getDayOfMonth());
 
-//        log.info("[提醒] 检查提醒: 当前时间={}, 周几={}, 日期={}", now.toLocalTime(), currentWeekday, now.toLocalDate());
-
         for (Reminder r : getEnabledReminders()) {
-//            log.info("[提醒] 检查提醒: {}, 时间={}, 类型={}, 启用={}", r.name, r.time, r.type, r.enabled);
-            
             if (!shouldTriggerNow(r, now, currentTime, currentWeekday, currentMonth, currentDayOfMonth)) {
-//                log.info("[提醒] 时间不匹配，跳过: {}", r.name);
                 continue;
             }
             if (wasTriggeredToday(r, now)) {
@@ -384,9 +498,7 @@ public class ReminderService {
         int currentHour = currentTime.getHour();
         int currentMinute = currentTime.getMinute();
 
-        // 只比较小时和分钟，忽略秒，确保整分钟内都能触发
         if (triggerHour != currentHour || triggerMinute != currentMinute) {
-//            log.info("[提醒] 时间不匹配: 期望{}:{} vs 当前{}:{}", triggerHour, triggerMinute, currentHour, currentMinute);
             return false;
         }
 
@@ -454,5 +566,27 @@ public class ReminderService {
             sb.append(" (").append(r.monthDay.replace("-", "月")).append("日)");
         }
         return sb.toString();
+    }
+
+    private void syncToNoteLibrary(Long kbId) {
+        try {
+            String notesDir = configService.getNotesDir(kbId);
+            if (notesDir == null || notesDir.isEmpty()) return;
+
+            List<Reminder> allReminders = getAllRemindersFromDb();
+            Root root = new Root();
+            root.reminders = allReminders;
+            root.meta = new LinkedHashMap<>();
+            root.meta.put("lastUpdated", LocalDate.now(TZ).toString());
+
+            Path reminderDir = Paths.get(notesDir, "AI", "提醒");
+            if (!Files.exists(reminderDir)) {
+                Files.createDirectories(reminderDir);
+            }
+            FileUtil.writeJson(reminderDir.resolve("reminders.json"), root);
+            log.debug("[提醒] 同步到笔记库: kbId={}, count={}", kbId, allReminders.size());
+        } catch (Exception e) {
+            log.warn("[提醒] 同步到笔记库失败: {}", e.getMessage());
+        }
     }
 }
