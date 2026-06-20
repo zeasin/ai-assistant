@@ -14,7 +14,7 @@
     <artifactId>ai-assistant</artifactId>
     <version>1.0.0</version>
     <name>AI 助理</name>
-    <description>AI 助理 v0.4.0 — 自包含的 AI 应用，基于 Spring AI 2.0 + Spring Boot 4.1</description>
+    <description>AI Assistant — 自包含的 AI 应用，基于 Spring AI 2.0 + Spring Boot 4.1，多知识库管理、@Tool 工具编排、语义检索、飞书集成</description>
 
     <properties>
         <java.version>17</java.version>

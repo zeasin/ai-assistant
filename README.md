@@ -1,5 +1,12 @@
 # AI 助理 v1.0.0
 
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![Java](https://img.shields.io/badge/Java-17+-orange.svg)](https://openjdk.org/)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1-brightgreen.svg)](https://spring.io/projects/spring-boot)
+[![Spring AI](https://img.shields.io/badge/Spring%20AI-2.0-brightgreen.svg)](https://spring.io/projects/spring-ai)
+
+`AI Assistant` `Spring AI` `Spring Boot` `LLM` `Tool Calling` `多知识库` `知识库管理` `AI 对话` `语义检索` `Ollama` `DeepSeek` `飞书机器人` `RAG` `Embedding` `向量数据库` `SQLite` `Thymeleaf` `个人效率工具` `笔记管理` `任务管理` `日报生成` `多模态` `图片识别`
+
 > **自带 AI 大脑，零外部依赖。多知识库，一例运行。**
 
 一个完全自包含的 AI 助理应用——基于 **Spring AI 2.0** + **Spring Boot 4.1**，原生集成多知识库管理、AI 对话（LLM 推理、`@Tool` 工具编排、语义向量检索）、编程 AI（Pi CLI 代码自动排查）、多模态图片识别。支持同时管理多个知识库（如工作、学习），数据、对话、记忆、模块完全隔离。`java -jar` 一步启动，你的数据就在你自己的笔记库里。
@@ -666,3 +673,21 @@ spring:
 ---
 
 > **自带 AI 大脑，一步启动，你的数据始终在你手里。**
+
+---
+
+## 🤝 贡献
+
+欢迎提交 Issue 和 Pull Request！
+
+1. Fork 本仓库
+2. 创建你的特性分支 (`git checkout -b feature/xxx`)
+3. 提交你的修改 (`git commit -m 'Add xxx'`)
+4. 推送到分支 (`git push origin feature/xxx`)
+5. 创建一个 Pull Request
+
+---
+
+## 📄 开源协议
+
+本项目基于 [Apache License 2.0](LICENSE) 开源。

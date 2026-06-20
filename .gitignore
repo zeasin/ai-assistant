@@ -1,20 +1,9 @@
+# ========== 编译输出 ==========
 target/
-!.mvn/wrapper/maven-wrapper.jar
-!**/src/main/**/target/
-!**/src/test/**/target/
-
-# ========== 编译输出目录 ==========
 dist/
 build/
-!**/src/main/**/build/
-!**/src/test/**/build/
-
-# ========== Node.js ==========
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-*.local
+*.jar
+*.war
 
 # ========== IDE ==========
 .idea/
@@ -22,70 +11,34 @@ yarn-error.log*
 *.iws
 *.iml
 *.ipr
-*.iws
-.apt_generated
 .classpath
 .factorypath
 .project
-.settings
+.settings/
 .springBeans
 .sts4-cache
+.fastRequest
 
 # ========== 日志 ==========
 logs/
 *.log
-**/*.log
 
 # ========== 操作系统 ==========
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
-.config
-
-# ========== 其他 ==========
-.fastRequest
-docs/qihangerp3-*.sql
-.sisyphus/
-
-package-lock.json
-yarn.lock
-
-# ========== 各子项目特定 ==========
-ux/vue-erp/.vscode/
-ux/vue-erp/node_modules/
-ux/vue-erp/dist/
-ux/vue-wechat-h5/node_modules/
-ux/vue-wechat-h5/dist/
-ux/mini-wechat/node_modules/
-ux/mini-wechat/dist/
-ux/cli/node_modules/
-cert/
-assistant_log.json
-collector-logs/
-*.jar
-.claude
-.mimocode/
-AGENTS.md
-CLAUDE.md
-sensenova-extension-ds.js
-sensenova-extension.js
-nul
-
-# ========== 构建输出 ==========
-BOOT-INF/
-META-INF/
-org/
 
 # ========== 运行时数据 ==========
 memory*.db
+assistant_log.json
+collector-logs/
 
 # ========== 配置文件（含敏感凭据） ==========
 config.json
 !config.template.json
 
-
-AI
+# ========== AI 相关 ==========
+AI/
+.claude/
+.mimocode/
+AGENTS.md
+CLAUDE.md
