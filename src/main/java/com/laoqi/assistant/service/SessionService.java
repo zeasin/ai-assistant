@@ -228,6 +228,48 @@ public class SessionService {
                 """);
             log.info("Table reminders initialized");
 
+            // 试卷识别表
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS exam_papers (
+                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name        TEXT NOT NULL DEFAULT '',
+                    image_path  TEXT NOT NULL DEFAULT '',
+                    image_type  TEXT NOT NULL DEFAULT 'image/jpeg',
+                    kb_id       INTEGER,
+                    model       TEXT NOT NULL DEFAULT '',
+                    status      TEXT NOT NULL DEFAULT 'pending',
+                    created_at  TEXT NOT NULL
+                )
+                """);
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS exam_questions (
+                    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                    paper_id        INTEGER NOT NULL,
+                    seq_num         INTEGER NOT NULL DEFAULT 0,
+                    question_type   TEXT NOT NULL DEFAULT '未知',
+                    content         TEXT NOT NULL DEFAULT '',
+                    options         TEXT NOT NULL DEFAULT '',
+                    answer          TEXT NOT NULL DEFAULT '',
+                    explanation     TEXT NOT NULL DEFAULT '',
+                    knowledge_tags  TEXT NOT NULL DEFAULT '',
+                    difficulty      INTEGER NOT NULL DEFAULT 0,
+                    created_at      TEXT NOT NULL
+                )
+                """);
+            stmt.execute("CREATE INDEX IF NOT EXISTS idx_exam_questions_paper ON exam_questions(paper_id)");
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS exam_practices (
+                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                    question_id INTEGER NOT NULL,
+                    user_answer TEXT NOT NULL DEFAULT '',
+                    is_correct  INTEGER NOT NULL DEFAULT 0,
+                    used_time   INTEGER NOT NULL DEFAULT 0,
+                    created_at  TEXT NOT NULL
+                )
+                """);
+            stmt.execute("CREATE INDEX IF NOT EXISTS idx_exam_practices_question ON exam_practices(question_id)");
+            log.info("Table exam_papers, exam_questions, exam_practices initialized");
+
         } catch (SQLException e) {
             throw new RuntimeException("Failed to create new tables", e);
         }

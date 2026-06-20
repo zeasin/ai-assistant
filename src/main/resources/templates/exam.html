@@ -1,0 +1,501 @@
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title layout:fragment="title">试卷识别 - AI 助理</title>
+</head>
+<body>
+<th:block layout:fragment="content">
+
+<style>
+.exam-card { background:#fff; border:1px solid #e1e3e6; border-radius:12px; padding:20px; margin-bottom:16px; }
+.exam-card h3 { font-size:15px; font-weight:600; margin:0 0 12px; color:#1a1b1e; display:flex; align-items:center; gap:6px; }
+.exam-upload-zone { border:2px dashed #d0d5dd; border-radius:12px; padding:36px 20px; text-align:center; cursor:pointer; transition:all .2s; background:#fafafa; }
+.exam-upload-zone:hover { border-color:#7c5cfc; background:#f5f3ff; }
+.exam-upload-zone.dragover { border-color:#7c5cfc; background:#f0edff; }
+.exam-tab-bar { display:flex; gap:0; border-bottom:2px solid #e1e3e6; }
+.exam-tab-btn { padding:10px 24px; font-size:14px; cursor:pointer; transition:all .15s; border:none; background:transparent; color:#5c5f66; border-bottom:2px solid transparent; margin-bottom:-2px; font-weight:500; }
+.exam-tab-btn:hover { color:#1a1b1e; background:#f5f5f7; border-radius:6px 6px 0 0; }
+.exam-tab-btn.active { color:#7c5cfc; border-bottom-color:#7c5cfc; font-weight:600; }
+.exam-question-card { border:1px solid #e1e3e6; border-radius:10px; padding:16px; margin-bottom:12px; background:#fafafa; }
+.exam-question-card .seq { display:inline-block; background:#7c5cfc; color:#fff; border-radius:6px; padding:2px 8px; font-size:12px; font-weight:600; margin-right:8px; }
+.exam-question-card .type { display:inline-block; background:#f0edff; color:#5c3dcf; border-radius:6px; padding:2px 8px; font-size:12px; font-weight:500; }
+.exam-question-card .content { margin-top:10px; font-size:14px; color:#1a1b1e; line-height:1.7; }
+.exam-question-card .options { margin-top:8px; font-size:13px; color:#3c4043; line-height:1.8; }
+.exam-question-card .answer-block { margin-top:10px; padding:10px 14px; background:#f0fdf4; border-left:3px solid #2b8a3e; border-radius:0 8px 8px 0; font-size:13px; }
+.exam-question-card .explanation { margin-top:8px; padding:10px 14px; background:#f8f7ff; border-left:3px solid #7c5cfc; border-radius:0 8px 8px 0; font-size:13px; color:#3c4043; line-height:1.7; }
+.exam-practice-card { border:2px solid #e1e3e6; border-radius:12px; padding:24px; margin-bottom:16px; background:#fff; transition:all .2s; }
+.exam-practice-card.active { border-color:#7c5cfc; box-shadow:0 0 0 3px rgba(124,92,252,.15); }
+.exam-option { padding:10px 14px; border:1px solid #e1e3e6; border-radius:8px; margin-bottom:8px; cursor:pointer; transition:all .15s; font-size:14px; }
+.exam-option:hover { border-color:#7c5cfc; background:#f8f7ff; }
+.exam-option.selected { border-color:#7c5cfc; background:#f0edff; font-weight:500; }
+.exam-option.correct { border-color:#2b8a3e; background:#f0fdf4; }
+.exam-option.wrong { border-color:#e03131; background:#fff5f5; }
+.exam-stat-bar { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+.exam-stat-label { font-size:13px; color:#5c5f66; min-width:80px; }
+.exam-stat-track { flex:1; height:8px; background:#e1e3e6; border-radius:4px; overflow:hidden; }
+.exam-stat-fill { height:100%; background:#7c5cfc; border-radius:4px; transition:width .3s; }
+.exam-stat-value { font-size:13px; color:#1a1b1e; font-weight:500; min-width:50px; text-align:right; }
+.exam-empty { text-align:center; color:#909296; padding:40px 0; font-size:14px; }
+.exam-loading { text-align:center; color:#909296; padding:40px 0; font-size:14px; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+</style>
+
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+    <h1 style="font-size:22px;font-weight:600;margin:0;">📝 试卷识别</h1>
+</div>
+
+<div class="exam-tab-bar">
+    <button class="exam-tab-btn active" data-tab="recognize">📤 识别试卷</button>
+    <button class="exam-tab-btn" data-tab="bank">📚 题库管理</button>
+    <button class="exam-tab-btn" data-tab="practice">✏️ 练习模式</button>
+    <button class="exam-tab-btn" data-tab="stats">📊 学习统计</button>
+</div>
+
+<!-- Tab 1: 识别试卷 -->
+<div id="panelRecognize" class="exam-card" style="border-radius:0 0 12px 12px;border-top:none;">
+    <div class="exam-upload-zone" id="examUploadZone">
+        <div id="examUploadHint" style="color:#909296;font-size:14px;">
+            <div style="font-size:40px;margin-bottom:8px;">📁</div>
+            点击选择试卷图片 或 拖拽到此处<br>
+            <span style="font-size:12px;">支持 jpg / png / gif / webp / bmp，最大 10MB</span>
+        </div>
+        <div id="examUploadPreview" style="display:none;">
+            <img id="examPreviewImg" style="max-height:320px;border-radius:8px;border:1px solid #e1e3e6;" />
+            <div id="examPreviewFileName" style="margin-top:8px;font-size:13px;color:#5c5f66;"></div>
+        </div>
+    </div>
+    <input type="file" id="examFileInput" accept="image/*" style="display:none" />
+
+    <div style="margin-top:14px;">
+        <label style="font-size:12px;color:#5c5f66;font-weight:500;display:block;margin-bottom:4px;">📝 试卷名称（可选）</label>
+        <input type="text" id="examPaperName" placeholder="如：2024年高考数学真题" style="width:100%;padding:8px 12px;border:1px solid #e1e3e6;border-radius:8px;font-size:13px;outline:none;" />
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:12px;">
+        <select id="examModelSelector" style="flex:1;padding:8px 12px;border:1px solid #e1e3e6;border-radius:8px;background:#fff;font-size:13px;outline:none;">
+            <option th:if="${#lists.size(visionModels) > 0}" value="">选择多模态模型...</option>
+            <option th:unless="${#lists.size(visionModels) > 0}" value="">暂无多模态模型，请在配置页添加</option>
+            <option th:each="m : ${visionModels}" th:value="${m.name}" th:text="${m.name + ' (' + m.model + ')'}">模型</option>
+        </select>
+        <button class="btn btn-primary" id="examRecognizeBtn" style="white-space:nowrap;">🔍 识别试卷</button>
+    </div>
+
+    <div id="examRecognizeResult" style="display:none;margin-top:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <h3 style="margin:0;">📋 识别结果</h3>
+            <button class="btn btn-primary" id="examSaveBtn" style="font-size:13px;padding:6px 14px;">💾 入库</button>
+        </div>
+        <div id="examQuestionsList"></div>
+    </div>
+</div>
+
+<!-- Tab 2: 题库管理 -->
+<div id="panelBank" style="display:none;">
+    <div class="exam-card" style="border-radius:0 0 12px 12px;border-top:none;">
+        <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+            <select id="examTypeFilter" style="padding:8px 12px;border:1px solid #e1e3e6;border-radius:8px;font-size:13px;background:#fff;outline:none;">
+                <option value="">全部题型</option>
+                <option value="选择题">选择题</option>
+                <option value="填空题">填空题</option>
+                <option value="判断题">判断题</option>
+                <option value="解答题">解答题</option>
+                <option value="计算题">计算题</option>
+                <option value="简答题">简答题</option>
+            </select>
+            <input type="text" id="examTagFilter" placeholder="知识点筛选..." style="padding:8px 12px;border:1px solid #e1e3e6;border-radius:8px;font-size:13px;outline:none;min-width:160px;" />
+            <button class="btn btn-secondary" id="examBankRefresh" style="padding:6px 14px;font-size:13px;">🔄 刷新</button>
+        </div>
+        <div id="examBankList">
+            <div class="exam-loading">加载中...</div>
+        </div>
+    </div>
+</div>
+
+<!-- Tab 3: 练习模式 -->
+<div id="panelPractice" style="display:none;">
+    <div id="examPracticeSetup" class="exam-card" style="border-radius:0 0 12px 12px;border-top:none;">
+        <h3 style="margin-bottom:16px;">⚙️ 练习设置</h3>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:end;">
+            <div>
+                <label style="font-size:12px;color:#5c5f66;font-weight:500;display:block;margin-bottom:4px;">题目数量</label>
+                <select id="examPracticeCount" style="padding:8px 12px;border:1px solid #e1e3e6;border-radius:8px;font-size:13px;background:#fff;outline:none;">
+                    <option value="5">5 题</option>
+                    <option value="10" selected>10 题</option>
+                    <option value="20">20 题</option>
+                    <option value="50">50 题</option>
+                </select>
+            </div>
+            <div>
+                <label style="font-size:12px;color:#5c5f66;font-weight:500;display:block;margin-bottom:4px;">题型筛选</label>
+                <select id="examPracticeType" style="padding:8px 12px;border:1px solid #e1e3e6;border-radius:8px;font-size:13px;background:#fff;outline:none;">
+                    <option value="">全部题型</option>
+                    <option value="选择题">选择题</option>
+                    <option value="填空题">填空题</option>
+                    <option value="判断题">判断题</option>
+                    <option value="解答题">解答题</option>
+                </select>
+            </div>
+            <button class="btn btn-primary" id="examStartPractice" style="padding:8px 20px;">▶️ 开始练习</button>
+        </div>
+    </div>
+
+    <div id="examPracticeArea" style="display:none;"></div>
+    <div id="examPracticeResult" style="display:none;"></div>
+</div>
+
+<!-- Tab 4: 学习统计 -->
+<div id="panelStats" style="display:none;">
+    <div id="examStatsContent">
+        <div class="exam-loading">加载中...</div>
+    </div>
+</div>
+
+<script>
+var examQuestions = [];
+var examCurrentPractice = [];
+var examPracticeIndex = 0;
+var examPracticeAnswers = [];
+
+function examSwitchTab(tab) {
+    document.querySelectorAll('.exam-tab-btn').forEach(function(b) {
+        b.classList.toggle('active', b.dataset.tab === tab);
+    });
+    document.getElementById('panelRecognize').style.display = tab === 'recognize' ? 'block' : 'none';
+    document.getElementById('panelBank').style.display = tab === 'bank' ? 'block' : 'none';
+    document.getElementById('panelPractice').style.display = tab === 'practice' ? 'block' : 'none';
+    document.getElementById('panelStats').style.display = tab === 'stats' ? 'block' : 'none';
+    if (tab === 'bank') examLoadBank();
+    if (tab === 'stats') examLoadStats();
+}
+
+function examPreviewImage(input) {
+    if (!input.files || !input.files[0]) return;
+    var file = input.files[0];
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        document.getElementById('examUploadHint').style.display = 'none';
+        document.getElementById('examUploadPreview').style.display = 'block';
+        document.getElementById('examPreviewImg').src = e.target.result;
+        document.getElementById('examPreviewFileName').textContent = file.name + ' (' + (file.size/1024).toFixed(1) + 'KB)';
+    };
+    reader.readAsDataURL(file);
+}
+
+async function examRecognize() {
+    var input = document.getElementById('examFileInput');
+    if (!input.files || !input.files[0]) { toast('请先选择试卷图片', 'error'); return; }
+    var modelSel = document.getElementById('examModelSelector');
+    var modelName = modelSel ? modelSel.value : '';
+    if (!modelName) { toast('请选择多模态模型', 'error'); return; }
+    var btn = document.getElementById('examRecognizeBtn');
+    btn.disabled = true; btn.textContent = '⏳ 识别中...';
+    var fd = new FormData();
+    fd.append('image', input.files[0]);
+    fd.append('modelName', modelName);
+    fd.append('paperName', document.getElementById('examPaperName').value);
+    try {
+        var resp = await fetch('/image/exam/api/recognize', { method: 'POST', body: fd });
+        var data = await resp.json();
+        if (data.ok) {
+            examQuestions = data.questions || [];
+            examRenderQuestions(examQuestions);
+            document.getElementById('examRecognizeResult').style.display = 'block';
+            document.getElementById('examSaveBtn').disabled = false;
+            toast('识别完成，共 ' + examQuestions.length + ' 题', 'success');
+        } else {
+            toast('识别失败: ' + (data.error || '未知错误'), 'error');
+        }
+    } catch(e) { toast('请求失败', 'error'); }
+    btn.disabled = false; btn.textContent = '🔍 识别试卷';
+}
+
+function examRenderQuestions(questions) {
+    var container = document.getElementById('examQuestionsList');
+    if (!questions || questions.length === 0) {
+        container.innerHTML = '<div class="exam-empty">未识别到题目</div>';
+        return;
+    }
+    var html = '';
+    for (var i = 0; i < questions.length; i++) {
+        var q = questions[i];
+        html += '<div class="exam-question-card">';
+        html += '<div><span class="seq">第' + (q.seq || (i+1)) + '题</span><span class="type">' + (q.type || '未知') + '</span>';
+        if (q.difficulty) html += '<span style="margin-left:8px;font-size:12px;color:#909296;">难度: ' + '★'.repeat(q.difficulty) + '</span>';
+        html += '</div>';
+        html += '<div class="content">' + examEscapeHtml(q.content) + '</div>';
+        if (q.options) html += '<div class="options">' + examEscapeHtml(q.options).replace(/\n/g, '<br>') + '</div>';
+        if (q.answer) html += '<div class="answer-block"><strong>答案：</strong>' + examEscapeHtml(q.answer) + '</div>';
+        if (q.explanation) html += '<div class="explanation"><strong>解析：</strong>' + examEscapeHtml(q.explanation) + '</div>';
+        html += '</div>';
+    }
+    container.innerHTML = html;
+}
+
+async function examSaveToBank() {
+    if (!examQuestions || examQuestions.length === 0) { toast('没有可保存的题目', 'error'); return; }
+    var btn = document.getElementById('examSaveBtn');
+    btn.disabled = true; btn.textContent = '⏳ 保存中...';
+    try {
+        var resp = await fetch('/image/exam/api/papers', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                name: document.getElementById('examPaperName').value || '未命名试卷',
+                questions: examQuestions
+            })
+        });
+        var data = await resp.json();
+        if (data.ok) {
+            toast('✅ 已保存 ' + data.count + ' 题到题库');
+            btn.textContent = '✅ 已保存';
+        } else {
+            toast('保存失败: ' + (data.error || ''), 'error');
+            btn.disabled = false;
+        }
+    } catch(e) { toast('保存失败', 'error'); btn.disabled = false; }
+    btn.textContent = '💾 入库';
+}
+
+async function examLoadBank() {
+    var container = document.getElementById('examBankList');
+    container.innerHTML = '<div class="exam-loading">加载中...</div>';
+    var type = document.getElementById('examTypeFilter').value;
+    var tag = document.getElementById('examTagFilter').value;
+    try {
+        var url = '/image/exam/api/questions?type=' + encodeURIComponent(type) + '&tag=' + encodeURIComponent(tag);
+        var resp = await fetch(url);
+        var data = await resp.json();
+        if (!data.ok || !data.questions || data.questions.length === 0) {
+            container.innerHTML = '<div class="exam-empty">📭 暂无题目，请先识别试卷</div>';
+            return;
+        }
+        var html = '';
+        for (var i = 0; i < data.questions.length; i++) {
+            var q = data.questions[i];
+            html += '<div class="exam-question-card">';
+            html += '<div style="display:flex;justify-content:space-between;align-items:center;">';
+            html += '<div><span class="seq">第' + q.seqNum + '题</span><span class="type">' + examEscapeHtml(q.questionType) + '</span>';
+            if (q.knowledgeTags) html += '<span style="margin-left:8px;font-size:12px;color:#7c5cfc;">' + examEscapeHtml(q.knowledgeTags) + '</span>';
+            html += '</div>';
+            html += '<button class="btn btn-secondary" style="font-size:11px;padding:4px 10px;" onclick="examDeleteQuestion(' + q.id + ')">删除</button>';
+            html += '</div>';
+            html += '<div class="content">' + examEscapeHtml(q.content) + '</div>';
+            if (q.options) html += '<div class="options">' + examEscapeHtml(q.options).replace(/\n/g, '<br>') + '</div>';
+            html += '<div class="answer-block"><strong>答案：</strong>' + examEscapeHtml(q.answer) + '</div>';
+            if (q.explanation) html += '<div class="explanation"><strong>解析：</strong>' + examEscapeHtml(q.explanation) + '</div>';
+            html += '</div>';
+        }
+        container.innerHTML = html;
+    } catch(e) { container.innerHTML = '<div class="exam-empty">加载失败</div>'; }
+}
+
+async function examDeleteQuestion(id) {
+    if (!confirm('确定删除此题目？')) return;
+    try {
+        var resp = await fetch('/image/exam/api/questions/' + id, { method: 'DELETE' });
+        var data = await resp.json();
+        if (data.ok) { toast('已删除'); examLoadBank(); }
+        else toast('删除失败', 'error');
+    } catch(e) { toast('删除失败', 'error'); }
+}
+
+async function examStartPractice() {
+    var count = document.getElementById('examPracticeCount').value;
+    var type = document.getElementById('examPracticeType').value;
+    try {
+        var resp = await fetch('/image/exam/api/practice/start', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ count: parseInt(count), type: type })
+        });
+        var data = await resp.json();
+        if (!data.ok || !data.questions || data.questions.length === 0) {
+            toast('题库中没有可用题目', 'error');
+            return;
+        }
+        examCurrentPractice = data.questions;
+        examPracticeIndex = 0;
+        examPracticeAnswers = [];
+        document.getElementById('examPracticeSetup').style.display = 'none';
+        document.getElementById('examPracticeResult').style.display = 'none';
+        document.getElementById('examPracticeArea').style.display = 'block';
+        examRenderPracticeQuestion();
+    } catch(e) { toast('请求失败', 'error'); }
+}
+
+function examRenderPracticeQuestion() {
+    var container = document.getElementById('examPracticeArea');
+    if (examPracticeIndex >= examCurrentPractice.length) {
+        examShowPracticeResult();
+        return;
+    }
+    var q = examCurrentPractice[examPracticeIndex];
+    var total = examCurrentPractice.length;
+    var html = '<div class="exam-card">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">';
+    html += '<h3 style="margin:0;">第 ' + (examPracticeIndex+1) + ' / ' + total + ' 题</h3>';
+    html += '<span class="type">' + examEscapeHtml(q.questionType) + '</span>';
+    html += '</div>';
+    html += '<div style="font-size:15px;line-height:1.8;margin-bottom:16px;">' + examEscapeHtml(q.content) + '</div>';
+    if (q.questionType === '选择题' && q.options) {
+        var opts = q.options.split('\n');
+        for (var i = 0; i < opts.length; i++) {
+            if (opts[i].trim()) {
+                html += '<div class="exam-option" data-idx="' + i + '" onclick="examSelectOption(this)">' + examEscapeHtml(opts[i].trim()) + '</div>';
+            }
+        }
+    } else {
+        html += '<textarea id="examPracticeInput" rows="4" style="width:100%;padding:10px 12px;border:1px solid #e1e3e6;border-radius:8px;font-size:14px;resize:vertical;outline:none;font-family:inherit;" placeholder="请输入你的答案..."></textarea>';
+    }
+    html += '<div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end;">';
+    html += '<button class="btn btn-primary" onclick="examSubmitPracticeAnswer()">✅ 提交</button>';
+    html += '</div></div>';
+    container.innerHTML = html;
+}
+
+function examSelectOption(el) {
+    el.parentElement.querySelectorAll('.exam-option').forEach(function(o) { o.classList.remove('selected'); });
+    el.classList.add('selected');
+}
+
+async function examSubmitPracticeAnswer() {
+    var q = examCurrentPractice[examPracticeIndex];
+    var userAnswer = '';
+    if (q.questionType === '选择题') {
+        var selected = document.querySelector('.exam-option.selected');
+        if (!selected) { toast('请选择一个选项', 'error'); return; }
+        userAnswer = selected.textContent;
+    } else {
+        var input = document.getElementById('examPracticeInput');
+        if (!input || !input.value.trim()) { toast('请输入答案', 'error'); return; }
+        userAnswer = input.value.trim();
+    }
+    try {
+        var resp = await fetch('/image/exam/api/practice/submit', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ questionId: q.id, userAnswer: userAnswer })
+        });
+        var data = await resp.json();
+        if (data.ok) {
+            examPracticeAnswers.push({ questionId: q.id, userAnswer: userAnswer, isCorrect: data.isCorrect });
+            examShowAnswerFeedback(q, userAnswer, data.isCorrect);
+        }
+    } catch(e) { toast('提交失败', 'error'); }
+}
+
+function examShowAnswerFeedback(q, userAnswer, isCorrect) {
+    var container = document.getElementById('examPracticeArea');
+    var html = '<div class="exam-card">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">';
+    html += '<h3 style="margin:0;">' + (isCorrect ? '✅ 回答正确！' : '❌ 回答错误') + '</h3>';
+    html += '</div>';
+    html += '<div style="font-size:15px;line-height:1.8;margin-bottom:12px;">' + examEscapeHtml(q.content) + '</div>';
+    html += '<div style="margin-bottom:8px;"><strong>你的答案：</strong><span style="color:' + (isCorrect ? '#2b8a3e' : '#e03131') + ';">' + examEscapeHtml(userAnswer) + '</span></div>';
+    html += '<div style="margin-bottom:8px;"><strong>正确答案：</strong><span style="color:#2b8a3e;">' + examEscapeHtml(q.answer) + '</span></div>';
+    if (q.explanation) {
+        html += '<div class="explanation"><strong>解析：</strong>' + examEscapeHtml(q.explanation) + '</div>';
+    }
+    html += '<div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end;">';
+    html += '<button class="btn btn-primary" onclick="examNextQuestion()">▶️ 下一题</button>';
+    html += '</div></div>';
+    container.innerHTML = html;
+}
+
+function examNextQuestion() {
+    examPracticeIndex++;
+    examRenderPracticeQuestion();
+}
+
+function examShowPracticeResult() {
+    document.getElementById('examPracticeArea').style.display = 'none';
+    var container = document.getElementById('examPracticeResult');
+    container.style.display = 'block';
+    var correct = examPracticeAnswers.filter(function(a) { return a.isCorrect; }).length;
+    var total = examPracticeAnswers.length;
+    var rate = total > 0 ? Math.round(correct / total * 100) : 0;
+    var html = '<div class="exam-card">';
+    html += '<h3 style="margin-bottom:20px;text-align:center;">📊 练习结果</h3>';
+    html += '<div style="text-align:center;margin-bottom:20px;">';
+    html += '<div style="font-size:48px;font-weight:700;color:#7c5cfc;">' + rate + '%</div>';
+    html += '<div style="font-size:14px;color:#5c5f66;">正确率（' + correct + '/' + total + '）</div>';
+    html += '</div>';
+    html += '<div style="display:flex;gap:12px;justify-content:center;">';
+    html += '<button class="btn btn-primary" onclick="examResetPractice()">🔄 再来一轮</button>';
+    html += '<button class="btn btn-secondary" onclick="examSwitchTab(\'stats\')">📊 查看统计</button>';
+    html += '</div></div>';
+    container.innerHTML = html;
+}
+
+function examResetPractice() {
+    document.getElementById('examPracticeSetup').style.display = 'block';
+    document.getElementById('examPracticeArea').style.display = 'none';
+    document.getElementById('examPracticeResult').style.display = 'none';
+}
+
+async function examLoadStats() {
+    var container = document.getElementById('examStatsContent');
+    container.innerHTML = '<div class="exam-loading">加载中...</div>';
+    try {
+        var resp = await fetch('/image/exam/api/stats');
+        var data = await resp.json();
+        if (!data.ok) { container.innerHTML = '<div class="exam-empty">加载失败</div>'; return; }
+        var s = data.stats;
+        var html = '<div class="exam-card">';
+        html += '<h3>📊 学习概览</h3>';
+        html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px;margin-bottom:20px;">';
+        html += '<div style="text-align:center;padding:16px;background:#f8f7ff;border-radius:10px;"><div style="font-size:28px;font-weight:700;color:#7c5cfc;">' + (s.totalQuestions || 0) + '</div><div style="font-size:13px;color:#5c5f66;">题库总量</div></div>';
+        html += '<div style="text-align:center;padding:16px;background:#f8f7ff;border-radius:10px;"><div style="font-size:28px;font-weight:700;color:#7c5cfc;">' + (s.totalPracticed || 0) + '</div><div style="font-size:13px;color:#5c5f66;">已练习</div></div>';
+        html += '<div style="text-align:center;padding:16px;background:#f0fdf4;border-radius:10px;"><div style="font-size:28px;font-weight:700;color:#2b8a3e;">' + (s.correctRate || 0) + '%</div><div style="font-size:13px;color:#5c5f66;">正确率</div></div>';
+        html += '<div style="text-align:center;padding:16px;background:#fff5f5;border-radius:10px;"><div style="font-size:28px;font-weight:700;color:#e03131;">' + (s.wrongCount || 0) + '</div><div style="font-size:13px;color:#5c5f66;">错题数</div></div>';
+        html += '</div></div>';
+        if (s.byType && s.byType.length > 0) {
+            html += '<div class="exam-card"><h3>📋 按题型统计</h3>';
+            for (var i = 0; i < s.byType.length; i++) {
+                var t = s.byType[i];
+                html += '<div class="exam-stat-bar">';
+                html += '<span class="exam-stat-label">' + examEscapeHtml(t.type) + '</span>';
+                html += '<div class="exam-stat-track"><div class="exam-stat-fill" style="width:' + (t.rate || 0) + '%"></div></div>';
+                html += '<span class="exam-stat-value">' + (t.rate || 0) + '%</span>';
+                html += '</div>';
+            }
+            html += '</div>';
+        }
+        container.innerHTML = html;
+    } catch(e) { container.innerHTML = '<div class="exam-empty">加载失败</div>'; }
+}
+
+function examEscapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.exam-tab-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() { examSwitchTab(this.dataset.tab); });
+    });
+    var uz = document.getElementById('examUploadZone');
+    if (uz) {
+        uz.addEventListener('click', function() { document.getElementById('examFileInput').click(); });
+        uz.addEventListener('dragover', function(e) { e.preventDefault(); this.classList.add('dragover'); });
+        uz.addEventListener('dragleave', function(e) { this.classList.remove('dragover'); });
+        uz.addEventListener('drop', function(e) {
+            e.preventDefault(); this.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) {
+                document.getElementById('examFileInput').files = e.dataTransfer.files;
+                examPreviewImage(document.getElementById('examFileInput'));
+            }
+        });
+    }
+    document.getElementById('examFileInput').addEventListener('change', function() { examPreviewImage(this); });
+    document.getElementById('examRecognizeBtn').addEventListener('click', examRecognize);
+    document.getElementById('examSaveBtn').addEventListener('click', examSaveToBank);
+    document.getElementById('examStartPractice').addEventListener('click', examStartPractice);
+    document.getElementById('examBankRefresh').addEventListener('click', examLoadBank);
+});
+</script>
+
+</th:block>
+</body>
+</html>

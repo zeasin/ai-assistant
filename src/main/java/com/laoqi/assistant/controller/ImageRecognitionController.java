@@ -51,6 +51,11 @@ public class ImageRecognitionController {
     }
 
     @GetMapping
+    public String index() {
+        return "redirect:/image/general";
+    }
+
+    @GetMapping("/general")
     public String page(@RequestParam(required = false) Long kbId, Model model) {
         if (!llmService.isAvailable()) {
             return "redirect:/config#ai-model-section";
