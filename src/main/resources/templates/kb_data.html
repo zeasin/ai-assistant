@@ -1,0 +1,290 @@
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title layout:fragment="title">笔记库数据 - AI 助理</title>
+</head>
+<body>
+<th:block layout:fragment="content">
+
+<style>
+.kbd-wrap { display:flex; gap:0; height:calc(100vh - 100px); overflow:hidden; background:#fff; border:1px solid #e1e3e6; border-radius:12px; }
+.kbd-sidebar { width:220px; min-width:220px; border-right:1px solid #e1e3e6; display:flex; flex-direction:column; background:#fafbfc; }
+.kbd-sidebar-header { padding:14px 16px; border-bottom:1px solid #e1e3e6; }
+.kbd-sidebar-header h2 { font-size:16px; font-weight:600; margin:0; }
+.kbd-kb-list { flex:1; overflow-y:auto; padding:4px 0; }
+.kbd-kb-item { display:flex; align-items:center; padding:10px 16px; cursor:pointer; transition:all .1s; gap:8px; border-left:3px solid transparent; }
+.kbd-kb-item:hover { background:#f0edff; }
+.kbd-kb-item.active { background:#f0edff; border-left-color:#7c5cfc; }
+.kbd-kb-item .icon { font-size:16px; }
+.kbd-kb-item .name { font-size:13px; font-weight:500; }
+.kbd-kb-item .count { font-size:11px; color:#909296; margin-left:auto; }
+.kbd-main { flex:1; display:flex; flex-direction:column; min-width:0; }
+.kbd-header { padding:12px 20px; border-bottom:1px solid #e1e3e6; display:flex; align-items:center; gap:12px; }
+.kbd-header h3 { margin:0; font-size:15px; flex:1; }
+.kbd-content { flex:1; overflow-y:auto; padding:16px 20px; }
+.kbd-file-list { display:flex; flex-direction:column; gap:4px; }
+.kbd-file-item { display:flex; align-items:center; padding:10px 14px; border-radius:8px; cursor:pointer; transition:all .1s; gap:8px; }
+.kbd-file-item:hover { background:#f0edff; }
+.kbd-file-item.active { background:#f0edff; border-left:3px solid #7c5cfc; }
+.kbd-file-item .icon { font-size:18px; }
+.kbd-file-item .name { font-size:13px; font-weight:500; color:#1a1b1e; }
+.kbd-file-item .meta { font-size:11px; color:#909296; margin-left:auto; }
+.kbd-data-view { display:none; }
+.kbd-data-header { display:flex; align-items:center; gap:8px; margin-bottom:12px; }
+.kbd-back-btn { padding:6px 12px; border:1px solid #e1e3e6; border-radius:6px; background:#fff; color:#5c5f66; font-size:12px; cursor:pointer; }
+.kbd-back-btn:hover { border-color:#7c5cfc; color:#7c5cfc; }
+.kbd-group-tabs { display:flex; gap:0; border-bottom:2px solid #e1e3e6; margin-bottom:12px; }
+.kbd-group-tab { padding:8px 16px; font-size:13px; cursor:pointer; border:none; background:transparent; color:#5c5f66; border-bottom:2px solid transparent; margin-bottom:-2px; font-weight:500; }
+.kbd-group-tab:hover { color:#1a1b1e; background:#f5f5f7; }
+.kbd-group-tab.active { color:#7c5cfc; border-bottom-color:#7c5cfc; font-weight:600; }
+.kbd-table-wrap { overflow-x:auto; }
+.kbd-table { width:100%; border-collapse:collapse; font-size:13px; }
+.kbd-table th { text-align:left; padding:8px 12px; border-bottom:2px solid #7c5cfc; color:#5c5f66; font-weight:600; white-space:nowrap; background:#fafafe; }
+.kbd-table td { padding:8px 12px; border-bottom:1px solid #e1e3e6; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.kbd-table tr:hover { background:#f8f7ff; cursor:pointer; }
+.kbd-table .row-num { color:#909296; font-size:11px; width:40px; }
+.kbd-empty { text-align:center; color:#909296; padding:60px; font-size:14px; }
+.kbd-empty .icon { font-size:40px; margin-bottom:8px; }
+.kbd-detail-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:200; justify-content:center; align-items:center; }
+.kbd-detail-modal.active { display:flex; }
+.kbd-detail-box { background:#fff; border-radius:12px; padding:20px; width:600px; max-width:90vw; max-height:80vh; overflow-y:auto; box-shadow:0 8px 32px rgba(0,0,0,0.15); }
+.kbd-detail-box h3 { margin:0 0 12px; font-size:15px; }
+.kbd-detail-box pre { background:#1e1e2e; color:#cdd6f4; padding:14px; border-radius:8px; font-size:12px; overflow-x:auto; }
+.kbd-search { padding:6px 10px; border:1px solid #e1e3e6; border-radius:6px; font-size:13px; outline:none; width:180px; }
+.kbd-search:focus { border-color:#7c5cfc; }
+.kbd-record-count { font-size:12px; color:#909296; }
+</style>
+
+<div class="kbd-wrap">
+    <div class="kbd-sidebar">
+        <div class="kbd-sidebar-header">
+            <h2>📁 笔记库数据</h2>
+        </div>
+        <div class="kbd-kb-list" id="kbList">
+            <div th:each="kb : ${kbs}" class="kbd-kb-item" th:attr="onclick='kbdSelectKb('+${kb.id}+',this)'" th:data-id="${kb.id}">
+                <span class="icon">📂</span>
+                <span class="name" th:text="${kb.name}">KB</span>
+                <span class="count" id="count-${kb.id}">-</span>
+            </div>
+        </div>
+    </div>
+    <div class="kbd-main">
+        <div class="kbd-header">
+            <a class="kbd-back-btn" href="/data">← 返回</a>
+            <h3 id="kbdTitle">选择知识库查看数据</h3>
+            <input type="text" class="kbd-search" id="kbdSearch" placeholder="搜索..." oninput="kbdFilterFiles()" style="display:none;" />
+        </div>
+        <div class="kbd-content">
+            <div id="kbdFileList">
+                <div class="kbd-empty"><div class="icon">📁</div><p>点击左侧知识库查看数据文件</p></div>
+            </div>
+            <div id="kbdDataView" class="kbd-data-view">
+                <div class="kbd-data-header">
+                    <button class="kbd-back-btn" onclick="kbdBackToList()">← 返回文件列表</button>
+                    <span id="kbdDataFileName" style="font-weight:600;font-size:14px;"></span>
+                    <span id="kbdRecordCount" class="kbd-record-count"></span>
+                </div>
+                <div class="kbd-group-tabs" id="kbdGroupTabs"></div>
+                <div class="kbd-table-wrap" id="kbdTableContainer"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="kbd-detail-modal" id="detailModal">
+    <div class="kbd-detail-box">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <h3 id="detailTitle">📋 记录详情</h3>
+            <button class="kbd-back-btn" onclick="document.getElementById('detailModal').classList.remove('active')">✕ 关闭</button>
+        </div>
+        <pre id="detailContent"></pre>
+    </div>
+</div>
+
+<script>
+var kbdAllFiles = [];
+var kbdCurrentKbId = null;
+var kbdCurrentFile = null;
+var kbdCurrentGroups = {};
+var kbdCurrentGroupName = '';
+
+function kbdEscapeHtml(t) { if (!t) return ''; var d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+
+async function kbdLoadAllFiles() {
+    try {
+        var resp = await fetch('/data/kb/api/files');
+        var data = await resp.json();
+        if (data.ok) { kbdAllFiles = data.files || []; kbdUpdateCounts(); }
+    } catch(e) {}
+}
+
+function kbdUpdateCounts() {
+    var counts = {};
+    kbdAllFiles.forEach(function(f) { counts[f.kbId] = (counts[f.kbId] || 0) + 1; });
+    document.querySelectorAll('.kbd-kb-item').forEach(function(el) {
+        var id = el.dataset.id;
+        var countEl = document.getElementById('count-' + id);
+        if (countEl) countEl.textContent = (counts[id] || 0) + ' 个';
+    });
+}
+
+function kbdSelectKb(kbId, el) {
+    kbdCurrentKbId = kbId;
+    document.querySelectorAll('.kbd-kb-item').forEach(function(e) { e.classList.remove('active'); });
+    if (el) el.classList.add('active');
+    var kbName = el ? el.querySelector('.name').textContent : '';
+    document.getElementById('kbdTitle').textContent = kbName + ' - 数据文件';
+    document.getElementById('kbdSearch').style.display = '';
+    document.getElementById('kbdFileList').style.display = '';
+    document.getElementById('kbdDataView').style.display = 'none';
+    kbdRenderFiles(kbdAllFiles.filter(function(f) { return f.kbId == kbId; }));
+}
+
+function kbdFilterFiles() {
+    var q = document.getElementById('kbdSearch').value.toLowerCase();
+    var files = kbdAllFiles.filter(function(f) { return f.kbId == kbdCurrentKbId; });
+    if (q) files = files.filter(function(f) { return f.name.toLowerCase().indexOf(q) >= 0; });
+    kbdRenderFiles(files);
+}
+
+function kbdRenderFiles(files) {
+    var container = document.getElementById('kbdFileList');
+    if (files.length === 0) {
+        container.innerHTML = '<div class="kbd-empty"><div class="icon">📭</div><p>此知识库暂无数据文件</p></div>';
+        return;
+    }
+    var html = '<div class="kbd-file-list">';
+    for (var i = 0; i < files.length; i++) {
+        var f = files[i];
+        var size = f.size > 1024 ? (f.size/1024).toFixed(1) + 'KB' : f.size + 'B';
+        var date = new Date(f.lastModified);
+        var dateStr = date.getFullYear() + '-' + String(date.getMonth()+1).padStart(2,'0') + '-' + String(date.getDate()).padStart(2,'0');
+        html += '<div class="kbd-file-item" onclick="kbdOpenFile(' + f.kbId + ',\'' + kbdEscapeHtml(f.dir).replace(/'/g,"\\'") + '\',\'' + kbdEscapeHtml(f.fileName).replace(/'/g,"\\'") + '\',\'' + kbdEscapeHtml(f.name).replace(/'/g,"\\'") + '\')">';
+        html += '<span class="icon">📄</span>';
+        html += '<span class="name">' + kbdEscapeHtml(f.name) + '</span>';
+        html += '<span class="meta">' + size + ' · ' + dateStr + '</span>';
+        html += '</div>';
+    }
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+async function kbdOpenFile(kbId, dir, fileName, displayName) {
+    kbdCurrentFile = { kbId: kbId, dir: dir, fileName: fileName };
+    document.getElementById('kbdFileList').style.display = 'none';
+    document.getElementById('kbdDataView').style.display = '';
+    document.getElementById('kbdDataFileName').textContent = '📊 ' + displayName;
+    document.getElementById('kbdGroupTabs').innerHTML = '';
+    document.getElementById('kbdTableContainer').innerHTML = '<div style="padding:20px;text-align:center;color:#909296;">⏳ 加载中...</div>';
+
+    try {
+        var resp = await fetch('/data/kb/api/read?kbId=' + kbId + '&dir=' + encodeURIComponent(dir) + '&fileName=' + encodeURIComponent(fileName));
+        var res = await resp.json();
+        if (!res.ok || !res.data || !res.data.groups) {
+            document.getElementById('kbdTableContainer').innerHTML = '<div style="padding:20px;text-align:center;color:#909296;">无法读取数据</div>';
+            return;
+        }
+        var groups = res.data.groups;
+        var arrayGroups = Object.keys(groups).filter(function(g) { return groups[g].type === 'array'; });
+        if (arrayGroups.length === 0) {
+            document.getElementById('kbdTableContainer').innerHTML = '<div style="padding:20px;text-align:center;color:#909296;">暂无数组类型数据</div>';
+            return;
+        }
+        var tabsHtml = '';
+        for (var i = 0; i < arrayGroups.length; i++) {
+            var g = arrayGroups[i];
+            tabsHtml += '<button class="kbd-group-tab' + (i === 0 ? ' active' : '') + '" onclick="kbdSwitchGroup(\'' + kbdEscapeHtml(g).replace(/'/g,"\\'") + '\',this)">' + kbdEscapeHtml(g) + ' (' + groups[g].count + ')</button>';
+        }
+        document.getElementById('kbdGroupTabs').innerHTML = tabsHtml;
+        kbdLoadGroup(arrayGroups[0]);
+    } catch(e) {
+        document.getElementById('kbdTableContainer').innerHTML = '<div style="padding:20px;text-align:center;color:#909296;">加载失败</div>';
+    }
+}
+
+function kbdSwitchGroup(groupName, el) {
+    document.querySelectorAll('.kbd-group-tab').forEach(function(t) { t.classList.remove('active'); });
+    if (el) el.classList.add('active');
+    kbdLoadGroup(groupName);
+}
+
+async function kbdLoadGroup(groupName) {
+    kbdCurrentGroupName = groupName;
+    document.getElementById('kbdTableContainer').innerHTML = '<div style="padding:20px;text-align:center;color:#909296;">⏳ 加载...</div>';
+    try {
+        var f = kbdCurrentFile;
+        var resp = await fetch('/data/kb/api/group?kbId=' + f.kbId + '&dir=' + encodeURIComponent(f.dir) + '&fileName=' + encodeURIComponent(f.fileName) + '&group=' + encodeURIComponent(groupName));
+        var res = await resp.json();
+        if (res.ok && Array.isArray(res.data)) {
+            kbdCurrentGroups[groupName] = res.data;
+            document.getElementById('kbdRecordCount').textContent = res.data.length + ' 条记录';
+            kbdRenderTable(res.data);
+        } else {
+            document.getElementById('kbdTableContainer').innerHTML = '<div style="padding:20px;text-align:center;color:#909296;">加载失败</div>';
+        }
+    } catch(e) {
+        document.getElementById('kbdTableContainer').innerHTML = '<div style="padding:20px;text-align:center;color:#909296;">加载失败</div>';
+    }
+}
+
+function kbdRenderTable(rows) {
+    if (!rows || rows.length === 0) {
+        document.getElementById('kbdTableContainer').innerHTML = '<div style="padding:20px;text-align:center;color:#909296;">暂无数据</div>';
+        return;
+    }
+    var allKeys = new Set();
+    rows.forEach(function(r) { if (r && typeof r === 'object') Object.keys(r).forEach(function(k) { allKeys.add(k); }); });
+    var keys = Array.from(allKeys);
+    var html = '<table class="kbd-table"><thead><tr><th class="row-num">#</th>';
+    for (var i = 0; i < keys.length; i++) {
+        html += '<th>' + kbdEscapeHtml(keys[i]) + '</th>';
+    }
+    html += '</tr></thead><tbody>';
+    for (var r = 0; r < rows.length; r++) {
+        html += '<tr onclick="kbdShowDetail(' + r + ')">';
+        html += '<td class="row-num">' + (r + 1) + '</td>';
+        for (var c = 0; c < keys.length; c++) {
+            var val = rows[r] ? rows[r][keys[c]] : '';
+            if (val === null || val === undefined) val = '';
+            else if (typeof val === 'object') val = JSON.stringify(val);
+            else val = String(val);
+            html += '<td title="' + kbdEscapeHtml(val) + '">' + kbdEscapeHtml(val.length > 50 ? val.substring(0, 50) + '...' : val) + '</td>';
+        }
+        html += '</tr>';
+    }
+    html += '</tbody></table>';
+    document.getElementById('kbdTableContainer').innerHTML = html;
+}
+
+function kbdShowDetail(rowIdx) {
+    var rows = kbdCurrentGroups[kbdCurrentGroupName];
+    if (!rows || !rows[rowIdx]) return;
+    document.getElementById('detailTitle').textContent = '📋 ' + kbdCurrentGroupName + ' - 第 ' + (rowIdx + 1) + ' 条';
+    document.getElementById('detailContent').textContent = JSON.stringify(rows[rowIdx], null, 2);
+    document.getElementById('detailModal').classList.add('active');
+}
+
+function kbdBackToList() {
+    document.getElementById('kbdFileList').style.display = '';
+    document.getElementById('kbdDataView').style.display = 'none';
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    kbdLoadAllFiles().then(function() {
+        var firstKb = document.querySelector('.kbd-kb-item');
+        if (firstKb) {
+            firstKb.click();
+        } else {
+            document.getElementById('kbdFileList').innerHTML = '<div class="kbd-empty"><div class="icon">📭</div><p>暂无知识库，请先在配置页面添加</p></div>';
+        }
+    });
+});
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') document.getElementById('detailModal').classList.remove('active');
+});
+</script>
+
+</th:block>
+</body>
+</html>
