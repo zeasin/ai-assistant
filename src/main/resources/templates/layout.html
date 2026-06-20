@@ -344,7 +344,7 @@
                 <a href="/image/exam" th:classappend="${requestURI == '/image/exam' ? 'active' : ''}">📝 试卷识别</a>
             </div>
         </div>
-        <a th:classappend="${#strings.startsWith(requestURI, '/datacenter')} ? 'active' : ''" href="/datacenter">🗂️ 数据</a>
+        <a th:classappend="${#strings.startsWith(requestURI, '/data')} ? 'active' : ''" href="/data">🗂️ 数据</a>
         <a th:classappend="${#strings.startsWith(requestURI, '/planner')} ? 'active' : ''" href="/planner">📋 计划</a>
 
         <!-- 有笔记库时显示下拉 -->

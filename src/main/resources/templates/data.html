@@ -1,0 +1,229 @@
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title layout:fragment="title">数据 - AI 助理</title>
+</head>
+<body>
+<th:block layout:fragment="content">
+
+<style>
+.data-wrap { max-width:1100px; margin:0 auto; }
+.data-tabs { display:flex; gap:0; border-bottom:2px solid #e1e3e6; margin-bottom:20px; background:#fff; border-radius:12px 12px 0 0; padding:0 20px; }
+.data-tab { padding:12px 20px; font-size:14px; cursor:pointer; transition:all .15s; border:none; background:transparent; color:#5c5f66; border-bottom:2px solid transparent; margin-bottom:-2px; font-weight:500; }
+.data-tab:hover { color:#1a1b1e; background:#f5f5f7; border-radius:6px 6px 0 0; }
+.data-tab.active { color:#7c5cfc; border-bottom-color:#7c5cfc; font-weight:600; }
+.data-panel { background:#fff; border:1px solid #e1e3e6; border-radius:0 0 12px 12px; padding:20px; min-height:400px; }
+.data-empty { text-align:center; color:#909296; padding:60px 20px; font-size:14px; }
+.data-empty .icon { font-size:48px; margin-bottom:12px; }
+.data-metric-row { display:grid; grid-template-columns:repeat(auto-fit, minmax(160px,1fr)); gap:14px; margin-bottom:20px; }
+.data-metric { background:#f8f7ff; border-radius:10px; padding:16px; text-align:center; }
+.data-metric .value { font-size:28px; font-weight:700; color:#7c5cfc; }
+.data-metric .label { font-size:13px; color:#5c5f66; margin-top:4px; }
+.data-chart-row { display:grid; grid-template-columns:repeat(auto-fit, minmax(300px,1fr)); gap:14px; margin-bottom:20px; }
+.data-chart-card { background:#fafbfc; border:1px solid #e1e3e6; border-radius:10px; padding:16px; }
+.data-chart-card h4 { font-size:14px; font-weight:600; margin:0 0 12px; color:#1a1b1e; }
+.data-chart-card canvas { width:100%!important; max-height:220px; }
+.data-insight { background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; padding:16px; margin-bottom:16px; }
+.data-insight h4 { font-size:14px; font-weight:600; margin:0 0 8px; color:#166534; }
+.data-insight p { font-size:13px; color:#166534; line-height:1.7; margin:4px 0; }
+.data-kb-layout { display:flex; gap:16px; min-height:360px; }
+.data-kb-sidebar { width:200px; min-width:200px; border-right:1px solid #e1e3e6; padding-right:16px; }
+.data-kb-sidebar h4 { font-size:13px; font-weight:600; color:#5c5f66; margin:0 0 10px; }
+.data-kb-item { padding:8px 12px; border-radius:6px; cursor:pointer; font-size:13px; transition:all .1s; margin-bottom:2px; }
+.data-kb-item:hover { background:#f0edff; color:#7c5cfc; }
+.data-kb-item.active { background:#f0edff; color:#7c5cfc; font-weight:500; }
+.data-kb-content { flex:1; min-width:0; }
+.data-file-table { width:100%; border-collapse:collapse; font-size:13px; }
+.data-file-table th { text-align:left; padding:8px 12px; border-bottom:2px solid #e1e3e6; color:#5c5f66; font-weight:600; font-size:12px; }
+.data-file-table td { padding:8px 12px; border-bottom:1px solid #f0f0f0; }
+.data-file-table tr:hover { background:#fafbfc; cursor:pointer; }
+.data-file-table .name { font-weight:500; color:#1a1b1e; }
+.data-file-table .meta { color:#909296; font-size:12px; }
+.data-loading { text-align:center; color:#909296; padding:40px; font-size:13px; }
+.data-detail { background:#fafbfc; border:1px solid #e1e3e6; border-radius:8px; padding:16px; margin-top:14px; }
+.data-detail pre { background:#1e1e2e; color:#cdd6f4; padding:12px; border-radius:8px; overflow-x:auto; font-size:12px; max-height:400px; overflow-y:auto; }
+.data-refresh-btn { padding:6px 14px; border:1px solid #e1e3e6; border-radius:6px; background:#fff; color:#5c5f66; font-size:12px; cursor:pointer; transition:all .15s; }
+.data-refresh-btn:hover { border-color:#7c5cfc; color:#7c5cfc; }
+</style>
+
+<div class="data-wrap">
+    <h1 style="font-size:22px;font-weight:600;margin:0 0 16px;">🗂️ 数据</h1>
+
+    <div class="data-tabs">
+        <button class="data-tab active" onclick="dataSwitchTab('overview', this)">📊 数据概览</button>
+        <button class="data-tab" onclick="dataSwitchTab('kbdata', this)">📁 笔记库数据</button>
+        <button class="data-tab" onclick="window.location.href='/datacenter'">📋 数据集</button>
+        <button class="data-tab" onclick="window.location.href='/collector'">🔧 数据采集</button>
+    </div>
+
+    <!-- 数据概览 -->
+    <div id="panelOverview" class="data-panel">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <h3 style="margin:0;font-size:15px;">📊 数据概览</h3>
+            <button class="data-refresh-btn" onclick="dataLoadOverview()">🔄 刷新分析</button>
+        </div>
+        <div id="overviewContent">
+            <div class="data-loading">⏳ 正在分析笔记库数据...</div>
+        </div>
+    </div>
+
+    <!-- 笔记库数据 -->
+    <div id="panelKbdata" class="data-panel" style="display:none;">
+        <div class="data-kb-layout">
+            <div class="data-kb-sidebar">
+                <h4>📚 知识库</h4>
+                <div id="kbList">
+                    <div th:each="kb : ${kbs}" class="data-kb-item" th:attr="onclick='dataSelectKb('+${kb.id}+')'" th:data-id="${kb.id}" th:text="${kb.name}">KB</div>
+                </div>
+            </div>
+            <div class="data-kb-content">
+                <div id="kbDataContent">
+                    <div class="data-empty">
+                        <div class="icon">📁</div>
+                        <p>选择左侧知识库查看数据文件</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+var dataCurrentKbId = null;
+var dataCharts = [];
+
+function dataSwitchTab(tab, btn) {
+    document.querySelectorAll('.data-tab').forEach(function(t) { t.classList.remove('active'); });
+    btn.classList.add('active');
+    document.getElementById('panelOverview').style.display = tab === 'overview' ? '' : 'none';
+    document.getElementById('panelKbdata').style.display = tab === 'kbdata' ? '' : 'none';
+}
+
+function dataSelectKb(kbId) {
+    dataCurrentKbId = kbId;
+    document.querySelectorAll('.data-kb-item').forEach(function(el) {
+        el.classList.toggle('active', el.dataset.id == kbId);
+    });
+    dataLoadKbFiles(kbId);
+}
+
+async function dataLoadKbFiles(kbId) {
+    var container = document.getElementById('kbDataContent');
+    container.innerHTML = '<div class="data-loading">加载中...</div>';
+    try {
+        var resp = await fetch('/kb/' + kbId + '/api/data/list?dir=');
+        var data = await resp.json();
+        if (!data.ok || !data.files || data.files.length === 0) {
+            container.innerHTML = '<div class="data-empty"><div class="icon">📭</div><p>此知识库暂无数据文件</p></div>';
+            return;
+        }
+        var html = '<table class="data-file-table">';
+        html += '<thead><tr><th>文件名</th><th>大小</th><th>更新时间</th></tr></thead><tbody>';
+        for (var i = 0; i < data.files.length; i++) {
+            var f = data.files[i];
+            var size = f.size > 1024 ? (f.size/1024).toFixed(1) + 'KB' : f.size + 'B';
+            html += '<tr onclick="dataViewFile(' + kbId + ', \'' + f.path.replace(/'/g, "\\'") + '\')">';
+            html += '<td class="name">📄 ' + dataEscapeHtml(f.name) + '</td>';
+            html += '<td class="meta">' + size + '</td>';
+            html += '<td class="meta">' + (f.lastModified || '') + '</td>';
+            html += '</tr>';
+        }
+        html += '</tbody></table>';
+        html += '<div id="fileDetail"></div>';
+        container.innerHTML = html;
+    } catch(e) {
+        container.innerHTML = '<div class="data-empty">加载失败</div>';
+    }
+}
+
+async function dataViewFile(kbId, filePath) {
+    var detail = document.getElementById('fileDetail');
+    if (!detail) return;
+    detail.innerHTML = '<div class="data-loading">加载文件内容...</div>';
+    try {
+        var resp = await fetch('/kb/' + kbId + '/api/data/read?dir=&file=' + encodeURIComponent(filePath));
+        var data = await resp.json();
+        if (!data.ok) {
+            detail.innerHTML = '<div class="data-detail">读取失败: ' + (data.error || '') + '</div>';
+            return;
+        }
+        var content = JSON.stringify(data.data || data.content || data, null, 2);
+        detail.innerHTML = '<div class="data-detail"><pre>' + dataEscapeHtml(content) + '</pre></div>';
+        detail.scrollIntoView({behavior: 'smooth'});
+    } catch(e) {
+        detail.innerHTML = '<div class="data-detail">加载失败</div>';
+    }
+}
+
+async function dataLoadOverview() {
+    var container = document.getElementById('overviewContent');
+    var btn = document.querySelector('.data-refresh-btn');
+    container.innerHTML = '<div class="data-loading">⏳ 正在分析笔记库数据...</div>';
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ 分析中...'; }
+    try {
+        var resp = await fetch('/data/api/overview');
+        var result = await resp.json();
+        if (!result.ok) {
+            container.innerHTML = '<div class="data-empty">分析失败: ' + (result.error || '') + '</div>';
+            return;
+        }
+        var ov = result.overview;
+        var html = '';
+        if (result.cached) {
+            html += '<div style="font-size:11px;color:#909296;margin-bottom:12px;">📋 已加载缓存结果</div>';
+        }
+        if (ov.metrics && ov.metrics.length > 0) {
+            html += '<div class="data-metric-row">';
+            for (var i = 0; i < ov.metrics.length; i++) {
+                var m = ov.metrics[i];
+                html += '<div class="data-metric"><div class="value">' + (m.icon || '') + ' ' + dataEscapeHtml(m.value) + '</div><div class="label">' + dataEscapeHtml(m.label) + '</div></div>';
+            }
+            html += '</div>';
+        }
+        if (ov.charts && ov.charts.length > 0) {
+            html += '<div class="data-chart-row">';
+            for (var i = 0; i < ov.charts.length; i++) {
+                var c = ov.charts[i];
+                html += '<div class="data-chart-card"><h4>' + dataEscapeHtml(c.title) + '</h4><canvas id="aiChart' + i + '"></canvas></div>';
+            }
+            html += '</div>';
+        }
+        if (ov.insights && ov.insights.length > 0) {
+            html += '<div class="data-insight"><h4>💡 AI 洞察</h4>';
+            for (var i = 0; i < ov.insights.length; i++) {
+                html += '<p>' + dataEscapeHtml(ov.insights[i]) + '</p>';
+            }
+            html += '</div>';
+        }
+        html += '<div style="text-align:center;margin-top:12px;"><a href="javascript:void(0)" onclick="dataSwitchTab(\'kbdata\',document.querySelectorAll(\'.data-tab\')[1])" style="color:#7c5cfc;font-size:13px;">📁 查看笔记库数据详情 →</a></div>';
+        container.innerHTML = html;
+        if (ov.charts && ov.charts.length > 0) {
+            dataCharts.forEach(function(c) { c.destroy(); });
+            dataCharts = [];
+            var colors = ['#7c5cfc','#f59e0b','#10b981','#ef4444','#6366f1','#ec4899','#14b8a6','#f97316'];
+            for (var i = 0; i < ov.charts.length; i++) {
+                var c = ov.charts[i];
+                var ctx = document.getElementById('aiChart' + i);
+                if (!ctx) continue;
+                var chartType = c.type || 'bar';
+                var config = { type: chartType, data: { labels: c.labels || [], datasets: [{ label: c.title || '', data: c.data || [], backgroundColor: colors.slice(0, (c.labels || []).length), borderRadius: 6 }] }, options: { responsive: true, plugins: { legend: { display: chartType === 'pie' || chartType === 'doughnut' } } } };
+                if (chartType === 'bar' || chartType === 'line') { config.options.scales = { y: { beginAtZero: true } }; }
+                dataCharts.push(new Chart(ctx, config));
+            }
+        }
+        if (btn) { btn.disabled = false; btn.textContent = '🔄 刷新分析'; }
+    } catch(e) {
+        container.innerHTML = '<div class="data-empty">加载失败</div>';
+        if (btn) { btn.disabled = false; btn.textContent = '🔄 刷新分析'; }
+    }
+}
+
+function dataEscapeHtml(t) { if (!t) return ''; var d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+document.addEventListener('DOMContentLoaded', function() { dataLoadOverview(); });
+</script>
+
+</th:block>
+</body>
+</html>
