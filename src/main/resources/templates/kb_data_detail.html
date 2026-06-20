@@ -4,6 +4,10 @@
 <head>
     <title layout:fragment="title">数据详情 - AI 助理</title>
     <style>
+        .data-tabs { display:flex; gap:0; border-bottom:2px solid #e1e3e6; margin-bottom:20px; background:#fff; border-radius:12px 12px 0 0; padding:0 20px; }
+        .data-tab { padding:12px 20px; font-size:14px; cursor:pointer; transition:all .15s; border:none; background:transparent; color:#5c5f66; border-bottom:2px solid transparent; margin-bottom:-2px; font-weight:500; }
+        .data-tab:hover { color:#1a1b1e; background:#f5f5f7; border-radius:6px 6px 0 0; }
+        .data-tab.active { color:#7c5cfc; border-bottom-color:#7c5cfc; font-weight:600; }
         .data-table-container { overflow-x:auto; }
         .data-table { width:100%; border-collapse:collapse; font-size:13px; }
         .data-table th { text-align:left; padding:10px 12px; border-bottom:2px solid #7c5cfc; color:#5c5f66; font-weight:600; white-space:nowrap; background:#fafafe; }
@@ -62,6 +66,16 @@
 </head>
 <body>
 <th:block layout:fragment="content">
+
+<div class="data-wrap">
+    <h1 style="font-size:22px;font-weight:600;margin:0 0 16px;">🗂️ 数据</h1>
+
+    <div class="data-tabs">
+        <button class="data-tab" onclick="window.location.href='/data'">📊 数据概览</button>
+        <button class="data-tab active" onclick="window.location.href='/data/kb'">📁 笔记库数据</button>
+        <button class="data-tab" onclick="window.location.href='/datacenter'">📋 数据集</button>
+        <button class="data-tab" onclick="window.location.href='/collector'">🔧 数据采集</button>
+    </div>
 
 <div class="card">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
@@ -618,6 +632,9 @@ document.addEventListener('keydown', function(e) {
     }
 });
 </script>
+
+</div>
+</div>
 
 </th:block>
 </body>
