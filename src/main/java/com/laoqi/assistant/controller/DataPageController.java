@@ -87,7 +87,7 @@ public class DataPageController {
                 if (!Files.isDirectory(notesDir)) continue;
                 sb.append(kb.getId()).append(":");
                 Files.walk(notesDir)
-                        .filter(p -> p.toString().endsWith(".json") && p.toString().contains("/data/"))
+                        .filter(p -> p.toString().endsWith(".json") && (p.toString().contains("/data/") || p.toString().contains("\\data\\")))
                         .sorted()
                         .forEach(p -> {
                             try {
@@ -108,7 +108,7 @@ public class DataPageController {
             if (!Files.isDirectory(notesDir)) continue;
             try {
                 Files.walk(notesDir)
-                        .filter(p -> p.toString().endsWith(".json") && p.toString().contains("/data/"))
+                        .filter(p -> p.toString().endsWith(".json") && (p.toString().contains("/data/") || p.toString().contains("\\data\\")))
                         .forEach(p -> {
                             try {
                                 Map<String, Object> file = new LinkedHashMap<>();
