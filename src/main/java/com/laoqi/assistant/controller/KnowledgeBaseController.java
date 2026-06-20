@@ -131,44 +131,40 @@ public class KnowledgeBaseController {
 
         if (kb.getNotesDir() == null || kb.getNotesDir().isBlank()) {
             model.put("error", "未配置笔记库路径");
-            return "kb_modules";
+            return "kb_browse";
         }
 
         Path base = kbDir(kb);
 
-        // dir 为空 → 显示一级目录列表
         if (dir.isEmpty()) {
-            model.put("topDirs", listTopDirs(base, kb.getDirSettings()));
-            model.put("allDirInfos", listAllDirInfos(base, kb.getDirSettings()));
-            model.put("dirSettings", parseDirSettings(kb.getDirSettings()));
-            model.put("currentDir", "");
-            return "kb_modules";
+            model.put("dirs", listTopDirsAsFiles(base));
+            model.put("files", List.of());
+            model.put("breadcrumbs", List.of());
+            model.put("breadcrumbPaths", List.of());
+            model.put("rel", "");
+            model.put("parent", "");
+            return "kb_browse";
         }
 
-        // dir 不为空 → 显示目录内容 + AI 分析
         Path target = safeResolve(base, dir);
         if (!Files.isDirectory(target)) {
             return "redirect:/kb/" + id + "/notes";
         }
 
-        model.put("topDirs", listTopDirs(base, kb.getDirSettings()));
-        model.put("allDirInfos", listAllDirInfos(base, kb.getDirSettings()));
-        model.put("dirSettings", parseDirSettings(kb.getDirSettings()));
-        model.put("currentDir", dir);
-        model.put("files", listDirContents(target));
+        model.put("dirs", listSubDirs(target));
+        model.put("files", listFiles(target));
         model.put("breadcrumbs", buildBreadcrumbs(dir));
-        model.put("breadcrumbLinks", buildBreadcrumbLinks(dir));
+        model.put("breadcrumbPaths", buildBreadcrumbPaths(dir));
+        model.put("rel", dir);
         model.put("parent", parentDir(dir));
 
-        // 读取该目录的历史分析报告
         Path analysisDir = target.resolve("AI分析");
         model.put("latestReport", readLatestReport(analysisDir));
 
-        // 读取 JSON 数据文件列表
         Path dataDir = target.resolve("data");
         model.put("jsonFiles", directoryDataService.listJsonFiles(dataDir));
 
-        return "kb_module_detail";
+        return "kb_browse";
     }
 
     @GetMapping("/kb/{id}/notes/view")
@@ -1082,6 +1078,104 @@ public class KnowledgeBaseController {
             }
         } catch (Exception ignored) {}
         return null;
+    }
+
+    private List<Map<String, Object>> listTopDirsAsFiles(Path base) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        if (!Files.exists(base)) return result;
+        try (var stream = Files.list(base)) {
+            stream.filter(Files::isDirectory)
+                    .filter(p -> !IGNORED_DIRS.contains(p.getFileName().toString()))
+                    .sorted(Comparator.comparing(p -> p.getFileName().toString()))
+                    .forEach(p -> {
+                        Map<String, Object> entry = new LinkedHashMap<>();
+                        entry.put("name", p.getFileName().toString());
+                        try {
+                            entry.put("modified", java.time.LocalDateTime
+                                    .ofInstant(Files.getLastModifiedTime(p).toInstant(),
+                                            ZoneId.of("Asia/Shanghai"))
+                                    .format(java.time.format.DateTimeFormatter.ofPattern("MM-dd HH:mm")));
+                        } catch (IOException e) {
+                            entry.put("modified", "");
+                        }
+                        Path analysisDir = p.resolve("AI分析");
+                        entry.put("hasReport", Files.exists(analysisDir) && hasAnalysisReport(analysisDir));
+                        result.add(entry);
+                    });
+        } catch (Exception e) {
+            log.error("遍历根目录失败", e);
+        }
+        return result;
+    }
+
+    private boolean hasAnalysisReport(Path analysisDir) {
+        try (var stream = Files.list(analysisDir)) {
+            return stream.anyMatch(p -> p.getFileName().toString().endsWith(".md"));
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private List<Map<String, Object>> listSubDirs(Path dir) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        try (var stream = Files.list(dir)) {
+            stream.filter(Files::isDirectory)
+                    .filter(p -> !IGNORED_DIRS.contains(p.getFileName().toString()))
+                    .sorted(Comparator.comparing(p -> p.getFileName().toString()))
+                    .forEach(p -> {
+                        Map<String, Object> entry = new LinkedHashMap<>();
+                        entry.put("name", p.getFileName().toString());
+                        try {
+                            entry.put("modified", java.time.LocalDateTime
+                                    .ofInstant(Files.getLastModifiedTime(p).toInstant(),
+                                            ZoneId.of("Asia/Shanghai"))
+                                    .format(java.time.format.DateTimeFormatter.ofPattern("MM-dd HH:mm")));
+                        } catch (IOException e) {
+                            entry.put("modified", "");
+                        }
+                        result.add(entry);
+                    });
+        } catch (Exception e) {
+            log.error("遍历目录失败: {}", dir, e);
+        }
+        return result;
+    }
+
+    private List<Map<String, Object>> listFiles(Path dir) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        try (var stream = Files.list(dir)) {
+            stream.filter(Files::isRegularFile)
+                    .sorted(Comparator.comparing(p -> p.getFileName().toString()))
+                    .forEach(p -> {
+                        Map<String, Object> entry = new LinkedHashMap<>();
+                        entry.put("name", p.getFileName().toString());
+                        try {
+                            entry.put("modified", java.time.LocalDateTime
+                                    .ofInstant(Files.getLastModifiedTime(p).toInstant(),
+                                            ZoneId.of("Asia/Shanghai"))
+                                    .format(java.time.format.DateTimeFormatter.ofPattern("MM-dd HH:mm")));
+                        } catch (IOException e) {
+                            entry.put("modified", "");
+                        }
+                        result.add(entry);
+                    });
+        } catch (Exception e) {
+            log.error("遍历文件失败: {}", dir, e);
+        }
+        return result;
+    }
+
+    private List<String> buildBreadcrumbPaths(String dir) {
+        if (dir == null || dir.isEmpty()) return List.of();
+        String[] parts = dir.split("/");
+        List<String> paths = new ArrayList<>();
+        StringBuilder sb = new StringBuilder();
+        for (String part : parts) {
+            if (sb.length() > 0) sb.append("/");
+            sb.append(part);
+            paths.add(sb.toString());
+        }
+        return paths;
     }
 
     @SuppressWarnings("unchecked")

@@ -15,6 +15,7 @@
         <h2>📂 笔记文件浏览</h2>
         <div class="flex">
             <button class="btn btn-primary" onclick="showNewModal()">✏️ 新建</button>
+            <button th:if="${rel != null and !rel.isEmpty()}" class="btn btn-secondary" onclick="openAnalyzeModal()">🤖 AI 分析</button>
             <a th:if="${rel != null && !rel.isEmpty()}" class="btn btn-secondary"
                th:with="parentDir=${parent != null && !parent.isEmpty() ? '?dir=' + parent : ''}"
                th:href="@{|/kb/${kb.id}/notes${parentDir}|}">← 上级目录</a>
@@ -41,7 +42,10 @@
         </thead>
         <tbody>
             <tr th:each="d : ${dirs}">
-                <td>📁 <strong th:text="${d.name}">目录名</strong></td>
+                <td>
+                    📁 <strong th:text="${d.name}">目录名</strong>
+                    <span th:if="${d['hasReport']}" style="background:#e8f5e9;color:#2e7d32;padding:2px 6px;border-radius:4px;font-size:11px;margin-left:6px;">已分析</span>
+                </td>
                 <td th:text="${d.modified}">时间</td>
                 <td>
                     <a class="btn btn-secondary"
@@ -77,6 +81,13 @@
     </th:block>
 </div>
 
+<th:block th:if="${rel != null and !rel.isEmpty() and latestReport != null}">
+<div class="card" style="background:linear-gradient(135deg,#f0edff,#fafafe);border:1px solid #d9d0ff;margin-top:16px;">
+    <h2 style="margin-bottom:8px;">📊 AI 分析报告</h2>
+    <div class="report" th:utext="${latestReport}"></div>
+</div>
+</th:block>
+
 <div class="modal-overlay" id="newModal" style="display:none;" onclick="if(event.target===this)hideNewModal()">
     <div class="modal">
         <div class="flex" style="justify-content:space-between;margin-bottom:12px;">
@@ -98,6 +109,26 @@
                 <button type="submit" class="btn btn-primary">创建</button>
             </div>
         </form>
+    </div>
+</div>
+
+<div class="modal-overlay" id="analyzeModal" style="display:none;" onclick="if(event.target===this)closeAnalyzeModal()">
+    <div class="modal">
+        <div class="flex" style="justify-content:space-between;margin-bottom:12px;">
+            <h3 style="margin:0;">🤖 AI 分析 - <span id="analyzeDirName"></span></h3>
+            <button class="btn btn-secondary" onclick="closeAnalyzeModal()" style="padding:4px 10px;">✕</button>
+        </div>
+        <textarea id="analyzePrompt" rows="3" placeholder="输入分析提示词（可留空，AI 将自行决定分析内容）"
+            style="width:100%;padding:10px;border:1px solid #e1e3e6;border-radius:8px;font-size:13px;
+                   font-family:monospace;resize:vertical;box-sizing:border-box;"></textarea>
+        <div id="analyzeResult" style="margin-top:12px;display:none;">
+            <div style="max-height:400px;overflow-y:auto;padding:12px;background:#f9f9fb;border-radius:8px;"
+                 id="analyzeResultContent"></div>
+        </div>
+        <div class="flex" style="gap:8px;margin-top:12px;justify-content:flex-end;">
+            <button class="btn btn-secondary" onclick="closeAnalyzeModal()">取消</button>
+            <button class="btn btn-primary" id="analyzeBtn" onclick="startAnalysis()">🚀 开始分析</button>
+        </div>
     </div>
 </div>
 
@@ -124,8 +155,10 @@
 .form-group textarea { resize: vertical; font-family: "SF Mono", "Fira Code", monospace; font-size: 13px; }
 </style>
 
-<script>
+<script th:inline="javascript">
 const KB_ID = [[${kb.id}]];
+const CURRENT_DIR = [[${rel}]];
+
 function showNewModal() {
     document.getElementById('newModal').style.display = 'flex';
     document.getElementById('filename').focus();
@@ -140,7 +173,7 @@ async function submitNew(e) {
     if (!filename) { toast('请输入文件名', 'error'); return; }
 
     const form = new FormData();
-    form.set('dir', [[${rel}]]);
+    form.set('dir', CURRENT_DIR);
     form.set('filename', filename);
     form.set('content', content);
 
@@ -169,6 +202,51 @@ async function deleteFile(path) {
     } else {
         toast('删除失败：' + (data.error || '未知错误'), 'error');
     }
+}
+
+function openAnalyzeModal() {
+    document.getElementById('analyzeDirName').textContent = CURRENT_DIR;
+    document.getElementById('analyzePrompt').value = '';
+    document.getElementById('analyzeResult').style.display = 'none';
+    document.getElementById('analyzeBtn').disabled = false;
+    document.getElementById('analyzeBtn').textContent = '🚀 开始分析';
+    document.getElementById('analyzeModal').style.display = 'flex';
+}
+
+function closeAnalyzeModal() {
+    document.getElementById('analyzeModal').style.display = 'none';
+}
+
+function startAnalysis() {
+    var btn = document.getElementById('analyzeBtn');
+    btn.disabled = true; btn.textContent = '⏳ 分析中...';
+    var resultDiv = document.getElementById('analyzeResult');
+    var resultContent = document.getElementById('analyzeResultContent');
+    resultDiv.style.display = 'block';
+    resultContent.innerHTML = '<span class="text-muted">AI 正在探索目录并分析内容...</span>';
+
+    var prompt = document.getElementById('analyzePrompt').value;
+    var url = '/kb/' + KB_ID + '/api/analyze-dir?dir=' + encodeURIComponent(CURRENT_DIR)
+              + '&prompt=' + encodeURIComponent(prompt);
+
+    var evtSource = new EventSource(url);
+    evtSource.onmessage = function(e) {
+        var data = JSON.parse(e.data);
+        if (data.type === 'text') {
+            resultContent.innerHTML = data.content.replace(/\n/g, '<br>');
+            btn.textContent = '✅ 分析完成';
+            setTimeout(function() { location.reload(); }, 1000);
+        } else if (data.type === 'error') {
+            resultContent.innerHTML = '<span style="color:red;">' + data.content + '</span>';
+            btn.disabled = false; btn.textContent = '🚀 重新分析';
+        } else if (data.type === 'done') {
+            evtSource.close();
+        }
+    };
+    evtSource.onerror = function() {
+        evtSource.close();
+        btn.disabled = false; btn.textContent = '🚀 重新分析';
+    };
 }
 </script>
 
