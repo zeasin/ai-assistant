@@ -8,45 +8,49 @@
 <th:block layout:fragment="content">
 
 <style>
-.solve-wrap { max-width:860px; margin:0 auto; }
-.solve-top { background:#fff; border:1px solid #e1e3e6; border-radius:12px; padding:16px 20px; margin-bottom:16px; }
-.solve-top-row { display:flex; gap:12px; align-items:start; flex-wrap:wrap; }
-.solve-upload-zone { width:180px; height:140px; border:2px dashed #d0d5dd; border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; transition:all .2s; background:#fafafa; flex-shrink:0; }
+.solve-wrap { display:flex; height:calc(100vh - 100px); gap:0; overflow:hidden; background:#fff; border:1px solid #e1e3e6; border-radius:12px; }
+.solve-sidebar { width:260px; min-width:260px; border-right:1px solid #e1e3e6; display:flex; flex-direction:column; background:#fafbfc; }
+.solve-sidebar-header { padding:14px 16px; border-bottom:1px solid #e1e3e6; }
+.solve-sidebar-header h2 { font-size:16px; font-weight:600; margin:0 0 10px; }
+.solve-new-btn { width:100%; padding:8px; border:1px dashed #7c5cfc; border-radius:8px; background:#f8f7ff; color:#7c5cfc; font-size:13px; cursor:pointer; transition:all .15s; text-align:center; }
+.solve-new-btn:hover { background:#f0edff; border-style:solid; }
+.solve-session-list { flex:1; overflow-y:auto; padding:4px 0; }
+.solve-session-item { display:flex; align-items:center; padding:10px 16px; cursor:pointer; transition:all .1s; gap:8px; border-left:3px solid transparent; }
+.solve-session-item:hover { background:#f0edff; }
+.solve-session-item.active { background:#f0edff; border-left-color:#7c5cfc; }
+.solve-session-item .icon { font-size:18px; flex-shrink:0; }
+.solve-session-item .info { flex:1; min-width:0; }
+.solve-session-item .name { font-size:13px; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.solve-session-item .meta { font-size:11px; color:#909296; margin-top:2px; }
+.solve-session-item .del { opacity:0; border:none; background:none; color:#909296; cursor:pointer; font-size:12px; padding:2px 4px; border-radius:4px; }
+.solve-session-item:hover .del { opacity:1; }
+.solve-session-item .del:hover { color:#e03131; background:#ffe0e0; }
+.solve-main { flex:1; display:flex; flex-direction:column; min-width:0; }
+.solve-top { padding:14px 20px; border-bottom:1px solid #e1e3e6; display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+.solve-upload-zone { width:120px; height:90px; border:2px dashed #d0d5dd; border-radius:8px; display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; transition:all .2s; background:#fafafa; flex-shrink:0; }
 .solve-upload-zone:hover { border-color:#7c5cfc; background:#f5f3ff; }
 .solve-upload-zone.dragover { border-color:#7c5cfc; background:#f0edff; }
-.solve-upload-zone .icon { font-size:32px; margin-bottom:4px; }
-.solve-upload-zone .text { font-size:12px; color:#909296; }
-.solve-preview-wrap { width:180px; height:140px; border-radius:10px; overflow:hidden; border:1px solid #e1e3e6; position:relative; flex-shrink:0; display:none; }
+.solve-upload-zone .text { font-size:11px; color:#909296; }
+.solve-preview-wrap { width:120px; height:90px; border-radius:8px; overflow:hidden; border:1px solid #e1e3e6; position:relative; flex-shrink:0; display:none; }
 .solve-preview-wrap img { width:100%; height:100%; object-fit:cover; }
-.solve-preview-wrap .close { position:absolute; top:4px; right:4px; width:22px; height:22px; border-radius:50%; background:rgba(0,0,0,0.5); color:#fff; border:none; cursor:pointer; font-size:14px; display:flex; align-items:center; justify-content:center; }
-.solve-kb-picker { flex:1; min-width:200px; }
-.solve-kb-picker label { font-size:12px; color:#5c5f66; font-weight:500; display:block; margin-bottom:4px; }
-.solve-kb-picker select { width:100%; padding:7px 10px; border:1px solid #e1e3e6; border-radius:8px; font-size:13px; background:#fff; outline:none; }
-.solve-kb-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(90px,1fr)); gap:6px; max-height:120px; overflow-y:auto; margin-top:8px; }
-.solve-kb-thumb { width:100%; aspect-ratio:1; border-radius:8px; border:2px solid transparent; overflow:hidden; cursor:pointer; transition:all .15s; }
+.solve-preview-wrap .close { position:absolute; top:2px; right:2px; width:20px; height:20px; border-radius:50%; background:rgba(0,0,0,0.5); color:#fff; border:none; cursor:pointer; font-size:12px; display:flex; align-items:center; justify-content:center; }
+.solve-kb-picker { flex:1; min-width:160px; }
+.solve-kb-picker label { font-size:11px; color:#5c5f66; font-weight:500; display:block; margin-bottom:3px; }
+.solve-kb-picker select { width:100%; padding:6px 8px; border:1px solid #e1e3e6; border-radius:6px; font-size:12px; background:#fff; outline:none; }
+.solve-kb-grid { display:flex; gap:4px; overflow-x:auto; padding:6px 0 0; }
+.solve-kb-thumb { width:52px; height:52px; border-radius:6px; border:2px solid transparent; overflow:hidden; cursor:pointer; flex-shrink:0; transition:all .15s; }
 .solve-kb-thumb:hover { border-color:#7c5cfc; }
-.solve-kb-thumb.selected { border-color:#7c5cfc; box-shadow:0 0 0 3px rgba(124,92,252,.2); }
 .solve-kb-thumb img { width:100%; height:100%; object-fit:cover; }
-.solve-model-row { display:flex; gap:8px; align-items:center; margin-top:10px; }
-.solve-model-row select { flex:1; padding:7px 10px; border:1px solid #e1e3e6; border-radius:8px; font-size:13px; background:#fff; outline:none; }
-.solve-action-btn { padding:7px 18px; border-radius:8px; font-size:13px; cursor:pointer; border:none; transition:all .15s; font-weight:500; }
-.solve-action-btn.primary { background:#7c5cfc; color:#fff; }
-.solve-action-btn.primary:hover { background:#6b4de6; }
-.solve-action-btn.primary:disabled { background:#ccc; cursor:not-allowed; }
-
-.solve-cards { display:flex; flex-direction:column; gap:14px; }
-.solve-card { background:#fff; border:1px solid #e1e3e6; border-radius:12px; overflow:hidden; animation:fadeSlideIn .25s ease; }
+.solve-model-row { display:flex; gap:6px; align-items:center; }
+.solve-model-row select { padding:6px 8px; border:1px solid #e1e3e6; border-radius:6px; font-size:12px; background:#fff; outline:none; }
+.solve-chat { flex:1; overflow-y:auto; padding:16px 20px; background:#fafbfc; }
+.solve-chat-empty { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:#909296; text-align:center; }
+.solve-chat-empty .icon { font-size:40px; margin-bottom:8px; }
+.solve-card { background:#fff; border:1px solid #e1e3e6; border-radius:12px; margin-bottom:14px; overflow:hidden; animation:fadeSlideIn .25s ease; }
 @keyframes fadeSlideIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
-.solve-card-header { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; cursor:pointer; user-select:none; transition:background .1s; }
-.solve-card-header:hover { background:#fafbfc; }
-.solve-card-header .title { font-size:14px; font-weight:600; color:#1a1b1e; display:flex; align-items:center; gap:8px; }
-.solve-card-header .arrow { font-size:12px; color:#909296; transition:transform .2s; }
-.solve-card-header .arrow.open { transform:rotate(90deg); }
-.solve-card-header .meta { font-size:12px; color:#909296; }
-.solve-card-body { padding:0 16px 16px; }
-.solve-card-img { text-align:center; margin-bottom:12px; }
-.solve-card-img img { max-width:100%; max-height:300px; border-radius:8px; border:1px solid #e1e3e6; }
-.solve-card-answer { font-size:14px; line-height:1.8; color:#1a1b1e; }
+.solve-card-img { text-align:center; padding:12px 16px 0; }
+.solve-card-img img { max-width:100%; max-height:250px; border-radius:8px; border:1px solid #e1e3e6; }
+.solve-card-answer { padding:12px 16px; font-size:14px; line-height:1.8; color:#1a1b1e; }
 .solve-card-answer pre { background:#1e1e2e; color:#cdd6f4; padding:12px; border-radius:8px; overflow-x:auto; font-size:13px; margin:6px 0; }
 .solve-card-answer code { font-family:'Cascadia Code','Fira Code','Consolas',monospace; font-size:13px; }
 .solve-card-answer :not(pre)>code { background:#f0edff; padding:2px 6px; border-radius:4px; color:#5c3dcf; }
@@ -56,31 +60,41 @@
 .solve-card-answer ul,.solve-card-answer ol { padding-left:20px; margin:4px 0; }
 .solve-card-answer blockquote { border-left:3px solid #7c5cfc; padding-left:12px; color:#5c5f66; margin:6px 0; }
 .solve-card-answer p { margin:4px 0; }
-
-.solve-follow { border-top:1px solid #e1e3e6; padding:12px 16px; background:#fafbfc; }
-.solve-follow-list { margin-bottom:10px; }
+.solve-follow { border-top:1px solid #e1e3e6; padding:10px 16px; background:#fafbfc; }
 .solve-follow-item { margin-bottom:8px; }
-.solve-follow-item .q { font-size:13px; color:#5c5f66; margin-bottom:2px; }
+.solve-follow-item .q { font-size:13px; margin-bottom:2px; }
 .solve-follow-item .q span { font-weight:500; color:#7c5cfc; }
-.solve-follow-item .a { font-size:13px; color:#1a1b1e; line-height:1.7; padding-left:12px; border-left:2px solid #e1e3e6; }
+.solve-follow-item .a { font-size:13px; color:#1a1b1e; line-height:1.7; padding-left:10px; border-left:2px solid #e1e3e6; }
 .solve-follow-input { display:flex; gap:6px; }
-.solve-follow-input input { flex:1; padding:7px 12px; border:1px solid #e1e3e6; border-radius:8px; font-size:13px; outline:none; }
+.solve-follow-input input { flex:1; padding:7px 10px; border:1px solid #e1e3e6; border-radius:6px; font-size:13px; outline:none; }
 .solve-follow-input input:focus { border-color:#7c5cfc; }
-.solve-follow-input button { padding:7px 14px; border-radius:8px; font-size:13px; cursor:pointer; border:none; background:#7c5cfc; color:#fff; white-space:nowrap; }
+.solve-follow-input button { padding:7px 12px; border-radius:6px; font-size:13px; cursor:pointer; border:none; background:#7c5cfc; color:#fff; white-space:nowrap; }
 .solve-follow-input button:disabled { background:#ccc; cursor:not-allowed; }
-
 .solve-loading { text-align:center; padding:20px; color:#909296; font-size:13px; }
-.solve-empty { text-align:center; padding:40px; color:#909296; font-size:14px; }
-.solve-empty .icon { font-size:40px; margin-bottom:8px; }
 </style>
 
 <div class="solve-wrap">
-    <div class="solve-top">
-        <div class="solve-top-row">
+    <div class="solve-sidebar">
+        <div class="solve-sidebar-header">
+            <h2>❓ 识题</h2>
+        </div>
+        <div class="solve-session-list" id="solveSessionList">
+            <div th:each="s : ${sessions}" class="solve-session-item" th:attr="onclick='solveLoadSession('+${s.id}+')',data-id=${s.id}">
+                <span class="icon">📷</span>
+                <div class="info">
+                    <div class="name" th:text="${s.title}">识题</div>
+                    <div class="meta" th:text="${s.createdAt}">时间</div>
+                </div>
+                <button class="del" th:attr="onclick='event.stopPropagation();solveDeleteSession('+${s.id}+')'">✕</button>
+            </div>
+        </div>
+    </div>
+    <div class="solve-main">
+        <div class="solve-top">
             <div class="solve-upload-zone" id="solveUploadZone">
                 <div id="solveUploadHint">
-                    <div class="icon">📷</div>
-                    <div class="text">点击或拖拽题目图片</div>
+                    <div style="font-size:24px;">📷</div>
+                    <div class="text">上传题目</div>
                 </div>
             </div>
             <div class="solve-preview-wrap" id="solvePreviewWrap">
@@ -94,23 +108,21 @@
                 <select id="solveKbSelect" onchange="solveOnKbChange()">
                     <option th:each="kb : ${kbList}" th:value="${kb.id}" th:text="${kb.name}">笔记库</option>
                 </select>
-                <div class="solve-kb-grid" id="solveKbGrid">
-                    <div style="grid-column:1/-1;text-align:center;color:#909296;font-size:12px;padding:12px;">加载中...</div>
-                </div>
+                <div class="solve-kb-grid" id="solveKbGrid"></div>
+            </div>
+
+            <div class="solve-model-row">
+                <select id="solveModelSelector">
+                    <option th:each="m : ${visionModels}" th:value="${m.name}" th:selected="${m.name == defaultModel}" th:text="${m.name}">模型</option>
+                </select>
             </div>
         </div>
-        <div class="solve-model-row">
-            <select id="solveModelSelector">
-                <option th:each="m : ${visionModels}" th:value="${m.name}" th:selected="${m.name == defaultModel}" th:text="${m.name + ' (' + m.model + ')'}">模型</option>
-                <option th:if="${#lists.size(visionModels) == 0}" value="">暂无多模态模型</option>
-            </select>
-        </div>
-    </div>
-
-    <div class="solve-cards" id="solveCards">
-        <div class="solve-empty" id="solveEmpty">
-            <div class="icon">❓</div>
-            <p>上传一张题目图片，AI 帮你解答<br>支持对每道题独立追问</p>
+        <div class="solve-chat" id="solveChat">
+            <div class="solve-chat-empty" id="solveEmpty">
+                <div class="icon">❓</div>
+                <p>上传一张题目图片，AI 帮你解答</p>
+            </div>
+            <div id="solveCardList"></div>
         </div>
     </div>
 </div>
@@ -121,8 +133,8 @@
         onload="window.__katexLoaded = true"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css">
 <script>
-var solveCards = [];
 var solveSending = false;
+var solveCurrentSessionId = null;
 
 function solveRenderMath(el) {
     if (window.__katexLoaded || typeof renderMathInElement !== 'undefined') {
@@ -138,91 +150,6 @@ function solveToast(m, t) {
     setTimeout(function() { d.remove(); }, 2500);
 }
 
-function solveClearPreview() {
-    document.getElementById('solveUploadHint').style.display = '';
-    document.getElementById('solvePreviewWrap').style.display = 'none';
-    document.getElementById('solveFileInput').value = '';
-}
-
-function solveCreateCard(imageUrl) {
-    var id = 'card-' + Date.now();
-    var card = {
-        id: id,
-        imageUrl: imageUrl,
-        answer: '',
-        conversation: [],
-        followUps: [],
-        loading: true,
-        collapsed: false
-    };
-    solveCards.unshift(card);
-    solveRenderCards();
-    return id;
-}
-
-function solveRenderCards() {
-    var container = document.getElementById('solveCards');
-    var empty = document.getElementById('solveEmpty');
-    if (solveCards.length === 0) {
-        empty.style.display = '';
-        return;
-    }
-    empty.style.display = 'none';
-    var html = '';
-    for (var i = 0; i < solveCards.length; i++) {
-        var c = solveCards[i];
-        html += '<div class="solve-card" id="' + c.id + '">';
-        html += '<div class="solve-card-header" onclick="solveToggleCard(\'' + c.id + '\')">';
-        html += '<div class="title"><span class="arrow ' + (c.collapsed ? '' : 'open') + '">▶</span> 📷 题目 ' + (solveCards.length - i) + '</div>';
-        if (c.loading) html += '<div class="meta">⏳ 识别中...</div>';
-        else html += '<div class="meta">' + (c.followUps.length > 0 ? c.followUps.length + ' 条追问' : '点击展开') + '</div>';
-        html += '</div>';
-        if (!c.collapsed) {
-            html += '<div class="solve-card-body">';
-            if (c.imageUrl) {
-                html += '<div class="solve-card-img"><img src="' + c.imageUrl + '" /></div>';
-            }
-            if (c.loading) {
-                html += '<div class="solve-loading">⏳ 正在识别题目...</div>';
-            } else {
-                html += '<div class="solve-card-answer">' + marked.parse(c.answer, {breaks:true}) + '</div>';
-                html += '<div class="solve-follow">';
-                if (c.followUps.length > 0) {
-                    html += '<div class="solve-follow-list">';
-                    for (var j = 0; j < c.followUps.length; j++) {
-                        var fu = c.followUps[j];
-                        html += '<div class="solve-follow-item">';
-                        html += '<div class="q"><span>Q:</span> ' + solveEscapeHtml(fu.q) + '</div>';
-                        html += '<div class="a">' + marked.parse(fu.a, {breaks:true}) + '</div>';
-                        html += '</div>';
-                    }
-                    html += '</div>';
-                }
-                html += '<div class="solve-follow-input">';
-                html += '<input type="text" placeholder="追问这道题..." onkeydown="if(event.key===\'Enter\') solveFollowUp(\'' + c.id + '\', this)" />';
-                html += '<button onclick="solveFollowUp(\'' + c.id + '\', this.previousElementSibling)">发送</button>';
-                html += '</div>';
-                html += '</div>';
-            }
-            html += '</div>';
-        }
-        html += '</div>';
-    }
-    container.innerHTML = html + '<div id="solveEmpty" style="display:none;"></div>';
-    setTimeout(function() {
-        container.querySelectorAll('.solve-card-answer').forEach(solveRenderMath);
-        container.querySelectorAll('.solve-follow-item .a').forEach(solveRenderMath);
-    }, 50);
-}
-
-function solveToggleCard(id) {
-    var card = solveCards.find(function(c) { return c.id === id; });
-    if (card) {
-        card.collapsed = !card.collapsed;
-        solveRenderCards();
-    }
-}
-
 function solveEscapeHtml(t) {
     if (!t) return '';
     var d = document.createElement('div');
@@ -230,12 +157,189 @@ function solveEscapeHtml(t) {
     return d.innerHTML;
 }
 
+function solveClearPreview() {
+    document.getElementById('solveUploadHint').style.display = '';
+    document.getElementById('solvePreviewWrap').style.display = 'none';
+    document.getElementById('solveFileInput').value = '';
+}
+
+function solveNewSession() {
+    solveCurrentSessionId = null;
+    document.getElementById('solveCardList').innerHTML = '';
+    document.getElementById('solveEmpty').style.display = '';
+    solveClearPreview();
+    document.querySelectorAll('.solve-session-item').forEach(function(el) { el.classList.remove('active'); });
+    document.querySelectorAll('.solve-kb-thumb').forEach(function(el) { el.classList.remove('selected'); });
+}
+
+function solveShowCard(imageUrl, answer, followUps, sessionId, loading) {
+    document.getElementById('solveEmpty').style.display = 'none';
+    var container = document.getElementById('solveCardList');
+    var html = '<div class="solve-card">';
+    if (imageUrl) html += '<div class="solve-card-img"><img src="' + imageUrl + '" /></div>';
+    if (loading) {
+        html += '<div class="solve-loading">⏳ 正在识别题目...</div>';
+    } else {
+        html += '<div class="solve-card-answer">' + marked.parse(answer || '', {breaks:true}) + '</div>';
+    }
+    if (followUps && followUps.length > 0) {
+        html += '<div class="solve-follow">';
+        for (var i = 0; i < followUps.length; i++) {
+            var fu = followUps[i];
+            html += '<div class="solve-follow-item">';
+            html += '<div class="q"><span>Q:</span> ' + solveEscapeHtml(fu.question || fu.q) + '</div>';
+            html += '<div class="a">' + marked.parse(fu.answer || fu.a || '', {breaks:true}) + '</div>';
+            html += '</div>';
+        }
+        html += '</div>';
+    }
+    if (!loading) {
+        html += '<div class="solve-follow">';
+        html += '<div class="solve-follow-input">';
+        html += '<input type="text" id="solveFollowInput" placeholder="追问这道题..." onkeydown="if(event.key===\'Enter\') solveSendFollowUp()" />';
+        html += '<button onclick="solveSendFollowUp()">发送</button>';
+        html += '</div></div>';
+    }
+    html += '</div>';
+    container.innerHTML = html;
+    setTimeout(function() {
+        container.querySelectorAll('.solve-card-answer, .solve-follow-item .a').forEach(solveRenderMath);
+    }, 50);
+    var chatEl = document.getElementById('solveChat');
+    chatEl.scrollTop = chatEl.scrollHeight;
+}
+
+function solveShowLoading(imageUrl) {
+    solveShowCard(imageUrl, null, null, null, true);
+}
+
+async function solveAutoRecognize(file) {
+    var modelName = document.getElementById('solveModelSelector').value;
+    console.log('[识题] 模型选择:', modelName);
+    if (!modelName) { solveToast('请先选择多模态模型', 'error'); return; }
+    if (solveSending) return;
+
+    var imageUrl = URL.createObjectURL(file);
+    solveShowLoading(imageUrl);
+    solveSending = true;
+
+    var fd = new FormData();
+    fd.append('image', file);
+    fd.append('modelName', modelName);
+    console.log('[识题] 发送识别请求...');
+
+    try {
+        var resp = await fetch('/image/solve/api/recognize', { method: 'POST', body: fd });
+        var data = await resp.json();
+        console.log('[识题] 收到响应:', data.ok ? '成功' : '失败');
+        if (data.ok) {
+            solveCurrentSessionId = data.sessionId;
+            solveShowCard(imageUrl, data.answer, [], data.sessionId, false);
+            solveAddSessionToList(data.sessionId, file.name);
+        } else {
+            solveShowCard(imageUrl, '识别失败：' + (data.error || '未知错误'), [], null, false);
+        }
+    } catch(e) {
+        console.error('[识题] 请求异常:', e);
+        solveShowCard(imageUrl, '请求失败：' + e.message, [], null, false);
+    }
+
+    solveSending = false;
+    solveClearPreview();
+}
+
+function solveAddSessionToList(id, name) {
+    var list = document.getElementById('solveSessionList');
+    var now = new Date();
+    var ts = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0') + ' ' + String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+    var html = '<div class="solve-session-item active" onclick="solveLoadSession(' + id + ')" data-id="' + id + '">';
+    html += '<span class="icon">📷</span>';
+    html += '<div class="info"><div class="name">' + solveEscapeHtml(name || '识题') + '</div>';
+    html += '<div class="meta">' + ts + '</div></div>';
+    html += '<button class="del" onclick="event.stopPropagation();solveDeleteSession(' + id + ')">✕</button>';
+    html += '</div>';
+    document.querySelectorAll('.solve-session-item').forEach(function(el) { el.classList.remove('active'); });
+    list.insertAdjacentHTML('afterbegin', html);
+}
+
+async function solveLoadSession(id) {
+    document.querySelectorAll('.solve-session-item').forEach(function(el) {
+        el.classList.toggle('active', el.dataset.id == id);
+    });
+    solveCurrentSessionId = id;
+    try {
+        var resp = await fetch('/image/solve/api/sessions/' + id);
+        var data = await resp.json();
+        if (!data.ok) { solveToast('加载失败', 'error'); return; }
+        var s = data.session;
+        var followUps = data.followUps || [];
+        var imageUrl = '/image/solve/api/sessions/' + id + '/image';
+        solveShowCard(imageUrl, s.answer, followUps, id, false);
+    } catch(e) { solveToast('加载失败', 'error'); }
+}
+
+async function solveDeleteSession(id) {
+    if (!confirm('确定删除此识题记录？')) return;
+    try {
+        var resp = await fetch('/image/solve/api/sessions/' + id, { method: 'DELETE' });
+        var data = await resp.json();
+        if (data.ok) {
+            var el = document.querySelector('.solve-session-item[data-id="' + id + '"]');
+            if (el) el.remove();
+            if (solveCurrentSessionId == id) solveNewSession();
+            toast('已删除');
+        }
+    } catch(e) { solveToast('删除失败', 'error'); }
+}
+
+async function solveSendFollowUp() {
+    var inp = document.getElementById('solveFollowInput');
+    var msg = inp ? inp.value.trim() : '';
+    if (!msg || solveSending) return;
+    inp.value = '';
+
+    var modelName = document.getElementById('solveModelSelector').value;
+    solveSending = true;
+
+    try {
+        var resp = await fetch('/image/solve/api/ask', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ message: msg, conversation: [], modelName: modelName, sessionId: solveCurrentSessionId })
+        });
+        var data = await resp.json();
+        if (data.ok) {
+            var followUps = [{ question: msg, answer: data.answer }];
+            var existingFollowUps = document.querySelectorAll('.solve-follow-item');
+            var container = document.getElementById('solveCardList');
+            var card = container.querySelector('.solve-card');
+            if (card) {
+                var followSection = card.querySelector('.solve-follow');
+                var inputSection = card.querySelector('.solve-follow-input').parentElement;
+                var fuHtml = '<div class="solve-follow-item">';
+                fuHtml += '<div class="q"><span>Q:</span> ' + solveEscapeHtml(msg) + '</div>';
+                fuHtml += '<div class="a">' + marked.parse(data.answer, {breaks:true}) + '</div>';
+                fuHtml += '</div>';
+                inputSection.insertAdjacentHTML('beforebegin', fuHtml);
+                setTimeout(function() {
+                    card.querySelectorAll('.solve-follow-item .a').forEach(solveRenderMath);
+                }, 50);
+            }
+        } else {
+            solveToast('追问失败', 'error');
+        }
+    } catch(e) { solveToast('请求失败', 'error'); }
+
+    solveSending = false;
+}
+
 async function solveRecognizeKbImage(path, kbId) {
     var modelName = document.getElementById('solveModelSelector').value;
-    if (!modelName) { solveToast('请选择多模态模型', 'error'); return; }
+    if (!modelName) { solveToast('请先选择多模态模型', 'error'); return; }
 
     var thumbUrl = '/image/thumb?path=' + encodeURIComponent(path) + '&kbId=' + kbId;
-    var cardId = solveCreateCard(thumbUrl);
+    solveShowLoading(thumbUrl);
+    solveSending = true;
 
     try {
         var resp = await fetch('/image/solve/api/recognize-file', {
@@ -244,56 +348,24 @@ async function solveRecognizeKbImage(path, kbId) {
             body: JSON.stringify({ path: path, kbId: kbId, modelName: modelName })
         });
         var data = await resp.json();
-        var card = solveCards.find(function(c) { return c.id === cardId; });
-        if (card) {
-            card.loading = false;
-            if (data.ok) {
-                card.answer = data.answer;
-                card.conversation = data.conversation || [];
-            } else {
-                card.answer = '识别失败：' + (data.error || '未知错误');
-            }
+        if (data.ok) {
+            solveCurrentSessionId = data.sessionId;
+            solveShowCard(thumbUrl, data.answer, [], data.sessionId, false);
+            solveAddSessionToList(data.sessionId, path.split('/').pop());
+        } else {
+            solveShowCard(thumbUrl, '识别失败：' + (data.error || '未知错误'), [], null, false);
         }
     } catch(e) {
-        var card = solveCards.find(function(c) { return c.id === cardId; });
-        if (card) { card.loading = false; card.answer = '请求失败：' + e.message; }
+        solveShowCard(thumbUrl, '请求失败：' + e.message, [], null, false);
     }
 
-    solveRenderCards();
+    solveSending = false;
 }
 
-async function solveFollowUp(cardId, inputEl) {
-    var msg = inputEl.value.trim();
-    if (!msg) return;
-    inputEl.value = '';
-
-    var card = solveCards.find(function(c) { return c.id === cardId; });
-    if (!card || !card.conversation || card.conversation.length === 0) return;
-
-    var modelName = document.getElementById('solveModelSelector').value;
-    card.followUps.push({ q: msg, a: '⏳ 思考中...' });
-    solveRenderCards();
-
-    try {
-        var resp = await fetch('/image/solve/api/ask', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ message: msg, conversation: card.conversation, modelName: modelName })
-        });
-        var data = await resp.json();
-        var lastFu = card.followUps[card.followUps.length - 1];
-        if (data.ok) {
-            lastFu.a = data.answer;
-            card.conversation = data.conversation || card.conversation;
-        } else {
-            lastFu.a = '回复失败：' + (data.error || '未知错误');
-        }
-    } catch(e) {
-        var lastFu = card.followUps[card.followUps.length - 1];
-        lastFu.a = '请求失败：' + e.message;
-    }
-
-    solveRenderCards();
+function solvePickKbImage(el, path, kbId) {
+    document.querySelectorAll('.solve-kb-thumb').forEach(function(t) { t.classList.remove('selected'); });
+    el.classList.add('selected');
+    solveRecognizeKbImage(path, kbId);
 }
 
 async function solveLoadKbImages() {
@@ -305,11 +377,11 @@ async function solveLoadKbImages() {
         var resp = await fetch('/image/api/images?kbId=' + kbId + '&dir=');
         var data = await resp.json();
         if (!data.ok || !data.images || data.images.length === 0) {
-            grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#909296;font-size:12px;padding:12px;">暂无图片</div>';
+            grid.innerHTML = '<div style="font-size:11px;color:#909296;padding:4px;">暂无图片</div>';
             return;
         }
         var html = '';
-        var showCount = Math.min(data.images.length, 30);
+        var showCount = Math.min(data.images.length, 20);
         for (var i = 0; i < showCount; i++) {
             var img = data.images[i];
             html += '<div class="solve-kb-thumb" onclick="solvePickKbImage(this, \'' + img.path.replace(/'/g, "\\'") + '\', ' + kbId + ')">';
@@ -318,19 +390,11 @@ async function solveLoadKbImages() {
         }
         grid.innerHTML = html;
     } catch(e) {
-        grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#909296;font-size:12px;padding:12px;">加载失败</div>';
+        grid.innerHTML = '<div style="font-size:11px;color:#909296;padding:4px;">加载失败</div>';
     }
 }
 
-function solveOnKbChange() {
-    solveLoadKbImages();
-}
-
-function solvePickKbImage(el, path, kbId) {
-    document.querySelectorAll('.solve-kb-thumb').forEach(function(t) { t.classList.remove('selected'); });
-    el.classList.add('selected');
-    solveRecognizeKbImage(path, kbId);
-}
+function solveOnKbChange() { solveLoadKbImages(); }
 
 document.addEventListener('DOMContentLoaded', function() {
     var uz = document.getElementById('solveUploadZone');
@@ -362,50 +426,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     solveLoadKbImages();
 });
-
-async function solveAutoRecognize(file) {
-    var modelName = document.getElementById('solveModelSelector').value;
-    console.log('[识题] 模型选择:', modelName);
-    if (!modelName) {
-        solveToast('请先选择多模态模型', 'error');
-        return;
-    }
-    if (solveSending) return;
-
-    var imageUrl = URL.createObjectURL(file);
-    var cardId = solveCreateCard(imageUrl);
-
-    solveSending = true;
-
-    var fd = new FormData();
-    fd.append('image', file);
-    fd.append('modelName', modelName);
-    console.log('[识题] 发送识别请求...');
-
-    try {
-        var resp = await fetch('/image/solve/api/recognize', { method: 'POST', body: fd });
-        var data = await resp.json();
-        console.log('[识题] 收到响应:', data.ok ? '成功' : '失败');
-        var card = solveCards.find(function(c) { return c.id === cardId; });
-        if (card) {
-            card.loading = false;
-            if (data.ok) {
-                card.answer = data.answer;
-                card.conversation = data.conversation || [];
-            } else {
-                card.answer = '识别失败：' + (data.error || '未知错误');
-            }
-        }
-    } catch(e) {
-        console.error('[识题] 请求异常:', e);
-        var card = solveCards.find(function(c) { return c.id === cardId; });
-        if (card) { card.loading = false; card.answer = '请求失败：' + e.message; }
-    }
-
-    solveRenderCards();
-    solveSending = false;
-    solveClearPreview();
-}
 </script>
 
 </th:block>

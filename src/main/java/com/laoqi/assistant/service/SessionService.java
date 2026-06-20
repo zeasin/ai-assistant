@@ -270,6 +270,36 @@ public class SessionService {
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_exam_practices_question ON exam_practices(question_id)");
             log.info("Table exam_papers, exam_questions, exam_practices initialized");
 
+            // 识题记录表
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS solve_sessions (
+                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                    title       TEXT NOT NULL DEFAULT '新识题',
+                    image_name  TEXT NOT NULL DEFAULT '',
+                    image_path  TEXT NOT NULL DEFAULT '',
+                    image_type  TEXT NOT NULL DEFAULT 'image/jpeg',
+                    image_data  BLOB,
+                    model       TEXT NOT NULL DEFAULT '',
+                    answer      TEXT NOT NULL DEFAULT '',
+                    status      TEXT NOT NULL DEFAULT 'pending',
+                    created_at  TEXT NOT NULL
+                )
+                """);
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS solve_follow_ups (
+                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id  INTEGER NOT NULL,
+                    question    TEXT NOT NULL DEFAULT '',
+                    answer      TEXT NOT NULL DEFAULT '',
+                    sort_order  INTEGER NOT NULL DEFAULT 0,
+                    created_at  TEXT NOT NULL
+                )
+                """);
+            stmt.execute("CREATE INDEX IF NOT EXISTS idx_solve_follow_ups_session ON solve_follow_ups(session_id)");
+            log.info("Table solve_sessions, solve_follow_ups initialized");
+            try { stmt.execute("ALTER TABLE solve_sessions ADD COLUMN image_type TEXT NOT NULL DEFAULT 'image/jpeg'"); } catch (Exception ignored) {}
+            try { stmt.execute("ALTER TABLE solve_sessions ADD COLUMN image_data BLOB"); } catch (Exception ignored) {}
+
         } catch (SQLException e) {
             throw new RuntimeException("Failed to create new tables", e);
         }
