@@ -33,6 +33,21 @@ public class KbDataController {
         return "kb_data";
     }
 
+    @GetMapping("/{kbId}/data")
+    public String dataDetailPage(@PathVariable Long kbId,
+                                  @RequestParam(defaultValue = "") String dir,
+                                  @RequestParam(defaultValue = "") String file,
+                                  Model model) {
+        KnowledgeBaseEntity kb = kbService.getById(kbId);
+        if (kb == null) {
+            return "redirect:/data/kb";
+        }
+        model.addAttribute("kb", kb);
+        model.addAttribute("dir", dir);
+        model.addAttribute("file", file);
+        return "kb_data_detail";
+    }
+
     @GetMapping("/api/files")
     @ResponseBody
     public Map<String, Object> listAllDataFiles() {

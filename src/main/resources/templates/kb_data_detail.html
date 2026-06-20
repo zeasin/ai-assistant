@@ -1,0 +1,624 @@
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title layout:fragment="title">数据详情 - AI 助理</title>
+    <style>
+        .data-table-container { overflow-x:auto; }
+        .data-table { width:100%; border-collapse:collapse; font-size:13px; }
+        .data-table th { text-align:left; padding:10px 12px; border-bottom:2px solid #7c5cfc; color:#5c5f66; font-weight:600; white-space:nowrap; background:#fafafe; }
+        .data-table td { padding:10px 12px; border-bottom:1px solid #e1e3e6; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .data-table tr:hover { background:#f8f7ff; }
+        .data-row-actions { display:flex; gap:6px; white-space:nowrap; }
+        .data-row-actions .btn { padding:4px 10px; font-size:12px; }
+        .group-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+        .group-header h3 { margin:0; font-size:15px; }
+
+        .detail-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; }
+        .detail-item { padding:10px 12px; background:#f8f7ff; border-radius:8px; border:1px solid #eef0f4; }
+        .detail-item .label { font-size:11px; color:#5c5f66; margin-bottom:4px; }
+        .detail-item .value { font-size:14px; color:#1a1b1e; word-break:break-all; }
+        .edit-form { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; }
+        .edit-form .full-width { grid-column:span 2; }
+        .edit-form label { display:block; font-size:12px; font-weight:500; color:#5c5f66; margin-bottom:4px; }
+        .edit-form input, .edit-form textarea { width:100%; padding:8px 10px; border:1px solid #e1e3e6; border-radius:6px; font-size:13px; box-sizing:border-box; }
+        .edit-form input:focus, .edit-form textarea:focus { border-color:#7c5cfc; outline:none; }
+        .data-search { margin-bottom:12px; }
+        .data-search input { width:100%; max-width:360px; padding:8px 12px; border:1px solid #e1e3e6; border-radius:8px; font-size:13px; }
+        .data-search input:focus { border-color:#7c5cfc; outline:none; }
+
+        .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:200; justify-content:center; align-items:center; }
+        .modal-overlay.active { display:flex; }
+        .modal { background:#fff; border-radius:12px; padding:28px; width:640px; max-width:92vw; max-height:88vh; overflow-y:auto; box-shadow:0 8px 32px rgba(0,0,0,0.15); }
+        .modal h3 { font-size:16px; margin-bottom:16px; }
+        .btn { padding:6px 14px; border-radius:6px; font-size:13px; cursor:pointer; border:1px solid #e1e3e6; background:#fff; color:#5c5f66; transition:all .15s; }
+        .btn:hover { border-color:#7c5cfc; color:#7c5cfc; }
+        .btn-primary { background:#7c5cfc; color:#fff; border-color:#7c5cfc; }
+        .btn-primary:hover { background:#6a4ae0; border-color:#6a4ae0; color:#fff; }
+        .btn-secondary { background:#fff; color:#5c5f66; }
+        .btn-danger { background:#fff; color:#d32f2f; border-color:#ffcdd2; }
+        .btn-danger:hover { background:#ffebee; border-color:#d32f2f; }
+        .text-muted { color:#909296; }
+        .toast-box { position:fixed; top:20px; right:20px; z-index:10001; }
+        .toast-item { background:#333; color:#fff; padding:10px 18px; border-radius:8px; margin-bottom:8px; font-size:13px; }
+        .toast-item.success { background:#27ae60; }
+
+        .stats-bar { display:flex; gap:16px; margin-bottom:16px; flex-wrap:wrap; }
+        .stat-item { background:#fff; border:1px solid #e1e3e6; border-radius:8px; padding:10px 16px; }
+        .stat-item .label { font-size:11px; color:#5c5f66; }
+        .stat-item .value { font-size:18px; font-weight:600; color:#7c5cfc; }
+        .loading-state { text-align:center; padding:40px 20px; color:#5c5f66; }
+        .empty-state { text-align:center; padding:40px 20px; color:#909296; }
+        .empty-state .icon { font-size:48px; margin-bottom:12px; }
+        .col-settings-overlay { position:fixed; top:0;left:0;right:0;bottom:0; background:rgba(0,0,0,0.3); z-index:9999; display:flex; align-items:center; justify-content:center; }
+        .col-settings-popup { background:#fff; border-radius:12px; padding:20px 24px; min-width:260px; max-width:400px; max-height:80vh; box-shadow:0 8px 32px rgba(0,0,0,0.15); }
+        .col-settings-popup h3 { margin:0 0 12px; font-size:15px; }
+        .col-settings-item { display:flex; align-items:center; padding:6px 0; font-size:13px; }
+        .col-settings-item input[type="checkbox"] { margin-right:8px; }
+        .col-settings-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:14px; padding-top:12px; border-top:1px solid #e1e3e6; }
+        .col-settings-btn { cursor:pointer; font-size:14px; color:#909296; padding:2px 6px; border-radius:4px; background:none; border:none; margin-left:8px; }
+        .col-settings-btn:hover { color:#7c5cfc; background:#f0edff; }
+    </style>
+</head>
+<body>
+<th:block layout:fragment="content">
+
+<div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        <div>
+            <a href="/data/kb" style="color:#7c5cfc;text-decoration:none;font-size:13px;">← 返回数据列表</a>
+            <h2 style="margin:8px 0 0 0;font-size:18px;">📊 <span id="dataFileTitle">客户数据.json</span></h2>
+            <div class="text-muted" style="font-size:13px;" id="dataSourceInfo">
+                目录: <span th:text="${dir}"></span>
+                <span th:if="${kb != null}"> · 知识库: <span th:text="${kb.name}"></span></span>
+                · 文件: <span id="dataSourceFile" th:text="${file}"></span>
+            </div>
+        </div>
+    </div>
+
+    <div class="data-search">
+        <input type="text" id="searchInput" placeholder="搜索所有字段..." oninput="renderAllTables()">
+    </div>
+
+    <div class="stats-bar" id="statsBar"></div>
+
+    <div id="dataContainer">
+        <div class="loading-state">⏳ 加载中...</div>
+    </div>
+</div>
+
+<!-- 详情弹窗 -->
+<div class="modal-overlay" id="detailModal">
+    <div class="modal" style="width:720px;">
+        <h3 id="detailTitle">📋 详情</h3>
+        <div id="detailContent"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid #e1e3e6;">
+            <button class="btn" onclick="closeModal('detailModal')">关闭</button>
+            <button class="btn btn-primary" id="btnEditFromDetail">编辑</button>
+        </div>
+    </div>
+</div>
+
+<!-- 编辑弹窗 -->
+<div class="modal-overlay" id="editModal">
+    <div class="modal" style="width:800px;">
+        <h3 id="editTitle">✏️ 编辑</h3>
+        <form id="editForm" onsubmit="return submitEdit(event)">
+            <input type="hidden" id="editFile">
+            <input type="hidden" id="editDir">
+            <input type="hidden" id="editGroup">
+            <input type="hidden" id="editIdField">
+            <input type="hidden" id="editIdValue">
+            <div id="editFields"></div>
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid #e1e3e6;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('editModal')">取消</button>
+                <button type="submit" class="btn btn-primary" id="btnSaveEdit">保存</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 添加弹窗 -->
+<div class="modal-overlay" id="addModal">
+    <div class="modal" style="width:800px;">
+        <h3>➕ 添加记录</h3>
+        <form id="addForm" onsubmit="return submitAdd(event)">
+            <input type="hidden" id="addFile">
+            <input type="hidden" id="addDir">
+            <input type="hidden" id="addGroup">
+            <div style="margin-bottom:12px;">
+                <label style="display:block;font-size:12px;font-weight:500;color:#5c5f66;margin-bottom:4px;">JSON 数据</label>
+                <textarea id="addJson" rows="12" placeholder='{ "key": "value" }'
+                    style="width:100%;padding:10px;border:1px solid #e1e3e6;border-radius:8px;font-size:13px;font-family:monospace;resize:vertical;box-sizing:border-box;"></textarea>
+            </div>
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid #e1e3e6;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('addModal')">取消</button>
+                <button type="submit" class="btn btn-primary" id="btnSaveAdd">添加</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 删除确认 -->
+<div class="modal-overlay" id="deleteModal">
+    <div class="modal" style="width:400px;">
+        <h3>🗑️ 确认删除</h3>
+        <p style="margin:16px 0;color:#5c5f66;">确定要删除这条记录吗？此操作不可恢复。</p>
+        <input type="hidden" id="deleteFile">
+        <input type="hidden" id="deleteDir">
+        <input type="hidden" id="deleteGroup">
+        <input type="hidden" id="deleteIdField">
+        <input type="hidden" id="deleteIdValue">
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button class="btn btn-secondary" onclick="closeModal('deleteModal')">取消</button>
+            <button class="btn btn-danger" id="btnConfirmDelete">删除</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast-box" id="toastBox"></div>
+
+<script th:inline="javascript">
+var KB_ID = [[${kb.id}]];
+var CURRENT_DIR = [[${dir}]];
+var CURRENT_FILE = ([[${file}]] || '').replace(/\.json$/i, '');
+var DISPLAY_FILE = [[${file}]];
+var allGroupData = {};
+var columnSettings = {};
+
+/* ====== 加载数据 ====== */
+document.addEventListener('DOMContentLoaded', function() {
+    if (!KB_ID || !CURRENT_FILE) {
+        document.getElementById('dataContainer').innerHTML =
+            '<div class="empty-state"><div class="icon">⚠️</div><div>缺少参数，无法加载数据</div></div>';
+        return;
+    }
+    // 设置显示文件名
+    document.getElementById('dataFileTitle').textContent = DISPLAY_FILE;
+    loadData();
+
+    document.getElementById('btnEditFromDetail').addEventListener('click', function() {
+        if (currentDetailRow) {
+            closeModal('detailModal');
+            showEditModalByRow(currentDetailRow.row, currentDetailRow.groupName);
+        }
+    });
+    document.getElementById('btnConfirmDelete').addEventListener('click', confirmDelete);
+});
+
+function loadData() {
+    var container = document.getElementById('dataContainer');
+    container.innerHTML = '<div class="loading-state">⏳ 加载中...</div>';
+
+    var apiUrl = '/kb/' + KB_ID + '/api/data/read?dir=' + encodeURIComponent(CURRENT_DIR) + '&file=' + encodeURIComponent(CURRENT_FILE);
+    console.log('📡 请求数据:', apiUrl);
+
+    fetch(apiUrl)
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+            console.log('📡 响应数据:', res);
+            if (!res.ok || !res.data || !res.data.groups) {
+                container.innerHTML = '<div class="empty-state"><div class="icon">📋</div><div>无法读取数据或数据为空</div><div style="font-size:12px;color:#909296;margin-top:8px;">API: ' + apiUrl + '</div><div style="font-size:12px;color:#909296;">响应: ' + JSON.stringify(res) + '</div></div>';
+                return;
+            }
+            var groups = res.data.groups;
+            var arrayGroups = Object.keys(groups).filter(function(g) { return groups[g].type === 'array'; });
+            if (arrayGroups.length === 0) {
+                container.innerHTML = '<div class="empty-state"><div class="icon">📋</div><div>暂无数组类型数据</div></div>';
+                return;
+            }
+            loadGroupsSequentially(arrayGroups, 0);
+        })
+        .catch(function(e) {
+            container.innerHTML = '<div class="empty-state"><div class="icon">❌</div><div>加载失败: ' + e.message + '</div></div>';
+            console.error('❌ 加载失败:', e);
+        });
+}
+
+function loadGroupsSequentially(groups, idx) {
+    if (idx >= groups.length) {
+        loadColumnSettings().then(function() { renderAllTables(); });
+        return;
+    }
+    var g = groups[idx];
+    fetch('/kb/' + KB_ID + '/api/data/group?dir=' + encodeURIComponent(CURRENT_DIR) + '&file=' + encodeURIComponent(CURRENT_FILE) + '&group=' + encodeURIComponent(g))
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+            if (res.ok && Array.isArray(res.data)) {
+                if (!allGroupData[g]) allGroupData[g] = [];
+                allGroupData[g] = res.data;
+                allGroupData[g].sort(compareByTime);
+            }
+            loadGroupsSequentially(groups, idx + 1);
+        })
+        .catch(function() { loadGroupsSequentially(groups, idx + 1); });
+}
+
+function loadColumnSettings() {
+    var typeKey = KB_ID + '_' + CURRENT_DIR;
+    return fetch('/api/data/column-settings?type=' + encodeURIComponent(typeKey))
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+            if (res.ok && res.settings) columnSettings = res.settings;
+        })
+        .catch(function() {});
+}
+
+/* ====== 渲染表格 ====== */
+function renderAllTables() {
+    var container = document.getElementById('dataContainer');
+    var searchTerm = (document.getElementById('searchInput').value || '').toLowerCase();
+    var groupNames = Object.keys(allGroupData);
+
+    var totalRecords = 0;
+    var totalFiltered = 0;
+    var html = '';
+
+    groupNames.forEach(function(groupName) {
+        var records = allGroupData[groupName] || [];
+        totalRecords += records.length;
+
+        var filtered = searchTerm ? records.filter(function(row) {
+            return Object.values(row).some(function(v) {
+                return v != null && String(v).toLowerCase().indexOf(searchTerm) !== -1;
+            });
+        }) : records;
+        totalFiltered += filtered.length;
+
+        var colSet = new Set();
+        records.forEach(function(row) {
+            if (typeof row === 'object' && row !== null) {
+                Object.keys(row).forEach(function(k) { colSet.add(k); });
+            }
+        });
+        var allColumns = Array.from(colSet);
+        var tableId = CURRENT_FILE + '_' + groupName;
+        var savedCols = columnSettings[tableId];
+        var columns = (savedCols && savedCols.length > 0)
+            ? allColumns.filter(function(c) { return savedCols.indexOf(c) !== -1; })
+            : allColumns;
+
+        if (filtered.length === 0 && searchTerm) return;
+
+        html += '<div class="card" style="margin-bottom:16px;padding:16px 20px;">';
+        html += '<div class="group-header">';
+        html += '<h3>' + esc(groupName) + ' <span style="font-weight:400;color:#5c5f66;">(' + records.length + '条)</span>';
+        html += '<button class="col-settings-btn" onclick="showColumnSettings(\'' + esc(tableId) + '\')" title="列设置">⚙️</button></h3>';
+        html += '<button class="btn btn-primary" style="font-size:12px;" onclick="showAddModal(\'' + esc(groupName) + '\')">➕ 添加</button>';
+        html += '</div>';
+        html += '<div class="data-table-container"><table class="data-table">';
+        html += '<thead><tr><th style="width:50px;">#</th>';
+        columns.forEach(function(col) { html += '<th>' + esc(col) + '</th>'; });
+        html += '<th style="width:140px;">操作</th></tr></thead><tbody>';
+
+        var display = searchTerm ? filtered : records;
+        display.forEach(function(row) {
+            var actualIdx = records.indexOf(row);
+            html += '<tr><td>' + (actualIdx + 1) + '</td>';
+            columns.forEach(function(col) {
+                var val = row[col];
+                if (val == null) { html += '<td style="color:#909296;">—</td>'; }
+                else if (typeof val === 'object') { html += '<td style="color:#7c5cfc;">{...}</td>'; }
+                else {
+                    var s = String(val);
+                    if (s.length > 50) s = s.substring(0, 50) + '...';
+                    html += '<td title="' + esc(String(val)) + '">' + esc(s) + '</td>';
+                }
+            });
+            html += '<td class="data-row-actions">';
+            html += '<button class="btn btn-secondary" onclick="showDetailModal(\'' + esc(groupName) + '\',' + actualIdx + ')">详情</button>';
+            html += '<button class="btn btn-secondary" onclick="showEditModal(\'' + esc(groupName) + '\',' + actualIdx + ')">编辑</button>';
+            html += '<button class="btn btn-danger" onclick="showDeleteModal(\'' + esc(groupName) + '\',' + actualIdx + ')">删除</button>';
+            html += '</td></tr>';
+        });
+
+        if (records.length === 0) {
+            html += '<tr><td colspan="' + (columns.length + 2) + '" style="text-align:center;color:#909296;">暂无数据</td></tr>';
+        }
+        html += '</tbody></table></div></div>';
+    });
+
+    // Stats bar
+    var statsHtml = '<div class="stat-item"><div class="label">总记录数</div><div class="value">' + totalRecords + '</div></div>';
+    if (searchTerm) {
+        statsHtml += '<div class="stat-item"><div class="label">匹配结果</div><div class="value">' + totalFiltered + '</div></div>';
+    }
+    document.getElementById('statsBar').innerHTML = statsHtml;
+
+    if (html === '') {
+        container.innerHTML = '<div class="empty-state"><div class="icon">🔍</div><div>未找到匹配记录</div></div>';
+    } else {
+        container.innerHTML = html;
+    }
+}
+
+/* ====== 比较时间排序 ====== */
+function compareByTime(a, b) {
+    var timeField = null;
+    var timeKeywords = ['时间', '日期', '创建时间', '更新时间', '发布时间', 'date', 'created', 'updated', 'timestamp', 'publish', 'lastContact'];
+    for (var k = 0; k < timeKeywords.length; k++) {
+        for (var key in a) {
+            if (key.indexOf(timeKeywords[k]) !== -1) { timeField = key; break; }
+        }
+        if (timeField) break;
+    }
+    if (!timeField) {
+        for (var key in a) {
+            if (typeof a[key] === 'string' && /^\d{4}[-\/]\d{1,2}[-\/]\d/.test(a[key])) { timeField = key; break; }
+        }
+    }
+    if (!timeField) return 0;
+    return String(b[timeField] || '').localeCompare(String(a[timeField] || ''));
+}
+
+/* ====== 查找 ID 字段 ====== */
+function findIdField(records) {
+    if (!records || records.length === 0) return 'id';
+    var candidates = ['id', 'ID', 'Id', '_id', 'key', 'name'];
+    var first = records[0];
+    for (var i = 0; i < candidates.length; i++) { if (first.hasOwnProperty(candidates[i])) return candidates[i]; }
+    for (var k in first) return k;
+    return 'id';
+}
+
+/* ====== 详情 ====== */
+var currentDetailRow = null;
+
+function showDetailModal(groupName, index) {
+    var records = allGroupData[groupName] || [];
+    var row = records[index];
+    if (!row) return;
+    currentDetailRow = { row: row, groupName: groupName, index: index };
+
+    document.getElementById('detailTitle').textContent = '📋 ' + (row.name || row.id || row.title || groupName + ' - 第 ' + (index + 1) + ' 条');
+    var html = '<div class="detail-grid">';
+    Object.keys(row).forEach(function(key) {
+        var val = row[key];
+        var dv;
+        if (val == null) dv = '<span style="color:#909296;">—</span>';
+        else if (typeof val === 'object') dv = '<pre style="margin:0;font-size:12px;white-space:pre-wrap;background:#f5f5f7;padding:8px;border-radius:6px;">' + JSON.stringify(val, null, 2) + '</pre>';
+        else dv = esc(String(val));
+        html += '<div class="detail-item"><div class="label">' + esc(key) + '</div><div class="value">' + dv + '</div></div>';
+    });
+    html += '</div>';
+    document.getElementById('detailContent').innerHTML = html;
+    document.getElementById('detailModal').classList.add('active');
+}
+
+/* ====== 编辑 ====== */
+function showEditModal(groupName, index) {
+    var records = allGroupData[groupName] || [];
+    var row = records[index];
+    if (!row) return;
+    showEditModalByRow(row, groupName);
+}
+
+function showEditModalByRow(row, groupName) {
+    var records = allGroupData[groupName] || [];
+    var idField = findIdField(records);
+    var idValue = String(row[idField]);
+
+    document.getElementById('editTitle').textContent = '✏️ 编辑: ' + (row.name || row.id || idValue);
+    document.getElementById('editFile').value = CURRENT_FILE;
+    document.getElementById('editDir').value = CURRENT_DIR;
+    document.getElementById('editGroup').value = groupName;
+    document.getElementById('editIdField').value = idField;
+    document.getElementById('editIdValue').value = idValue;
+
+    var html = '<div class="edit-form">';
+    Object.keys(row).forEach(function(key) {
+        var val = row[key];
+        var cls = (key === 'notes' || key === 'content' || key === 'description' || (typeof val === 'string' && val.length > 100)) ? 'full-width' : '';
+        html += '<div class="form-group ' + cls + '"><label>' + esc(key) + '</label>';
+        if (cls === 'full-width' || (typeof val === 'object' && val !== null)) {
+            var ta = typeof val === 'object' ? JSON.stringify(val, null, 2) : (val != null ? esc(String(val)) : '');
+            html += '<textarea name="' + esc(key) + '" rows="3">' + ta + '</textarea>';
+        } else {
+            var inputVal = val != null ? esc(String(val)) : '';
+            var inputType = typeof val === 'number' ? 'number' : 'text';
+            html += '<input type="' + inputType + '" name="' + esc(key) + '" value="' + inputVal + '">';
+        }
+        html += '</div>';
+    });
+    html += '</div>';
+    document.getElementById('editFields').innerHTML = html;
+    document.getElementById('editModal').classList.add('active');
+}
+
+function submitEdit(event) {
+    event.preventDefault();
+    var btn = document.getElementById('btnSaveEdit');
+    btn.disabled = true; btn.textContent = '⏳ 保存中...';
+
+    var form = document.getElementById('editForm');
+    var formData = new FormData(form);
+    var updates = {};
+    var groupName = document.getElementById('editGroup').value;
+    var records = allGroupData[groupName] || [];
+    var originalRow = records.find(function(r) { return String(r[document.getElementById('editIdField').value]) === document.getElementById('editIdValue').value; });
+
+    var skip = ['editFile', 'editDir', 'editGroup', 'editIdField', 'editIdValue'];
+    formData.forEach(function(value, key) {
+        if (skip.indexOf(key) !== -1) return;
+        if (originalRow && typeof originalRow[key] === 'object' && originalRow[key] !== null) {
+            try { updates[key] = JSON.parse(value); } catch(e) { updates[key] = value; }
+        } else if (originalRow && typeof originalRow[key] === 'number') {
+            updates[key] = value === '' ? null : parseFloat(value);
+        } else {
+            updates[key] = value === '' ? null : value;
+        }
+    });
+
+    var params = new URLSearchParams({ dir: CURRENT_DIR, file: CURRENT_FILE, group: groupName, idField: document.getElementById('editIdField').value, idValue: document.getElementById('editIdValue').value });
+    fetch('/kb/' + KB_ID + '/api/data/update?' + params.toString(), {
+        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(updates)
+    }).then(function(r) { return r.json(); }).then(function(res) {
+        btn.disabled = false; btn.textContent = '保存';
+        if (res.ok) { toast('✅ 保存成功', 'success'); closeModal('editModal'); loadData(); }
+        else { toast(res.error || '保存失败', 'error'); }
+    }).catch(function(e) { btn.disabled = false; btn.textContent = '保存'; toast('保存失败: ' + e.message, 'error'); });
+    return false;
+}
+
+/* ====== 添加 ====== */
+function showAddModal(groupName) {
+    document.getElementById('addFile').value = CURRENT_FILE;
+    document.getElementById('addDir').value = CURRENT_DIR;
+    document.getElementById('addGroup').value = groupName;
+
+    var records = allGroupData[groupName] || [];
+    var defaultJson = records.length > 0 ? JSON.stringify(records[records.length - 1], null, 2) : '{}';
+    document.getElementById('addJson').value = defaultJson;
+    document.getElementById('addModal').classList.add('active');
+}
+
+function submitAdd(event) {
+    event.preventDefault();
+    var btn = document.getElementById('btnSaveAdd');
+    btn.disabled = true; btn.textContent = '⏳ 添加中...';
+
+    var groupName = document.getElementById('addGroup').value;
+    var record;
+    try { record = JSON.parse(document.getElementById('addJson').value.trim()); }
+    catch(e) { toast('JSON 格式错误: ' + e.message, 'error'); btn.disabled = false; btn.textContent = '添加'; return false; }
+
+    var params = new URLSearchParams({ dir: CURRENT_DIR, file: CURRENT_FILE, group: groupName });
+    fetch('/kb/' + KB_ID + '/api/data/add?' + params.toString(), {
+        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(record)
+    }).then(function(r) { return r.json(); }).then(function(res) {
+        btn.disabled = false; btn.textContent = '添加';
+        if (res.ok) { toast('✅ 添加成功', 'success'); closeModal('addModal'); loadData(); }
+        else { toast(res.error || '添加失败', 'error'); }
+    }).catch(function(e) { btn.disabled = false; btn.textContent = '添加'; toast('添加失败: ' + e.message, 'error'); });
+    return false;
+}
+
+/* ====== 删除 ====== */
+function showDeleteModal(groupName, index) {
+    var records = allGroupData[groupName] || [];
+    var row = records[index];
+    if (!row) return;
+    var idField = findIdField(records);
+
+    document.getElementById('deleteFile').value = CURRENT_FILE;
+    document.getElementById('deleteDir').value = CURRENT_DIR;
+    document.getElementById('deleteGroup').value = groupName;
+    document.getElementById('deleteIdField').value = idField;
+    document.getElementById('deleteIdValue').value = String(row[idField]);
+    document.getElementById('deleteModal').classList.add('active');
+}
+
+function confirmDelete() {
+    var btn = document.getElementById('btnConfirmDelete');
+    btn.disabled = true; btn.textContent = '⏳ 删除中...';
+
+    var params = new URLSearchParams({
+        dir: document.getElementById('deleteDir').value,
+        file: document.getElementById('deleteFile').value,
+        group: document.getElementById('deleteGroup').value,
+        idField: document.getElementById('deleteIdField').value,
+        idValue: document.getElementById('deleteIdValue').value
+    });
+    fetch('/kb/' + KB_ID + '/api/data/delete?' + params.toString(), { method: 'POST' })
+        .then(function(r) { return r.json(); }).then(function(res) {
+            btn.disabled = false; btn.textContent = '删除';
+            if (res.ok) { toast('✅ 删除成功', 'success'); closeModal('deleteModal'); loadData(); }
+            else { toast(res.error || '删除失败', 'error'); }
+        }).catch(function(e) { btn.disabled = false; btn.textContent = '删除'; toast('删除失败: ' + e.message, 'error'); });
+}
+
+/* ====== 列设置 ====== */
+function getAllColumnsForTable(tableId) {
+    var groupNames = Object.keys(allGroupData);
+    for (var g = 0; g < groupNames.length; g++) {
+        var tid = CURRENT_FILE + '_' + groupNames[g];
+        if (tid === tableId) {
+            var records = allGroupData[groupNames[g]] || [];
+            var colSet = new Set();
+            records.forEach(function(row) {
+                if (typeof row === 'object' && row !== null) {
+                    Object.keys(row).forEach(function(key) { colSet.add(key); });
+                }
+            });
+            return Array.from(colSet);
+        }
+    }
+    return [];
+}
+
+function showColumnSettings(tableId) {
+    var allColumns = getAllColumnsForTable(tableId);
+    if (allColumns.length === 0) return;
+
+    var savedCols = columnSettings[tableId];
+    var selected = savedCols && savedCols.length > 0 ? savedCols.slice() : allColumns.slice();
+
+    var popup = document.createElement('div');
+    popup.className = 'col-settings-overlay';
+    popup.onclick = function(e) { if (e.target === popup) popup.remove(); };
+
+    var html = '<div class="col-settings-popup" onclick="event.stopPropagation();">';
+    html += '<h3>选择要显示的列</h3>';
+    html += '<div style="max-height:50vh;overflow-y:auto;">';
+    for (var i = 0; i < allColumns.length; i++) {
+        var col = allColumns[i];
+        var checked = selected.indexOf(col) !== -1;
+        html += '<label class="col-settings-item">';
+        html += '<input type="checkbox" value="' + col.replace(/"/g, '&quot;') + '" ' + (checked ? 'checked' : '') + '>';
+        html += col;
+        html += '</label>';
+    }
+    html += '</div>';
+    html += '<div class="col-settings-actions">';
+    html += '<button class="btn" onclick="this.closest(\'.col-settings-overlay\').remove()">取消</button>';
+    html += '<button class="btn btn-primary" onclick="saveColumnSettings(\'' + tableId + '\', this)">确认</button>';
+    html += '</div></div>';
+
+    popup.innerHTML = html;
+    document.body.appendChild(popup);
+}
+
+function saveColumnSettings(tableId, btn) {
+    var popup = btn.closest('.col-settings-overlay');
+    var checkboxes = popup.querySelectorAll('input[type="checkbox"]');
+    var selected = [];
+    for (var i = 0; i < checkboxes.length; i++) {
+        if (checkboxes[i].checked) selected.push(checkboxes[i].value);
+    }
+    columnSettings[tableId] = selected;
+    var typeKey = KB_ID + '_' + CURRENT_DIR;
+
+    fetch('/api/data/column-settings?type=' + encodeURIComponent(typeKey), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(columnSettings)
+    }).then(function(r) { return r.json(); }).then(function(res) {
+        if (res.ok) { renderAllTables(); popup.remove(); }
+        else { toast('保存失败: ' + (res.error || '未知错误'), 'error'); }
+    }).catch(function(e) { toast('保存失败: ' + e.message, 'error'); });
+}
+
+/* ====== 工具函数 ====== */
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+
+function toast(msg, type) {
+    var box = document.getElementById('toastBox');
+    var t = document.createElement('div');
+    t.className = 'toast-item' + (type ? ' ' + type : '');
+    t.textContent = msg;
+    box.appendChild(t);
+    setTimeout(function() { t.remove(); }, 3000);
+}
+
+function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        ['detailModal', 'editModal', 'addModal', 'deleteModal'].forEach(function(id) {
+            document.getElementById(id).classList.remove('active');
+        });
+    }
+});
+</script>
+
+</th:block>
+</body>
+</html>
