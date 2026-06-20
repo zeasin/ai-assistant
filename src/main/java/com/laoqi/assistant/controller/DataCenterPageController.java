@@ -1,4 +1,4 @@
-package com.laoqi.assistant.datacenter;
+package com.laoqi.assistant.controller;
 
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -6,7 +6,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 @Controller
 public class DataCenterPageController {
 
-    @GetMapping("/datacenter")
+    @GetMapping("/data/processing")
     public String dataCenterPage() {
         return "datacenter";
     }

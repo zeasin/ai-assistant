@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <style>
+        .data-tabs { display:flex; gap:0; border-bottom:2px solid #e1e3e6; margin-bottom:20px; background:#fff; border-radius:12px 12px 0 0; padding:0 20px; }
+        .data-tab { padding:12px 20px; font-size:14px; cursor:pointer; transition:all .15s; border:none; background:transparent; color:#5c5f66; border-bottom:2px solid transparent; margin-bottom:-2px; font-weight:500; }
+        .data-tab:hover { color:#1a1b1e; background:#f5f5f7; border-radius:6px 6px 0 0; }
+        .data-tab.active { color:#7c5cfc; border-bottom-color:#7c5cfc; font-weight:600; }
+
+        .di-wrap { max-width:900px; margin:0 auto; }
+        .di-section { background:#fff; border:1px solid #e1e3e6; border-radius:12px; padding:20px; margin-bottom:16px; }
+        .di-section h2 { font-size:16px; font-weight:600; margin:0 0 16px; display:flex; align-items:center; gap:8px; }
+        .di-section .desc { font-size:13px; color:#5c5f66; margin-bottom:12px; }
+
+        .form-row { display:flex; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
+        .form-group { flex:1; min-width:180px; display:flex; flex-direction:column; gap:4px; }
+        .form-group label { font-size:12px; color:#5c5f66; font-weight:500; }
+        .form-group input, .form-group select, .form-group textarea {
+            padding:8px 10px; border:1px solid #e1e3e6; border-radius:6px; font-size:13px; outline:none; background:#fff; color:#1a1b1e; box-sizing:border-box;
+        }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color:#7c5cfc; }
+        .form-group textarea { resize:vertical; min-height:60px; }
+
+        .upload-area { border:2px dashed #d0d0d0; border-radius:8px; padding:30px; text-align:center; cursor:pointer; transition:border-color 0.2s; }
+        .upload-area:hover { border-color:#7c5cfc; }
+        .upload-area.dragover { border-color:#7c5cfc; background:#f8f5ff; }
+        .upload-area input[type="file"] { display:none; }
+
+        .btn { padding:6px 14px; border-radius:6px; font-size:13px; cursor:pointer; border:1px solid #e1e3e6; background:#fff; color:#5c5f66; transition:all .15s; }
+        .btn:hover { border-color:#7c5cfc; color:#7c5cfc; }
+        .btn-primary { background:#7c5cfc; color:#fff; border-color:#7c5cfc; }
+        .btn-primary:hover { background:#6a4ae0; border-color:#6a4ae0; color:#fff; }
+        .btn-sm { padding:4px 10px; font-size:12px; }
+
+        .toast-box { position:fixed; top:20px; right:20px; z-index:10001; }
+        .toast-item { background:#333; color:#fff; padding:10px 18px; border-radius:8px; margin-bottom:8px; font-size:13px; }
+        .toast-item.success { background:#27ae60; }
+        .toast-item.error { background:#e74c3c; }
+
+        .mapping-table { width:100%; border-collapse:collapse; font-size:13px; margin-top:12px; }
+        .mapping-table th { background:#f5f5f5; padding:8px 12px; text-align:left; font-weight:500; border-bottom:2px solid #e1e3e6; }
+        .mapping-table td { padding:6px 12px; border-bottom:1px solid #f0f0f0; }
+        .mapping-table select { padding:4px 8px; border:1px solid #e1e3e6; border-radius:4px; font-size:12px; }
+
+        .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:200; justify-content:center; align-items:center; }
+        .modal-overlay.active { display:flex; }
+        .modal { background:#fff; border-radius:12px; padding:24px; width:700px; max-width:92vw; max-height:88vh; overflow-y:auto; box-shadow:0 8px 32px rgba(0,0,0,0.15); }
+        .modal h3 { font-size:16px; margin:0 0 16px; }
+        .modal-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:16px; padding-top:12px; border-top:1px solid #e1e3e6; }
+
+        .import-status { font-size:13px; color:#909296; margin-top:8px; padding:8px 12px; background:#f8f8fa; border-radius:6px; }
+        .import-status.success { color:#27ae60; background:#f0fdf4; }
+        .import-status.error { color:#d32f2f; background:#fff5f5; }
+    </style>
+</head>
+<body>
+<div layout:fragment="content">
+    <h1 style="font-size:22px;font-weight:600;margin:0 0 16px;">🗂️ 数据</h1>
+
+    <div class="data-tabs">
+        <button class="data-tab" onclick="window.location.href='/data'">📊 数据概览</button>
+        <button class="data-tab" onclick="window.location.href='/data/kb'">📁 笔记库数据</button>
+        <button class="data-tab" onclick="window.location.href='/data/processing'">📋 数据加工</button>
+        <button class="data-tab active" onclick="window.location.href='/data/import'">📥 数据导入</button>
+        <button class="data-tab" onclick="window.location.href='/data/collector'">🔧 数据采集</button>
+    </div>
+
+    <div class="di-wrap">
+        <!-- Excel 导入 -->
+        <div class="di-section">
+            <h2>📊 Excel 导入</h2>
+            <div class="desc">上传 .xlsx / .xls 文件，自动识别列结构并映射到数据集字段。</div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>选择数据集</label>
+                    <select id="excelDatasetId" onchange="updateImportStatus('')"></select>
+                </div>
+            </div>
+            <div class="upload-area" id="excelUploadArea" onclick="document.getElementById('excelFileInput').click()">
+                <input type="file" id="excelFileInput" accept=".xlsx,.xls" onchange="handleExcelFile(this)">
+                <div style="color:#5c5f66;">点击或拖拽 Excel 文件到这里</div>
+                <div style="font-size:12px;color:#909296;margin-top:4px;">支持 .xlsx / .xls 格式</div>
+            </div>
+            <div style="margin-top:8px;display:flex;align-items:center;gap:12px;">
+                <label style="font-size:13px;cursor:pointer;"><input type="checkbox" id="excelUseAi"> AI 智能处理（字段映射+标准化）</label>
+            </div>
+            <div id="excelStatus" class="import-status"></div>
+        </div>
+
+        <!-- JSON 导入 -->
+        <div class="di-section">
+            <h2>📋 JSON 导入</h2>
+            <div class="desc">粘贴 JSON 数组或对象，直接导入到数据集。</div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>选择数据集</label>
+                    <select id="jsonDatasetId"></select>
+                </div>
+            </div>
+            <div class="form-group" style="margin-bottom:8px;">
+                <label>JSON 数据</label>
+                <textarea id="jsonData" rows="6" placeholder='[{"name": "张三", "phone": "138..."}, ...]'></textarea>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;justify-content:space-between;">
+                <label style="font-size:13px;cursor:pointer;"><input type="checkbox" id="jsonUseAi"> AI 智能处理</label>
+                <button class="btn btn-primary" onclick="importJson()">🚀 导入 JSON</button>
+            </div>
+            <div id="jsonStatus" class="import-status"></div>
+        </div>
+
+        <!-- URL 采集导入 -->
+        <div class="di-section">
+            <h2>🌐 URL 数据获取</h2>
+            <div class="desc">输入目标网页 URL，AI 自动访问并提取结构化数据。</div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>选择数据集</label>
+                    <select id="urlDatasetId"></select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>目标 URL</label>
+                    <input type="url" id="importUrl" placeholder="https://example.com/data">
+                </div>
+            </div>
+            <div style="text-align:right;">
+                <button class="btn btn-primary" onclick="importFromUrl()">🤖 AI 提取数据</button>
+            </div>
+            <div id="urlStatus" class="import-status"></div>
+        </div>
+    </div>
+
+    <!-- Excel 预览弹窗 -->
+    <div class="modal-overlay" id="excelPreviewModal">
+        <div class="modal" style="width:700px;">
+            <h3>📊 Excel 列映射预览</h3>
+            <div id="excelPreviewContent"></div>
+            <div class="modal-actions">
+                <button type="button" class="btn" onclick="closeModal('excelPreviewModal')">取消</button>
+                <button type="button" class="btn btn-primary" onclick="confirmExcelImport()">✅ 确认导入</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast-box" id="toastBox"></div>
+
+    <script>
+    let allDatasets = [];
+    let previewData = null;
+    let previewFile = null;
+
+    // ========== 加载数据集列表 ==========
+    async function loadDatasets() {
+        try {
+            const res = await fetch('/api/datacenter/datasets');
+            const data = await res.json();
+            if (data.ok) {
+                allDatasets = data.data || [];
+                populateSelects();
+            }
+        } catch (e) {
+            document.querySelectorAll('select[id$="DatasetId"]').forEach(function(sel) {
+                sel.innerHTML = '<option value="">加载失败</option>';
+            });
+        }
+    }
+
+    function populateSelects() {
+        const ids = ['excelDatasetId', 'jsonDatasetId', 'urlDatasetId'];
+        const opts = allDatasets.map(function(ds) {
+            return '<option value="' + ds.id + '">' + esc(ds.name) + ' (' + (ds.recordCount || 0) + '条)</option>';
+        }).join('');
+        ids.forEach(function(id) {
+            const sel = document.getElementById(id);
+            if (sel) sel.innerHTML = '<option value="">选择数据集...</option>' + opts;
+        });
+    }
+
+    // ========== Excel 导入 ==========
+    const excelArea = document.getElementById('excelUploadArea');
+    excelArea.addEventListener('dragover', function(e) { e.preventDefault(); excelArea.classList.add('dragover'); });
+    excelArea.addEventListener('dragleave', function() { excelArea.classList.remove('dragover'); });
+    excelArea.addEventListener('drop', function(e) {
+        e.preventDefault();
+        excelArea.classList.remove('dragover');
+        if (e.dataTransfer.files.length > 0) {
+            document.getElementById('excelFileInput').files = e.dataTransfer.files;
+            handleExcelFile(document.getElementById('excelFileInput'));
+        }
+    });
+
+    async function handleExcelFile(input) {
+        const file = input.files[0];
+        if (!file) return;
+        const dsId = document.getElementById('excelDatasetId').value;
+        if (!dsId) { updateImportStatus('excelStatus', '请先选择数据集', 'error'); return; }
+
+        updateImportStatus('excelStatus', '正在预览文件...', '');
+        previewFile = file;
+
+        const formData = new FormData();
+        formData.append('file', file);
+        try {
+            const res = await fetch('/api/datacenter/datasets/import/excel/preview', { method: 'POST', body: formData });
+            const data = await res.json();
+            if (data.ok) {
+                previewData = data.data;
+                renderExcelPreview(data.data, dsId);
+                document.getElementById('excelPreviewModal').classList.add('active');
+                updateImportStatus('excelStatus', '');
+            } else {
+                updateImportStatus('excelStatus', '预览失败: ' + (data.error || ''), 'error');
+            }
+        } catch (e) {
+            updateImportStatus('excelStatus', '预览失败', 'error');
+        }
+    }
+
+    async function renderExcelPreview(preview, dsId) {
+        let schemaFields = [];
+        try {
+            const res = await fetch('/api/datacenter/datasets/' + dsId);
+            const data = await res.json();
+            if (data.ok && data.data.schema && data.data.schema.fields) schemaFields = data.data.schema.fields;
+        } catch(e) {}
+
+        let h = '<table class="mapping-table"><thead><tr><th>Excel列名</th><th>映射到字段</th></tr></thead><tbody>';
+        preview.headers.forEach(function(header) {
+            const matched = schemaFields.find(function(f) {
+                return f.name.toLowerCase() === header.toLowerCase() || (f.displayName && f.displayName.toLowerCase() === header.toLowerCase());
+            });
+            h += '<tr><td>' + esc(header) + '</td>'
+               + '<td><select class="mapping-select" data-excel-col="' + esc(header) + '">'
+               + '<option value="' + esc(header) + '">' + esc(header) + ' (保持原名)</option>';
+            schemaFields.forEach(function(f) {
+                h += '<option value="' + esc(f.name) + '"' + (matched && matched.name === f.name ? ' selected' : '') + '>' + esc(f.displayName || f.name) + '</option>';
+            });
+            h += '</select></td></tr>';
+        });
+        h += '</tbody></table>';
+        h += '<div style="font-size:12px;color:#5c5f66;margin-top:8px;">共 ' + preview.totalRows + ' 行数据，预览前 ' + preview.rows.length + ' 行</div>';
+        document.getElementById('excelPreviewContent').innerHTML = h;
+    }
+
+    async function confirmExcelImport() {
+        const dsId = document.getElementById('excelDatasetId').value;
+        if (!dsId || !previewFile) return;
+
+        const mapping = {};
+        document.querySelectorAll('.mapping-select').forEach(function(sel) {
+            mapping[sel.dataset.excelCol] = sel.value;
+        });
+
+        const useAi = document.getElementById('excelUseAi').checked;
+        const formData = new FormData();
+        formData.append('file', previewFile);
+        formData.append('mapping', JSON.stringify(mapping));
+        formData.append('useAi', useAi);
+
+        updateImportStatus('excelStatus', '⏳ 导入中...', '');
+        try {
+            const res = await fetch('/api/datacenter/datasets/' + dsId + '/import/excel', { method: 'POST', body: formData });
+            const data = await res.json();
+            if (data.ok) {
+                updateImportStatus('excelStatus', '✅ ' + data.message, 'success');
+                closeModal('excelPreviewModal');
+                previewFile = null;
+                previewData = null;
+                document.getElementById('excelFileInput').value = '';
+                loadDatasets();
+            } else {
+                updateImportStatus('excelStatus', '❌ ' + (data.error || '导入失败'), 'error');
+            }
+        } catch (e) {
+            updateImportStatus('excelStatus', '❌ 导入失败', 'error');
+        }
+    }
+
+    // ========== JSON 导入 ==========
+    async function importJson() {
+        const dsId = document.getElementById('jsonDatasetId').value;
+        if (!dsId) { updateImportStatus('jsonStatus', '请先选择数据集', 'error'); return; }
+        const raw = document.getElementById('jsonData').value.trim();
+        if (!raw) { updateImportStatus('jsonStatus', '请输入JSON数据', 'error'); return; }
+
+        let parsed;
+        try { parsed = JSON.parse(raw); } catch (e) { updateImportStatus('jsonStatus', 'JSON格式错误', 'error'); return; }
+
+        const useAi = document.getElementById('jsonUseAi').checked;
+        updateImportStatus('jsonStatus', '⏳ 导入中...', '');
+
+        try {
+            const res = await fetch('/api/datacenter/datasets/' + dsId + '/import/json', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ data: parsed, useAi: useAi })
+            });
+            const data = await res.json();
+            if (data.ok) {
+                updateImportStatus('jsonStatus', '✅ ' + data.message, 'success');
+                document.getElementById('jsonData').value = '';
+                loadDatasets();
+            } else {
+                updateImportStatus('jsonStatus', '❌ ' + (data.error || '导入失败'), 'error');
+            }
+        } catch (e) {
+            updateImportStatus('jsonStatus', '❌ 导入失败', 'error');
+        }
+    }
+
+    // ========== URL 导入 ==========
+    async function importFromUrl() {
+        const dsId = document.getElementById('urlDatasetId').value;
+        if (!dsId) { updateImportStatus('urlStatus', '请先选择数据集', 'error'); return; }
+        const url = document.getElementById('importUrl').value.trim();
+        if (!url) { updateImportStatus('urlStatus', '请输入URL', 'error'); return; }
+
+        updateImportStatus('urlStatus', '⏳ AI 正在采集数据...', '');
+        try {
+            const res = await fetch('/api/datacenter/datasets/' + dsId + '/import/url', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url: url })
+            });
+            const data = await res.json();
+            if (data.ok) {
+                updateImportStatus('urlStatus', '✅ ' + data.message, 'success');
+                document.getElementById('importUrl').value = '';
+                loadDatasets();
+            } else {
+                updateImportStatus('urlStatus', '❌ ' + (data.error || '导入失败'), 'error');
+            }
+        } catch (e) {
+            updateImportStatus('urlStatus', '❌ 导入失败', 'error');
+        }
+    }
+
+    // ========== 工具 ==========
+    function updateImportStatus(id, msg, type) {
+        const el = typeof id === 'string' ? document.getElementById(id) : id;
+        if (!el) return;
+        el.textContent = msg || '';
+        el.className = 'import-status' + (type ? ' ' + type : '');
+    }
+
+    function esc(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+    function toast(msg, type) {
+        const box = document.getElementById('toastBox');
+        const t = document.createElement('div');
+        t.className = 'toast-item' + (type ? ' ' + type : '');
+        t.textContent = msg;
+        box.appendChild(t);
+        setTimeout(function() { t.remove(); }, 3000);
+    }
+
+    function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+    document.querySelectorAll('.modal-overlay').forEach(function(m) {
+        m.addEventListener('click', function(e) { if (e.target === this) this.classList.remove('active'); });
+    });
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') document.querySelectorAll('.modal-overlay').forEach(function(m) { m.classList.remove('active'); });
+    });
+
+    loadDatasets();
+    </script>
+</div>
+</body>
+</html>

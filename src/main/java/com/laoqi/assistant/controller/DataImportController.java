@@ -4,10 +4,10 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 
 @Controller
-public class CollectorPageController {
+public class DataImportController {
 
-    @GetMapping("/data/collector")
-    public String collectorPage() {
-        return "collector";
+    @GetMapping("/data/import")
+    public String importPage() {
+        return "data_import";
     }
 }
