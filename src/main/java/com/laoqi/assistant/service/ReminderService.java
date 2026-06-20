@@ -573,7 +573,7 @@ public class ReminderService {
             String notesDir = configService.getNotesDir(kbId);
             if (notesDir == null || notesDir.isEmpty()) return;
 
-            List<Reminder> allReminders = getAllRemindersFromDb();
+            List<Reminder> allReminders = getRemindersByKbId(kbId);
             Root root = new Root();
             root.reminders = allReminders;
             root.meta = new LinkedHashMap<>();
@@ -588,5 +588,24 @@ public class ReminderService {
         } catch (Exception e) {
             log.warn("[提醒] 同步到笔记库失败: {}", e.getMessage());
         }
+    }
+
+    private List<Reminder> getRemindersByKbId(Long kbId) {
+        List<Reminder> reminders = new ArrayList<>();
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement ps = conn.prepareStatement("SELECT * FROM reminders WHERE kb_id = ? ORDER BY created_at DESC")) {
+            if (kbId != null) {
+                ps.setLong(1, kbId);
+            } else {
+                ps.setObject(1, null);
+            }
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                reminders.add(mapRowToReminder(rs));
+            }
+        } catch (SQLException e) {
+            log.error("[提醒] 按KB查询失败", e);
+        }
+        return reminders;
     }
 }

@@ -175,6 +175,7 @@
 var solveSending = false;
 var solveCurrentSessionId = null;
 var solveCurrentAnswer = '';
+var solveCurrentConversation = [];
 var solveSelectedSaveDir = '';
 
 function solveRenderMath(el) {
@@ -269,6 +270,7 @@ async function solveAutoRecognize(file) {
         var data = await resp.json();
         if (data.ok) {
             solveCurrentSessionId = data.sessionId;
+            solveCurrentConversation = data.conversation || [];
             solveShowCard('/image/solve/api/sessions/' + data.sessionId + '/image', data.answer, [], data.sessionId, false);
             var tempEl = document.querySelector('.solve-session-item[data-id="' + tempId + '"]');
             if (tempEl) {
@@ -332,10 +334,11 @@ async function solveSendFollowUp() {
         var resp = await fetch('/image/solve/api/ask', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ message: msg, conversation: [], modelName: modelName, sessionId: solveCurrentSessionId })
+            body: JSON.stringify({ message: msg, conversation: solveCurrentConversation, modelName: modelName, sessionId: solveCurrentSessionId })
         });
         var data = await resp.json();
         if (data.ok) {
+            solveCurrentConversation = data.conversation || solveCurrentConversation;
             var card = document.querySelector('#solveCardList .solve-card');
             if (card) {
                 var followSection = card.querySelector('.solve-follow');
@@ -367,6 +370,7 @@ async function solveRecognizeKbImage(path, kbId) {
         var data = await resp.json();
         if (data.ok) {
             solveCurrentSessionId = data.sessionId;
+            solveCurrentConversation = data.conversation || [];
             solveShowCard('/image/solve/api/sessions/' + data.sessionId + '/image', data.answer, [], data.sessionId, false);
             solveAddSessionToList(data.sessionId, path.split('/').pop());
         } else {

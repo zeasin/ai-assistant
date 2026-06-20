@@ -242,6 +242,7 @@ let selectedImage = null;
 let currentResultMd = '';
 let currentBrowseDir = '';
 let selectedSaveDir = '';
+let allAnalyses = [];
 
 function selectScenario(btn) {
     document.querySelectorAll('.sr-scenario-btn').forEach(function(b) { b.classList.remove('active'); });
@@ -277,6 +278,7 @@ async function loadHistory() {
             container.innerHTML = '<div class="sr-empty">暂无分析记录</div>';
             return;
         }
+        allAnalyses = data.analyses;
         var html = '';
         for (var i = 0; i < data.analyses.length; i++) {
             var a = data.analyses[i];
@@ -301,7 +303,34 @@ async function loadHistory() {
 }
 
 async function showHistoryDetail(id) {
-    toast('加载详情...', 'success');
+    var analysis = allAnalyses.find(function(a) { return a.id === id; });
+    if (!analysis) { toast('未找到记录', 'error'); return; }
+
+    var imageUrl = analysis.imagePath ? '/image/thumb?path=' + encodeURIComponent(analysis.imagePath) + '&kbId=' + (analysis.kbId || getKbId()) : null;
+    if (!imageUrl && analysis.source === 'upload') {
+        imageUrl = 'data:' + (analysis.imageType || 'image/jpeg') + ';base64,';
+    }
+
+    var resultMd = analysis.result || '(无结果)';
+    currentResultMd = resultMd;
+
+    document.getElementById('resultArea').style.display = 'block';
+    if (imageUrl && !imageUrl.startsWith('data:')) {
+        document.getElementById('resultImg').src = imageUrl;
+        document.getElementById('modalResultImg').src = imageUrl;
+    }
+    var html = marked.parse(resultMd);
+    document.getElementById('resultText').innerHTML = html;
+    document.getElementById('modalResultText').innerHTML = html;
+    if (window.__katexLoaded || typeof renderMathInElement !== 'undefined') {
+        try {
+            renderMathInElement(document.getElementById('resultText'), { delimiters: [{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}], throwOnError: false });
+            renderMathInElement(document.getElementById('modalResultText'), { delimiters: [{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}], throwOnError: false });
+        } catch(e) {}
+    }
+    document.getElementById('saveStatus').textContent = '';
+    document.getElementById('modalSaveStatus').textContent = '';
+    document.getElementById('resultArea').scrollIntoView({behavior: 'smooth', block: 'start'});
 }
 
 function escapeHtml(str) {

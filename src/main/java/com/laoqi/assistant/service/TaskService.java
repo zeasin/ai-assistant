@@ -271,7 +271,7 @@ public class TaskService {
             String notesDir = configService.getNotesDir(kbId);
             if (notesDir == null || notesDir.isEmpty()) return;
 
-            List<TaskItem> allTasks = getAllTasksFromDb();
+            List<TaskItem> allTasks = getTasksByKbId(kbId);
             Root root = new Root();
             root.tasks = allTasks;
             root.meta = new LinkedHashMap<>();
@@ -282,5 +282,24 @@ public class TaskService {
         } catch (Exception e) {
             log.warn("[任务] 同步到笔记库失败: {}", e.getMessage());
         }
+    }
+
+    private List<TaskItem> getTasksByKbId(Long kbId) {
+        List<TaskItem> tasks = new ArrayList<>();
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement ps = conn.prepareStatement("SELECT * FROM tasks WHERE kb_id = ? ORDER BY created_at DESC")) {
+            if (kbId != null) {
+                ps.setLong(1, kbId);
+            } else {
+                ps.setObject(1, null);
+            }
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                tasks.add(mapRowToTask(rs));
+            }
+        } catch (SQLException e) {
+            log.error("[任务] 按KB查询失败", e);
+        }
+        return tasks;
     }
 }
