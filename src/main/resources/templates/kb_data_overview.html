@@ -181,7 +181,7 @@ function renderFiles(files) {
     }
     var html = '<div class="data-table-container"><table class="data-table">';
     html += '<thead><tr>';
-    html += '<th>文件名</th><th>大小</th><th>更新时间</th><th>操作</th>';
+    html += '<th>文件名</th><th>所在目录</th><th>大小</th><th>更新时间</th>';
     html += '</tr></thead><tbody>';
     for (var i = 0; i < files.length; i++) {
         var f = files[i];
@@ -189,14 +189,24 @@ function renderFiles(files) {
         var date = f.lastModified ? new Date(f.lastModified).toLocaleString() : '';
         var filePath = f.path;
         var dir = filePath.includes('/') ? filePath.substring(0, filePath.lastIndexOf('/')) : '';
+        var folderName = '根目录';
+        if (dir) {
+            var parts = dir.split('/');
+            // 找到 data 目录的上一级中文目录名
+            for (var j = parts.length - 1; j >= 0; j--) {
+                if (parts[j] !== 'data' && parts[j] !== '') {
+                    folderName = parts[j];
+                    break;
+                }
+            }
+        }
         var fileName = f.name.replace('.json', '');
-        html += '<tr>';
-        html += '<td>📄 ' + escapeHtml(f.name) + '</td>';
+        var detailUrl = '/kb/' + KB_ID + '/data/detail?dir=' + encodeURIComponent(dir) + '&file=' + encodeURIComponent(fileName);
+        html += '<tr style="cursor:pointer;" onclick="window.location.href=\'' + detailUrl + '\'">';
+        html += '<td><span class="icon">📊</span> ' + escapeHtml(f.name) + '</td>';
+        html += '<td>📁 ' + escapeHtml(folderName) + '</td>';
         html += '<td>' + size + '</td>';
         html += '<td>' + date + '</td>';
-        html += '<td><div class="data-row-actions">';
-        html += '<a href="/kb/' + KB_ID + '/data/detail?dir=' + encodeURIComponent(dir) + '&file=' + encodeURIComponent(fileName) + '" class="btn" style="text-decoration:none;">查看</a>';
-        html += '</div></td>';
         html += '</tr>';
     }
     html += '</tbody></table></div>';

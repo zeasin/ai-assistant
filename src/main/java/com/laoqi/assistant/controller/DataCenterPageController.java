@@ -8,6 +8,6 @@ public class DataCenterPageController {
 
     @GetMapping("/data/processing")
     public String dataCenterPage() {
-        return "datacenter";
+        return "data_processing";
     }
 }
