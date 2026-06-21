@@ -161,14 +161,60 @@ public class ReportService {
     }
 
     public String readTodayReport(String notesDir) {
+        return readLatestReport(notesDir);
+    }
+
+    public String readLatestReport(String notesDir) {
         Path dir = getComprehensiveReportDir(notesDir);
+        if (!java.nio.file.Files.isDirectory(dir)) return null;
+
+        // 优先读取今天的
         String date = TimeUtil.todayStr();
-        Path file = dir.resolve(date + ".md");
-        if (FileUtil.exists(file)) {
-            String raw = FileUtil.readText(file);
+        Path todayFile = dir.resolve(date + ".md");
+        if (FileUtil.exists(todayFile)) {
+            String raw = FileUtil.readText(todayFile);
             return MarkdownUtil.stripFrontmatter(raw);
         }
-        return null;
+
+        // 没有今天的，读取最近一份（排除提示词文件）
+        try (java.util.stream.Stream<Path> files = java.nio.file.Files.list(dir)) {
+            return files
+                    .filter(p -> p.toString().endsWith(".md"))
+                    .filter(p -> !p.getFileName().toString().equals(PROMPT_FILENAME))
+                    .sorted(java.util.Comparator.reverseOrder())
+                    .findFirst()
+                    .map(p -> {
+                        String raw = FileUtil.readText(p);
+                        return MarkdownUtil.stripFrontmatter(raw);
+                    })
+                    .orElse(null);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    public String getLatestReportDate(String notesDir) {
+        Path dir = getComprehensiveReportDir(notesDir);
+        if (!java.nio.file.Files.isDirectory(dir)) return null;
+
+        // 优先今天的
+        String today = TimeUtil.todayStr();
+        if (FileUtil.exists(dir.resolve(today + ".md"))) {
+            return today;
+        }
+
+        // 否则取最近文件名（排除提示词文件）
+        try (java.util.stream.Stream<Path> files = java.nio.file.Files.list(dir)) {
+            return files
+                    .filter(p -> p.toString().endsWith(".md"))
+                    .filter(p -> !p.getFileName().toString().equals(PROMPT_FILENAME))
+                    .sorted(java.util.Comparator.reverseOrder())
+                    .findFirst()
+                    .map(p -> p.getFileName().toString().replace(".md", ""))
+                    .orElse(null);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     public Path getTodayReportPath() {

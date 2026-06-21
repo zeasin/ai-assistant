@@ -4,6 +4,7 @@
       layout:decorate="~{layout}">
 <head>
     <title>笔记库</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         .kb-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(360px,1fr)); gap:16px; }
         .kb-card { background:#fff; border:1px solid #e1e3e6; border-radius:12px; padding:20px; transition:all .2s; position:relative; }
@@ -30,27 +31,81 @@
         .kb-empty .text { font-size:16px; font-weight:600; color:#7c5cfc; margin-bottom:8px; }
         .kb-mgmt-bar { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; padding:12px 16px; background:#fff; border:1px solid #e1e3e6; border-radius:12px; }
         .kb-mgmt-bar .info { font-size:13px; color:#5c5f66; }
+        .data-tabs { display:flex; gap:0; border-bottom:2px solid #e1e3e6; margin-bottom:20px; background:#fff; border-radius:12px 12px 0 0; padding:0 20px; }
+        .data-tab { padding:12px 20px; font-size:14px; cursor:pointer; transition:all .15s; border:none; background:transparent; color:#5c5f66; border-bottom:2px solid transparent; margin-bottom:-2px; font-weight:500; }
+        .data-tab:hover { color:#1a1b1e; background:#f5f5f7; border-radius:6px 6px 0 0; }
+        .data-tab.active { color:#7c5cfc; border-bottom-color:#7c5cfc; font-weight:600; }
+        .data-panel { background:#fff; border:1px solid #e1e3e6; border-radius:0 0 12px 12px; padding:20px; min-height:200px; }
     </style>
 </head>
 <body>
     <div layout:fragment="content">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
             <h1 style="font-size:22px;font-weight:600;margin:0;">📚 笔记库</h1>
             <button class="btn btn-primary" onclick="showAddKbModal()">+ 添加笔记库</button>
         </div>
 
-        <div th:if="${#lists.size(kbInfos) == 0}" class="kb-empty" id="emptyState">
-            <div class="icon">📚</div>
-            <div class="text">尚未配置笔记库</div>
-            <div class="text-muted" style="margin-bottom:16px;">点击上方「添加笔记库」创建一个</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px;">
+            <div style="background:#fff;border:1px solid #e1e3e6;border-radius:10px;padding:16px;text-align:center;">
+                <div style="font-size:28px;font-weight:700;color:#7c5cfc;" th:text="${totalKbs}">0</div>
+                <div style="font-size:12px;color:#5c5f66;margin-top:4px;">笔记库</div>
+            </div>
+            <div style="background:#fff;border:1px solid #e1e3e6;border-radius:10px;padding:16px;text-align:center;">
+                <div style="font-size:28px;font-weight:700;color:#7c5cfc;" th:text="${totalDirs}">0</div>
+                <div style="font-size:12px;color:#5c5f66;margin-top:4px;">目录</div>
+            </div>
+            <div style="background:#fff;border:1px solid #e1e3e6;border-radius:10px;padding:16px;text-align:center;">
+                <div style="font-size:28px;font-weight:700;color:#7c5cfc;" th:text="${totalFiles}">0</div>
+                <div style="font-size:12px;color:#5c5f66;margin-top:4px;">文件</div>
+            </div>
+            <div style="background:#fff;border:1px solid #e1e3e6;border-radius:10px;padding:16px;text-align:center;">
+                <div style="font-size:28px;font-weight:700;color:#f59e0b;" th:text="${totalTasks}">0</div>
+                <div style="font-size:12px;color:#5c5f66;margin-top:4px;">待办任务</div>
+            </div>
+            <div style="background:#fff;border:1px solid #e1e3e6;border-radius:10px;padding:16px;text-align:center;">
+                <div style="font-size:28px;font-weight:700;color:#10b981;" th:text="${totalReminders}">0</div>
+                <div style="font-size:12px;color:#5c5f66;margin-top:4px;">提醒</div>
+            </div>
         </div>
 
-        <div th:if="${#lists.size(kbInfos) > 0}" id="kbGridContainer">
-            <div class="kb-mgmt-bar">
-                <span class="info">共 <strong th:text="${#lists.size(kbInfos)}">0</strong> 个笔记库</span>
-                <button class="btn btn-secondary btn-sm" onclick="refreshKbList()" style="padding:4px 12px;font-size:12px;">🔄 刷新</button>
+        <div class="data-tabs">
+            <button class="data-tab active" onclick="switchTab('analysis', this)">📊 AI 分析</button>
+            <button class="data-tab" onclick="switchTab('list', this)">📋 笔记库管理</button>
+        </div>
+
+        <!-- AI 分析 Tab -->
+        <div id="panelAnalysis" class="data-panel">
+            <div th:if="${#lists.size(kbInfos) == 0}" class="exam-empty">
+                暂无笔记库，请先添加
             </div>
-            <div class="kb-grid" id="kbGrid">
+            <div th:if="${#lists.size(kbInfos) > 0}">
+                <div th:each="kb : ${kbInfos}" style="margin-bottom:20px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                        <h3 style="margin:0;font-size:15px;">📂 <span th:text="${kb.name}">笔记库</span></h3>
+                        <button class="btn btn-secondary" style="font-size:12px;padding:4px 12px;" onclick="startKbAnalysis(${kb.id}, '${kb.name}')">🤖 AI 分析</button>
+                    </div>
+                    <div th:if="${kb.hasReport}" class="kb-report-preview" th:attr="data-report=${kb.latestReport}" style="padding:16px;background:linear-gradient(135deg,#f0edff,#fafafe);border:1px solid #d9d0ff;border-radius:10px;cursor:pointer;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                            <span style="font-size:12px;color:#7c5cfc;font-weight:500;">📊 综合日报</span>
+                            <span style="font-size:11px;color:#909296;" th:text="${kb.reportDate}">日期</span>
+                        </div>
+                        <div class="kb-report-content report" style="font-size:13px;line-height:1.8;"></div>
+                    </div>
+                    <div th:unless="${kb.hasReport}" style="padding:20px;text-align:center;color:#909296;font-size:13px;border:1px dashed #d9d0ff;border-radius:10px;">
+                        暂无分析报告，点击「AI 分析」生成
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 笔记库管理 Tab -->
+        <div id="panelList" class="data-panel" style="display:none;">
+            <div th:if="${#lists.size(kbInfos) == 0}" class="kb-empty">
+                <div class="icon">📚</div>
+                <div class="text">尚未配置笔记库</div>
+                <div class="text-muted" style="margin-bottom:16px;">点击上方「添加笔记库」创建一个</div>
+            </div>
+            <div th:if="${#lists.size(kbInfos) > 0}" class="kb-grid">
                 <div th:each="kb : ${kbInfos}" class="kb-card" th:attr="data-kb-id=${kb.id}">
                     <div class="kb-card-actions">
                         <button onclick="showEditKbModal(this)" title="编辑">✏️</button>
@@ -59,9 +114,10 @@
                     <div class="kb-name">📂 <span th:text="${kb.name}">知识库</span></div>
                     <div class="kb-path" th:text="${kb.notesDir}">路径</div>
                     <div class="kb-stats">
+                        <div class="kb-stat"><div class="num" th:text="${kb.dirCount}">0</div><div class="label">目录</div></div>
+                        <div class="kb-stat"><div class="num" th:text="${kb.fileCount}">0</div><div class="label">文件</div></div>
                         <div class="kb-stat"><div class="num" th:text="${kb.taskCount}">0</div><div class="label" th:text="${kb.labels != null ? kb.labels.get('tasks') : '任务'}">任务</div></div>
                         <div class="kb-stat"><div class="num" th:text="${kb.reminderCount}">0</div><div class="label" th:text="${kb.labels != null ? kb.labels.get('reminders') : '提醒'}">提醒</div></div>
-                        <div class="kb-stat"><div class="num">📂</div><div class="label" th:text="${kb.labels != null ? kb.labels.get('notes') : '笔记'}">笔记</div></div>
                     </div>
                     <div class="kb-actions">
                         <a th:href="@{/kb/{id}(id=${kb.id})}" class="btn-kb">📊 概览</a>
@@ -129,8 +185,104 @@
             </div>
         </div>
 
+        <!-- AI分析报告预览弹窗 -->
+        <div class="modal-overlay" id="reportModal">
+            <div class="modal" style="width:80%;max-width:800px;max-height:85vh;display:flex;flex-direction:column;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                    <h3 style="margin:0;">📊 AI 分析报告</h3>
+                    <button class="btn btn-secondary" onclick="closeModal('reportModal')" style="padding:4px 12px;">✕</button>
+                </div>
+                <div id="reportContent" style="overflow:auto;flex:1;padding:16px;background:#fafafe;border-radius:8px;" class="report"></div>
+            </div>
+        </div>
+
+        <!-- AI分析弹窗 -->
+        <div class="modal-overlay" id="analysisModal">
+            <div class="modal" style="width:80%;max-width:800px;max-height:85vh;display:flex;flex-direction:column;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                    <h3 style="margin:0;">📊 综合日报 - <span id="analysisKbName"></span></h3>
+                    <button class="btn btn-secondary" onclick="closeModal('analysisModal')" style="padding:4px 12px;">✕</button>
+                </div>
+                <div id="analysisResult" style="overflow:auto;flex:1;padding:16px;background:#fafafe;border-radius:8px;" class="report"></div>
+                <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end;">
+                    <button class="btn btn-secondary" onclick="closeModal('analysisModal')">关闭</button>
+                    <button class="btn btn-primary" id="analysisBtn" onclick="runKbAnalysis()">🚀 开始生成</button>
+                </div>
+            </div>
+        </div>
+
         <script>
-            var kbList = [];
+            function switchTab(tab, btn) {
+                document.querySelectorAll('.data-tab').forEach(function(t) { t.classList.remove('active'); });
+                btn.classList.add('active');
+                document.getElementById('panelAnalysis').style.display = tab === 'analysis' ? '' : 'none';
+                document.getElementById('panelList').style.display = tab === 'list' ? '' : 'none';
+            }
+
+            function showKbReport(el) {
+                var report = el.getAttribute('data-report');
+                if (report) {
+                    document.getElementById('reportContent').innerHTML = marked.parse(report, {breaks: true});
+                    document.getElementById('reportModal').classList.add('active');
+                }
+            }
+
+            document.querySelectorAll('.kb-report-preview').forEach(function(el) {
+                var contentEl = el.querySelector('.kb-report-content');
+                if (contentEl) {
+                    var markdown = el.getAttribute('data-report');
+                    if (markdown) {
+                        contentEl.innerHTML = marked.parse(markdown, {breaks: true});
+                    }
+                }
+                el.addEventListener('click', function(e) {
+                    if (e.target.tagName === 'BUTTON') return;
+                    showKbReport(this);
+                });
+            });
+
+            var currentAnalysisKbId = null;
+            var currentAnalysisEventSource = null;
+
+            function startKbAnalysis(kbId, kbName) {
+                currentAnalysisKbId = kbId;
+                document.getElementById('analysisKbName').textContent = kbName;
+                document.getElementById('analysisPrompt').value = '';
+                document.getElementById('analysisResult').style.display = 'none';
+                document.getElementById('analysisResult').innerHTML = '';
+                document.getElementById('analysisBtn').disabled = false;
+                document.getElementById('analysisBtn').textContent = '🚀 开始生成';
+                document.getElementById('analysisModal').classList.add('active');
+            }
+
+            async function runKbAnalysis() {
+                if (!currentAnalysisKbId) return;
+                var btn = document.getElementById('analysisBtn');
+                var resultDiv = document.getElementById('analysisResult');
+
+                btn.disabled = true;
+                btn.textContent = '⏳ 生成中...';
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = '<div style="text-align:center;color:#909296;padding:20px;">AI 正在生成综合日报...</div>';
+
+                try {
+                    var resp = await fetch('/kb/' + currentAnalysisKbId + '/api/generate', { method: 'POST' });
+                    var data = await resp.json();
+                    if (data.ok && data.report) {
+                        resultDiv.innerHTML = marked.parse(data.report, {breaks: true});
+                        btn.textContent = '✅ 生成完成';
+                        setTimeout(function() { location.reload(); }, 1500);
+                    } else {
+                        resultDiv.innerHTML = '<div style="color:#e03131;">' + (data.error || '生成失败') + '</div>';
+                        btn.disabled = false;
+                        btn.textContent = '🚀 重新生成';
+                    }
+                } catch(e) {
+                    resultDiv.innerHTML = '<div style="color:#e03131;">请求失败: ' + e.message + '</div>';
+                    btn.disabled = false;
+                    btn.textContent = '🚀 重新生成';
+                }
+            }
 
             // ====== 弹窗通用 ======
             function closeModal(id) { document.getElementById(id).classList.remove('active'); }
