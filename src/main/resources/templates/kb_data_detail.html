@@ -67,21 +67,12 @@
 <body>
 <th:block layout:fragment="content">
 
-<div class="data-wrap">
-    <h1 style="font-size:22px;font-weight:600;margin:0 0 16px;">🗂️ 数据</h1>
-
-    <div class="data-tabs">
-        <button class="data-tab" onclick="window.location.href='/data'">📊 数据概览</button>
-        <button class="data-tab active" onclick="window.location.href='/data/kb'">📁 笔记库数据</button>
-        <button class="data-tab" onclick="window.location.href='/data/processing'">📋 数据加工</button>
-        <button class="data-tab" onclick="window.location.href='/data/import'">📥 数据导入</button>
-        <button class="data-tab" onclick="window.location.href='/data/collector'">🔧 数据采集</button>
-    </div>
+<th:block th:replace="~{kb_tab_bar :: kb-tabs('data', ${kb}, ${labels})}" />
 
 <div class="card">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
         <div>
-            <a href="/data/kb" style="color:#7c5cfc;text-decoration:none;font-size:13px;">← 返回数据列表</a>
+            <a th:href="@{/kb/{id}/data(id=${kb.id})}" style="color:#7c5cfc;text-decoration:none;font-size:13px;">← 返回数据概览</a>
             <h2 style="margin:8px 0 0 0;font-size:18px;">📊 <span id="dataFileTitle">客户数据.json</span></h2>
             <div class="text-muted" style="font-size:13px;" id="dataSourceInfo">
                 目录: <span th:text="${dir}"></span>
@@ -212,11 +203,44 @@ function loadData() {
         .then(function(r) { return r.json(); })
         .then(function(res) {
             console.log('📡 响应数据:', res);
-            if (!res.ok || !res.data || !res.data.groups) {
-                container.innerHTML = '<div class="empty-state"><div class="icon">📋</div><div>无法读取数据或数据为空</div><div style="font-size:12px;color:#909296;margin-top:8px;">API: ' + apiUrl + '</div><div style="font-size:12px;color:#909296;">响应: ' + JSON.stringify(res) + '</div></div>';
+            if (!res.ok || !res.data) {
+                container.innerHTML = '<div class="empty-state"><div class="icon">📋</div><div>无法读取数据或数据为空</div></div>';
                 return;
             }
-            var groups = res.data.groups;
+            
+            var data = res.data;
+            
+            // 格式1: 直接的 JSON 对象（有数组字段）
+            if (!data.groups) {
+                var arrayKeys = Object.keys(data).filter(function(k) { 
+                    return Array.isArray(data[k]); 
+                });
+                
+                if (arrayKeys.length > 0) {
+                    // 转换为 groups 格式
+                    var groups = {};
+                    arrayKeys.forEach(function(k) {
+                        groups[k] = { type: 'array', data: data[k] };
+                    });
+                    allGroupData = {};
+                    arrayKeys.forEach(function(k) {
+                        allGroupData[k] = data[k];
+                    });
+                    loadColumnSettings().then(function() { renderAllTables(); });
+                    return;
+                }
+                
+                // 没有数组字段，显示元数据
+                var html = '<div class="card" style="padding:20px;">';
+                html += '<h3 style="margin:0 0 12px;">📋 数据内容</h3>';
+                html += '<pre style="background:#f5f5f5;padding:12px;border-radius:8px;overflow-x:auto;font-size:12px;max-height:500px;overflow-y:auto;">' + esc(JSON.stringify(data, null, 2)) + '</pre>';
+                html += '</div>';
+                container.innerHTML = html;
+                return;
+            }
+            
+            // 格式2: groups 格式
+            var groups = data.groups;
             var arrayGroups = Object.keys(groups).filter(function(g) { return groups[g].type === 'array'; });
             if (arrayGroups.length === 0) {
                 container.innerHTML = '<div class="empty-state"><div class="icon">📋</div><div>暂无数组类型数据</div></div>';

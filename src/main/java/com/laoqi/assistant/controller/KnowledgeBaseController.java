@@ -129,6 +129,23 @@ public class KnowledgeBaseController {
         return "kb_data_overview";
     }
 
+    @GetMapping("/kb/{id}/data/detail")
+    public String kbDataDetail(@PathVariable Long id,
+                                @RequestParam(defaultValue = "") String dir,
+                                @RequestParam(defaultValue = "") String file,
+                                Map<String, Object> model) {
+        KnowledgeBaseEntity kb = kbService.getById(id);
+        if (kb == null) return "redirect:/config";
+
+        model.put("kb", kb);
+        model.put("labels", parseLabels(kb.getLabels()));
+        model.put("kbId", id);
+        model.put("dir", dir);
+        model.put("file", file);
+
+        return "kb_data_detail";
+    }
+
     // ========== 目录分析 ==========
 
     @GetMapping("/kb/{id}/notes")
@@ -521,11 +538,41 @@ public class KnowledgeBaseController {
 
     @ResponseBody
     @GetMapping("/kb/{id}/api/data/list")
-    public Map<String, Object> listJsonData(@PathVariable Long id, @RequestParam String dir) {
+    public Map<String, Object> listJsonData(@PathVariable Long id, @RequestParam(defaultValue = "") String dir) {
         KnowledgeBaseEntity kb = kbService.getById(id);
         if (kb == null) return Map.of("ok", false, "error", "知识库不存在");
-        Path dataDir = safeResolve(kbDir(kb), dir).resolve("data");
-        return Map.of("ok", true, "files", directoryDataService.listJsonFiles(dataDir));
+        
+        Path baseDir = kbDir(kb);
+        Path targetDir = dir.isEmpty() ? baseDir : safeResolve(baseDir, dir);
+        
+        List<Map<String, Object>> files = new ArrayList<>();
+        try (java.util.stream.Stream<Path> walk = Files.walk(targetDir)) {
+            walk.filter(Files::isRegularFile)
+                .filter(p -> p.toString().endsWith(".json"))
+                .filter(p -> {
+                    // 排除 . 开头的文件和目录
+                    Path relative = baseDir.relativize(p);
+                    for (Path pathSegment : relative) {
+                        if (pathSegment.toString().startsWith(".")) return false;
+                    }
+                    return true;
+                })
+                .sorted()
+                .forEach(p -> {
+                    try {
+                        Map<String, Object> file = new LinkedHashMap<>();
+                        file.put("name", p.getFileName().toString());
+                        file.put("path", baseDir.relativize(p).toString().replace("\\", "/"));
+                        file.put("size", Files.size(p));
+                        file.put("lastModified", Files.getLastModifiedTime(p).toMillis());
+                        files.add(file);
+                    } catch (Exception ignored) {}
+                });
+        } catch (Exception e) {
+            log.error("扫描JSON文件失败: {}", targetDir, e);
+        }
+        
+        return Map.of("ok", true, "files", files);
     }
 
     @ResponseBody
@@ -534,10 +581,42 @@ public class KnowledgeBaseController {
                                             @RequestParam String file) {
         KnowledgeBaseEntity kb = kbService.getById(id);
         if (kb == null) return Map.of("ok", false, "error", "知识库不存在");
-        Path dataDir = safeResolve(kbDir(kb), dir).resolve("data");
-        Map<String, Object> fileData = directoryDataService.getFileData(dataDir, file);
-        if (fileData == null) return Map.of("ok", false, "error", "文件不存在");
-        return Map.of("ok", true, "data", fileData);
+        
+        // 自动补全 .json 后缀
+        if (!file.endsWith(".json")) {
+            file = file + ".json";
+        }
+        
+        Path baseDir = kbDir(kb);
+        Path filePath = dir.isEmpty() ? baseDir.resolve(file) : baseDir.resolve(dir).resolve(file);
+        
+        // 尝试直接读取
+        if (Files.isRegularFile(filePath)) {
+            try {
+                String content = new String(Files.readAllBytes(filePath), java.nio.charset.StandardCharsets.UTF_8);
+                com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                Object data = mapper.readValue(content, Object.class);
+                return Map.of("ok", true, "data", data);
+            } catch (Exception e) {
+                return Map.of("ok", false, "error", "读取文件失败: " + e.getMessage());
+            }
+        }
+        
+        // 尝试在 data 子目录查找
+        Path dataDir = dir.isEmpty() ? baseDir.resolve("data") : baseDir.resolve(dir).resolve("data");
+        Path dataFilePath = dataDir.resolve(file);
+        if (Files.isRegularFile(dataFilePath)) {
+            try {
+                String content = new String(Files.readAllBytes(dataFilePath), java.nio.charset.StandardCharsets.UTF_8);
+                com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                Object data = mapper.readValue(content, Object.class);
+                return Map.of("ok", true, "data", data);
+            } catch (Exception e) {
+                return Map.of("ok", false, "error", "读取文件失败: " + e.getMessage());
+            }
+        }
+        
+        return Map.of("ok", false, "error", "文件不存在: " + file);
     }
 
     @ResponseBody
