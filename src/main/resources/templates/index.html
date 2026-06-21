@@ -49,7 +49,7 @@
 <th:block layout:fragment="content">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
         <h1 style="font-size:22px;font-weight:600;margin:0;">📊 工作台</h1>
-        <a href="/kb" style="font-size:13px;color:#7c5cfc;text-decoration:none;">📚 笔记库管理 →</a>
+        <button class="btn btn-primary" onclick="showAddKbModal()">+ 添加笔记库</button>
     </div>
 
     <!-- 统计卡片 -->
@@ -137,6 +137,30 @@
         </div>
     </div>
 
+    <!-- 添加/编辑笔记库弹窗 -->
+    <div class="modal-overlay" id="kbModal">
+        <div class="modal" style="width:560px;">
+            <h3 id="kbModalTitle">添加笔记库</h3>
+            <input type="hidden" id="kbEditId">
+            <div class="form-row">
+                <div class="form-group" style="flex:1;">
+                    <label>名称 *</label>
+                    <input type="text" id="kbName" placeholder="如 工作" style="width:100%;">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:1;">
+                    <label>笔记库路径 *</label>
+                    <input type="text" id="kbNotesDir" placeholder="D:\projects\notes" style="width:100%;font-family:monospace;">
+                </div>
+            </div>
+            <div class="modal-actions" style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+                <button class="btn btn-secondary" onclick="closeModal('kbModal')">取消</button>
+                <button class="btn btn-primary" onclick="submitKb()">保存</button>
+            </div>
+        </div>
+    </div>
+
     <script>
     function kbHomeSwitchTab(kbId, tab, btn) {
         var tabsContainer = document.getElementById('kb-tabs-' + kbId);
@@ -197,6 +221,45 @@
     }
 
     function escapeHtml(t) { if (!t) return ''; var d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+
+    // ====== 笔记库管理 ======
+    function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+    document.querySelectorAll('.modal-overlay').forEach(function(m) {
+        m.addEventListener('click', function(e) { if (e.target === this) this.classList.remove('active'); });
+    });
+
+    function showAddKbModal() {
+        document.getElementById('kbModalTitle').textContent = '添加笔记库';
+        document.getElementById('kbEditId').value = '';
+        document.getElementById('kbName').value = '';
+        document.getElementById('kbNotesDir').value = '';
+        document.getElementById('kbModal').classList.add('active');
+        setTimeout(function(){ document.getElementById('kbName').focus(); }, 100);
+    }
+
+    async function submitKb() {
+        var name = document.getElementById('kbName').value.trim();
+        var notesDir = document.getElementById('kbNotesDir').value.trim();
+        if (!name || !notesDir) { toast('名称和路径不能为空', 'error'); return; }
+
+        var editId = document.getElementById('kbEditId').value;
+        var body = { name: name, notesDir: notesDir };
+        if (editId) body.id = editId;
+
+        try {
+            var r = await fetch('/api/kb/save', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+            });
+            var d = await r.json();
+            if (d.ok) {
+                toast(editId ? '✅ 笔记库已更新' : '✅ 笔记库已添加');
+                closeModal('kbModal');
+                location.reload();
+            } else {
+                toast('❌ ' + (d.error || '保存失败'), 'error');
+            }
+        } catch(e) { toast('❌ 请求失败: ' + e.message, 'error'); }
+    }
     </script>
 </th:block>
 </body>

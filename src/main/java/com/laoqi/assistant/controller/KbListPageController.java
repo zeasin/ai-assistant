@@ -39,7 +39,12 @@ public class KbListPageController {
     }
 
     @GetMapping("/kb")
-    public String kbListPage(Model model) {
+    public String kbListPage() {
+        return "redirect:/";
+    }
+
+    // 保留此方法但不再使用，备用
+    public String kbListPageOld(Model model) {
         List<KnowledgeBaseEntity> allKbs = kbService.getAll();
         List<Map<String, Object>> kbInfos = new ArrayList<>();
 
