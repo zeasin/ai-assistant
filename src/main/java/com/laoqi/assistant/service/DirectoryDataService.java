@@ -16,6 +16,33 @@ public class DirectoryDataService {
 
     private static final Logger log = LoggerFactory.getLogger(DirectoryDataService.class);
     private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
+    private static final TypeReference<List<Object>> LIST_TYPE = new TypeReference<>() {};
+
+    /** 读取 JSON 文件，兼容 Map 和 List 格式 */
+    private Object readJsonFile(Path filePath) {
+        if (!Files.exists(filePath)) return null;
+        // 先尝试读取为 Map
+        Map<String, Object> asMap = FileUtil.readJson(filePath, MAP_TYPE, null);
+        if (asMap != null) return asMap;
+        // 再尝试读取为 List
+        List<Object> asList = FileUtil.readJson(filePath, LIST_TYPE, null);
+        if (asList != null) return asList;
+        return null;
+    }
+
+    /** 解析文件路径：先尝试直接路径 dir/file.json，再尝试 dir/data/file.json */
+    private Path resolveJsonFile(Path baseDir, String dir, String fileName) {
+        String file = fileName + ".json";
+        // 尝试直接路径
+        Path direct = dir.isEmpty() ? baseDir.resolve(file) : baseDir.resolve(dir).resolve(file);
+        if (Files.isRegularFile(direct)) return direct;
+        // 尝试 data 子目录
+        Path dataDir = dir.isEmpty() ? baseDir.resolve("data") : baseDir.resolve(dir).resolve("data");
+        Path inData = dataDir.resolve(file);
+        if (Files.isRegularFile(inData)) return inData;
+        // 返回直接路径（即使不存在，用于报错）
+        return direct;
+    }
 
     public List<FileInfo> listJsonFiles(Path dataDir) {
         if (!Files.exists(dataDir)) return List.of();
@@ -39,29 +66,44 @@ public class DirectoryDataService {
         }
     }
 
-    public Map<String, Object> getFileData(Path dataDir, String fileName) {
-        Path filePath = dataDir.resolve(fileName + ".json");
-        if (!Files.exists(filePath)) return null;
-        Map<String, Object> data = FileUtil.readJson(filePath, MAP_TYPE, new LinkedHashMap<>());
-        Map<String, Object> groups = extractGroups(data);
-        return Map.of("data", data, "groups", groups);
+    public Map<String, Object> getFileData(Path baseDir, String dir, String fileName) {
+        Path filePath = resolveJsonFile(baseDir, dir, fileName);
+        Object data = readJsonFile(filePath);
+        if (data == null) return null;
+
+        if (data instanceof List) {
+            List<?> list = (List<?>) data;
+            return Map.of("data", data, "groups", Map.of("数据", Map.of("count", list.size(), "type", "array")));
+        }
+
+        Map<String, Object> mapData = (Map<String, Object>) data;
+        Map<String, Object> groups = extractGroups(mapData);
+        return Map.of("data", mapData, "groups", groups);
     }
 
-    public Map<String, Object> getGroupData(Path dataDir, String fileName, String group) {
-        Path filePath = dataDir.resolve(fileName + ".json");
-        if (!Files.exists(filePath)) return null;
-        Map<String, Object> data = FileUtil.readJson(filePath, MAP_TYPE, new LinkedHashMap<>());
-        Object groupData = data.get(group);
+    public Map<String, Object> getGroupData(Path baseDir, String dir, String fileName, String group) {
+        Path filePath = resolveJsonFile(baseDir, dir, fileName);
+        Object data = readJsonFile(filePath);
+        if (data == null) return null;
+
+        // 当文件是顶层数组时，整个数组作为一个虚拟分组
+        if (data instanceof List) {
+            List<?> list = (List<?>) data;
+            return Map.of("count", list.size(), "data", list);
+        }
+
+        Map<String, Object> mapData = (Map<String, Object>) data;
+        Object groupData = mapData.get(group);
         if (groupData == null) return null;
 
         if (groupData instanceof List) {
             return Map.of("count", ((List<?>) groupData).size(), "data", groupData);
         } else if (groupData instanceof Map) {
-            Map<?, ?> mapData = (Map<?, ?>) groupData;
-            boolean hasArrayValues = mapData.values().stream().anyMatch(v -> v instanceof List);
+            Map<?, ?> map = (Map<?, ?>) groupData;
+            boolean hasArrayValues = map.values().stream().anyMatch(v -> v instanceof List);
             if (hasArrayValues) {
                 List<Object> flatList = new ArrayList<>();
-                for (Object val : mapData.values()) {
+                for (Object val : map.values()) {
                     if (val instanceof List) flatList.addAll((List<?>) val);
                 }
                 return Map.of("count", flatList.size(), "data", flatList);
@@ -72,12 +114,22 @@ public class DirectoryDataService {
     }
 
     @SuppressWarnings("unchecked")
-    public Map<String, Object> addRecord(Path dataDir, String fileName, String group,
+    public Map<String, Object> addRecord(Path baseDir, String dir, String fileName, String group,
                                           Map<String, Object> record, String subGroup) {
-        Path filePath = dataDir.resolve(fileName + ".json");
+        Path filePath = resolveJsonFile(baseDir, dir, fileName);
         if (!Files.exists(filePath)) return Map.of("ok", false, "error", "文件不存在");
 
-        Map<String, Object> fileData = FileUtil.readJson(filePath, MAP_TYPE, new LinkedHashMap<>());
+        Object raw = readJsonFile(filePath);
+        if (raw == null) return Map.of("ok", false, "error", "文件为空或格式错误");
+
+        // 顶层数组: 直接添加
+        if (raw instanceof List) {
+            ((List<Object>) raw).add(record);
+            FileUtil.writeJson(filePath, raw);
+            return Map.of("ok", true, "message", "添加成功");
+        }
+
+        Map<String, Object> fileData = (Map<String, Object>) raw;
         Object groupData = fileData.get(group);
         boolean added = false;
 
@@ -110,13 +162,28 @@ public class DirectoryDataService {
     }
 
     @SuppressWarnings("unchecked")
-    public Map<String, Object> updateRecord(Path dataDir, String fileName, String group,
+    public Map<String, Object> updateRecord(Path baseDir, String dir, String fileName, String group,
                                              String idField, String idValue,
                                              Map<String, Object> updates) {
-        Path filePath = dataDir.resolve(fileName + ".json");
+        Path filePath = resolveJsonFile(baseDir, dir, fileName);
         if (!Files.exists(filePath)) return Map.of("ok", false, "error", "文件不存在");
 
-        Map<String, Object> fileData = FileUtil.readJson(filePath, MAP_TYPE, new LinkedHashMap<>());
+        Object raw = readJsonFile(filePath);
+        if (raw == null) return Map.of("ok", false, "error", "文件为空或格式错误");
+
+        // 顶层数组: 在数组中查找并更新
+        if (raw instanceof List) {
+            for (Map<String, Object> r : (List<Map<String, Object>>) raw) {
+                if (idValue.equals(String.valueOf(r.get(idField)))) {
+                    r.putAll(updates);
+                    FileUtil.writeJson(filePath, raw);
+                    return Map.of("ok", true, "message", "更新成功");
+                }
+            }
+            return Map.of("ok", false, "error", "未找到记录");
+        }
+
+        Map<String, Object> fileData = (Map<String, Object>) raw;
         Object groupData = fileData.get(group);
         boolean found = false;
 
@@ -149,12 +216,24 @@ public class DirectoryDataService {
     }
 
     @SuppressWarnings("unchecked")
-    public Map<String, Object> deleteRecord(Path dataDir, String fileName, String group,
+    public Map<String, Object> deleteRecord(Path baseDir, String dir, String fileName, String group,
                                              String idField, String idValue) {
-        Path filePath = dataDir.resolve(fileName + ".json");
+        Path filePath = resolveJsonFile(baseDir, dir, fileName);
         if (!Files.exists(filePath)) return Map.of("ok", false, "error", "文件不存在");
 
-        Map<String, Object> fileData = FileUtil.readJson(filePath, MAP_TYPE, new LinkedHashMap<>());
+        Object raw = readJsonFile(filePath);
+        if (raw == null) return Map.of("ok", false, "error", "文件为空或格式错误");
+
+        // 顶层数组: 在数组中查找并删除
+        if (raw instanceof List) {
+            boolean removed = ((List<Map<String, Object>>) raw)
+                .removeIf(r -> idValue.equals(String.valueOf(r.get(idField))));
+            if (!removed) return Map.of("ok", false, "error", "未找到记录");
+            FileUtil.writeJson(filePath, raw);
+            return Map.of("ok", true, "message", "删除成功");
+        }
+
+        Map<String, Object> fileData = (Map<String, Object>) raw;
         Object groupData = fileData.get(group);
         boolean removed = false;
 

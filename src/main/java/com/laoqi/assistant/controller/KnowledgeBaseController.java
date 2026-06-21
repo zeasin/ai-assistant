@@ -633,8 +633,7 @@ public class KnowledgeBaseController {
                                              @RequestParam String file, @RequestParam String group) {
         KnowledgeBaseEntity kb = kbService.getById(id);
         if (kb == null) return Map.of("ok", false, "error", "知识库不存在");
-        Path dataDir = safeResolve(kbDir(kb), dir).resolve("data");
-        Map<String, Object> result = directoryDataService.getGroupData(dataDir, file, group);
+        Map<String, Object> result = directoryDataService.getGroupData(kbDir(kb), dir, file, group);
         if (result == null) return Map.of("ok", false, "error", "分组不存在");
         return Map.of("ok", true, "count", result.getOrDefault("count", 0), "data", result.getOrDefault("data", List.of()));
     }
@@ -646,8 +645,7 @@ public class KnowledgeBaseController {
                                          @RequestBody Map<String, Object> record) {
         KnowledgeBaseEntity kb = kbService.getById(id);
         if (kb == null) return Map.of("ok", false, "error", "知识库不存在");
-        Path dataDir = safeResolve(kbDir(kb), dir).resolve("data");
-        return directoryDataService.addRecord(dataDir, file, group, record, null);
+        return directoryDataService.addRecord(kbDir(kb), dir, file, group, record, null);
     }
 
     @ResponseBody
@@ -658,8 +656,7 @@ public class KnowledgeBaseController {
                                             @RequestBody Map<String, Object> updates) {
         KnowledgeBaseEntity kb = kbService.getById(id);
         if (kb == null) return Map.of("ok", false, "error", "知识库不存在");
-        Path dataDir = safeResolve(kbDir(kb), dir).resolve("data");
-        return directoryDataService.updateRecord(dataDir, file, group, idField, idValue, updates);
+        return directoryDataService.updateRecord(kbDir(kb), dir, file, group, idField, idValue, updates);
     }
 
     @ResponseBody
@@ -669,8 +666,7 @@ public class KnowledgeBaseController {
                                             @RequestParam String idField, @RequestParam String idValue) {
         KnowledgeBaseEntity kb = kbService.getById(id);
         if (kb == null) return Map.of("ok", false, "error", "知识库不存在");
-        Path dataDir = safeResolve(kbDir(kb), dir).resolve("data");
-        return directoryDataService.deleteRecord(dataDir, file, group, idField, idValue);
+        return directoryDataService.deleteRecord(kbDir(kb), dir, file, group, idField, idValue);
     }
 
     @GetMapping("/kb/{id}/config")

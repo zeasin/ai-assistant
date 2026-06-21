@@ -99,6 +99,7 @@
         <h3 id="detailTitle">📋 详情</h3>
         <div id="detailContent"></div>
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid #e1e3e6;">
+            <button class="btn btn-danger" onclick="deleteFromDetail()">🗑️ 删除</button>
             <button class="btn" onclick="closeModal('detailModal')">关闭</button>
             <button class="btn btn-primary" id="btnEditFromDetail">编辑</button>
         </div>
@@ -209,13 +210,21 @@ function loadData() {
             }
             
             var data = res.data;
-            
+
+            // 格式0: 顶层 JSON 数组（如 [{...}, {...}]）
+            if (Array.isArray(data)) {
+                allGroupData = {};
+                allGroupData['数据'] = data;
+                loadColumnSettings().then(function() { renderAllTables(); });
+                return;
+            }
+
             // 格式1: 直接的 JSON 对象（有数组字段）
             if (!data.groups) {
-                var arrayKeys = Object.keys(data).filter(function(k) { 
-                    return Array.isArray(data[k]); 
+                var arrayKeys = Object.keys(data).filter(function(k) {
+                    return Array.isArray(data[k]);
                 });
-                
+
                 if (arrayKeys.length > 0) {
                     // 转换为 groups 格式
                     var groups = {};
@@ -229,7 +238,7 @@ function loadData() {
                     loadColumnSettings().then(function() { renderAllTables(); });
                     return;
                 }
-                
+
                 // 没有数组字段，显示元数据
                 var html = '<div class="card" style="padding:20px;">';
                 html += '<h3 style="margin:0 0 12px;">📋 数据内容</h3>';
@@ -238,7 +247,7 @@ function loadData() {
                 container.innerHTML = html;
                 return;
             }
-            
+
             // 格式2: groups 格式
             var groups = data.groups;
             var arrayGroups = Object.keys(groups).filter(function(g) { return groups[g].type === 'array'; });
@@ -328,12 +337,12 @@ function renderAllTables() {
         html += '<div class="data-table-container"><table class="data-table">';
         html += '<thead><tr><th style="width:50px;">#</th>';
         columns.forEach(function(col) { html += '<th>' + esc(col) + '</th>'; });
-        html += '<th style="width:140px;">操作</th></tr></thead><tbody>';
+        html += '</tr></thead><tbody>';
 
         var display = searchTerm ? filtered : records;
         display.forEach(function(row) {
             var actualIdx = records.indexOf(row);
-            html += '<tr><td>' + (actualIdx + 1) + '</td>';
+            html += '<tr style="cursor:pointer;" onclick="showDetailModal(\'' + esc(groupName) + '\',' + actualIdx + ')"><td>' + (actualIdx + 1) + '</td>';
             columns.forEach(function(col) {
                 var val = row[col];
                 if (val == null) { html += '<td style="color:#909296;">—</td>'; }
@@ -344,15 +353,11 @@ function renderAllTables() {
                     html += '<td title="' + esc(String(val)) + '">' + esc(s) + '</td>';
                 }
             });
-            html += '<td class="data-row-actions">';
-            html += '<button class="btn btn-secondary" onclick="showDetailModal(\'' + esc(groupName) + '\',' + actualIdx + ')">详情</button>';
-            html += '<button class="btn btn-secondary" onclick="showEditModal(\'' + esc(groupName) + '\',' + actualIdx + ')">编辑</button>';
-            html += '<button class="btn btn-danger" onclick="showDeleteModal(\'' + esc(groupName) + '\',' + actualIdx + ')">删除</button>';
-            html += '</td></tr>';
+            html += '</tr>';
         });
 
         if (records.length === 0) {
-            html += '<tr><td colspan="' + (columns.length + 2) + '" style="text-align:center;color:#909296;">暂无数据</td></tr>';
+            html += '<tr><td colspan="' + (columns.length + 1) + '" style="text-align:center;color:#909296;">暂无数据</td></tr>';
         }
         html += '</tbody></table></div></div>';
     });
@@ -422,6 +427,12 @@ function showDetailModal(groupName, index) {
     html += '</div>';
     document.getElementById('detailContent').innerHTML = html;
     document.getElementById('detailModal').classList.add('active');
+}
+
+function deleteFromDetail() {
+    if (!currentDetailRow) return;
+    closeModal('detailModal');
+    showDeleteModal(currentDetailRow.groupName, currentDetailRow.index);
 }
 
 /* ====== 编辑 ====== */
