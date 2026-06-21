@@ -8,7 +8,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -23,8 +22,8 @@ public class FileUtil {
 
     public static <T> T readJson(Path path, Class<T> clazz, T defaultVal) {
         if (!Files.exists(path)) return defaultVal;
-        try (var reader = new InputStreamReader(Files.newInputStream(path), StandardCharsets.UTF_8)) {
-            return mapper.readValue(reader, clazz);
+        try (var in = Files.newInputStream(path)) {
+            return mapper.readValue(in, clazz);
         } catch (Exception e) {
             log.warn("Failed to read JSON {}: {}", path, e.getMessage());
             return defaultVal;
@@ -33,8 +32,8 @@ public class FileUtil {
 
     public static <T> T readJson(Path path, TypeReference<T> typeRef, T defaultVal) {
         if (!Files.exists(path)) return defaultVal;
-        try (var reader = new InputStreamReader(Files.newInputStream(path), StandardCharsets.UTF_8)) {
-            return mapper.readValue(reader, typeRef);
+        try (var in = Files.newInputStream(path)) {
+            return mapper.readValue(in, typeRef);
         } catch (Exception e) {
             log.warn("Failed to read JSON {}: {}", path, e.getMessage());
             return defaultVal;

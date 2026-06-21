@@ -594,6 +594,10 @@ public class KnowledgeBaseController {
         if (Files.isRegularFile(filePath)) {
             try {
                 String content = new String(Files.readAllBytes(filePath), java.nio.charset.StandardCharsets.UTF_8);
+                // 去除 BOM (Byte Order Mark) 字符 ﻿，避免 Jackson 解析报错
+                if (!content.isEmpty() && content.charAt(0) == '﻿') {
+                    content = content.substring(1);
+                }
                 com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
                 Object data = mapper.readValue(content, Object.class);
                 return Map.of("ok", true, "data", data);
@@ -601,13 +605,17 @@ public class KnowledgeBaseController {
                 return Map.of("ok", false, "error", "读取文件失败: " + e.getMessage());
             }
         }
-        
+
         // 尝试在 data 子目录查找
         Path dataDir = dir.isEmpty() ? baseDir.resolve("data") : baseDir.resolve(dir).resolve("data");
         Path dataFilePath = dataDir.resolve(file);
         if (Files.isRegularFile(dataFilePath)) {
             try {
                 String content = new String(Files.readAllBytes(dataFilePath), java.nio.charset.StandardCharsets.UTF_8);
+                // 去除 BOM (Byte Order Mark) 字符 ﻿，避免 Jackson 解析报错
+                if (!content.isEmpty() && content.charAt(0) == '﻿') {
+                    content = content.substring(1);
+                }
                 com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
                 Object data = mapper.readValue(content, Object.class);
                 return Map.of("ok", true, "data", data);
