@@ -332,7 +332,8 @@
     <nav class="nav">
         <div class="nav-inner">
         <span class="title">AI 助理</span>
-        <a th:classappend="${requestURI == '/chat' or requestURI == '/'} ? 'active' : ''" href="/chat">💬 对话</a>
+        <a th:classappend="${requestURI == '/'} ? 'active' : ''" href="/">🏠 首页</a>
+        <a th:classappend="${requestURI == '/chat'} ? 'active' : ''" href="/chat">💬 对话</a>
         <div class="dropdown">
             <a th:classappend="${#strings.startsWith(requestURI, '/image')} ? 'active' : ''"
                href="/image" class="dropdown-toggle" style="display:inline-flex;align-items:center;text-decoration:none;">

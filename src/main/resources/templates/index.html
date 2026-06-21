@@ -2,14 +2,113 @@
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{layout}">
 <head>
-    <title layout:fragment="title">首页</title>
-    <meta http-equiv="refresh" content="0; url=/chat">
+    <title layout:fragment="title">首页 - AI 助理</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        .home-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:20px; }
+        .home-stat { background:#fff; border:1px solid #e1e3e6; border-radius:10px; padding:16px; text-align:center; }
+        .home-stat .num { font-size:28px; font-weight:700; color:#7c5cfc; }
+        .home-stat .label { font-size:12px; color:#5c5f66; margin-top:4px; }
+        .home-section { background:#fff; border:1px solid #e1e3e6; border-radius:12px; padding:20px; margin-bottom:16px; }
+        .home-section h2 { font-size:16px; font-weight:600; margin:0 0 16px; color:#1a1b1e; display:flex; align-items:center; gap:8px; }
+        .kb-summary { border:1px solid #e1e3e6; border-radius:10px; padding:16px; margin-bottom:12px; }
+        .kb-summary:last-child { margin-bottom:0; }
+        .kb-summary-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+        .kb-summary-name { font-size:14px; font-weight:600; color:#1a1b1e; display:flex; align-items:center; gap:6px; }
+        .kb-summary-stats { display:flex; gap:12px; font-size:12px; color:#5c5f66; }
+        .kb-summary-stats span { display:flex; align-items:center; gap:4px; }
+        .kb-report { background:linear-gradient(135deg,#f0edff,#fafafe); border:1px solid #d9d0ff; border-radius:8px; padding:12px; margin-top:8px; cursor:pointer; }
+        .kb-report:hover { box-shadow:0 2px 8px rgba(124,92,252,0.1); }
+        .kb-report-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; font-size:12px; }
+        .kb-report-title { color:#7c5cfc; font-weight:500; }
+        .kb-report-date { color:#909296; }
+        .kb-report-content { font-size:13px; line-height:1.7; color:#3c4043; }
+        .kb-report-content h1 { font-size:18px; margin:16px 0 8px; }
+        .kb-report-content h2 { font-size:16px; margin:14px 0 6px; }
+        .kb-report-content h3 { font-size:14px; margin:12px 0 4px; }
+        .kb-report-content p { margin:8px 0; }
+        .kb-report-content ul, .kb-report-content ol { padding-left:20px; margin:8px 0; }
+        .kb-report-content li { margin:4px 0; }
+        .kb-report-content strong { font-weight:600; }
+        .kb-report-content hr { border:none; border-top:1px solid #e1e3e6; margin:12px 0; }
+        .kb-no-report { text-align:center; color:#909296; font-size:13px; padding:16px; border:1px dashed #d9d0ff; border-radius:8px; }
+        .kb-actions { display:flex; gap:8px; margin-top:12px; }
+        .kb-actions a { flex:1; text-align:center; padding:8px 12px; border-radius:6px; font-size:12px; text-decoration:none; transition:all .15s; }
+        .kb-actions .btn-chat { background:#7c5cfc; color:#fff; }
+        .kb-actions .btn-chat:hover { background:#6b4de6; }
+        .kb-actions .btn-notes { background:#f0edff; color:#7c5cfc; }
+        .kb-actions .btn-notes:hover { background:#e0dcff; }
+        .quick-links { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:10px; }
+        .quick-link { display:flex; flex-direction:column; align-items:center; gap:8px; padding:16px 12px; background:#fafafe; border:1px solid #e1e3e6; border-radius:10px; text-decoration:none; color:#5c5f66; transition:all .15s; }
+        .quick-link:hover { background:#f0edff; border-color:#7c5cfc; color:#7c5cfc; }
+        .quick-link .icon { font-size:24px; }
+        .quick-link .text { font-size:12px; font-weight:500; }
+    </style>
 </head>
 <body>
 <th:block layout:fragment="content">
-    <div style="text-align:center;padding:80px 24px;">
-        <div style="font-size:48px;margin-bottom:16px;">⏳</div>
-        <p style="color:#909296;">正在跳转到对话页面...</p>
+    <h1 style="font-size:22px;font-weight:600;margin:0 0 16px;">📊 工作台</h1>
+
+    <!-- 统计卡片 -->
+    <div class="home-stats">
+        <div class="home-stat">
+            <div class="num" th:text="${kbCount}">0</div>
+            <div class="label">笔记库</div>
+        </div>
+        <div class="home-stat">
+            <div class="num" style="color:#f59e0b;" th:text="${totalTasks}">0</div>
+            <div class="label">待办任务</div>
+        </div>
+        <div class="home-stat">
+            <div class="num" style="color:#10b981;" th:text="${totalReminders}">0</div>
+            <div class="label">提醒</div>
+        </div>
+        <div class="home-stat">
+            <div class="num" style="color:#7c5cfc;">●</div>
+            <div class="label" th:text="${llmConfigured} ? 'AI 已就绪' : 'AI 未配置'">AI 状态</div>
+        </div>
+    </div>
+
+    <!-- 笔记库卡片 -->
+    <div th:if="${#lists.size(kbSummaries) > 0}" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;margin-bottom:20px;">
+        <div th:each="kb : ${kbSummaries}" style="background:#fff;border:1px solid #e1e3e6;border-radius:12px;padding:16px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                <div style="font-size:15px;font-weight:600;color:#1a1b1e;">📂 <span th:text="${kb.name}">笔记库</span></div>
+                <div style="font-size:12px;color:#5c5f66;">
+                    <span style="margin-right:8px;">📋 <span th:text="${kb.taskCount}">0</span> 待办</span>
+                    <span>🔔 <span th:text="${kb.reminderCount}">0</span> 提醒</span>
+                </div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <a th:href="@{/chat(kbId=${kb.id})}" style="flex:1;min-width:60px;text-align:center;padding:8px 12px;background:#7c5cfc;color:#fff;border-radius:6px;font-size:12px;text-decoration:none;">💬 对话</a>
+                <a th:href="@{/kb/{id}/notes(id=${kb.id})}" style="flex:1;min-width:60px;text-align:center;padding:8px 12px;background:#f0edff;color:#7c5cfc;border-radius:6px;font-size:12px;text-decoration:none;">📂 笔记</a>
+                <a th:href="@{/kb/{id}(id=${kb.id})}" style="flex:1;min-width:60px;text-align:center;padding:8px 12px;background:#f0edff;color:#7c5cfc;border-radius:6px;font-size:12px;text-decoration:none;">📊 概览</a>
+                <a th:href="@{/kb/{id}/config(id=${kb.id})}" style="flex:1;min-width:60px;text-align:center;padding:8px 12px;background:#f5f5f7;color:#5c5f66;border-radius:6px;font-size:12px;text-decoration:none;">⚙️ 配置</a>
+            </div>
+        </div>
+    </div>
+
+    <div th:if="${#lists.size(kbSummaries) == 0}" class="home-section" style="text-align:center;padding:40px;">
+        <div style="font-size:48px;margin-bottom:12px;">📚</div>
+        <div style="font-size:16px;font-weight:600;color:#7c5cfc;margin-bottom:8px;">尚未配置笔记库</div>
+        <a href="/kb" style="color:#7c5cfc;">前往添加 →</a>
+    </div>
+
+    <!-- 各笔记库日报 -->
+    <div th:if="${#lists.size(kbSummaries) > 0}" class="home-section">
+        <h2>📊 AI 综合日报</h2>
+        <div th:each="kb : ${kbSummaries}" class="kb-summary">
+            <div class="kb-summary-header">
+                <div class="kb-summary-name">📂 <span th:text="${kb.name}">笔记库</span></div>
+                <div class="kb-report-date" th:text="${kb.reportDate}">日期</div>
+            </div>
+            <div th:if="${kb.hasReport}" class="kb-report">
+                <div class="kb-report-content report" th:utext="${kb.reportHtml}"></div>
+            </div>
+            <div th:unless="${kb.hasReport}" class="kb-no-report">
+                暂无日报，前往笔记库概览页生成
+            </div>
+        </div>
     </div>
 </th:block>
 </body>
