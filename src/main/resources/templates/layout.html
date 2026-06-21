@@ -353,10 +353,9 @@
 
         <!-- 有笔记库时显示下拉 -->
         <div th:if="${#lists.size(kbList) > 0}" class="dropdown">
-            <a th:classappend="${#strings.startsWith(requestURI, '/kb')} ? 'active' : ''"
-               href="/" class="dropdown-toggle" style="display:inline-flex;align-items:center;text-decoration:none;">
+            <span class="dropdown-toggle" style="display:inline-flex;align-items:center;cursor:default;color:#5c5f66;">
                 📚 笔记库<span class="arrow">▾</span>
-            </a>
+            </span>
             <div class="dropdown-content">
                 <a th:each="kb : ${kbList}"
                    th:href="@{/kb/{id}(id=${kb.id})}"
