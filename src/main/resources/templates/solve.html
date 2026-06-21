@@ -84,12 +84,7 @@
 <div class="solve-wrap">
     <div class="solve-sidebar">
         <div class="solve-sidebar-header">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-                <h2 style="margin:0;flex:1;">❓ 识题</h2>
-                <select class="solve-model-select" id="solveModelSelector" style="max-width:120px;font-size:11px;padding:4px 6px;">
-                    <option th:each="m : ${visionModels}" th:value="${m.name}" th:selected="${m.name == defaultModel}" th:text="${m.name}">模型</option>
-                </select>
-            </div>
+            <h2>❓ 识题</h2>
         </div>
         <div class="solve-session-list" id="solveSessionList">
             <div th:each="s : ${sessions}" class="solve-session-item" th:attr="onclick='solveLoadSession('+${s.id}+')',data-id=${s.id}">
@@ -390,7 +385,7 @@ async function solveSendFollowUp() {
     var msg = inp ? inp.value.trim() : '';
     if (!msg || solveSending) return;
     inp.value = '';
-    var modelName = document.getElementById('solveModelSelector').value;
+    var modelName = document.getElementById('confirmModelSelector').value;
     solveSending = true;
     try {
         var resp = await fetch('/image/solve/api/ask', {
