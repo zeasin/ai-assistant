@@ -85,6 +85,7 @@
             <div style="display:flex;gap:8px;flex-wrap:wrap;">
                 <a th:href="@{/chat(kbId=${kb.id})}" style="flex:1;min-width:60px;text-align:center;padding:8px 12px;background:#7c5cfc;color:#fff;border-radius:6px;font-size:12px;text-decoration:none;">💬 对话</a>
                 <a th:href="@{/kb/{id}/notes(id=${kb.id})}" style="flex:1;min-width:60px;text-align:center;padding:8px 12px;background:#f0edff;color:#7c5cfc;border-radius:6px;font-size:12px;text-decoration:none;">📂 笔记</a>
+                <a th:href="@{/kb/{id}/data(id=${kb.id})}" style="flex:1;min-width:60px;text-align:center;padding:8px 12px;background:#f0edff;color:#7c5cfc;border-radius:6px;font-size:12px;text-decoration:none;">📈 数据</a>
                 <a th:href="@{/kb/{id}(id=${kb.id})}" style="flex:1;min-width:60px;text-align:center;padding:8px 12px;background:#f0edff;color:#7c5cfc;border-radius:6px;font-size:12px;text-decoration:none;">📊 概览</a>
                 <a th:href="@{/kb/{id}/config(id=${kb.id})}" style="flex:1;min-width:60px;text-align:center;padding:8px 12px;background:#f5f5f7;color:#5c5f66;border-radius:6px;font-size:12px;text-decoration:none;">⚙️ 配置</a>
             </div>
@@ -97,22 +98,106 @@
         <a href="/kb" style="color:#7c5cfc;">前往添加 →</a>
     </div>
 
-    <!-- 各笔记库日报 -->
-    <div th:if="${#lists.size(kbSummaries) > 0}" class="home-section">
-        <h2>📊 AI 综合日报</h2>
-        <div th:each="kb : ${kbSummaries}" class="kb-summary">
-            <div class="kb-summary-header">
-                <div class="kb-summary-name">📂 <span th:text="${kb.name}">笔记库</span></div>
-                <div class="kb-report-date" th:text="${kb.reportDate}">日期</div>
+    <!-- 笔记库AI概览 -->
+    <div th:if="${#lists.size(kbSummaries) > 0}">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <h2 style="margin:0;font-size:18px;font-weight:600;">📚 笔记库AI概览</h2>
+        </div>
+
+        <div th:each="kb : ${kbSummaries}" class="home-section" style="margin-bottom:16px;">
+            <!-- 笔记库标题 + Tab -->
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                <h3 style="margin:0;font-size:15px;">📂 <span th:text="${kb.name}">笔记库</span></h3>
             </div>
-            <div th:if="${kb.hasReport}" class="kb-report">
-                <div class="kb-report-content report" th:utext="${kb.reportHtml}"></div>
+            <div th:id="'kb-tabs-' + ${kb.id}" style="display:flex;gap:0;border-bottom:2px solid #e1e3e6;margin-bottom:12px;">
+                <button class="kb-home-tab active" th:onclick="'kbHomeSwitchTab(' + ${kb.id} + ', \'ai\', this)'" style="padding:8px 16px;font-size:13px;cursor:pointer;border:none;background:transparent;color:#7c5cfc;border-bottom:2px solid #7c5cfc;margin-bottom:-2px;font-weight:600;">📊 AI 分析</button>
+                <button class="kb-home-tab" th:onclick="'kbHomeSwitchTab(' + ${kb.id} + ', \'data\', this)'" style="padding:8px 16px;font-size:13px;cursor:pointer;border:none;background:transparent;color:#5c5f66;border-bottom:2px solid transparent;margin-bottom:-2px;">📈 数据概览</button>
             </div>
-            <div th:unless="${kb.hasReport}" class="kb-no-report">
-                暂无日报，前往笔记库概览页生成
+
+            <!-- AI 分析内容 -->
+            <div th:id="'kb-content-ai-' + ${kb.id}" class="kb-home-content">
+                <div th:if="${kb.hasReport}" class="kb-report">
+                    <div style="font-size:12px;color:#909296;margin-bottom:8px;" th:text="${kb.reportDate}">日期</div>
+                    <div class="kb-report-content report" th:utext="${kb.reportHtml}"></div>
+                </div>
+                <div th:unless="${kb.hasReport}" class="kb-no-report">
+                    暂无日报，前往笔记库概览页生成
+                </div>
+            </div>
+
+            <!-- 数据概览内容 -->
+            <div th:id="'kb-content-data-' + ${kb.id}" class="kb-home-content" style="display:none;">
+                <div th:id="'home-kb-data-' + ${kb.id}" class="home-kb-data" style="padding:12px;background:#fafafe;border-radius:8px;border:1px solid #e1e3e6;">
+                    <div style="padding:16px;text-align:center;font-size:12px;color:#909296;">加载中...</div>
+                </div>
+                <div style="text-align:right;margin-top:8px;">
+                    <a th:href="@{/kb/{id}/data(id=${kb.id})}" style="font-size:12px;color:#7c5cfc;text-decoration:none;">查看详情 →</a>
+                </div>
             </div>
         </div>
     </div>
+
+    <script>
+    function kbHomeSwitchTab(kbId, tab, btn) {
+        var tabsContainer = document.getElementById('kb-tabs-' + kbId);
+        tabsContainer.querySelectorAll('.kb-home-tab').forEach(function(t) {
+            t.classList.remove('active');
+            t.style.color = '#5c5f66';
+            t.style.borderBottomColor = 'transparent';
+            t.style.fontWeight = 'normal';
+        });
+        btn.classList.add('active');
+        btn.style.color = '#7c5cfc';
+        btn.style.borderBottomColor = '#7c5cfc';
+        btn.style.fontWeight = '600';
+
+        document.getElementById('kb-content-ai-' + kbId).style.display = tab === 'ai' ? '' : 'none';
+        document.getElementById('kb-content-data-' + kbId).style.display = tab === 'data' ? '' : 'none';
+
+        if (tab === 'data') {
+            var container = document.getElementById('home-kb-data-' + kbId);
+            if (container && !container.dataset.loaded) {
+                loadHomeKbData(kbId, container);
+            }
+        }
+    }
+
+    async function loadHomeKbData(kbId, container) {
+        container.innerHTML = '<div style="padding:16px;text-align:center;font-size:12px;color:#909296;">⏳ 分析中...</div>';
+        try {
+            var resp = await fetch('/data/api/overview/' + kbId);
+            var result = await resp.json();
+            if (!result.ok) {
+                container.innerHTML = '<div style="padding:16px;text-align:center;font-size:12px;color:#909296;">暂无数据</div>';
+                return;
+            }
+            var ov = result.overview;
+            var html = '';
+            if (ov.metrics && ov.metrics.length > 0) {
+                html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:8px;">';
+                for (var i = 0; i < ov.metrics.length; i++) {
+                    var m = ov.metrics[i];
+                    html += '<div style="text-align:center;padding:8px;background:#fff;border-radius:6px;">';
+                    html += '<div style="font-size:16px;font-weight:700;color:#7c5cfc;">' + (m.icon || '') + ' ' + escapeHtml(m.value) + '</div>';
+                    html += '<div style="font-size:11px;color:#5c5f66;margin-top:2px;">' + escapeHtml(m.label) + '</div>';
+                    html += '</div>';
+                }
+                html += '</div>';
+            }
+            if (ov.insights && ov.insights.length > 0) {
+                html += '<div style="font-size:12px;color:#166534;padding:8px;background:#f0fdf4;border-radius:6px;">';
+                html += '<strong>💡 </strong>' + escapeHtml(ov.insights[0]);
+                html += '</div>';
+            }
+            container.innerHTML = html || '<div style="padding:16px;text-align:center;font-size:12px;color:#909296;">暂无数据</div>';
+            container.dataset.loaded = 'true';
+        } catch(e) {
+            container.innerHTML = '<div style="padding:16px;text-align:center;font-size:12px;color:#909296;">加载失败</div>';
+        }
+    }
+
+    function escapeHtml(t) { if (!t) return ''; var d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+    </script>
 </th:block>
 </body>
 </html>
