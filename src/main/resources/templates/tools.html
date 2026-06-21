@@ -17,7 +17,8 @@
 <th:block layout:fragment="content">
     <h1 style="font-size:22px;font-weight:600;margin:0 0 20px;">🧰 工具箱</h1>
 
-    <div class="tools-grid">
+    <h2 style="font-size:16px;font-weight:600;margin:0 0 12px;color:#5c5f66;">🖼️ 图像识别</h2>
+    <div class="tools-grid" style="margin-bottom:24px;">
         <a href="/image/general" class="tool-card">
             <div class="icon">🖼️</div>
             <div class="name">通用识别</div>
@@ -37,6 +38,30 @@
             <div class="name">试卷识别</div>
             <div class="desc">识别整张试卷，自动提取题目、答案、解析，建立个人题库。</div>
             <span class="tag">学习</span>
+        </a>
+    </div>
+
+    <h2 style="font-size:16px;font-weight:600;margin:0 0 12px;color:#5c5f66;">📊 数据工具</h2>
+    <div class="tools-grid">
+        <a href="/data/import" class="tool-card">
+            <div class="icon">📥</div>
+            <div class="name">数据导入</div>
+            <div class="desc">从外部导入数据到笔记库，支持 JSON、CSV 等格式。</div>
+            <span class="tag">数据</span>
+        </a>
+
+        <a href="/data/collector" class="tool-card">
+            <div class="icon">🔧</div>
+            <div class="name">数据采集</div>
+            <div class="desc">从网页或 API 自动采集数据，定时执行。</div>
+            <span class="tag">数据</span>
+        </a>
+
+        <a href="/data/datacenter" class="tool-card">
+            <div class="icon">📋</div>
+            <div class="name">数据加工</div>
+            <div class="desc">对采集的数据进行清洗、转换、标准化处理。</div>
+            <span class="tag">数据</span>
         </a>
     </div>
 </th:block>

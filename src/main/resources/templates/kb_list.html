@@ -70,6 +70,7 @@
 
         <div class="data-tabs">
             <button class="data-tab active" onclick="switchTab('analysis', this)">📊 AI 分析</button>
+            <button class="data-tab" onclick="switchTab('data', this)">📈 数据概览</button>
             <button class="data-tab" onclick="switchTab('list', this)">📋 笔记库管理</button>
         </div>
 
@@ -95,6 +96,20 @@
                         暂无分析报告，点击「AI 分析」生成
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <!-- 数据概览 Tab -->
+        <div id="panelData" class="data-panel" style="display:none;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                <h3 style="margin:0;font-size:15px;">📈 数据概览</h3>
+                <div style="display:flex;gap:8px;">
+                    <button class="data-refresh-btn" onclick="loadDataOverview()">🔄 刷新</button>
+                    <a href="/tools" class="data-refresh-btn" style="text-decoration:none;">🧰 数据工具</a>
+                </div>
+            </div>
+            <div id="dataOverviewContent">
+                <div class="data-loading">⏳ 加载中...</div>
             </div>
         </div>
 
@@ -216,8 +231,49 @@
                 document.querySelectorAll('.data-tab').forEach(function(t) { t.classList.remove('active'); });
                 btn.classList.add('active');
                 document.getElementById('panelAnalysis').style.display = tab === 'analysis' ? '' : 'none';
+                document.getElementById('panelData').style.display = tab === 'data' ? '' : 'none';
                 document.getElementById('panelList').style.display = tab === 'list' ? '' : 'none';
+                if (tab === 'data') loadDataOverview();
             }
+
+            async function loadDataOverview() {
+                var container = document.getElementById('dataOverviewContent');
+                container.innerHTML = '<div class="data-loading">⏳ 正在分析笔记库数据...</div>';
+                try {
+                    var resp = await fetch('/data/api/overview');
+                    var result = await resp.json();
+                    if (!result.ok) {
+                        container.innerHTML = '<div class="data-empty">分析失败: ' + (result.error || '') + '</div>';
+                        return;
+                    }
+                    var ov = result.overview;
+                    var html = '';
+                    if (ov.metrics && ov.metrics.length > 0) {
+                        html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px;">';
+                        for (var i = 0; i < ov.metrics.length; i++) {
+                            var m = ov.metrics[i];
+                            html += '<div style="background:#f8f7ff;border-radius:10px;padding:16px;text-align:center;">';
+                            html += '<div style="font-size:24px;font-weight:700;color:#7c5cfc;">' + (m.icon || '') + ' ' + escapeHtml(m.value) + '</div>';
+                            html += '<div style="font-size:12px;color:#5c5f66;margin-top:4px;">' + escapeHtml(m.label) + '</div>';
+                            html += '</div>';
+                        }
+                        html += '</div>';
+                    }
+                    if (ov.insights && ov.insights.length > 0) {
+                        html += '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:16px;">';
+                        html += '<h4 style="font-size:14px;font-weight:600;margin:0 0 8px;color:#166534;">💡 AI 洞察</h4>';
+                        for (var i = 0; i < ov.insights.length; i++) {
+                            html += '<p style="font-size:13px;color:#166534;margin:4px 0;">' + escapeHtml(ov.insights[i]) + '</p>';
+                        }
+                        html += '</div>';
+                    }
+                    container.innerHTML = html || '<div class="data-empty">暂无数据</div>';
+                } catch(e) {
+                    container.innerHTML = '<div class="data-empty">加载失败</div>';
+                }
+            }
+
+            function escapeHtml(t) { if (!t) return ''; var d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
 
             function showKbReport(el) {
                 var report = el.getAttribute('data-report');

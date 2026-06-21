@@ -335,7 +335,7 @@
         <a th:classappend="${requestURI == '/'} ? 'active' : ''" href="/">🏠 首页</a>
         <a th:classappend="${requestURI == '/chat'} ? 'active' : ''" href="/chat">💬 对话</a>
         <div class="dropdown">
-            <a th:classappend="${#strings.startsWith(requestURI, '/image') or requestURI == '/tools'} ? 'active' : ''"
+            <a th:classappend="${#strings.startsWith(requestURI, '/image') or requestURI == '/tools' or #strings.startsWith(requestURI, '/data')} ? 'active' : ''"
                href="/tools" class="dropdown-toggle" style="display:inline-flex;align-items:center;text-decoration:none;">
                 🧰 工具箱<span class="arrow">▾</span>
             </a>
@@ -343,6 +343,10 @@
                 <a href="/image/general" th:classappend="${requestURI == '/image/general' ? 'active' : ''}">🖼️ 通用识别</a>
                 <a href="/image/solve" th:classappend="${requestURI == '/image/solve' ? 'active' : ''}">❓ 识题</a>
                 <a href="/image/exam" th:classappend="${requestURI == '/image/exam' ? 'active' : ''}">📝 试卷识别</a>
+                <div style="border-top:1px solid #e1e3e6;margin:4px 0;"></div>
+                <a href="/data/import" th:classappend="${requestURI == '/data/import' ? 'active' : ''}">📥 数据导入</a>
+                <a href="/data/collector" th:classappend="${requestURI == '/data/collector' ? 'active' : ''}">🔧 数据采集</a>
+                <a href="/data/datacenter" th:classappend="${requestURI == '/data/datacenter' ? 'active' : ''}">📋 数据加工</a>
             </div>
         </div>
         <a th:classappend="${#strings.startsWith(requestURI, '/data')} ? 'active' : ''" href="/data">🗂️ 数据</a>

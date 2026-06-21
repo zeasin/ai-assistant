@@ -1,0 +1,117 @@
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title th:text="${kb.name} + ' - 数据 - AI助理'">数据</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<th:block layout:fragment="content">
+
+<th:block th:replace="~{kb_tab_bar :: kb-tabs('data', ${kb}, ${labels})}" />
+
+<div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <h2 style="margin:0;">📈 数据概览</h2>
+        <div style="display:flex;gap:8px;">
+            <button class="btn btn-secondary" onclick="loadDataOverview()">🔄 刷新</button>
+            <a href="/tools" class="btn btn-secondary" style="text-decoration:none;font-size:12px;">🧰 数据工具</a>
+        </div>
+    </div>
+    <div id="dataOverviewContent">
+        <div class="text-muted" style="padding:40px;text-align:center;">⏳ 加载中...</div>
+    </div>
+</div>
+
+<script th:inline="javascript">
+const KB_ID = [[${kb.id}]];
+
+async function loadDataOverview() {
+    var container = document.getElementById('dataOverviewContent');
+    container.innerHTML = '<div class="text-muted" style="padding:40px;text-align:center;">⏳ 分析中...</div>';
+    try {
+        var resp = await fetch('/data/api/overview');
+        var result = await resp.json();
+        if (!result.ok) {
+            container.innerHTML = '<div class="text-muted">加载失败: ' + (result.error || '') + '</div>';
+            return;
+        }
+        var ov = result.overview;
+        var html = '';
+
+        if (ov.metrics && ov.metrics.length > 0) {
+            html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px;">';
+            for (var i = 0; i < ov.metrics.length; i++) {
+                var m = ov.metrics[i];
+                html += '<div style="background:#f8f7ff;border-radius:10px;padding:16px;text-align:center;">';
+                html += '<div style="font-size:24px;font-weight:700;color:#7c5cfc;">' + (m.icon || '') + ' ' + escapeHtml(m.value) + '</div>';
+                html += '<div style="font-size:12px;color:#5c5f66;margin-top:4px;">' + escapeHtml(m.label) + '</div>';
+                html += '</div>';
+            }
+            html += '</div>';
+        }
+
+        if (ov.charts && ov.charts.length > 0) {
+            html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;margin-bottom:20px;">';
+            for (var i = 0; i < ov.charts.length; i++) {
+                var c = ov.charts[i];
+                html += '<div style="background:#fafbfc;border:1px solid #e1e3e6;border-radius:10px;padding:16px;">';
+                html += '<h4 style="font-size:14px;font-weight:600;margin:0 0 12px;color:#1a1b1e;">' + escapeHtml(c.title) + '</h4>';
+                html += '<canvas id="kbChart' + i + '" style="max-height:200px;"></canvas>';
+                html += '</div>';
+            }
+            html += '</div>';
+        }
+
+        if (ov.insights && ov.insights.length > 0) {
+            html += '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:16px;">';
+            html += '<h4 style="font-size:14px;font-weight:600;margin:0 0 8px;color:#166534;">💡 AI 洞察</h4>';
+            for (var i = 0; i < ov.insights.length; i++) {
+                html += '<p style="font-size:13px;color:#166534;margin:4px 0;line-height:1.6;">' + escapeHtml(ov.insights[i]) + '</p>';
+            }
+            html += '</div>';
+        }
+
+        container.innerHTML = html || '<div class="text-muted" style="padding:40px;text-align:center;">暂无数据</div>';
+
+        if (ov.charts && ov.charts.length > 0) {
+            var colors = ['#7c5cfc','#f59e0b','#10b981','#ef4444','#6366f1','#ec4899','#14b8a6','#f97316'];
+            for (var i = 0; i < ov.charts.length; i++) {
+                var c = ov.charts[i];
+                var ctx = document.getElementById('kbChart' + i);
+                if (!ctx) continue;
+                var chartType = c.type || 'bar';
+                var config = {
+                    type: chartType,
+                    data: {
+                        labels: c.labels || [],
+                        datasets: [{
+                            label: c.title || '',
+                            data: c.data || [],
+                            backgroundColor: colors.slice(0, (c.labels || []).length),
+                            borderRadius: 6
+                        }]
+                    },
+                    options: { responsive: true, plugins: { legend: { display: chartType === 'pie' || chartType === 'doughnut' } } }
+                };
+                if (chartType === 'bar' || chartType === 'line') {
+                    config.options.scales = { y: { beginAtZero: true } };
+                }
+                new Chart(ctx, config);
+            }
+        }
+    } catch(e) {
+        container.innerHTML = '<div class="text-muted">加载失败</div>';
+    }
+}
+
+function escapeHtml(t) { if (!t) return ''; var d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadDataOverview();
+});
+</script>
+
+</th:block>
+</body>
+</html>

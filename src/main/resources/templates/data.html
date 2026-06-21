@@ -48,22 +48,16 @@
 </style>
 
 <div class="data-wrap">
-    <h1 style="font-size:22px;font-weight:600;margin:0 0 16px;">🗂️ 数据</h1>
-
-    <div class="data-tabs">
-        <button class="data-tab active" onclick="dataSwitchTab('overview', this)">📊 数据概览</button>
-        <button class="data-tab" onclick="window.location.href='/data/kb'">📁 笔记库数据</button>
-        <button class="data-tab" onclick="window.location.href='/data/processing'">📋 数据加工</button>
-        <button class="data-tab" onclick="window.location.href='/data/import'">📥 数据导入</button>
-        <button class="data-tab" onclick="window.location.href='/data/collector'">🔧 数据采集</button>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <h1 style="font-size:22px;font-weight:600;margin:0;">📊 数据概览</h1>
+        <div style="display:flex;gap:8px;">
+            <button class="data-refresh-btn" onclick="dataLoadOverview()">🔄 刷新分析</button>
+            <a href="/tools" class="data-refresh-btn" style="text-decoration:none;">🧰 工具箱</a>
+        </div>
     </div>
 
     <!-- 数据概览 -->
-    <div id="panelOverview" class="data-panel">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-            <h3 style="margin:0;font-size:15px;">📊 数据概览</h3>
-            <button class="data-refresh-btn" onclick="dataLoadOverview()">🔄 刷新分析</button>
-        </div>
+    <div id="panelOverview" class="data-panel" style="border-radius:12px;">
         <div id="overviewContent">
             <div class="data-loading">⏳ 正在分析笔记库数据...</div>
         </div>
