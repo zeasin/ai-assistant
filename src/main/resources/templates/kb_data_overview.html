@@ -30,7 +30,7 @@ async function loadDataOverview() {
     var container = document.getElementById('dataOverviewContent');
     container.innerHTML = '<div class="text-muted" style="padding:40px;text-align:center;">⏳ 分析中...</div>';
     try {
-        var resp = await fetch('/data/api/overview');
+        var resp = await fetch('/data/api/overview/' + KB_ID);
         var result = await resp.json();
         if (!result.ok) {
             container.innerHTML = '<div class="text-muted">加载失败: ' + (result.error || '') + '</div>';

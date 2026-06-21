@@ -32,6 +32,9 @@ public class DataPageController {
     private volatile long cachedOverviewTime = 0;
     private volatile String cachedDataHash = null;
 
+    private final ConcurrentHashMap<Long, String> kbOverviewCache = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Long, String> kbDataHashCache = new ConcurrentHashMap<>();
+
     public DataPageController(KnowledgeBaseService kbService, LlmService llmService,
                               LogService logService, DataSource dataSource) {
         this.kbService = kbService;
@@ -40,12 +43,6 @@ public class DataPageController {
         this.dataSource = dataSource;
     }
 
-    @GetMapping("/data")
-    public String dataPage(Model model) {
-        List<KnowledgeBaseEntity> kbs = kbService.getAll();
-        model.addAttribute("kbs", kbs);
-        return "data";
-    }
 
     @GetMapping("/data/api/overview")
     @ResponseBody
@@ -166,5 +163,89 @@ public class DataPageController {
             cleaned = cleaned.substring(start, end + 1);
         }
         return cleaned;
+    }
+
+    @GetMapping("/data/api/overview/{kbId}")
+    @ResponseBody
+    public Map<String, Object> getKbOverview(@PathVariable Long kbId,
+                                              @RequestParam(value = "force", defaultValue = "false") boolean force) {
+        try {
+            KnowledgeBaseEntity kb = kbService.getById(kbId);
+            if (kb == null) {
+                return Map.of("ok", false, "error", "知识库不存在");
+            }
+
+            String currentHash = computeKbDataHash(kb);
+            String cached = kbOverviewCache.get(kbId);
+            String cachedHash = kbDataHashCache.get(kbId);
+
+            if (!force && cached != null && currentHash.equals(cachedHash)) {
+                log.info("[数据概览] kbId={} 返回缓存结果", kbId);
+                return Map.of("ok", true, "cached", true, "overview", objectMapper.readValue(cached, Map.class));
+            }
+
+            List<Map<String, Object>> kbFiles = scanKbData(kb);
+            if (kbFiles.isEmpty()) {
+                return Map.of("ok", true, "overview", Map.of("metrics", List.of(), "charts", List.of(), "insights", List.of("暂无数据文件")));
+            }
+
+            String overviewJson = generateAiOverview(kbFiles);
+            kbOverviewCache.put(kbId, overviewJson);
+            kbDataHashCache.put(kbId, currentHash);
+
+            log.info("[数据概览] kbId={} AI分析完成，已缓存", kbId);
+            return Map.of("ok", true, "cached", false, "overview", objectMapper.readValue(overviewJson, Map.class));
+        } catch (Exception e) {
+            log.error("[数据概览] 分析失败: kbId={}", kbId, e);
+            return Map.of("ok", false, "error", "分析失败: " + e.getMessage());
+        }
+    }
+
+    private String computeKbDataHash(KnowledgeBaseEntity kb) {
+        StringBuilder sb = new StringBuilder();
+        Path notesDir = Paths.get(kb.getNotesDir());
+        if (!Files.isDirectory(notesDir)) return "";
+        try {
+            Files.walk(notesDir)
+                    .filter(p -> p.toString().endsWith(".json") && (p.toString().contains("/data/") || p.toString().contains("\\data\\")))
+                    .sorted()
+                    .forEach(p -> {
+                        try {
+                            sb.append(p.getFileName()).append(":").append(Files.getLastModifiedTime(p).toMillis()).append(",");
+                        } catch (Exception ignored) {}
+                    });
+        } catch (Exception e) {
+            return String.valueOf(System.currentTimeMillis());
+        }
+        return sb.toString();
+    }
+
+    private List<Map<String, Object>> scanKbData(KnowledgeBaseEntity kb) {
+        List<Map<String, Object>> allFiles = new ArrayList<>();
+        Path notesDir = Paths.get(kb.getNotesDir());
+        if (!Files.isDirectory(notesDir)) return allFiles;
+
+        try {
+            Files.walk(notesDir)
+                    .filter(p -> p.toString().endsWith(".json") && (p.toString().contains("/data/") || p.toString().contains("\\data\\")))
+                    .forEach(p -> {
+                        try {
+                            Map<String, Object> file = new LinkedHashMap<>();
+                            file.put("name", p.getFileName().toString());
+                            file.put("path", notesDir.relativize(p).toString());
+                            file.put("size", Files.size(p));
+                            file.put("kbId", kb.getId());
+                            file.put("kbName", kb.getName());
+                            file.put("lastModified", Files.getLastModifiedTime(p).toMillis());
+
+                            String content = Files.readString(p, java.nio.charset.StandardCharsets.UTF_8);
+                            if (content.length() > 2000) content = content.substring(0, 2000);
+                            file.put("sample", content);
+
+                            allFiles.add(file);
+                        } catch (Exception ignored) {}
+                    });
+        } catch (Exception ignored) {}
+        return allFiles;
     }
 }

@@ -69,14 +69,9 @@
 </head>
 <body>
 <div layout:fragment="content">
-    <h1 style="font-size:22px;font-weight:600;margin:0 0 16px;">🗂️ 数据</h1>
-
-    <div class="data-tabs">
-        <button class="data-tab" onclick="window.location.href='/data'">📊 数据概览</button>
-        <button class="data-tab" onclick="window.location.href='/data/kb'">📁 笔记库数据</button>
-        <button class="data-tab active" onclick="window.location.href='/data/processing'">📋 数据加工</button>
-        <button class="data-tab" onclick="window.location.href='/data/import'">📥 数据导入</button>
-        <button class="data-tab" onclick="window.location.href='/data/collector'">🔧 数据采集</button>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <h1 style="font-size:22px;font-weight:600;margin:0;">📋 数据加工</h1>
+        <a href="/tools" style="font-size:13px;color:#7c5cfc;text-decoration:none;">🧰 工具箱</a>
     </div>
 
     <div class="dc-layout">

@@ -346,10 +346,9 @@
                 <div style="border-top:1px solid #e1e3e6;margin:4px 0;"></div>
                 <a href="/data/import" th:classappend="${requestURI == '/data/import' ? 'active' : ''}">📥 数据导入</a>
                 <a href="/data/collector" th:classappend="${requestURI == '/data/collector' ? 'active' : ''}">🔧 数据采集</a>
-                <a href="/data/datacenter" th:classappend="${requestURI == '/data/datacenter' ? 'active' : ''}">📋 数据加工</a>
+                <a href="/data/processing" th:classappend="${requestURI == '/data/processing' ? 'active' : ''}">📋 数据加工</a>
             </div>
         </div>
-        <a th:classappend="${#strings.startsWith(requestURI, '/data')} ? 'active' : ''" href="/data">🗂️ 数据</a>
         <a th:classappend="${#strings.startsWith(requestURI, '/planner')} ? 'active' : ''" href="/planner">📋 计划</a>
 
         <!-- 有笔记库时显示下拉 -->
