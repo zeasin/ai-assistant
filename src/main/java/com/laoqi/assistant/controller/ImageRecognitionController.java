@@ -173,7 +173,7 @@ public class ImageRecognitionController {
         return Map.of("ok", true, "analyses", getAnalysesFromDb(limit));
     }
 
-    /** 列出指定 KB 当前目录下的图片文件 */
+    /** 列出指定 KB 当前目录下的图片文件（递归搜索） */
     @GetMapping("/api/images")
     @ResponseBody
     public Map<String, Object> listImages(@RequestParam(required = false, defaultValue = "0") Long kbId,
@@ -189,8 +189,8 @@ public class ImageRecognitionController {
             }
 
             List<Map<String, String>> images = new ArrayList<>();
-            try (Stream<Path> list = Files.list(searchDir)) {
-                list.filter(Files::isRegularFile)
+            try (Stream<Path> walk = Files.walk(searchDir)) {
+                walk.filter(Files::isRegularFile)
                         .filter(p -> {
                             String name = p.getFileName().toString().toLowerCase();
                             return IMAGE_EXTENSIONS.stream().anyMatch(name::endsWith);

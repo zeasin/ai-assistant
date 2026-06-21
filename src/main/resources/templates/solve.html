@@ -290,18 +290,28 @@ function solveCancelConfirm() {
     document.getElementById('confirmModal').classList.remove('active');
     solvePendingFile = null;
     solvePendingImageUrl = null;
+    solvePendingKbPath = null;
+    solvePendingKbId = null;
     solveClearPreview();
 }
 
 async function solveConfirmRecognize() {
     var file = solvePendingFile;
+    var kbPath = solvePendingKbPath;
+    var kbId = solvePendingKbId;
     var prompt = document.getElementById('confirmPrompt').value.trim();
     var modelName = document.getElementById('confirmModelSelector').value;
     document.getElementById('confirmModal').classList.remove('active');
 
     if (!modelName) { solveToast('请先选择多模态模型', 'error'); return; }
-    if (!file) { solveToast('请先上传图片', 'error'); return; }
     if (solveSending) return;
+
+    if (kbPath && kbId) {
+        await solveConfirmKbRecognize();
+        return;
+    }
+
+    if (!file) { solveToast('请先上传图片', 'error'); return; }
 
     var imageUrl = solvePendingImageUrl || URL.createObjectURL(file);
     solveShowLoading(imageUrl);
@@ -407,9 +417,29 @@ async function solveSendFollowUp() {
     solveSending = false;
 }
 
-async function solveRecognizeKbImage(path, kbId) {
-    var modelName = document.getElementById('solveModelSelector').value;
+var solvePendingKbPath = null;
+var solvePendingKbId = null;
+
+function solveRecognizeKbImage(path, kbId) {
+    solvePendingKbPath = path;
+    solvePendingKbId = kbId;
+    var thumbUrl = '/image/thumb?path=' + encodeURIComponent(path) + '&kbId=' + kbId;
+    document.getElementById('confirmPreviewImg').src = thumbUrl;
+    document.getElementById('confirmPrompt').value = '';
+    document.getElementById('confirmModal').classList.add('active');
+}
+
+async function solveConfirmKbRecognize() {
+    var path = solvePendingKbPath;
+    var kbId = solvePendingKbId;
+    var prompt = document.getElementById('confirmPrompt').value.trim();
+    var modelName = document.getElementById('confirmModelSelector').value;
+    document.getElementById('confirmModal').classList.remove('active');
+
     if (!modelName) { solveToast('请先选择多模态模型', 'error'); return; }
+    if (!path) { solveToast('请先选择图片', 'error'); return; }
+    if (solveSending) return;
+
     var thumbUrl = '/image/thumb?path=' + encodeURIComponent(path) + '&kbId=' + kbId;
     solveShowLoading(thumbUrl);
     solveSending = true;
@@ -417,19 +447,21 @@ async function solveRecognizeKbImage(path, kbId) {
         var resp = await fetch('/image/solve/api/recognize-file', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ path: path, kbId: kbId, modelName: modelName })
+            body: JSON.stringify({ path: path, kbId: kbId, modelName: modelName, prompt: prompt })
         });
         var data = await resp.json();
         if (data.ok) {
             solveCurrentSessionId = data.sessionId;
             solveCurrentConversation = data.conversation || [];
-            solveShowCard('/image/solve/api/sessions/' + data.sessionId + '/image', data.answer, [], data.sessionId, false);
+            solveShowCard('/image/solve/api/sessions/' + data.sessionId + '/image', data.answer, [], data.sessionId, false, prompt || '');
             solveAddSessionToList(data.sessionId, path.split('/').pop());
         } else {
             solveShowCard(thumbUrl, '识别失败：' + (data.error || '未知错误'), [], null, false);
         }
     } catch(e) { solveShowCard(thumbUrl, '请求失败：' + e.message, [], null, false); }
     solveSending = false;
+    solvePendingKbPath = null;
+    solvePendingKbId = null;
 }
 
 function solvePickKbImage(el, path, kbId) {

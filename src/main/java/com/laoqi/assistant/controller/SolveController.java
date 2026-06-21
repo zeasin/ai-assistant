@@ -119,8 +119,10 @@ public class SolveController {
             String filePath = (String) body.getOrDefault("path", "");
             long kbId = body.containsKey("kbId") ? ((Number) body.get("kbId")).longValue() : 0;
             String modelName = (String) body.getOrDefault("modelName", "");
+            String prompt = (String) body.getOrDefault("prompt", "");
 
-            log.info("[识题] KB图片识别请求: model={}, path={}, kbId={}", modelName, filePath, kbId);
+            log.info("[识题] KB图片识别请求: model={}, path={}, kbId={}, prompt={}",
+                    modelName, filePath, kbId, prompt != null && !prompt.isEmpty() ? prompt : "(默认)");
 
             KnowledgeBaseEntity kb = kbService.getById(kbId);
             if (kb == null) return Map.of("ok", false, "error", "知识库不存在");
@@ -135,13 +137,13 @@ public class SolveController {
             String imageType = guessImageType(file.getFileName().toString().toLowerCase());
             String base64Image = Base64.getEncoder().encodeToString(imageBytes);
 
-            sessionId = insertSession(file.getFileName().toString(), filePath, imageType, imageBytes, modelName, "pending", "");
+            sessionId = insertSession(file.getFileName().toString(), filePath, imageType, imageBytes, modelName, "pending", prompt);
             log.info("[识题] 创建会话: sessionId={}, 图片已保存({}KB)", sessionId, imageBytes.length / 1024);
 
             String systemPrompt = "你是一个专业的解题助手。请识别图片中的题目，给出详细的解答过程和最终答案。" +
                     "如果图片中有多道题，请逐一解答。用中文回答，Markdown 格式。" +
                     "解答格式要求：先给出题目内容，再给出解题思路，最后给出答案。";
-            String userPrompt = "请识别并解答这道题。";
+            String userPrompt = prompt != null && !prompt.isEmpty() ? prompt : "请识别并解答这道题。";
 
             log.info("[识题] 组装提示词 - systemPrompt: {}, userPrompt: {}", systemPrompt, userPrompt);
 
