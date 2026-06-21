@@ -83,6 +83,11 @@ public class ChatController {
             kb = kbService.getFirst();
         }
 
+        // 3. 如果没有传 kbId 或传了无效的，重定向到正确的 URL
+        if (kb != null && (kbId == null || !kbId.equals(kb.getId()))) {
+            return "redirect:/chat?kbId=" + kb.getId();
+        }
+
         if (kb != null) {
             model.addAttribute("currentKb", kb);
             model.addAttribute("kbId", kb.getId());

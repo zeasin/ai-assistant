@@ -1,0 +1,44 @@
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title layout:fragment="title">工具箱 - AI 助理</title>
+    <style>
+        .tools-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:16px; }
+        .tool-card { background:#fff; border:1px solid #e1e3e6; border-radius:12px; padding:24px; transition:all .2s; text-decoration:none; color:inherit; display:block; }
+        .tool-card:hover { border-color:#7c5cfc; box-shadow:0 4px 16px rgba(124,92,252,0.1); transform:translateY(-2px); }
+        .tool-card .icon { font-size:40px; margin-bottom:12px; }
+        .tool-card .name { font-size:16px; font-weight:600; color:#1a1b1e; margin-bottom:6px; }
+        .tool-card .desc { font-size:13px; color:#5c5f66; line-height:1.6; }
+        .tool-card .tag { display:inline-block; background:#f0edff; color:#7c5cfc; padding:2px 8px; border-radius:4px; font-size:11px; margin-top:8px; }
+    </style>
+</head>
+<body>
+<th:block layout:fragment="content">
+    <h1 style="font-size:22px;font-weight:600;margin:0 0 20px;">🧰 工具箱</h1>
+
+    <div class="tools-grid">
+        <a href="/image/general" class="tool-card">
+            <div class="icon">🖼️</div>
+            <div class="name">通用识别</div>
+            <div class="desc">上传图片，AI 自动识别内容并分析。支持多种场景：风景、文字、图表等。</div>
+            <span class="tag">多模态</span>
+        </a>
+
+        <a href="/image/solve" class="tool-card">
+            <div class="icon">❓</div>
+            <div class="name">识题</div>
+            <div class="desc">拍照上传题目，AI 给出详细解答过程和答案。支持追问，深入理解。</div>
+            <span class="tag">学习</span>
+        </a>
+
+        <a href="/image/exam" class="tool-card">
+            <div class="icon">📝</div>
+            <div class="name">试卷识别</div>
+            <div class="desc">识别整张试卷，自动提取题目、答案、解析，建立个人题库。</div>
+            <span class="tag">学习</span>
+        </a>
+    </div>
+</th:block>
+</body>
+</html>
