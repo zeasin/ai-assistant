@@ -166,6 +166,30 @@
     </div>
 </div>
 
+<div class="modal-overlay" id="confirmModal">
+    <div class="modal">
+        <h3>❓ 识题确认</h3>
+        <div style="margin-bottom:12px;text-align:center;">
+            <img id="confirmPreviewImg" style="max-width:100%;max-height:200px;border-radius:8px;border:1px solid #e1e3e6;" />
+        </div>
+        <div style="margin-bottom:12px;">
+            <label style="font-size:12px;color:#5c5f66;font-weight:500;display:block;margin-bottom:4px;">💬 识别提示词（可选）</label>
+            <textarea id="confirmPrompt" rows="3" placeholder="留空使用默认提示词，或输入自定义要求..."
+                style="width:100%;padding:8px 12px;border:1px solid #e1e3e6;border-radius:8px;font-size:13px;resize:vertical;outline:none;font-family:inherit;"></textarea>
+        </div>
+        <div style="margin-bottom:12px;">
+            <label style="font-size:12px;color:#5c5f66;font-weight:500;display:block;margin-bottom:4px;">🤖 选择模型</label>
+            <select id="confirmModelSelector" style="width:100%;padding:8px 10px;border:1px solid #e1e3e6;border-radius:6px;font-size:13px;background:#fff;outline:none;">
+                <option th:each="m : ${visionModels}" th:value="${m.name}" th:selected="${m.name == defaultModel}" th:text="${m.name}">模型</option>
+            </select>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button class="solve-action-btn" onclick="solveCancelConfirm()">取消</button>
+            <button class="solve-action-btn" id="confirmBtn" style="background:#7c5cfc;color:#fff;border-color:#7c5cfc;" onclick="solveConfirmRecognize()">🔍 识别</button>
+        </div>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/contrib/auto-render.min.js"
@@ -177,6 +201,8 @@ var solveCurrentSessionId = null;
 var solveCurrentAnswer = '';
 var solveCurrentConversation = [];
 var solveSelectedSaveDir = '';
+var solvePendingFile = null;
+var solvePendingImageUrl = null;
 
 function solveRenderMath(el) {
     if (window.__katexLoaded || typeof renderMathInElement !== 'undefined') {
@@ -209,7 +235,7 @@ function solveAddSessionToList(id, name) {
     list.insertAdjacentHTML('afterbegin', html);
 }
 
-function solveShowCard(imageUrl, answer, followUps, sessionId, loading) {
+function solveShowCard(imageUrl, answer, followUps, sessionId, loading, prompt) {
     document.getElementById('solveEmpty').style.display = 'none';
     var container = document.getElementById('solveCardList');
     var html = '<div class="solve-card">';
@@ -217,6 +243,9 @@ function solveShowCard(imageUrl, answer, followUps, sessionId, loading) {
     if (loading) {
         html += '<div class="solve-loading">⏳ 正在识别题目...</div>';
     } else {
+        if (prompt) {
+            html += '<div style="padding:8px 16px;background:#f8f9fa;border-bottom:1px solid #e1e3e6;font-size:12px;color:#5c5f66;">💬 提示词: ' + solveEscapeHtml(prompt) + '</div>';
+        }
         html += '<div class="solve-card-answer">' + marked.parse(answer || '', {breaks:true}) + '</div>';
         solveCurrentAnswer = answer || '';
     }
@@ -249,12 +278,32 @@ function solveShowCard(imageUrl, answer, followUps, sessionId, loading) {
 
 function solveShowLoading(imageUrl) { solveShowCard(imageUrl, null, null, null, true); }
 
-async function solveAutoRecognize(file) {
-    var modelName = document.getElementById('solveModelSelector').value;
+function solveShowConfirmModal(file) {
+    solvePendingFile = file;
+    solvePendingImageUrl = URL.createObjectURL(file);
+    document.getElementById('confirmPreviewImg').src = solvePendingImageUrl;
+    document.getElementById('confirmPrompt').value = '';
+    document.getElementById('confirmModal').classList.add('active');
+}
+
+function solveCancelConfirm() {
+    document.getElementById('confirmModal').classList.remove('active');
+    solvePendingFile = null;
+    solvePendingImageUrl = null;
+    solveClearPreview();
+}
+
+async function solveConfirmRecognize() {
+    var file = solvePendingFile;
+    var prompt = document.getElementById('confirmPrompt').value.trim();
+    var modelName = document.getElementById('confirmModelSelector').value;
+    document.getElementById('confirmModal').classList.remove('active');
+
     if (!modelName) { solveToast('请先选择多模态模型', 'error'); return; }
+    if (!file) { solveToast('请先上传图片', 'error'); return; }
     if (solveSending) return;
 
-    var imageUrl = URL.createObjectURL(file);
+    var imageUrl = solvePendingImageUrl || URL.createObjectURL(file);
     solveShowLoading(imageUrl);
 
     var tempId = 'temp-' + Date.now();
@@ -264,6 +313,7 @@ async function solveAutoRecognize(file) {
     var fd = new FormData();
     fd.append('image', file);
     fd.append('modelName', modelName);
+    if (prompt) fd.append('prompt', prompt);
 
     try {
         var resp = await fetch('/image/solve/api/recognize', { method: 'POST', body: fd });
@@ -271,7 +321,7 @@ async function solveAutoRecognize(file) {
         if (data.ok) {
             solveCurrentSessionId = data.sessionId;
             solveCurrentConversation = data.conversation || [];
-            solveShowCard('/image/solve/api/sessions/' + data.sessionId + '/image', data.answer, [], data.sessionId, false);
+            solveShowCard('/image/solve/api/sessions/' + data.sessionId + '/image', data.answer, [], data.sessionId, false, prompt || '');
             var tempEl = document.querySelector('.solve-session-item[data-id="' + tempId + '"]');
             if (tempEl) {
                 tempEl.dataset.id = data.sessionId;
@@ -287,6 +337,8 @@ async function solveAutoRecognize(file) {
     }
     solveSending = false;
     solveClearPreview();
+    solvePendingFile = null;
+    solvePendingImageUrl = null;
 }
 
 async function solveLoadSession(id) {
@@ -301,7 +353,7 @@ async function solveLoadSession(id) {
         var s = data.session;
         var followUps = data.followUps || [];
         solveCurrentAnswer = s.answer || '';
-        solveShowCard('/image/solve/api/sessions/' + id + '/image', s.answer, followUps, id, false);
+        solveShowCard('/image/solve/api/sessions/' + id + '/image', s.answer, followUps, id, false, s.prompt || '');
     } catch(e) { solveToast('加载失败', 'error'); }
 }
 
@@ -493,7 +545,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     document.getElementById('solvePreviewWrap').style.display = '';
                     document.getElementById('solvePreviewImg').src = URL.createObjectURL(file);
                     document.getElementById('solveFileInput').files = e.dataTransfer.files;
-                    solveAutoRecognize(file);
+                    solveShowConfirmModal(file);
                 }
             }
         });
@@ -503,13 +555,18 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('solveUploadHint').style.display = 'none';
             document.getElementById('solvePreviewWrap').style.display = '';
             document.getElementById('solvePreviewImg').src = URL.createObjectURL(this.files[0]);
-            solveAutoRecognize(this.files[0]);
+            solveShowConfirmModal(this.files[0]);
         }
     });
     solveLoadKbImages();
     document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape' && document.getElementById('saveModal').classList.contains('active')) {
-            document.getElementById('saveModal').classList.remove('active');
+        if (e.key === 'Escape') {
+            if (document.getElementById('saveModal').classList.contains('active')) {
+                document.getElementById('saveModal').classList.remove('active');
+            }
+            if (document.getElementById('confirmModal').classList.contains('active')) {
+                solveCancelConfirm();
+            }
         }
     });
 });

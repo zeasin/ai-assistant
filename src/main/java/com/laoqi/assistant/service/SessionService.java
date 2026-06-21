@@ -280,6 +280,7 @@ public class SessionService {
                     image_type  TEXT NOT NULL DEFAULT 'image/jpeg',
                     image_data  BLOB,
                     model       TEXT NOT NULL DEFAULT '',
+                    prompt      TEXT NOT NULL DEFAULT '',
                     answer      TEXT NOT NULL DEFAULT '',
                     status      TEXT NOT NULL DEFAULT 'pending',
                     created_at  TEXT NOT NULL
@@ -299,6 +300,7 @@ public class SessionService {
             log.info("Table solve_sessions, solve_follow_ups initialized");
             try { stmt.execute("ALTER TABLE solve_sessions ADD COLUMN image_type TEXT NOT NULL DEFAULT 'image/jpeg'"); } catch (Exception ignored) {}
             try { stmt.execute("ALTER TABLE solve_sessions ADD COLUMN image_data BLOB"); } catch (Exception ignored) {}
+            try { stmt.execute("ALTER TABLE solve_sessions ADD COLUMN prompt TEXT NOT NULL DEFAULT ''"); } catch (Exception ignored) {}
 
         } catch (SQLException e) {
             throw new RuntimeException("Failed to create new tables", e);

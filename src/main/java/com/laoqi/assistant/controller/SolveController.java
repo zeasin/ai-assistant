@@ -61,7 +61,8 @@ public class SolveController {
     @PostMapping("/api/recognize")
     @ResponseBody
     public Map<String, Object> recognize(@RequestParam("image") MultipartFile image,
-                                          @RequestParam(value = "modelName", defaultValue = "") String modelName) {
+                                          @RequestParam(value = "modelName", defaultValue = "") String modelName,
+                                          @RequestParam(value = "prompt", defaultValue = "") String prompt) {
         long startMs = System.currentTimeMillis();
         String fileName = image.getOriginalFilename();
         long sessionId = -1;
@@ -70,17 +71,21 @@ public class SolveController {
             String imageType = image.getContentType();
             if (imageType == null || imageType.isEmpty()) imageType = "image/jpeg";
 
-            log.info("[识题] 识别请求: model={}, file={}, type={}, size={}KB",
-                    modelName, fileName, imageType, imageBytes.length / 1024);
+            log.info("[识题] 识别请求: model={}, file={}, type={}, size={}KB, prompt={}",
+                    modelName, fileName, imageType, imageBytes.length / 1024,
+                    prompt != null && !prompt.isEmpty() ? prompt : "(默认)");
 
-            sessionId = insertSession(fileName, "", imageType, imageBytes, modelName, "pending");
+            sessionId = insertSession(fileName, "", imageType, imageBytes, modelName, "pending", prompt);
             log.info("[识题] 创建会话: sessionId={}, 图片已保存({}KB)", sessionId, imageBytes.length / 1024);
 
             String base64Image = Base64.getEncoder().encodeToString(imageBytes);
             String systemPrompt = "你是一个专业的解题助手。请识别图片中的题目，给出详细的解答过程和最终答案。" +
                     "如果图片中有多道题，请逐一解答。用中文回答，Markdown 格式。" +
                     "解答格式要求：先给出题目内容，再给出解题思路，最后给出答案。";
-            String userPrompt = "请识别并解答这道题。";
+            String userPrompt = prompt != null && !prompt.isEmpty() ? prompt : "请识别并解答这道题。";
+
+            log.info("[识题] 用户提示词: {}", prompt != null && !prompt.isEmpty() ? prompt : "(使用默认提示词)");
+            log.info("[识题] 组装提示词 - systemPrompt: {}, userPrompt: {}", systemPrompt, userPrompt);
 
             String reply = llmService.chatWithImage(systemPrompt, userPrompt, base64Image, imageType, modelName);
 
@@ -98,7 +103,7 @@ public class SolveController {
             return Map.of("ok", true, "answer", reply, "conversation", conversation, "sessionId", sessionId);
         } catch (Exception e) {
             long elapsed = System.currentTimeMillis() - startMs;
-            log.error("[识题] 识别失败: model={}, 耗时={}ms, 错误={}", modelName, elapsed, e.getMessage());
+            log.error("[识题] 识别失败: model={}, file={}, 耗时={}ms, 错误={}", modelName, fileName, elapsed, e.getMessage());
             if (sessionId > 0) updateSessionResult(sessionId, "识别失败: " + e.getMessage(), "failed");
             logService.add("识题", "失败", e.getMessage());
             return Map.of("ok", false, "error", "识别失败: " + e.getMessage());
@@ -130,13 +135,15 @@ public class SolveController {
             String imageType = guessImageType(file.getFileName().toString().toLowerCase());
             String base64Image = Base64.getEncoder().encodeToString(imageBytes);
 
-            sessionId = insertSession(file.getFileName().toString(), filePath, imageType, imageBytes, modelName, "pending");
+            sessionId = insertSession(file.getFileName().toString(), filePath, imageType, imageBytes, modelName, "pending", "");
             log.info("[识题] 创建会话: sessionId={}, 图片已保存({}KB)", sessionId, imageBytes.length / 1024);
 
             String systemPrompt = "你是一个专业的解题助手。请识别图片中的题目，给出详细的解答过程和最终答案。" +
                     "如果图片中有多道题，请逐一解答。用中文回答，Markdown 格式。" +
                     "解答格式要求：先给出题目内容，再给出解题思路，最后给出答案。";
             String userPrompt = "请识别并解答这道题。";
+
+            log.info("[识题] 组装提示词 - systemPrompt: {}, userPrompt: {}", systemPrompt, userPrompt);
 
             String reply = llmService.chatWithImage(systemPrompt, userPrompt, base64Image, imageType, modelName);
 
@@ -278,12 +285,12 @@ public class SolveController {
 
     // ========== DB helpers ==========
 
-    private long insertSession(String imageName, String imagePath, String imageType, byte[] imageData, String model, String status) {
+    private long insertSession(String imageName, String imagePath, String imageType, byte[] imageData, String model, String status, String prompt) {
         String now = java.time.LocalDateTime.now()
                 .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
         try (Connection conn = dataSource.getConnection();
              PreparedStatement ps = conn.prepareStatement(
-                     "INSERT INTO solve_sessions (title, image_name, image_path, image_type, image_data, model, status, created_at) VALUES (?,?,?,?,?,?,?,?)",
+                     "INSERT INTO solve_sessions (title, image_name, image_path, image_type, image_data, model, status, created_at, prompt) VALUES (?,?,?,?,?,?,?,?,?)",
                      Statement.RETURN_GENERATED_KEYS)) {
             ps.setString(1, imageName);
             ps.setString(2, imageName);
@@ -297,6 +304,7 @@ public class SolveController {
             ps.setString(6, model);
             ps.setString(7, status);
             ps.setString(8, now);
+            ps.setString(9, prompt != null ? prompt : "");
             ps.executeUpdate();
             ResultSet rs = ps.getGeneratedKeys();
             if (rs.next()) return rs.getLong(1);
@@ -360,6 +368,7 @@ public class SolveController {
                 m.put("id", rs.getLong("id"));
                 m.put("title", rs.getString("title"));
                 m.put("imageName", rs.getString("image_name"));
+                m.put("prompt", rs.getString("prompt"));
                 m.put("status", rs.getString("status"));
                 m.put("createdAt", rs.getString("created_at"));
                 list.add(m);
@@ -382,6 +391,7 @@ public class SolveController {
                 m.put("imageName", rs.getString("image_name"));
                 m.put("imagePath", rs.getString("image_path"));
                 m.put("model", rs.getString("model"));
+                m.put("prompt", rs.getString("prompt"));
                 m.put("answer", rs.getString("answer"));
                 m.put("status", rs.getString("status"));
                 m.put("createdAt", rs.getString("created_at"));
