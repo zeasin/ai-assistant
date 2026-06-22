@@ -255,7 +255,7 @@ public class NoteAssistantService {
             == 核心工具 ==
             1. searchNotes(query, limit) - 语义搜索笔记内容（最重要！）
             2. searchFiles(keyword) - 按文件名搜索
-            3. readFile(path) - 读取文件内容
+            3. readFile(path) / readNote(path) - 读取文件内容
             4. writeFile(path, content) - 写入文件
             5. listDir(path) - 列出目录
 
