@@ -20,16 +20,19 @@ public class NoteAssistantService {
     private final LlmConfigResolver configResolver;
     private final ToolRegistry toolRegistry;
     private final SessionService sessionService;
+    private final ContextBuilder contextBuilder;
 
     private volatile ChatClient defaultClient;
     private volatile String cachedConfigKey = "";
     private final ConcurrentHashMap<String, ChatClient> modelClients = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, String> modelConfigKeys = new ConcurrentHashMap<>();
 
-    public NoteAssistantService(LlmConfigResolver configResolver, ToolRegistry toolRegistry, SessionService sessionService) {
+    public NoteAssistantService(LlmConfigResolver configResolver, ToolRegistry toolRegistry, 
+                               SessionService sessionService, ContextBuilder contextBuilder) {
         this.configResolver = configResolver;
         this.toolRegistry = toolRegistry;
         this.sessionService = sessionService;
+        this.contextBuilder = contextBuilder;
     }
 
     public boolean isAvailable() {
@@ -60,15 +63,12 @@ public class NoteAssistantService {
 
         NoteTools.setCurrentKbId(kbId);
         try {
-            String context = sessionService.buildHistoryContext(sessionId, mode, userMessage);
-            String fullMessage;
-            if (context != null) {
-                fullMessage = context + "\n\n---\n\n用户最新消息:\n" + userMessage;
-                log.info("[编排] 注入了历史上下文（含语义检索），总消息长度={}", fullMessage.length());
-            } else {
-                fullMessage = userMessage;
-                log.info("[编排] 无历史上下文，仅当前消息");
-            }
+            // 使用 ContextBuilder 构建完整上下文（主动搜索 + 历史对话 + 规则文件）
+            ContextBuilder.ChatContext context = contextBuilder.build(sessionId, userMessage, kbId);
+            String fullMessage = contextBuilder.merge(context, userMessage);
+            
+            int noteCount = context.relevantNotes() != null ? context.relevantNotes().size() : 0;
+            log.info("[编排] 上下文构建完成，总消息长度={}, 相关笔记={}", fullMessage.length(), noteCount);
 
             log.info("[编排] 用户: {} (session={}, kbId={}, model={})", userMessage, sessionId, kbId,
                     modelName != null ? modelName : "default");
@@ -102,15 +102,12 @@ public class NoteAssistantService {
 
         NoteTools.setCurrentKbId(kbId);
         try {
-            String context = sessionService.buildHistoryContext(sessionId, mode, userMessage);
-            String fullMessage;
-            if (context != null) {
-                fullMessage = context + "\n\n---\n\n用户最新消息:\n" + userMessage;
-                log.info("[编排] 注入了历史上下文（含语义检索），总消息长度={}", fullMessage.length());
-            } else {
-                fullMessage = userMessage;
-                log.info("[编排] 无历史上下文，仅当前消息");
-            }
+            // 使用 ContextBuilder 构建完整上下文（主动搜索 + 历史对话 + 规则文件）
+            ContextBuilder.ChatContext context = contextBuilder.build(sessionId, userMessage, kbId);
+            String fullMessage = contextBuilder.merge(context, userMessage);
+            
+            int noteCount = context.relevantNotes() != null ? context.relevantNotes().size() : 0;
+            log.info("[编排] 上下文构建完成，总消息长度={}, 相关笔记={}", fullMessage.length(), noteCount);
 
             log.info("[编排] 用户: {} (session={}, kbId={}, model={})", userMessage, sessionId, kbId,
                     modelName != null ? modelName : "default");
