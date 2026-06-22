@@ -302,6 +302,25 @@ public class SessionService {
             try { stmt.execute("ALTER TABLE solve_sessions ADD COLUMN image_data BLOB"); } catch (Exception ignored) {}
             try { stmt.execute("ALTER TABLE solve_sessions ADD COLUMN prompt TEXT NOT NULL DEFAULT ''"); } catch (Exception ignored) {}
 
+            // 笔记内容索引表
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS note_embeddings (
+                    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                    kb_id        INTEGER NOT NULL,
+                    file_path    TEXT NOT NULL,
+                    chunk_index  INTEGER NOT NULL DEFAULT 0,
+                    content      TEXT NOT NULL,
+                    embedding    TEXT NOT NULL,
+                    content_hash TEXT NOT NULL,
+                    created_at   TEXT NOT NULL,
+                    updated_at   TEXT NOT NULL,
+                    UNIQUE(kb_id, file_path, chunk_index)
+                )
+                """);
+            stmt.execute("CREATE INDEX IF NOT EXISTS idx_note_embeddings_kb ON note_embeddings(kb_id)");
+            stmt.execute("CREATE INDEX IF NOT EXISTS idx_note_embeddings_path ON note_embeddings(kb_id, file_path)");
+            log.info("Table note_embeddings initialized");
+
         } catch (SQLException e) {
             throw new RuntimeException("Failed to create new tables", e);
         }

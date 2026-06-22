@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -27,10 +28,13 @@ public class NoteTools {
 
     private final ConfigService configService;
     private final KnowledgeBaseService kbService;
+    private final NoteIndexService noteIndexService;
 
-    public NoteTools(ConfigService configService, KnowledgeBaseService kbService) {
+    public NoteTools(ConfigService configService, KnowledgeBaseService kbService,
+                    NoteIndexService noteIndexService) {
         this.configService = configService;
         this.kbService = kbService;
+        this.noteIndexService = noteIndexService;
     }
 
     public static void setCurrentKbId(Long kbId) {
@@ -101,6 +105,11 @@ public class NoteTools {
         return content;
     }
 
+    @Tool(description = "读取指定笔记文件的完整内容，语义与 readFile 相同，用于读取笔记内容")
+    public String readNote(@ToolParam(description = "文件路径，相对于笔记库根目录") String path) {
+        return readFile(path);
+    }
+
     @Tool(description = "将数据写入笔记库指定文件。如果文件已存在，需要先读取原有内容，合并后再写入")
     public String writeFile(
             @ToolParam(description = "文件路径，相对于笔记库根目录") String path,
@@ -133,5 +142,46 @@ public class NoteTools {
         }
         if (result.isEmpty()) return "未找到包含「" + keyword + "」的文件或目录";
         return result.toString().trim();
+    }
+
+    @Tool(description = "搜索笔记库内容，基于语义理解查找相关笔记片段。当用户询问某个主题、人物、事件时使用此工具")
+    public String searchNotes(
+            @ToolParam(description = "搜索关键词或自然语言查询，如'张三的跟进记录'、'本周工作重点'") String query,
+            @ToolParam(description = "返回结果数量，默认5，最多20") int limit) {
+
+        Long kbId = getCurrentKbId();
+        if (kbId == null) return "未指定知识库";
+
+        if (!noteIndexService.isAvailable()) {
+            return "语义搜索不可用（Embedding 服务未配置），请使用 searchFiles 按文件名搜索";
+        }
+
+        try {
+            List<NoteIndexService.NoteSearchResult> results = noteIndexService.search(kbId, query, limit);
+
+            if (results.isEmpty()) {
+                return "未找到与「" + query + "」相关的笔记内容。提示：可以先用 searchFiles 按文件名搜索，或检查索引是否已构建";
+            }
+
+            StringBuilder sb = new StringBuilder();
+            sb.append("找到 ").append(results.size()).append(" 条相关笔记：\n\n");
+
+            for (int i = 0; i < results.size(); i++) {
+                NoteIndexService.NoteSearchResult r = results.get(i);
+                sb.append("📄 ").append(r.filePath());
+                sb.append(" (相似度: ").append(String.format("%.2f", r.score())).append(")\n");
+
+                String contentPreview = r.content();
+                if (contentPreview.length() > 300) {
+                    contentPreview = contentPreview.substring(0, 300) + "...";
+                }
+                sb.append("内容摘要：").append(contentPreview).append("\n\n");
+            }
+
+            return sb.toString();
+        } catch (Exception e) {
+            log.error("[NoteTools] 搜索笔记失败", e);
+            return "搜索失败: " + e.getMessage();
+        }
     }
 }

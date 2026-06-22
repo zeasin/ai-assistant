@@ -117,6 +117,18 @@ public class KnowledgeBaseController {
 
     // 任务/提醒页面已迁移到 /planner
 
+    @GetMapping("/kb/{id}/index")
+    public String kbIndex(@PathVariable Long id, Map<String, Object> model) {
+        KnowledgeBaseEntity kb = kbService.getById(id);
+        if (kb == null) return "redirect:/config";
+
+        model.put("kb", kb);
+        model.put("kbId", id);
+        model.put("labels", parseLabels(kb.getLabels()));
+
+        return "kb_index";
+    }
+
     @GetMapping("/kb/{id}/data")
     public String kbData(@PathVariable Long id, Map<String, Object> model) {
         KnowledgeBaseEntity kb = kbService.getById(id);

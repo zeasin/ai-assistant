@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<th:block layout:fragment="content">
+<th:block th:replace="~{kb_tab_bar :: kb-tabs('index', ${kb}, ${labels})}" />
+
+    <div class="card">
+        <h2>📊 笔记索引管理</h2>
+        <p class="text-muted" style="margin-bottom:16px;">
+            笔记索引用于语义搜索，AI可以通过内容理解查找相关笔记。构建索引后，对话时AI会自动搜索相关内容。
+        </p>
+
+        <!-- 状态卡片 -->
+        <div class="status-bar">
+            <div class="status-item">
+                <div class="label">索引状态</div>
+                <div class="value" id="statusText">加载中...</div>
+            </div>
+            <div class="status-item">
+                <div class="label">已索引文件</div>
+                <div class="value" id="fileCount">-</div>
+            </div>
+            <div class="status-item">
+                <div class="label">内容片段</div>
+                <div class="value" id="chunkCount">-</div>
+            </div>
+            <div class="status-item">
+                <div class="label">Embedding 服务</div>
+                <div class="value" id="embeddingStatus">-</div>
+            </div>
+        </div>
+
+        <!-- 操作按钮 -->
+        <div class="flex" style="margin-bottom:16px;">
+            <button class="btn btn-primary" onclick="buildIndex()" id="btnBuild">
+                🔄 构建索引
+            </button>
+            <button class="btn btn-secondary" onclick="refreshStatus(true)">
+                📊 刷新状态
+            </button>
+            <button class="btn btn-danger" onclick="clearIndex()" id="btnClear">
+                🗑️ 清空索引
+            </button>
+        </div>
+
+        <div id="buildStatus" style="display:none; padding:12px; background:#f0edff; border-radius:8px; margin-bottom:16px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span id="buildStatusText"></span>
+                <button class="btn btn-secondary" onclick="stopPolling()" id="btnStop" style="display:none; margin-left:12px;">
+                    ⏹️ 停止
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 搜索测试 -->
+    <div class="card">
+        <h2>🔍 搜索测试</h2>
+        <p class="text-muted" style="margin-bottom:16px;">
+            测试语义搜索效果，输入关键词或自然语言查询。
+        </p>
+
+        <div style="display:flex; gap:8px; margin-bottom:16px;">
+            <input type="text" id="searchInput" placeholder="输入搜索内容，如：客户跟进、本周工作..."
+                   style="flex:1; padding:10px 14px; border:1px solid #e1e3e6; border-radius:8px; font-size:14px;"
+                   onkeydown="if(event.key==='Enter')doSearch()">
+            <button class="btn btn-primary" onclick="doSearch()">搜索</button>
+        </div>
+
+        <div id="searchResults"></div>
+        <div id="pagination" style="display:none; margin-top:16px; justify-content:center; gap:8px;"></div>
+    </div>
+
+    <!-- 文件详情弹窗 -->
+    <div id="fileModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1000; justify-content:center; align-items:center;" onclick="closeModal(event)">
+        <div style="background:#fff; border-radius:12px; width:800px; max-width:90vw; max-height:85vh; display:flex; flex-direction:column; box-shadow:0 8px 32px rgba(0,0,0,0.2);" onclick="event.stopPropagation()">
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:16px 20px; border-bottom:1px solid #e1e3e6;">
+                <h3 id="modalTitle" style="margin:0; font-size:16px;">📄 文件详情</h3>
+                <button onclick="closeModal()" style="background:none; border:none; font-size:20px; cursor:pointer; color:#909296;">✕</button>
+            </div>
+            <div id="modalContent" class="report" style="padding:20px; overflow-y:auto; flex:1; font-size:14px; line-height:1.8;"></div>
+        </div>
+    </div>
+
+<script th:inline="javascript">
+    const kbId = /*[[${kbId}]]*/ 1;
+    let pollingTimer = null;
+    let lastFileCount = 0;
+    let lastChunkCount = 0;
+    let pollCount = 0;
+    let allSearchResults = [];
+    let currentPage = 1;
+    const pageSize = 10;
+
+    function openFileDetail(filePath) {
+        document.getElementById('fileModal').style.display = 'flex';
+        document.getElementById('modalTitle').textContent = '📄 ' + filePath;
+        document.getElementById('modalContent').innerHTML = '<p class="text-muted">加载中...</p>';
+
+        fetch('/kb/' + kbId + '/notes/raw?path=' + encodeURIComponent(filePath))
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.ok) {
+                    var content = data.content;
+                    // 去除 frontmatter
+                    content = content.replace(/^---[\s\S]*?---\n*/, '');
+                    // 渲染 markdown
+                    document.getElementById('modalContent').innerHTML = marked.parse(content);
+                } else {
+                    document.getElementById('modalContent').innerHTML = '<p style="color:#e03131;">加载失败: ' + data.error + '</p>';
+                }
+            })
+            .catch(function(err) {
+                document.getElementById('modalContent').innerHTML = '<p style="color:#e03131;">请求失败: ' + err.message + '</p>';
+            });
+    }
+
+    function closeModal(event) {
+        if (event && event.target !== event.currentTarget) return;
+        document.getElementById('fileModal').style.display = 'none';
+    }
+
+    // ESC 键关闭弹窗
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closeModal();
+    });
+
+    function refreshStatus(showLoading) {
+        if (showLoading) {
+            document.getElementById('statusText').textContent = '加载中...';
+        }
+
+        fetch('/kb/' + kbId + '/api/index/status')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.ok) {
+                    // 索引状态
+                    var statusEl = document.getElementById('statusText');
+                    if (data.building) {
+                        statusEl.textContent = '⏳ 构建中';
+                        statusEl.className = 'value status-building';
+                    } else if (data.status === 'ready') {
+                        statusEl.textContent = '✅ 已就绪';
+                        statusEl.className = 'value status-up';
+                    } else if (data.status === 'empty') {
+                        statusEl.textContent = '📭 未索引';
+                        statusEl.className = 'value';
+                    } else {
+                        statusEl.textContent = '⚠️ 不可用';
+                        statusEl.className = 'value status-down';
+                    }
+
+                    // Embedding 服务状态
+                    var embEl = document.getElementById('embeddingStatus');
+                    if (data.embeddingAvailable) {
+                        embEl.textContent = '✅ 可用';
+                        embEl.className = 'value status-up';
+                    } else {
+                        embEl.textContent = '❌ 不可用';
+                        embEl.className = 'value status-down';
+                    }
+
+                    document.getElementById('fileCount').textContent = data.fileCount;
+                    document.getElementById('chunkCount').textContent = data.chunkCount;
+
+                    var fileChanged = data.fileCount !== lastFileCount;
+                    var chunkChanged = data.chunkCount !== lastChunkCount;
+
+                    lastFileCount = data.fileCount;
+                    lastChunkCount = data.chunkCount;
+
+                    // 构建进度显示
+                    if (pollingTimer && data.building) {
+                        var currentFile = data.currentFile || '';
+                        document.getElementById('buildStatusText').innerHTML = 
+                            '⏳ 正在构建索引... 已处理 ' + data.processedFiles + ' / ' + data.totalFiles + ' 个文件' +
+                            (currentFile && currentFile !== '完成' ? '<br><small style="color:#666;">当前: ' + currentFile + '</small>' : '');
+                    }
+                    
+                    // 如果构建完成，停止轮询
+                    if (pollingTimer && !data.building) {
+                        stopPolling();
+                        document.getElementById('buildStatusText').textContent = '✅ 索引构建完成';
+                    }
+                }
+            })
+            .catch(function(err) {
+                document.getElementById('statusText').textContent = '❌ 加载失败';
+            });
+    }
+
+    function startPolling() {
+        if (pollingTimer) return;
+
+        document.getElementById('buildStatus').style.display = 'block';
+        document.getElementById('btnStop').style.display = 'inline-flex';
+        document.getElementById('buildStatusText').innerHTML = '⏳ 正在构建索引，每秒自动刷新...';
+
+        pollCount = 0;
+        pollingTimer = setInterval(function() {
+            pollCount++;
+            refreshStatus(false);
+        }, 1000);
+    }
+
+    function stopPolling() {
+        if (pollingTimer) {
+            clearInterval(pollingTimer);
+            pollingTimer = null;
+        }
+        document.getElementById('btnStop').style.display = 'none';
+    }
+
+    function buildIndex() {
+        var btn = document.getElementById('btnBuild');
+        btn.disabled = true;
+        btn.textContent = '⏳ 构建中...';
+
+        document.getElementById('buildStatus').style.display = 'block';
+        document.getElementById('buildStatusText').textContent = '正在启动索引构建...';
+
+        fetch('/kb/' + kbId + '/api/index/build', { method: 'POST' })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.ok) {
+                    document.getElementById('buildStatusText').textContent = '✅ ' + data.message;
+                    startPolling();
+                } else {
+                    document.getElementById('buildStatusText').textContent = '❌ ' + data.error;
+                }
+            })
+            .catch(function(err) {
+                document.getElementById('buildStatusText').textContent = '❌ 请求失败: ' + err.message;
+            })
+            .finally(function() {
+                btn.disabled = false;
+                btn.textContent = '🔄 构建索引';
+            });
+    }
+
+    function clearIndex() {
+        if (!confirm('确定要清空索引吗？清空后需要重新构建。')) return;
+
+        fetch('/kb/' + kbId + '/api/index', { method: 'DELETE' })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.ok) {
+                    toast('索引已清空');
+                    lastFileCount = 0;
+                    lastChunkCount = 0;
+                    refreshStatus(true);
+                } else {
+                    toast(data.error || '操作失败', 'error');
+                }
+            });
+    }
+
+    function doSearch() {
+        var query = document.getElementById('searchInput').value.trim();
+        if (!query) {
+            toast('请输入搜索内容', 'error');
+            return;
+        }
+
+        var resultsDiv = document.getElementById('searchResults');
+        resultsDiv.innerHTML = '<p class="text-muted">搜索中...</p>';
+        document.getElementById('pagination').style.display = 'none';
+
+        fetch('/kb/' + kbId + '/api/index/search', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query: query, limit: 100 })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.ok) {
+                allSearchResults = data.results || [];
+                currentPage = 1;
+                renderSearchResults();
+            } else {
+                resultsDiv.innerHTML = '<p style="color:#e03131;">搜索失败: ' + data.error + '</p>';
+            }
+        })
+        .catch(function(err) {
+            resultsDiv.innerHTML = '<p style="color:#e03131;">请求失败: ' + err.message + '</p>';
+        });
+    }
+
+    function renderSearchResults() {
+        var resultsDiv = document.getElementById('searchResults');
+        var paginationDiv = document.getElementById('pagination');
+        
+        if (allSearchResults.length === 0) {
+            resultsDiv.innerHTML = '<p class="text-muted">未找到相关结果。提示：请先构建索引。</p>';
+            paginationDiv.style.display = 'none';
+            return;
+        }
+
+        var totalPages = Math.ceil(allSearchResults.length / pageSize);
+        var start = (currentPage - 1) * pageSize;
+        var end = Math.min(start + pageSize, allSearchResults.length);
+        var pageResults = allSearchResults.slice(start, end);
+
+        var html = '<p class="text-muted" style="margin-bottom:12px;">共找到 ' + allSearchResults.length + ' 条相关结果：</p>';
+        pageResults.forEach(function(r) {
+            var score = (r.score * 100).toFixed(0);
+            var preview = r.content.length > 200 ? r.content.substring(0, 200) + '...' : r.content;
+            html += '<div style="border:1px solid #e1e3e6; border-radius:8px; padding:12px; margin-bottom:8px;">' +
+                '<div style="display:flex; justify-content:space-between; margin-bottom:8px;">' +
+                '<a href="javascript:void(0)" onclick="openFileDetail(\'' + r.filePath.replace(/'/g, "\\'") + '\')" style="font-weight:500; color:#7c5cfc; text-decoration:none; cursor:pointer;">📄 ' + r.filePath + '</a>' +
+                '<span class="badge badge-info">' + score + '% 相似</span>' +
+                '</div>' +
+                '<div style="font-size:13px; color:#5c5f66; line-height:1.6;">' + preview + '</div>' +
+                '</div>';
+        });
+        resultsDiv.innerHTML = html;
+
+        // 渲染分页
+        if (totalPages > 1) {
+            var pageHtml = '';
+            if (currentPage > 1) {
+                pageHtml += '<button class="btn btn-secondary" onclick="goToPage(' + (currentPage - 1) + ')">← 上一页</button>';
+            }
+            pageHtml += '<span style="padding:8px 16px; color:#5c5f66;">第 ' + currentPage + ' / ' + totalPages + ' 页</span>';
+            if (currentPage < totalPages) {
+                pageHtml += '<button class="btn btn-secondary" onclick="goToPage(' + (currentPage + 1) + ')">下一页 →</button>';
+            }
+            paginationDiv.innerHTML = pageHtml;
+            paginationDiv.style.display = 'flex';
+        } else {
+            paginationDiv.style.display = 'none';
+        }
+    }
+
+    function goToPage(page) {
+        currentPage = page;
+        renderSearchResults();
+        document.getElementById('searchResults').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    refreshStatus(true);
+</script>
+</th:block>
+</html>
