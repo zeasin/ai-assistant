@@ -145,7 +145,11 @@ public class ContextBuilder {
             if (isDuplicate) continue;
             
             addedContents.add(content);
-            sb.append("【来源: ").append(note.filePath()).append("】\n");
+            sb.append("【来源: ").append(note.filePath()).append("】");
+            if (note.title() != null && !note.title().isBlank()) {
+                sb.append(" 标题: ").append(note.title());
+            }
+            sb.append("\n");
             sb.append(content).append("\n\n");
             count++;
         }

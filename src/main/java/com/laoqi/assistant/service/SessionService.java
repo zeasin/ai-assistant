@@ -315,6 +315,7 @@ public class SessionService {
                     chunk_index  INTEGER NOT NULL DEFAULT 0,
                     path_context TEXT NOT NULL DEFAULT '',
                     content      TEXT NOT NULL,
+                    title      TEXT NOT NULL,
                     embedding    TEXT NOT NULL,
                     content_hash TEXT NOT NULL,
                     created_at   TEXT NOT NULL,
@@ -325,6 +326,7 @@ public class SessionService {
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_note_embeddings_kb ON note_embeddings(kb_id)");
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_note_embeddings_path ON note_embeddings(kb_id, file_path)");
             try { stmt.execute("ALTER TABLE note_embeddings ADD COLUMN path_context TEXT NOT NULL DEFAULT ''"); } catch (Exception ignored) {}
+            try { stmt.execute("ALTER TABLE note_embeddings ADD COLUMN title TEXT"); } catch (Exception ignored) {}
             log.info("Table note_embeddings initialized");
 
         } catch (SQLException e) {

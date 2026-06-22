@@ -388,10 +388,12 @@
             var scoreClass = r.score >= 0.8 ? 'badge-ok' : (r.score >= 0.6 ? 'badge-info' : 'badge-fail');
             var preview = r.content.length > 200 ? r.content.substring(0, 200) + '...' : r.content;
             var pathInfo = r.pathContext ? '<span style="color:#909296; font-size:12px; margin-left:8px;">📂 ' + r.pathContext + '</span>' : '';
+            var title = r.title ? ' <span style="color:#e67e22; font-weight:500;">' + r.title + '</span>' : '';
             html += '<div style="border:1px solid #e1e3e6; border-radius:8px; padding:12px; margin-bottom:8px;">' +
                 '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">' +
                 '<div>' +
                 '<a href="javascript:void(0)" onclick="openFileDetail(\'' + r.filePath.replace(/'/g, "\\'") + '\')" style="font-weight:500; color:#7c5cfc; text-decoration:none; cursor:pointer;">📄 ' + r.filePath + '</a>' +
+                title +
                 pathInfo +
                 '</div>' +
                 '<span class="badge ' + scoreClass + '">' + score + '% 相似</span>' +

@@ -275,15 +275,20 @@ public class NoteIndexService {
         // 提取路径特征信息：上级文件夹名称
         String pathContext = extractPathContext(relativePath);
 
-        // 如果文件已存在且内容未变，检查 pathContext 是否一致，一致则跳过
+        // 提取 Markdown 标题（第一个 # 标题）
+        String title = extractTitle(content);
+
+        // 如果文件已存在且内容未变，检查 pathContext 和 title 是否一致，一致则跳过
         if (!existing.isEmpty() && existing.get(0).getContentHash().equals(contentHash)) {
             String existingPathContext = existing.get(0).getPathContext();
-            if (existingPathContext != null && existingPathContext.equals(pathContext)) {
+            String existingTitle = existing.get(0).getTitle();
+            if (existingPathContext != null && existingPathContext.equals(pathContext)
+                    && Objects.equals(existingTitle, title)) {
                 log.debug("[NoteIndex] 跳过未变更文件: {}", relativePath);
                 return;
             }
-            log.info("[NoteIndex] 文件内容未变但需重新索引（pathContext 变更: {} -> {}）: {}",
-                    existingPathContext, pathContext, relativePath);
+            log.info("[NoteIndex] 文件内容未变但需重新索引（pathContext/title 变更）: {}",
+                    relativePath);
         }
 
         noteEmbeddingDbService.deleteByKbAndPath(kbId, relativePath);
@@ -293,8 +298,9 @@ public class NoteIndexService {
 
         for (int i = 0; i < chunks.size(); i++) {
             String chunk = chunks.get(i);
-            // 将路径信息加入内容，提高搜索相关性
-            String enhancedContent = pathContext + "\n" + chunk;
+            // 标题优先级最高，路径次之，内容最后
+            String enhancedContent = title != null ? title + "\n" + pathContext + "\n" + chunk
+                    : pathContext + "\n" + chunk;
             float[] vector = embeddingService.embed(enhancedContent);
             if (vector == null) {
                 log.warn("[NoteIndex] 生成向量失败: {} chunk={}", relativePath, i);
@@ -305,6 +311,7 @@ public class NoteIndexService {
             entity.setKbId(kbId);
             entity.setFilePath(relativePath);
             entity.setChunkIndex(i);
+            entity.setTitle(title);
             entity.setPathContext(pathContext);
             entity.setContent(chunk);  // 存储纯内容，不含路径
             entity.setEmbedding(Base64.getEncoder().encodeToString(floatToBytes(vector)));
@@ -315,7 +322,28 @@ public class NoteIndexService {
             noteEmbeddingDbService.save(entity);
         }
 
-        log.debug("[NoteIndex] 已索引: {} ({} 个片段, 路径上下文: {})", relativePath, chunks.size(), pathContext);
+        log.debug("[NoteIndex] 已索引: {} ({} 个片段, 标题: {}, 路径: {})",
+                relativePath, chunks.size(), title, pathContext);
+    }
+
+    /**
+     * 提取 Markdown 文件的第一个 # 标题
+     */
+    private String extractTitle(String content) {
+        if (content == null) return null;
+        // 跳过 YAML frontmatter
+        String body = content;
+        if (body.startsWith("---")) {
+            int end = body.indexOf("---", 3);
+            if (end > 0) body = body.substring(end + 3);
+        }
+        for (String line : body.split("\n")) {
+            String trimmed = line.trim();
+            if (trimmed.startsWith("# ")) {
+                return trimmed.substring(2).trim();
+            }
+        }
+        return null;
     }
 
     /**
@@ -384,6 +412,7 @@ public class NoteIndexService {
             perFileCount.put(chunk.entity.getFilePath(), count + 1);
             results.add(new NoteSearchResult(
                     chunk.entity.getFilePath(),
+                    chunk.entity.getTitle(),
                     chunk.entity.getPathContext(),
                     chunk.entity.getContent(),
                     chunk.score,
@@ -512,6 +541,7 @@ public class NoteIndexService {
                 float display = toDisplayScore(rawCosineByFile.getOrDefault(file, rankScore));
                 results.add(new NoteSearchResult(
                         original.filePath(),
+                        original.title(),
                         original.pathContext(),
                         original.content(),
                         display,
@@ -522,6 +552,7 @@ public class NoteIndexService {
                 float display = toDisplayScore(rankScore);
                 results.add(new NoteSearchResult(
                         file,
+                        "",
                         "",
                         "[关键词匹配] " + file,
                         display,
@@ -594,6 +625,7 @@ public class NoteIndexService {
         Map<String, Float> fileScores = new HashMap<>();
         Map<String, String> fileBestContent = new HashMap<>();
         Map<String, String> filePathContext = new HashMap<>();
+        Map<String, String> fileTitle = new HashMap<>();
 
         for (NoteEmbeddingEntity entity : allEntities) {
             String key = entity.getFilePath();
@@ -618,6 +650,7 @@ public class NoteIndexService {
                 fileScores.put(key, score);
                 fileBestContent.put(key, content != null ? content : "");
                 filePathContext.put(key, entity.getPathContext());
+                fileTitle.put(key, entity.getTitle());
             }
         }
 
@@ -632,6 +665,7 @@ public class NoteIndexService {
                             : content;
                     return new NoteSearchResult(
                             fp,
+                            fileTitle.getOrDefault(fp, ""),
                             filePathContext.getOrDefault(fp, ""),
                             displayContent,
                             e.getValue(),
@@ -753,6 +787,7 @@ public class NoteIndexService {
 
     public record NoteSearchResult(
             String filePath,
+            String title,
             String pathContext,
             String content,
             float score,
