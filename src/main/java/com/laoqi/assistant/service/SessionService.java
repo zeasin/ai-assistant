@@ -34,9 +34,10 @@ public class SessionService {
     private static final Logger log = LoggerFactory.getLogger(SessionService.class);
 
     private static final float COSINE_THRESHOLD = 0.5f;
-    private static final int MAX_TURNS_PER_SESSION = 4;
     private static final int MAX_GLOBAL_TURNS = 5;
     private static final int DEFAULT_FALLBACK_TURNS = 3;
+    private static final int MAX_HISTORY_CHARS = 5000;
+    private static final int MAX_SINGLE_MSG_CHARS = 1000;
     private static final int EMBEDDING_DIM = 768;
 
     private final DataSource dataSource;
@@ -501,42 +502,37 @@ public class SessionService {
         }
         if (filtered.isEmpty()) return null;
 
-        if (currentQuery == null || currentQuery.isBlank()
-                || !ollamaEmbeddingService.isAvailable()) {
-            String ctx = buildSimpleContext(filtered);
-            log.info("[ctx] 无 query 或 Ollama 不可用，使用全部历史（{} 条消息）", filtered.size());
-            return ctx;
+        // 1. 始终包含最近 N 轮
+        String recentCtx = buildRecentContext(filtered);
+
+        // 2. 如果 Ollama 可用，叠加语义搜索到的历史轮次
+        String semanticCtx = null;
+        int totalTurns = filtered.size() / 2;
+        if (currentQuery != null && !currentQuery.isBlank()
+                && ollamaEmbeddingService.isAvailable() && totalTurns > DEFAULT_FALLBACK_TURNS) {
+            float[] queryEmb = ollamaEmbeddingService.embed(currentQuery);
+            if (queryEmb != null) {
+                semanticCtx = searchGlobalContext(queryEmb, sessionId, totalTurns);
+            }
         }
 
-        float[] queryEmb = ollamaEmbeddingService.embed(currentQuery);
-        if (queryEmb == null) {
-            String ctx = buildSimpleContext(filtered);
-            log.info("[ctx] 嵌入失败，回退全部历史（{} 条消息）", filtered.size());
-            return ctx;
+        // 3. 合并：近期聊天 + 语义搜索结果
+        if (semanticCtx != null) {
+            log.info("[ctx] 近期 {} 轮 + 语义命中历史，合并注入", DEFAULT_FALLBACK_TURNS);
+            return recentCtx.replace("继续回复用户的最新消息。",
+                    "同时参考以下语义相关的历史对话：\n\n" + semanticCtx + "\n继续回复用户的最新消息。");
         }
 
-        String globalContext = searchGlobalContext(queryEmb, sessionId, currentQuery);
-        if (globalContext != null) {
-            log.info("[ctx] 命中跨会话语义检索");
-            return globalContext;
-        }
-
-        if (filtered.size() <= DEFAULT_FALLBACK_TURNS * 2) {
-            String ctx = buildSimpleContext(filtered);
-            log.info("[ctx] 消息少（{}），使用全部历史", filtered.size());
-            return ctx;
-        }
-        String ctx = buildRecentContext(filtered);
-        log.info("[ctx] 无语义命中，回退最近 {} 轮", DEFAULT_FALLBACK_TURNS);
-        return ctx;
+        log.info("[ctx] 无语义命中，使用近期 {} 轮", DEFAULT_FALLBACK_TURNS);
+        return recentCtx;
     }
 
-    private String searchGlobalContext(float[] queryEmb, String currentSessionId, String query) {
-        List<TurnEmbeddingEntity> allEmbeddings = turnEmbeddingDbService.list();
-        if (allEmbeddings.isEmpty()) return null;
+    private String searchGlobalContext(float[] queryEmb, String sessionId, int totalTurns) {
+        List<TurnEmbeddingEntity> embeddings = turnEmbeddingDbService.listBySession(sessionId);
+        if (embeddings.isEmpty()) return null;
 
         List<ScoredTurn> scored = new ArrayList<>();
-        for (TurnEmbeddingEntity te : allEmbeddings) {
+        for (TurnEmbeddingEntity te : embeddings) {
             float[] vec = byteArrayToFloatArray(Base64.getDecoder().decode(te.getEmbedding()));
             float score = cosineSimilarity(queryEmb, vec);
             scored.add(new ScoredTurn(te.getSessionId(), te.getTurnOrder(), score));
@@ -546,76 +542,43 @@ public class SessionService {
 
         scored.sort((a, b) -> Float.compare(b.score, a.score));
 
-        Map<String, Integer> perSessionCount = new java.util.HashMap<>();
+        // 排除最近 N 轮（已包含在近期上下文中），避免重复
+        int recentTurnStart = totalTurns - DEFAULT_FALLBACK_TURNS;
         List<ScoredTurn> matches = new ArrayList<>();
         for (ScoredTurn t : scored) {
             if (t.score <= COSINE_THRESHOLD) break;
-            int count = perSessionCount.getOrDefault(t.sessionId, 0);
-            if (count >= MAX_TURNS_PER_SESSION) continue;
-            perSessionCount.put(t.sessionId, count + 1);
-            matches.add(t);
+            if (t.turnOrder >= recentTurnStart) continue;
             if (matches.size() >= MAX_GLOBAL_TURNS) break;
-        }
-
-        log.info("语义检索: query=\"{}\", 全库 {} 条向量(排除当前会话), 命中 {} 轮", query, allEmbeddings.size(), matches.size());
-        for (ScoredTurn t : matches) {
-            log.info("  session={} turn={} score={}", t.sessionId, t.turnOrder, String.format("%.2f", t.score));
+            matches.add(t);
         }
 
         if (matches.isEmpty()) return null;
 
-        return buildGlobalContext(matches, currentSessionId);
+        log.info("语义检索: query=\"{}\", 已排除最近{}轮, 命中{}轮", 
+                sessionId, DEFAULT_FALLBACK_TURNS, matches.size());
+
+        return buildSemanticContext(matches, sessionId);
     }
 
-    private String buildGlobalContext(List<ScoredTurn> matches, String currentSessionId) {
-        Map<String, List<ScoredTurn>> bySession = matches.stream()
-                .collect(Collectors.groupingBy(t -> t.sessionId));
+    private String buildSemanticContext(List<ScoredTurn> matches, String sessionId) {
+        List<MessageEntity> msgs = messageDbService.listBySession(sessionId);
+        if (msgs.isEmpty()) return null;
+
+        Set<Integer> turnOrders = matches.stream()
+                .map(t -> t.turnOrder).collect(Collectors.toSet());
 
         StringBuilder sb = new StringBuilder();
-        sb.append("以下是相关历史对话（长期记忆）：\n\n");
-
-        for (Map.Entry<String, List<ScoredTurn>> entry : bySession.entrySet()) {
-            String sid = entry.getKey();
-            List<MessageEntity> msgs = messageDbService.listBySession(sid);
-            Set<Integer> turnOrders = entry.getValue().stream()
-                    .map(t -> t.turnOrder).collect(Collectors.toSet());
-
-            SessionEntity session = sessionDbService.getById(sid);
-            String header;
-            if (sid.equals(currentSessionId)) {
-                header = "当前对话";
-            } else if (session != null && session.getTitle() != null
-                    && !session.getTitle().isEmpty() && !"新对话".equals(session.getTitle())) {
-                header = "历史对话 - " + session.getTitle();
-            } else {
-                header = "其他历史对话";
+        int msgIdx = 0;
+        int turnIdx = 0;
+        while (msgIdx + 1 < msgs.size()) {
+            if (turnOrders.contains(turnIdx)) {
+                sb.append("用户: ").append(msgs.get(msgIdx).getContent()).append("\n\n");
+                sb.append("AI: ").append(msgs.get(msgIdx + 1).getContent()).append("\n\n");
             }
-            sb.append("【").append(header).append("】\n\n");
-
-            int msgIdx = 0;
-            int turnIdx = 0;
-            while (msgIdx + 1 < msgs.size()) {
-                if (turnOrders.contains(turnIdx)) {
-                    sb.append("用户: ").append(msgs.get(msgIdx).getContent()).append("\n\n");
-                    sb.append("AI: ").append(msgs.get(msgIdx + 1).getContent()).append("\n\n");
-                }
-                msgIdx += 2;
-                turnIdx++;
-            }
+            msgIdx += 2;
+            turnIdx++;
         }
 
-        sb.append("---\n\n请基于以上历史对话，继续回复用户的最新消息。");
-        return sb.toString();
-    }
-
-    private String buildSimpleContext(List<MessageEntity> filtered) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("以下是之前的对话历史，供参考：\n\n");
-        for (MessageEntity msg : filtered) {
-            String label = "user".equals(msg.getRole()) ? "用户" : "AI";
-            sb.append(label).append(": ").append(msg.getContent()).append("\n\n");
-        }
-        sb.append("---\n\n请基于以上历史对话，继续回复用户的最新消息。");
         return sb.toString();
     }
 
@@ -625,11 +588,33 @@ public class SessionService {
                 ? filtered.subList(filtered.size() - msgCount, filtered.size())
                 : filtered;
 
+        // 如果最后一条是用户消息（通常就是当前用户刚发送的消息），从历史中排除
+        // 因为 ContextBuilder.merge() 会把它作为"用户最新消息"另行注入，避免重复
+        if (!recent.isEmpty() && "user".equals(recent.get(recent.size() - 1).getRole())) {
+            recent = new ArrayList<>(recent.subList(0, recent.size() - 1));
+        }
+
         StringBuilder sb = new StringBuilder();
-        sb.append("以下是最近的对话历史，供参考：\n\n");
+        sb.append("以下是最近的对话历史（AI 回复仅保留摘要以节省上下文），供参考：\n\n");
         for (MessageEntity msg : recent) {
             String label = "user".equals(msg.getRole()) ? "用户" : "AI";
-            sb.append(label).append(": ").append(msg.getContent()).append("\n\n");
+            String content = msg.getContent();
+            // 用户消息：完整保留（通常较短且反映用户意图）
+            // AI 回复：仅保留开头摘要（长篇细节可通过重新搜索笔记重新获取）
+            if ("AI".equals(label)) {
+                int summaryLen = Math.min(content.length(), 200);
+                if (content.length() > summaryLen) {
+                    content = content.substring(0, summaryLen) + "...";
+                }
+            } else if (content.length() > MAX_SINGLE_MSG_CHARS) {
+                content = content.substring(0, MAX_SINGLE_MSG_CHARS) + "\n...（已截断）";
+            }
+            sb.append(label).append(": ").append(content).append("\n\n");
+            // 总体长度超限则停止追加，避免上下文爆炸
+            if (sb.length() > MAX_HISTORY_CHARS) {
+                sb.append("（历史对话过长，已截断后续内容）\n\n");
+                break;
+            }
         }
         sb.append("---\n\n请基于以上历史对话，继续回复用户的最新消息。");
         return sb.toString();
@@ -663,14 +648,14 @@ public class SessionService {
 
     public static byte[] floatArrayToByteArray(float[] values) {
         ByteBuffer buf = ByteBuffer.allocate(values.length * 4);
-        buf.order(ByteOrder.nativeOrder());
+        buf.order(ByteOrder.LITTLE_ENDIAN);
         for (float v : values) buf.putFloat(v);
         return buf.array();
     }
 
     public static float[] byteArrayToFloatArray(byte[] bytes) {
         ByteBuffer buf = ByteBuffer.wrap(bytes);
-        buf.order(ByteOrder.nativeOrder());
+        buf.order(ByteOrder.LITTLE_ENDIAN);
         float[] result = new float[bytes.length / 4];
         for (int i = 0; i < result.length; i++) {
             result[i] = buf.getFloat();

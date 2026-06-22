@@ -63,19 +63,20 @@ public class NoteAssistantService {
 
         NoteTools.setCurrentKbId(kbId);
         try {
-            // 使用 ContextBuilder 构建完整上下文（主动搜索 + 历史对话 + 规则文件）
-            ContextBuilder.ChatContext context = contextBuilder.build(sessionId, userMessage, kbId);
-            String fullMessage = contextBuilder.merge(context, userMessage);
-            
+            ContextBuilder.ChatContext context = contextBuilder.build(sessionId, userMessage, kbId, mode);
+            ContextBuilder.MergedContext merged = contextBuilder.merge(context, userMessage);
+
             int noteCount = context.relevantNotes() != null ? context.relevantNotes().size() : 0;
-            log.info("[编排] 上下文构建完成，总消息长度={}, 相关笔记={}", fullMessage.length(), noteCount);
+            log.info("[编排] 上下文构建完成，system长度={}, user长度={}, 相关笔记={}, mode={}",
+                    merged.systemContext().length(), merged.userMessage().length(), noteCount, mode);
 
             log.info("[编排] 用户: {} (session={}, kbId={}, model={})", userMessage, sessionId, kbId,
                     modelName != null ? modelName : "default");
 
             String reply = client.prompt()
                     .system(SYSTEM_PROMPT)
-                    .user(fullMessage)
+                    .system(merged.systemContext())
+                    .user(merged.userMessage())
                     .call()
                     .content();
 
@@ -102,12 +103,12 @@ public class NoteAssistantService {
 
         NoteTools.setCurrentKbId(kbId);
         try {
-            // 使用 ContextBuilder 构建完整上下文（主动搜索 + 历史对话 + 规则文件）
-            ContextBuilder.ChatContext context = contextBuilder.build(sessionId, userMessage, kbId);
-            String fullMessage = contextBuilder.merge(context, userMessage);
-            
+            ContextBuilder.ChatContext context = contextBuilder.build(sessionId, userMessage, kbId, mode);
+            ContextBuilder.MergedContext merged = contextBuilder.merge(context, userMessage);
+
             int noteCount = context.relevantNotes() != null ? context.relevantNotes().size() : 0;
-            log.info("[编排] 上下文构建完成，总消息长度={}, 相关笔记={}", fullMessage.length(), noteCount);
+            log.info("[编排] 上下文构建完成，system长度={}, user长度={}, 相关笔记={}, mode={}",
+                    merged.systemContext().length(), merged.userMessage().length(), noteCount, mode);
 
             log.info("[编排] 用户: {} (session={}, kbId={}, model={})", userMessage, sessionId, kbId,
                     modelName != null ? modelName : "default");
@@ -116,7 +117,8 @@ public class NoteAssistantService {
             boolean[] isFirstChunk = {true};
             client.prompt()
                     .system(SYSTEM_PROMPT)
-                    .user(fullMessage)
+                    .system(merged.systemContext())
+                    .user(merged.userMessage())
                     .stream()
                     .content()
                     .toStream()
@@ -247,10 +249,10 @@ public class NoteAssistantService {
     }
 
     private static final String SYSTEM_PROMPT = """
-            你是一个笔记库助手，具备主动检索和分析能力。
+            你是一个笔记库助手，基于当前知识库的内容帮助用户。
 
             == 核心工具 ==
-            1. searchNotes(query, limit) - 语义搜索笔记内容（当已有内容不足时使用）
+            1. searchNotes(query, limit) - 当系统提供的笔记内容不足时搜索笔记
             2. searchFiles(keyword) - 按文件名搜索
             3. readFile(path) / readNote(path) - 读取文件内容
             4. writeFile(path, content) - 写入文件
@@ -258,19 +260,20 @@ public class NoteAssistantService {
 
             == 工作流程 ==
             1. 理解用户意图
-            2. 优先使用系统已提供的「相关笔记内容」和「历史对话」回答问题
-            3. 只有当已有信息确实不足以回答用户问题时，才调用 searchNotes 进行补充搜索
-            4. 需要时用 readFile 读取 AGENTS.md 了解数据格式
-            5. 需要时用 writeFile 保存新笔记
+            2. 系统消息中已注入：
+               - AGENTS.md（当前知识库的规则文件）
+               - 相关笔记内容（已按语义排序的搜索结果）
+               - 最近对话历史
+            3. **优先使用系统消息中已注入的内容回答**，无需重复调用工具搜索
+            4. 只有当注入的信息确实不足以回答时，才调用 searchNotes 补充搜索
+            5. 需要时用 readFile 读取特定文件了解格式或内容
+            6. 需要时用 writeFile 保存新笔记
 
             == 重要原则 ==
             - 系统消息中已包含自动搜索到的相关笔记，请优先基于这些内容回答
             - 如果搜索无结果，再用 searchFiles 按文件名搜索
             - 引用笔记时标注来源：[来源: 文件路径]
-
-            == 硬性规则 ==
-            - 必须先读取 readFile("AGENTS.md") 了解规则
-            - 写入 JSON 时先读取现有数据，合并后写入
+            - **writeFile 不要修改 AGENTS.md，除非用户明确要求**
             - 用中文回复
             """;
 }
