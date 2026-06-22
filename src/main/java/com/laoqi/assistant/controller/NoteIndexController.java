@@ -1,16 +1,19 @@
 package com.laoqi.assistant.controller;
 
+import com.laoqi.assistant.entity.KnowledgeBaseEntity;
 import com.laoqi.assistant.service.LogService;
 import com.laoqi.assistant.service.NoteIndexService;
 import com.laoqi.assistant.service.NoteIndexService.IndexResult;
 import com.laoqi.assistant.service.NoteIndexService.IndexStats;
 import com.laoqi.assistant.service.NoteIndexService.NoteSearchResult;
+import com.laoqi.assistant.service.KnowledgeBaseService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -23,6 +26,7 @@ public class NoteIndexController {
 
     private final NoteIndexService noteIndexService;
     private final LogService logService;
+    private final KnowledgeBaseService kbService;
     
     private volatile boolean isBuilding = false;
     private volatile String lastBuildResult = "";
@@ -32,9 +36,11 @@ public class NoteIndexController {
     private volatile int processedFiles = 0;
     private volatile String currentFile = "";
 
-    public NoteIndexController(NoteIndexService noteIndexService, LogService logService) {
+    public NoteIndexController(NoteIndexService noteIndexService, LogService logService,
+                               KnowledgeBaseService kbService) {
         this.noteIndexService = noteIndexService;
         this.logService = logService;
+        this.kbService = kbService;
     }
 
     @PostMapping("/build")
@@ -129,7 +135,14 @@ public class NoteIndexController {
         }
 
         try {
-            List<NoteSearchResult> results = noteIndexService.search(id, query, limit);
+            // 使用混合搜索（语义+关键词），提高准确性
+            List<NoteSearchResult> results = noteIndexService.hybridSearch(id, query, limit);
+            // 添加调试日志
+            for (NoteSearchResult r : results) {
+                log.info("[NoteIndex] 搜索结果: file={}, score={}, content={}", 
+                        r.filePath(), String.format("%.3f", r.score()), 
+                        r.content().length() > 50 ? r.content().substring(0, 50) + "..." : r.content());
+            }
             return Map.of("ok", true, "results", results, "query", query);
         } catch (Exception e) {
             return Map.of("ok", false, "error", e.getMessage());
@@ -163,5 +176,38 @@ public class NoteIndexController {
         noteIndexService.clearIndex(id);
         logService.add("笔记索引", "清空", "知识库: " + id);
         return Map.of("ok", true, "message", "索引已清空");
+    }
+
+    @GetMapping("/ignored-dirs")
+    public Map<String, Object> getIgnoredDirs(@PathVariable Long id) {
+        // 获取用户自定义的排除列表
+        var kb = kbService.getById(id);
+        String userDirs = kb != null ? kb.getIgnoreDirs() : "";
+        return Map.of("ok", true, "user", userDirs != null ? userDirs : "");
+    }
+
+    @PostMapping("/ignored-dirs")
+    public Map<String, Object> updateIgnoredDirs(@PathVariable Long id,
+                                                  @RequestBody Map<String, String> body) {
+        String ignoreDirs = body.getOrDefault("ignoreDirs", "");
+        noteIndexService.updateIgnoredDirs(id, ignoreDirs);
+        logService.add("笔记索引", "更新排除文件夹列表", "知识库: " + id);
+        return Map.of("ok", true, "message", "排除文件夹列表已更新");
+    }
+
+    @GetMapping("/ignored-files")
+    public Map<String, Object> getIgnoredFiles(@PathVariable Long id) {
+        var kb = kbService.getById(id);
+        String userFiles = kb != null ? kb.getIgnoreFiles() : "";
+        return Map.of("ok", true, "user", userFiles != null ? userFiles : "");
+    }
+
+    @PostMapping("/ignored-files")
+    public Map<String, Object> updateIgnoredFiles(@PathVariable Long id,
+                                                  @RequestBody Map<String, String> body) {
+        String ignoreFiles = body.getOrDefault("ignoreFiles", "");
+        noteIndexService.updateIgnoredFiles(id, ignoreFiles);
+        logService.add("笔记索引", "更新排除文件列表", "知识库: " + id);
+        return Map.of("ok", true, "message", "排除文件列表已更新");
     }
 }

@@ -92,6 +92,8 @@ public class KnowledgeBaseService {
         if (body.containsKey("notesDir")) e.setNotesDir(str(body.get("notesDir")));
         if (body.containsKey("labels")) e.setLabels(str(body.get("labels")));
         if (body.containsKey("dirSettings")) e.setDirSettings(str(body.get("dirSettings")));
+        if (body.containsKey("ignoreDirs")) e.setIgnoreDirs(str(body.get("ignoreDirs")));
+        if (body.containsKey("ignoreFiles")) e.setIgnoreFiles(str(body.get("ignoreFiles")));
         if (body.containsKey("sortOrder")) {
             e.setSortOrder(Integer.valueOf(body.get("sortOrder").toString()));
         }

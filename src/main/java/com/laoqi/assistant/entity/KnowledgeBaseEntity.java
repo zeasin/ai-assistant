@@ -15,6 +15,8 @@ public class KnowledgeBaseEntity {
     private Integer sortOrder;
     private String createdAt;
     private String dirSettings;
+    private String ignoreDirs;
+    private String ignoreFiles;
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -30,4 +32,8 @@ public class KnowledgeBaseEntity {
     public void setCreatedAt(String createdAt) { this.createdAt = createdAt; }
     public String getDirSettings() { return dirSettings; }
     public void setDirSettings(String dirSettings) { this.dirSettings = dirSettings; }
+    public String getIgnoreDirs() { return ignoreDirs; }
+    public void setIgnoreDirs(String ignoreDirs) { this.ignoreDirs = ignoreDirs; }
+    public String getIgnoreFiles() { return ignoreFiles; }
+    public void setIgnoreFiles(String ignoreFiles) { this.ignoreFiles = ignoreFiles; }
 }

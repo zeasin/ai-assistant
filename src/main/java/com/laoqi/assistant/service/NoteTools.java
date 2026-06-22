@@ -157,7 +157,8 @@ public class NoteTools {
         }
 
         try {
-            List<NoteIndexService.NoteSearchResult> results = noteIndexService.search(kbId, query, limit);
+            // 使用混合搜索（语义+关键词），提高准确性
+            List<NoteIndexService.NoteSearchResult> results = noteIndexService.hybridSearch(kbId, query, limit);
 
             if (results.isEmpty()) {
                 return "未找到与「" + query + "」相关的笔记内容。提示：可以先用 searchFiles 按文件名搜索，或检查索引是否已构建";

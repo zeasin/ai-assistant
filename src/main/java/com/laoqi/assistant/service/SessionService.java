@@ -165,10 +165,14 @@ public class SessionService {
                     labels       TEXT NOT NULL DEFAULT '{}',
                     sort_order   INTEGER NOT NULL DEFAULT 0,
                     created_at   TEXT NOT NULL,
-                    dir_settings TEXT NOT NULL DEFAULT ''
+                    dir_settings TEXT NOT NULL DEFAULT '',
+                    ignore_dirs  TEXT NOT NULL DEFAULT '',
+                    ignore_files TEXT NOT NULL DEFAULT ''
                 )
                 """);
             try { stmt.execute("ALTER TABLE knowledge_bases ADD COLUMN dir_settings TEXT NOT NULL DEFAULT ''"); } catch (Exception ignored) {}
+            try { stmt.execute("ALTER TABLE knowledge_bases ADD COLUMN ignore_dirs TEXT NOT NULL DEFAULT ''"); } catch (Exception ignored) {}
+            try { stmt.execute("ALTER TABLE knowledge_bases ADD COLUMN ignore_files TEXT NOT NULL DEFAULT ''"); } catch (Exception ignored) {}
             log.info("Table knowledge_bases initialized");
 
             // 迁移：从 config.json 迁移第一条知识库
@@ -309,6 +313,7 @@ public class SessionService {
                     kb_id        INTEGER NOT NULL,
                     file_path    TEXT NOT NULL,
                     chunk_index  INTEGER NOT NULL DEFAULT 0,
+                    path_context TEXT NOT NULL DEFAULT '',
                     content      TEXT NOT NULL,
                     embedding    TEXT NOT NULL,
                     content_hash TEXT NOT NULL,
@@ -319,6 +324,7 @@ public class SessionService {
                 """);
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_note_embeddings_kb ON note_embeddings(kb_id)");
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_note_embeddings_path ON note_embeddings(kb_id, file_path)");
+            try { stmt.execute("ALTER TABLE note_embeddings ADD COLUMN path_context TEXT NOT NULL DEFAULT ''"); } catch (Exception ignored) {}
             log.info("Table note_embeddings initialized");
 
         } catch (SQLException e) {

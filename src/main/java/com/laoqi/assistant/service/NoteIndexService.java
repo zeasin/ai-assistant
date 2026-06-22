@@ -1,5 +1,6 @@
 package com.laoqi.assistant.service;
 
+import com.laoqi.assistant.entity.KnowledgeBaseEntity;
 import com.laoqi.assistant.entity.NoteEmbeddingEntity;
 import com.laoqi.assistant.service.db.NoteEmbeddingDbService;
 import com.laoqi.assistant.util.FileUtil;
@@ -22,12 +23,12 @@ public class NoteIndexService {
 
     private static final int CHUNK_SIZE = 300;
     private static final int CHUNK_OVERLAP = 50;
-    private static final float SIMILARITY_THRESHOLD = 0.5f;
+    private static final float SIMILARITY_THRESHOLD = 0.3f;  // bge-m3 阈值降低
 
     private static final Set<String> INDEXED_EXTENSIONS = Set.of(".md", ".json", ".txt");
-    private static final Set<String> IGNORED_DIRS = Set.of(
-            ".git", ".obsidian", "__pycache__", ".DS_Store",
-            ".claude", ".playwright-mcp", ".sisyphus", "AI");
+    
+    // 默认排除列表（系统级）- 只排除以.开头的
+    private static final Set<String> SYSTEM_IGNORED = Set.of();
 
     private final NoteEmbeddingDbService noteEmbeddingDbService;
     private final OllamaEmbeddingService embeddingService;
@@ -43,6 +44,77 @@ public class NoteIndexService {
 
     public boolean isAvailable() {
         return embeddingService.isAvailable();
+    }
+
+    // ========== 排除列表管理 ==========
+
+    /**
+     * 获取指定知识库的排除文件夹列表
+     */
+    public Set<String> getIgnoredDirs(Long kbId) {
+        Set<String> ignored = new HashSet<>(SYSTEM_IGNORED);
+        
+        // 从数据库读取用户自定义排除列表
+        if (kbId != null) {
+            KnowledgeBaseEntity kb = kbService.getById(kbId);
+            if (kb != null && kb.getIgnoreDirs() != null && !kb.getIgnoreDirs().isBlank()) {
+                try {
+                    String[] dirs = kb.getIgnoreDirs().split(",");
+                    for (String dir : dirs) {
+                        String trimmed = dir.trim();
+                        if (!trimmed.isEmpty()) {
+                            ignored.add(trimmed);
+                        }
+                    }
+                } catch (Exception e) {
+                    log.warn("[NoteIndex] 解析排除列表失败: {}", e.getMessage());
+                }
+            }
+        }
+        
+        return ignored;
+    }
+
+    /**
+     * 更新知识库的排除文件夹列表
+     */
+    public void updateIgnoredDirs(Long kbId, String ignoreDirs) {
+        kbService.save(Map.of("id", kbId, "ignoreDirs", ignoreDirs));
+        log.info("[NoteIndex] 更新排除列表: kbId={}, ignoreDirs={}", kbId, ignoreDirs);
+    }
+
+    /**
+     * 获取指定知识库的排除文件列表
+     */
+    public Set<String> getIgnoredFiles(Long kbId) {
+        Set<String> ignored = new HashSet<>();
+        
+        if (kbId != null) {
+            KnowledgeBaseEntity kb = kbService.getById(kbId);
+            if (kb != null && kb.getIgnoreFiles() != null && !kb.getIgnoreFiles().isBlank()) {
+                try {
+                    String[] files = kb.getIgnoreFiles().split(",");
+                    for (String file : files) {
+                        String trimmed = file.trim();
+                        if (!trimmed.isEmpty()) {
+                            ignored.add(trimmed);
+                        }
+                    }
+                } catch (Exception e) {
+                    log.warn("[NoteIndex] 解析排除文件列表失败: {}", e.getMessage());
+                }
+            }
+        }
+        
+        return ignored;
+    }
+
+    /**
+     * 更新知识库的排除文件列表
+     */
+    public void updateIgnoredFiles(Long kbId, String ignoreFiles) {
+        kbService.save(Map.of("id", kbId, "ignoreFiles", ignoreFiles));
+        log.info("[NoteIndex] 更新排除文件列表: kbId={}, ignoreFiles={}", kbId, ignoreFiles);
     }
 
     // ========== 进度回调接口 ==========
@@ -80,11 +152,16 @@ public class NoteIndexService {
             throw new IllegalStateException("笔记库路径不存在: " + notesDir);
         }
 
+        // 获取排除列表
+        Set<String> ignoredDirs = getIgnoredDirs(kbId);
+        Set<String> ignoredFiles = getIgnoredFiles(kbId);
+        log.info("[NoteIndex] 排除文件夹: {}, 排除文件: {}", ignoredDirs, ignoredFiles);
+
         IndexResult result = new IndexResult();
         try (Stream<Path> walk = Files.walk(baseDir, 10)) {
             List<Path> files = walk
                     .filter(Files::isRegularFile)
-                    .filter(p -> shouldIndex(p, baseDir))
+                    .filter(p -> shouldIndex(p, baseDir, ignoredDirs, ignoredFiles))
                     .sorted()
                     .collect(Collectors.toList());
 
@@ -122,14 +199,34 @@ public class NoteIndexService {
         return result;
     }
 
-    private boolean shouldIndex(Path file, Path baseDir) {
+    private boolean shouldIndex(Path file, Path baseDir, Set<String> ignoredDirs, Set<String> ignoredFiles) {
         String fileName = file.getFileName().toString();
 
+        // 排除所有以 . 开头的文件和目录
         if (fileName.startsWith(".")) return false;
 
         Path relative = baseDir.relativize(file);
+        String relativeStr = relative.toString().replace("\\", "/");
+        
+        // 精确匹配排除文件（必须是完整路径或文件名完全相同）
+        if (ignoredFiles.contains(relativeStr) || ignoredFiles.contains(fileName)) {
+            log.debug("[NoteIndex] 排除文件: {} (精确匹配)", relativeStr);
+            return false;
+        }
+        
+        // 检查文件夹排除列表
+        for (String ignored : ignoredDirs) {
+            if (relativeStr.startsWith(ignored + "/") || relativeStr.equals(ignored)) {
+                log.debug("[NoteIndex] 排除文件: {} (匹配文件夹: {})", relativeStr, ignored);
+                return false;
+            }
+        }
+        
+        // 检查每个目录段
         for (Path segment : relative) {
-            if (IGNORED_DIRS.contains(segment.toString())) return false;
+            String segStr = segment.toString();
+            if (segStr.startsWith(".")) return false;
+            if (ignoredDirs.contains(segStr)) return false;
         }
 
         String ext = getExtension(fileName);
@@ -149,19 +246,29 @@ public class NoteIndexService {
                 .eq(NoteEmbeddingEntity::getFilePath, relativePath)
                 .list();
 
+        // 提取路径特征信息：上级文件夹名称
+        String pathContext = extractPathContext(relativePath);
+
+        // 如果文件已存在且内容未变，检查是否需要重新索引
         if (!existing.isEmpty() && existing.get(0).getContentHash().equals(contentHash)) {
-            log.debug("[NoteIndex] 跳过未变更文件: {}", relativePath);
-            return;
+            String firstChunkContent = existing.get(0).getContent();
+            if (firstChunkContent != null && firstChunkContent.startsWith(pathContext)) {
+                log.debug("[NoteIndex] 跳过未变更文件: {}", relativePath);
+                return;
+            }
+            log.info("[NoteIndex] 文件内容未变但需重新索引（添加路径信息）: {}", relativePath);
         }
 
         noteEmbeddingDbService.deleteByKbAndPath(kbId, relativePath);
-
+        
         List<String> chunks = chunkContent(content);
         String now = TimeUtil.nowStr();
 
         for (int i = 0; i < chunks.size(); i++) {
             String chunk = chunks.get(i);
-            float[] vector = embeddingService.embed(chunk);
+            // 将路径信息加入内容，提高搜索相关性
+            String enhancedContent = pathContext + "\n" + chunk;
+            float[] vector = embeddingService.embed(enhancedContent);
             if (vector == null) {
                 log.warn("[NoteIndex] 生成向量失败: {} chunk={}", relativePath, i);
                 continue;
@@ -171,7 +278,8 @@ public class NoteIndexService {
             entity.setKbId(kbId);
             entity.setFilePath(relativePath);
             entity.setChunkIndex(i);
-            entity.setContent(chunk);
+            entity.setPathContext(pathContext);
+            entity.setContent(chunk);  // 存储纯内容，不含路径
             entity.setEmbedding(Base64.getEncoder().encodeToString(floatToBytes(vector)));
             entity.setContentHash(contentHash);
             entity.setCreatedAt(now);
@@ -180,7 +288,19 @@ public class NoteIndexService {
             noteEmbeddingDbService.save(entity);
         }
 
-        log.debug("[NoteIndex] 已索引: {} ({} 个片段)", relativePath, chunks.size());
+        log.debug("[NoteIndex] 已索引: {} ({} 个片段, 路径上下文: {})", relativePath, chunks.size(), pathContext);
+    }
+
+    /**
+     * 提取路径上下文信息
+     * 例如：项目/北京本数科技/会议记录.md → "项目 北京本数科技"
+     */
+    private String extractPathContext(String relativePath) {
+        // 移除文件扩展名
+        String pathWithoutExt = relativePath.replaceAll("\\.[^.]+$", "");
+        // 用空格替换路径分隔符
+        String pathContext = pathWithoutExt.replace("/", " ").replace("\\", " ");
+        return pathContext;
     }
 
     // ========== 搜索 ==========
@@ -204,14 +324,22 @@ public class NoteIndexService {
         }
 
         List<ScoredChunk> scored = new ArrayList<>();
+        int checkedCount = 0;
+        int matchedCount = 0;
         for (NoteEmbeddingEntity entity : allEntities) {
             float[] vec = bytesToFloat(Base64.getDecoder().decode(entity.getEmbedding()));
             float score = cosineSimilarity(queryVector, vec);
+            checkedCount++;
             if (score >= SIMILARITY_THRESHOLD) {
+                matchedCount++;
                 scored.add(new ScoredChunk(entity, score));
+                log.info("[NoteIndex] 匹配: file={}, score={}, path={}", 
+                        entity.getFilePath(), String.format("%.3f", score), entity.getPathContext());
             }
         }
+        log.info("[NoteIndex] 搜索完成: 总文件={}, 阈值={}, 匹配数={}", checkedCount, SIMILARITY_THRESHOLD, matchedCount);
 
+        // 按相似度降序排序
         scored.sort((a, b) -> Float.compare(b.score, a.score));
 
         Map<String, Integer> perFileCount = new HashMap<>();
@@ -219,11 +347,12 @@ public class NoteIndexService {
 
         for (ScoredChunk chunk : scored) {
             int count = perFileCount.getOrDefault(chunk.entity.getFilePath(), 0);
-            if (count >= 2) continue;
+            if (count >= 1) continue;  // 每个文件只返回最高分的一条
 
             perFileCount.put(chunk.entity.getFilePath(), count + 1);
             results.add(new NoteSearchResult(
                     chunk.entity.getFilePath(),
+                    chunk.entity.getPathContext(),
                     chunk.entity.getContent(),
                     chunk.score,
                     chunk.entity.getChunkIndex(),
@@ -237,26 +366,64 @@ public class NoteIndexService {
     }
 
     public List<NoteSearchResult> hybridSearch(Long kbId, String query, int limit) {
-        List<NoteSearchResult> semanticResults = search(kbId, query, limit * 2);
+        List<NoteSearchResult> semanticResults = search(kbId, query, limit * 3);
 
-        List<NoteSearchResult> keywordResults = keywordSearch(kbId, query, limit * 2);
+        List<NoteSearchResult> keywordResults = keywordSearch(kbId, query, limit * 3);
 
+        // 收集所有包含关键词的文件路径
+        Set<String> keywordMatchedFiles = new HashSet<>();
+        for (NoteSearchResult r : keywordResults) {
+            keywordMatchedFiles.add(r.filePath());
+        }
+
+        // 对语义结果进行评分调整，使用文件路径作为唯一key
         Map<String, Double> scores = new HashMap<>();
         Map<String, NoteSearchResult> resultMap = new HashMap<>();
 
         for (NoteSearchResult r : semanticResults) {
-            String key = r.filePath() + ":" + r.chunkIndex();
-            scores.merge(key, r.score() * 0.7, Double::sum);
-            resultMap.put(key, r);
+            String key = r.filePath();
+            double score = r.score();
+            
+            // 检查路径是否精确包含关键词
+            String pathLower = r.pathContext() != null ? r.pathContext().toLowerCase() : "";
+            boolean exactPathMatch = pathLower.contains(query.toLowerCase());
+            
+            log.info("[NoteIndex] 混合评分: file={}, 语义={}, pathContext={}, 匹配={}", 
+                    r.filePath(), String.format("%.3f", score), r.pathContext(), exactPathMatch);
+            
+            if (exactPathMatch) {
+                // 路径精确匹配，给高分
+                score = Math.max(score, 0.9);
+            } else if (keywordMatchedFiles.contains(r.filePath())) {
+                // 关键词也匹配，加分
+                score = Math.min(1.0, score * 0.7 + 0.3);
+            } else {
+                // 只有语义匹配，适当降分
+                score = score * 0.5;
+            }
+            
+            log.info("[NoteIndex] 最终分数: file={}, 最终={}", r.filePath(), String.format("%.3f", score));
+            
+            if (!scores.containsKey(key) || score > scores.get(key)) {
+                scores.put(key, score);
+                resultMap.put(key, r);
+            }
         }
 
+        // 关键词匹配但语义未匹配的结果
         for (NoteSearchResult r : keywordResults) {
-            String key = r.filePath() + ":" + r.chunkIndex();
-            scores.merge(key, r.score() * 0.3, Double::sum);
-            resultMap.putIfAbsent(key, r);
+            String key = r.filePath();
+            if (!scores.containsKey(key)) {
+                // 检查是否是路径匹配
+                String pathLower = r.pathContext() != null ? r.pathContext().toLowerCase() : "";
+                boolean exactPathMatch = pathLower.contains(query.toLowerCase());
+                scores.put(key, exactPathMatch ? 0.85 : 0.5);
+                resultMap.put(key, r);
+            }
         }
 
         return scores.entrySet().stream()
+                .filter(e -> e.getValue() >= 0.3)  // 过滤低分
                 .sorted(Map.Entry.<String, Double>comparingByValue().reversed())
                 .limit(limit)
                 .map(e -> resultMap.get(e.getKey()))
@@ -271,35 +438,61 @@ public class NoteIndexService {
         Path baseDir = Paths.get(notesDir);
         List<NoteSearchResult> results = new ArrayList<>();
         String queryLower = query.toLowerCase();
+        Set<String> ignoredDirs = getIgnoredDirs(kbId);
+        Set<String> ignoredFiles = getIgnoredFiles(kbId);
+
+        // 从数据库读取所有索引记录，用于检查路径上下文
+        List<NoteEmbeddingEntity> allEntities = noteEmbeddingDbService.lambdaQuery()
+                .eq(NoteEmbeddingEntity::getKbId, kbId)
+                .list();
+        Set<String> pathContextMatchedFiles = new HashSet<>();
+        for (NoteEmbeddingEntity entity : allEntities) {
+            if (entity.getPathContext() != null && entity.getPathContext().toLowerCase().contains(queryLower)) {
+                pathContextMatchedFiles.add(entity.getFilePath());
+            }
+        }
 
         try (Stream<Path> walk = Files.walk(baseDir, 10)) {
             walk.filter(Files::isRegularFile)
-                .filter(p -> shouldIndex(p, baseDir))
+                .filter(p -> shouldIndex(p, baseDir, ignoredDirs, ignoredFiles))
                 .forEach(file -> {
                     try {
-                        String content = FileUtil.readText(file);
-                        if (content == null || content.isBlank()) return;
-
-                        String contentLower = content.toLowerCase();
-                        if (!contentLower.contains(queryLower)) return;
-
                         String relativePath = baseDir.relativize(file).toString().replace("\\", "/");
-                        List<String> chunks = chunkContent(content);
+                        
+                        // 检查路径上下文是否包含关键词
+                        boolean pathMatch = pathContextMatchedFiles.contains(relativePath);
+                        
+                        String content = FileUtil.readText(file);
+                        if (content == null || content.isBlank() && !pathMatch) return;
 
-                        for (int i = 0; i < chunks.size(); i++) {
-                            if (chunks.get(i).toLowerCase().contains(queryLower)) {
-                                int matchCount = countOccurrences(chunks.get(i).toLowerCase(), queryLower);
-                                float score = Math.min(1.0f, matchCount * 0.2f);
+                        String contentLower = content != null ? content.toLowerCase() : "";
+                        boolean contentMatch = contentLower.contains(queryLower);
+                        
+                        if (!contentMatch && !pathMatch) return;
 
-                                results.add(new NoteSearchResult(
-                                        relativePath,
-                                        chunks.get(i),
-                                        score,
-                                        i,
-                                        chunks.size()
-                                ));
-                            }
+                        // 计算分数
+                        float score = 0;
+                        if (contentMatch) {
+                            int matchCount = countOccurrences(contentLower, queryLower);
+                            score = Math.min(1.0f, matchCount * 0.2f);
                         }
+                        if (pathMatch) {
+                            score = Math.max(score, 0.5f);  // 路径匹配给较高分数
+                        }
+
+                        String pathContext = extractPathContext(relativePath);
+                        String displayContent = contentMatch ? 
+                            content.substring(0, Math.min(500, content.length())) : 
+                            "[路径匹配] " + pathContext;
+
+                        results.add(new NoteSearchResult(
+                                relativePath,
+                                pathContext,
+                                displayContent,
+                                score,
+                                0,
+                                0
+                        ));
                     } catch (Exception e) {
                         log.debug("[NoteIndex] 关键词搜索文件失败: {}", file, e);
                     }
@@ -309,7 +502,7 @@ public class NoteIndexService {
         }
 
         return results.stream()
-                .sorted((a, b) -> Float.compare(b.score, a.score))
+                .sorted((a, b) -> Float.compare(b.score(), a.score()))
                 .limit(limit)
                 .collect(Collectors.toList());
     }
@@ -425,6 +618,7 @@ public class NoteIndexService {
 
     public record NoteSearchResult(
             String filePath,
+            String pathContext,
             String content,
             float score,
             int chunkIndex,

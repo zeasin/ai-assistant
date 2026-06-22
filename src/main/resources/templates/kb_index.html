@@ -44,6 +44,28 @@
             </button>
         </div>
 
+        <!-- 排除文件夹管理 -->
+        <div style="margin-top:16px; padding:12px; background:#f8f9fa; border-radius:8px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                <span style="font-weight:500;">🚫 排除文件夹</span>
+                <button class="btn btn-secondary" onclick="saveIgnoredDirs()" style="padding:4px 12px; font-size:12px;">保存</button>
+            </div>
+            <p class="text-muted" style="font-size:12px; margin-bottom:8px;">默认排除所有以"."开头的文件夹。其他排除项用逗号分隔</p>
+            <input type="text" id="ignoreDirs" placeholder="AI分析,AI/任务,AI/提醒"
+                   style="width:100%; padding:8px; border:1px solid #e1e3e6; border-radius:6px; font-size:13px;">
+        </div>
+
+        <!-- 排除文件管理 -->
+        <div style="margin-top:12px; padding:12px; background:#f8f9fa; border-radius:8px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                <span style="font-weight:500;">📄 排除文件</span>
+                <button class="btn btn-secondary" onclick="saveIgnoredFiles()" style="padding:4px 12px; font-size:12px;">保存</button>
+            </div>
+            <p class="text-muted" style="font-size:12px; margin-bottom:8px;">排除特定文件，用逗号分隔，支持文件名或相对路径</p>
+            <input type="text" id="ignoreFiles" placeholder="README.md,AGENTS.md"
+                   style="width:100%; padding:8px; border:1px solid #e1e3e6; border-radius:6px; font-size:13px;">
+        </div>
+
         <div id="buildStatus" style="display:none; padding:12px; background:#f0edff; border-radius:8px; margin-bottom:16px;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
                 <span id="buildStatusText"></span>
@@ -125,6 +147,64 @@
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') closeModal();
     });
+
+    // 加载排除列表
+    function loadIgnoredDirs() {
+        fetch('/kb/' + kbId + '/api/index/ignored-dirs')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.ok) {
+                    document.getElementById('ignoreDirs').value = data.user || '';
+                }
+            });
+    }
+
+    // 保存排除列表
+    function saveIgnoredDirs() {
+        var ignoreDirs = document.getElementById('ignoreDirs').value.trim();
+        fetch('/kb/' + kbId + '/api/index/ignored-dirs', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ignoreDirs: ignoreDirs })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.ok) {
+                toast('排除文件夹列表已保存');
+            } else {
+                toast(data.error || '保存失败', 'error');
+            }
+        });
+    }
+
+    // 加载排除文件列表
+    function loadIgnoredFiles() {
+        fetch('/kb/' + kbId + '/api/index/ignored-files')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.ok) {
+                    document.getElementById('ignoreFiles').value = data.user || '';
+                }
+            });
+    }
+
+    // 保存排除文件列表
+    function saveIgnoredFiles() {
+        var ignoreFiles = document.getElementById('ignoreFiles').value.trim();
+        fetch('/kb/' + kbId + '/api/index/ignored-files', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ignoreFiles: ignoreFiles })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.ok) {
+                toast('排除文件列表已保存');
+            } else {
+                toast(data.error || '保存失败', 'error');
+            }
+        });
+    }
 
     function refreshStatus(showLoading) {
         if (showLoading) {
@@ -305,11 +385,16 @@
         var html = '<p class="text-muted" style="margin-bottom:12px;">共找到 ' + allSearchResults.length + ' 条相关结果：</p>';
         pageResults.forEach(function(r) {
             var score = (r.score * 100).toFixed(0);
+            var scoreClass = r.score >= 0.8 ? 'badge-ok' : (r.score >= 0.6 ? 'badge-info' : 'badge-fail');
             var preview = r.content.length > 200 ? r.content.substring(0, 200) + '...' : r.content;
+            var pathInfo = r.pathContext ? '<span style="color:#909296; font-size:12px; margin-left:8px;">📂 ' + r.pathContext + '</span>' : '';
             html += '<div style="border:1px solid #e1e3e6; border-radius:8px; padding:12px; margin-bottom:8px;">' +
-                '<div style="display:flex; justify-content:space-between; margin-bottom:8px;">' +
+                '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">' +
+                '<div>' +
                 '<a href="javascript:void(0)" onclick="openFileDetail(\'' + r.filePath.replace(/'/g, "\\'") + '\')" style="font-weight:500; color:#7c5cfc; text-decoration:none; cursor:pointer;">📄 ' + r.filePath + '</a>' +
-                '<span class="badge badge-info">' + score + '% 相似</span>' +
+                pathInfo +
+                '</div>' +
+                '<span class="badge ' + scoreClass + '">' + score + '% 相似</span>' +
                 '</div>' +
                 '<div style="font-size:13px; color:#5c5f66; line-height:1.6;">' + preview + '</div>' +
                 '</div>';
@@ -340,6 +425,8 @@
     }
 
     refreshStatus(true);
+    loadIgnoredDirs();
+    loadIgnoredFiles();
 </script>
 </th:block>
 </html>

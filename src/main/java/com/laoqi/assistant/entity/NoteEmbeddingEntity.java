@@ -18,6 +18,8 @@ public class NoteEmbeddingEntity {
     
     private Integer chunkIndex;
     
+    private String pathContext;
+    
     private String content;
     
     private String embedding;
