@@ -426,7 +426,21 @@ public class NoteIndexService {
                 .filter(e -> e.getValue() >= 0.3)  // 过滤低分
                 .sorted(Map.Entry.<String, Double>comparingByValue().reversed())
                 .limit(limit)
-                .map(e -> resultMap.get(e.getKey()))
+                .map(e -> {
+                    NoteSearchResult original = resultMap.get(e.getKey());
+                    if (original != null) {
+                        // 创建新的结果，使用更新后的分数
+                        return new NoteSearchResult(
+                                original.filePath(),
+                                original.pathContext(),
+                                original.content(),
+                                e.getValue().floatValue(),  // 使用混合搜索后的分数
+                                original.chunkIndex(),
+                                original.totalChunks()
+                        );
+                    }
+                    return null;
+                })
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
     }
