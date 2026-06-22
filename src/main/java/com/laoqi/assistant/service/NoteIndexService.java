@@ -365,84 +365,180 @@ public class NoteIndexService {
         return results;
     }
 
+    /**
+     * 把余弦相似度映射到"用户友好"的百分比刻度（0~1）。
+     *
+     * BGE-M3 这类 embedding 的余弦相似度天然偏低：
+     *   - 不相关: ~ 0.05~0.15
+     *   - 语义较近: ~ 0.20~0.35
+     *   - 非常相关: ~ 0.40+
+     *
+     * 若直接 raw*100 展示，语义相近的结果会被卡在 20%~35%，看上去"很差"。
+     * 这里做一个线性平移 + 幂函数拉伸：1 - (1 - x)^3，让 0.32 -> 68%、0.42 -> 90%。
+     *
+     * 注意：这个函数 **只用于最终展示，绝不能参与排序**。排序始终用原始余弦相似度。
+     */
+    private static float toDisplayScore(float rawCosine) {
+        double rawMin = SIMILARITY_THRESHOLD;   // 0.3
+        double rawCap = 0.55;                   // 视作 "非常相关" 的上界
+        double x = Math.max(0.0, Math.min(rawCap, rawCosine) - rawMin) / (rawCap - rawMin);
+        double stretched = 1.0 - Math.pow(1.0 - x, 3);
+        return (float) Math.min(1.0, Math.round(stretched * 10000) / 10000.0);
+    }
+
     public List<NoteSearchResult> hybridSearch(Long kbId, String query, int limit) {
-        List<NoteSearchResult> semanticResults = search(kbId, query, limit * 3);
+        List<String> expandedQueries = expandQuery(query);
+        log.info("[NoteIndex] 查询扩展: 原始={}, 扩展={}", query, expandedQueries);
 
-        List<NoteSearchResult> keywordResults = keywordSearch(kbId, query, limit * 3);
-
-        // 收集所有包含关键词的文件路径
+        // 收集每个文件的原始余弦分（所有扩展查询中的最大值）以及路径/关键词匹配标记
+        Map<String, NoteSearchResult> bestByFile = new HashMap<>();  // 仅语义结果
+        Map<String, Float> rawCosineByFile = new HashMap<>();       // 语义分（原始余弦，取各扩展查询中最大值）
+        Map<String, Boolean> pathMatchedFiles = new HashMap<>();
         Set<String> keywordMatchedFiles = new HashSet<>();
-        for (NoteSearchResult r : keywordResults) {
-            keywordMatchedFiles.add(r.filePath());
+
+        for (String q : expandedQueries) {
+            List<NoteSearchResult> semanticResults = search(kbId, q, limit * 2);
+            List<NoteSearchResult> keywordResults = keywordSearch(kbId, q, limit * 2);
+
+            for (NoteSearchResult r : keywordResults) {
+                keywordMatchedFiles.add(r.filePath());
+            }
+
+            for (NoteSearchResult r : semanticResults) {
+                String key = r.filePath();
+                float raw = r.score();
+
+                if (!rawCosineByFile.containsKey(key) || raw > rawCosineByFile.get(key)) {
+                    rawCosineByFile.put(key, raw);
+                    bestByFile.put(key, r);
+
+                    String pathLower = r.pathContext() != null ? r.pathContext().toLowerCase() : "";
+                    String queryLower = q.toLowerCase();
+                    boolean pathMatch = isPathMatchPath(pathLower, queryLower);
+                    pathMatchedFiles.merge(key, pathMatch, Boolean::logicalOr);
+                }
+            }
         }
 
-        // 对语义结果进行评分调整，使用文件路径作为唯一key
-        Map<String, Double> scores = new HashMap<>();
-        Map<String, NoteSearchResult> resultMap = new HashMap<>();
+        // 构建候选集：语义结果 + 关键词命中但没被语义召回的结果
+        Set<String> candidateFiles = new HashSet<>(rawCosineByFile.keySet());
+        for (String f : keywordMatchedFiles) {
+            candidateFiles.add(f);
+        }
 
-        for (NoteSearchResult r : semanticResults) {
-            String key = r.filePath();
-            double score = r.score();
-            
-            // 检查路径是否精确包含关键词
-            String pathLower = r.pathContext() != null ? r.pathContext().toLowerCase() : "";
-            boolean exactPathMatch = pathLower.contains(query.toLowerCase());
-            
-            log.info("[NoteIndex] 混合评分: file={}, 语义={}, pathContext={}, 匹配={}", 
-                    r.filePath(), String.format("%.3f", score), r.pathContext(), exactPathMatch);
-            
-            if (exactPathMatch) {
-                // 路径精确匹配，给高分
-                score = Math.max(score, 0.9);
-            } else if (keywordMatchedFiles.contains(r.filePath())) {
-                // 关键词也匹配，加分
-                score = Math.min(1.0, score * 0.7 + 0.3);
+        // 对候选文件计算"最终排序分"，以原始余弦分为主，路径/关键词只做加分、不乘系数
+        List<Map.Entry<String, Float>> rankList = new ArrayList<>();
+        for (String file : candidateFiles) {
+            float raw = rawCosineByFile.getOrDefault(file, 0f);
+            boolean pathMatch = pathMatchedFiles.getOrDefault(file, false);
+            boolean kwMatch = keywordMatchedFiles.contains(file);
+
+            float rankScore;
+            if (pathMatch) {
+                rankScore = Math.max(raw, 0.92f);
+            } else if (kwMatch && raw > 0f) {
+                rankScore = Math.max(raw, 0.55f);
+            } else if (kwMatch) {
+                rankScore = 0.55f;
             } else {
-                // 只有语义匹配，适当降分
-                score = score * 0.5;
+                rankScore = raw;
             }
-            
-            log.info("[NoteIndex] 最终分数: file={}, 最终={}", r.filePath(), String.format("%.3f", score));
-            
-            if (!scores.containsKey(key) || score > scores.get(key)) {
-                scores.put(key, score);
-                resultMap.put(key, r);
+            rankList.add(new java.util.AbstractMap.SimpleEntry<>(file, rankScore));
+        }
+
+        // 按最终排序分降序，取 limit 条
+        rankList.sort((a, b) -> Float.compare(b.getValue(), a.getValue()));
+        if (rankList.size() > limit) rankList = new ArrayList<>(rankList.subList(0, limit));
+
+        List<NoteSearchResult> results = new ArrayList<>();
+        for (Map.Entry<String, Float> e : rankList) {
+            String file = e.getKey();
+            float rankScore = e.getValue();
+            NoteSearchResult original = bestByFile.get(file);
+
+            if (original != null) {
+                float display = toDisplayScore(rawCosineByFile.getOrDefault(file, rankScore));
+                results.add(new NoteSearchResult(
+                        original.filePath(),
+                        original.pathContext(),
+                        original.content(),
+                        display,
+                        original.chunkIndex(),
+                        original.totalChunks()
+                ));
+            } else {
+                // 只有关键词命中的结果
+                float display = toDisplayScore(rankScore);
+                results.add(new NoteSearchResult(
+                        file,
+                        "",
+                        "[关键词匹配] " + file,
+                        display,
+                        0,
+                        0
+                ));
             }
         }
 
-        // 关键词匹配但语义未匹配的结果
-        for (NoteSearchResult r : keywordResults) {
-            String key = r.filePath();
-            if (!scores.containsKey(key)) {
-                // 检查是否是路径匹配
-                String pathLower = r.pathContext() != null ? r.pathContext().toLowerCase() : "";
-                boolean exactPathMatch = pathLower.contains(query.toLowerCase());
-                scores.put(key, exactPathMatch ? 0.85 : 0.5);
-                resultMap.put(key, r);
+        return results;
+    }
+
+    /**
+     * 查询扩展：生成多个相关查询
+     */
+    private List<String> expandQuery(String query) {
+        List<String> queries = new ArrayList<>();
+        queries.add(query);  // 原始查询
+
+        // 策略1：提取核心关键词
+        String[] words = query.split("[\\s,，、]+");
+        if (words.length > 1) {
+            for (String word : words) {
+                if (word.length() >= 2) {
+                    queries.add(word);
+                }
             }
         }
 
-        return scores.entrySet().stream()
-                .filter(e -> e.getValue() >= 0.3)  // 过滤低分
-                .sorted(Map.Entry.<String, Double>comparingByValue().reversed())
-                .limit(limit)
-                .map(e -> {
-                    NoteSearchResult original = resultMap.get(e.getKey());
-                    if (original != null) {
-                        // 创建新的结果，使用更新后的分数
-                        return new NoteSearchResult(
-                                original.filePath(),
-                                original.pathContext(),
-                                original.content(),
-                                e.getValue().floatValue(),  // 使用混合搜索后的分数
-                                original.chunkIndex(),
-                                original.totalChunks()
-                        );
-                    }
-                    return null;
-                })
-                .filter(Objects::nonNull)
-                .collect(Collectors.toList());
+        // 策略2：添加常见后缀
+        String[] suffixes = {"项目", "文档", "记录", "合同", "需求", "客户"};
+        for (String suffix : suffixes) {
+            if (!query.contains(suffix)) {
+                queries.add(query + suffix);
+            }
+        }
+
+        // 策略3：如果有空格，尝试组合
+        if (query.contains(" ")) {
+            String[] parts = query.split("\\s+");
+            if (parts.length == 2) {
+                queries.add(parts[0] + parts[1]);
+                queries.add(parts[1] + parts[0]);
+            }
+        }
+
+        return queries.stream().distinct().collect(Collectors.toList());
+    }
+
+    /**
+     * 智能路径匹配：检查路径是否包含查询的所有关键词
+     */
+    private boolean isPathMatchPath(String pathLower, String queryLower) {
+        if (pathLower == null || queryLower == null) return false;
+        
+        // 直接包含
+        if (pathLower.contains(queryLower)) return true;
+        
+        // 分词后检查是否所有词都在路径中
+        String[] queryWords = queryLower.split("[\\s,，、]+");
+        if (queryWords.length <= 1) return false;
+        
+        for (String word : queryWords) {
+            if (word.length() >= 2 && !pathLower.contains(word)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private List<NoteSearchResult> keywordSearch(Long kbId, String query, int limit) {
@@ -477,7 +573,7 @@ public class NoteIndexService {
                         boolean pathMatch = pathContextMatchedFiles.contains(relativePath);
                         
                         String content = FileUtil.readText(file);
-                        if (content == null || content.isBlank() && !pathMatch) return;
+                        if ((content == null || content.isBlank()) && !pathMatch) return;
 
                         String contentLower = content != null ? content.toLowerCase() : "";
                         boolean contentMatch = contentLower.contains(queryLower);
@@ -491,7 +587,7 @@ public class NoteIndexService {
                             score = Math.min(1.0f, matchCount * 0.2f);
                         }
                         if (pathMatch) {
-                            score = Math.max(score, 0.5f);  // 路径匹配给较高分数
+                            score = Math.max(score, 0.5f);
                         }
 
                         String pathContext = extractPathContext(relativePath);

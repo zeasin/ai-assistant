@@ -42,3 +42,4 @@ AI/
 .mimocode/
 AGENTS.md
 CLAUDE.md
+app.log.*.*.gz
