@@ -13,6 +13,8 @@ import java.io.IOException;
 import java.nio.file.*;
 import java.security.MessageDigest;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -24,6 +26,10 @@ public class NoteIndexService {
     private static final int CHUNK_SIZE = 300;
     private static final int CHUNK_OVERLAP = 50;
     private static final float SIMILARITY_THRESHOLD = 0.3f;  // bge-m3 阈值降低
+    private static final int RERANK_TOP_K = 20;   // Bi-encoder 粗召 → BM25 精排的候选数
+    private static final float BM25_BI_WEIGHT = 0.8f;  // Bi-encoder 是主力（语义理解）
+    private static final float BM25_BM_WEIGHT = 0.2f;  // BM25 只是关键词微调
+    private static final float TITLE_PATH_BOOST = 0.15f;  // 标题/路径关键词命中额外加分（每个词）
 
     private static final Set<String> INDEXED_EXTENSIONS = Set.of(".md", ".json", ".txt");
     
@@ -439,11 +445,11 @@ public class NoteIndexService {
      *
      * 注意：这个函数 **只用于最终展示，绝不能参与排序**。排序始终用原始余弦相似度。
      */
-    private static float toDisplayScore(float rawCosine) {
-        double rawMin = SIMILARITY_THRESHOLD;   // 0.3
-        double rawCap = 0.55;                   // 视作 "非常相关" 的上界
-        double x = Math.max(0.0, Math.min(rawCap, rawCosine) - rawMin) / (rawCap - rawMin);
-        double stretched = 1.0 - Math.pow(1.0 - x, 3);
+    private static float toDisplayScore(float rankScore) {
+        double rawMin = 0.3;
+        double rawCap = 0.9;
+        double x = Math.max(0.0, Math.min(rawCap, rankScore) - rawMin) / (rawCap - rawMin);
+        double stretched = 1.0 - Math.pow(1.0 - x, 2);
         return (float) Math.min(1.0, Math.round(stretched * 10000) / 10000.0);
     }
 
@@ -468,21 +474,18 @@ public class NoteIndexService {
         List<String> expandedQueries = expandQuery(query);
         log.info("[NoteIndex] 查询扩展: 原始={}, 扩展={}", query, expandedQueries);
 
-        // 3. 对每个扩展查询执行语义搜索 + 关键词搜索（复用 entity 和 vectors）
+        // 3. Bi-encoder 粗召: 对每个扩展查询做语义搜索 + 关键词搜索
         Map<String, NoteSearchResult> bestByFile = new HashMap<>();
         Map<String, Float> rawCosineByFile = new HashMap<>();
         Map<String, Boolean> pathMatchedFiles = new HashMap<>();
         Set<String> keywordMatchedFiles = new HashSet<>();
 
         for (String q : expandedQueries) {
-            // 语义搜索
             float[] queryVector = embeddingService.embed(q);
             if (queryVector == null) continue;
 
-            List<NoteSearchResult> semanticResults = searchWithEntities(queryVector, allEntities, vectors, limit * 2);
-
-            // 关键词搜索（复用 entity）
-            List<NoteSearchResult> keywordResults = keywordSearchWithEntities(q, allEntities, limit * 2);
+            List<NoteSearchResult> semanticResults = searchWithEntities(queryVector, allEntities, vectors, RERANK_TOP_K);
+            List<NoteSearchResult> keywordResults = keywordSearchWithEntities(q, allEntities, RERANK_TOP_K);
 
             for (NoteSearchResult r : keywordResults) {
                 keywordMatchedFiles.add(r.filePath());
@@ -504,41 +507,24 @@ public class NoteIndexService {
             }
         }
 
-        // 4. 构建候选集并排序
-        Set<String> candidateFiles = new HashSet<>(rawCosineByFile.keySet());
-        candidateFiles.addAll(keywordMatchedFiles);
+        // 4. BM25 Rerank: 对 Bi-encoder 召回的候选集做精排
+        List<Map.Entry<String, Float>> reranked = bm25Rerank(
+                query, bestByFile, rawCosineByFile,
+                pathMatchedFiles, keywordMatchedFiles,
+                allEntities
+        );
 
-        List<Map.Entry<String, Float>> rankList = new ArrayList<>();
-        for (String file : candidateFiles) {
-            float raw = rawCosineByFile.getOrDefault(file, 0f);
-            boolean pathMatch = pathMatchedFiles.getOrDefault(file, false);
-            boolean kwMatch = keywordMatchedFiles.contains(file);
+        // 5. 截断并组装最终结果
+        if (reranked.size() > limit) reranked = new ArrayList<>(reranked.subList(0, limit));
 
-            float rankScore;
-            if (pathMatch) {
-                rankScore = Math.max(raw, 0.92f);
-            } else if (kwMatch && raw > 0f) {
-                rankScore = Math.max(raw, 0.55f);
-            } else if (kwMatch) {
-                rankScore = 0.55f;
-            } else {
-                rankScore = raw;
-            }
-            rankList.add(new java.util.AbstractMap.SimpleEntry<>(file, rankScore));
-        }
-
-        rankList.sort((a, b) -> Float.compare(b.getValue(), a.getValue()));
-        if (rankList.size() > limit) rankList = new ArrayList<>(rankList.subList(0, limit));
-
-        // 5. 组装最终结果，展示分用归一化
         List<NoteSearchResult> results = new ArrayList<>();
-        for (Map.Entry<String, Float> e : rankList) {
+        for (Map.Entry<String, Float> e : reranked) {
             String file = e.getKey();
             float rankScore = e.getValue();
             NoteSearchResult original = bestByFile.get(file);
 
             if (original != null) {
-                float display = toDisplayScore(rawCosineByFile.getOrDefault(file, rankScore));
+                float display = toDisplayScore(rankScore);
                 results.add(new NoteSearchResult(
                         original.filePath(),
                         original.title(),
@@ -563,6 +549,208 @@ public class NoteIndexService {
         }
 
         return results;
+    }
+
+    /**
+     * BM25 Rerank: 对 Bi-encoder 召回的候选集做精排。
+     * 算法：final = bi_cosine * w_bi + bm25_score * w_bm + title_path_boost
+     * - TF: term 在 chunk 中出现次数（对数衰减）
+     * - IDF: 全库中含该 term 的 chunk 数（越稀有分越高）
+     * - title_boost: term 出现在标题/路径中额外加分
+     */
+    private List<Map.Entry<String, Float>> bm25Rerank(
+            String query,
+            Map<String, NoteSearchResult> bestByFile,
+            Map<String, Float> rawCosineByFile,
+            Map<String, Boolean> pathMatchedFiles,
+            Set<String> keywordMatchedFiles,
+            List<NoteEmbeddingEntity> allEntities
+    ) {
+        // 4.1 解析查询词：中英文混合分词
+        List<String> queryTerms = tokenizeQuery(query);
+        Set<String> termSet = new HashSet<>(queryTerms);
+        log.info("[NoteIndex] BM25 查询词: {}", termSet);
+
+        // 4.2 计算 IDF（全库级别）：每个 term 出现在多少个 chunk 中
+        Map<String, Integer> docFreq = new HashMap<>();
+        for (NoteEmbeddingEntity entity : allEntities) {
+            String haystack = buildBm25Haystack(entity);
+            Set<String> chunkTerms = new HashSet<>();
+            for (String term : termSet) {
+                if (haystack.contains(term.toLowerCase()) || haystack.contains(term)) {
+                    chunkTerms.add(term);
+                }
+            }
+            for (String t : chunkTerms) {
+                docFreq.merge(t, 1, Integer::sum);
+            }
+        }
+        float totalChunks = allEntities.size();
+
+        // 4.3 聚合到文件级别：每个文件取所有 chunk 的最大 BM25 分
+        Map<String, Float> fileBm25 = new HashMap<>();
+        Map<String, String> fileBestContent = new HashMap<>();
+        Map<String, String> fileTitle = new HashMap<>();
+        Map<String, String> filePathContext = new HashMap<>();
+
+        for (NoteEmbeddingEntity entity : allEntities) {
+            String key = entity.getFilePath();
+            if (!bestByFile.containsKey(key) && !keywordMatchedFiles.contains(key)) continue;
+
+            String haystack = buildBm25Haystack(entity);
+            float bm25 = computeBm25(haystack, termSet, docFreq, totalChunks);
+
+            float current = fileBm25.getOrDefault(key, 0f);
+            if (bm25 > current) {
+                fileBm25.put(key, bm25);
+                fileBestContent.put(key, entity.getContent());
+                fileTitle.put(key, entity.getTitle() != null ? entity.getTitle() : "");
+                filePathContext.put(key, entity.getPathContext());
+            }
+        }
+
+        // 4.4 归一化 BM25 分到 [0, 1]
+        float maxBm25 = fileBm25.values().stream().max(Float::compare).orElse(0f);
+        Map<String, Float> bm25Norm = new HashMap<>();
+        for (Map.Entry<String, Float> e : fileBm25.entrySet()) {
+            bm25Norm.put(e.getKey(), maxBm25 > 0 ? e.getValue() / maxBm25 : 0f);
+        }
+
+        // 4.5 混合打分: final = bi_cosine * w_bi + bm25 * w_bm + title_path_boost - 品牌词缺失惩罚
+        // 先确定"品牌/实体核心词"：查询分词中 >=3 字的最长词，视为用户真正关注的实体
+        String coreTerm = null;
+        for (String t : queryTerms) {
+            if (t.length() >= 3) {
+                if (coreTerm == null || t.length() > coreTerm.length()) coreTerm = t;
+            }
+        }
+        final String finalCoreTerm = coreTerm;
+
+        List<Map.Entry<String, Float>> rankList = new ArrayList<>();
+        for (String file : fileBm25.keySet()) {
+            float rawBi = rawCosineByFile.getOrDefault(file, 0f);
+            float bm = bm25Norm.getOrDefault(file, 0f);
+
+            float titleBoost = 0f;
+            String titleStr = fileTitle.getOrDefault(file, "");
+            String pathStr = filePathContext.getOrDefault(file, "");
+            String fileName = file.toLowerCase();
+            for (String term : termSet) {
+                String t = term.toLowerCase();
+                if (titleStr != null && titleStr.toLowerCase().contains(t)) titleBoost += TITLE_PATH_BOOST;
+                if (pathStr != null && pathStr.toLowerCase().contains(t)) titleBoost += TITLE_PATH_BOOST * 0.5f;
+                if (fileName.contains(t)) titleBoost += TITLE_PATH_BOOST * 0.5f;
+            }
+
+            boolean pathMatch = pathMatchedFiles.getOrDefault(file, false);
+            boolean kwMatch = keywordMatchedFiles.contains(file);
+
+            // 品牌词缺失惩罚：核心实体词（如"本数科技"）在路径/标题中完全找不到任何关键前缀时降权
+            float penalty = 0f;
+            if (finalCoreTerm != null && finalCoreTerm.length() >= 3) {
+                String coreLower = finalCoreTerm.toLowerCase();
+                boolean coreExactInPath = (titleStr != null && titleStr.toLowerCase().contains(coreLower))
+                        || fileName.contains(coreLower);
+                // 核心词的第一个 2 字前缀（如"本数科技" → "本数"），是区分实体的关键
+                String corePrefix = coreLower.substring(0, Math.min(2, coreLower.length()));
+                boolean prefixInPath = (titleStr != null && titleStr.toLowerCase().contains(corePrefix))
+                        || fileName.contains(corePrefix);
+                if (!coreExactInPath && !prefixInPath) {
+                    penalty = 0.18f;
+                }
+            }
+
+            float rankScore;
+            if (pathMatch && rawBi > 0f) {
+                rankScore = Math.min(1.0f, Math.max(0.1f, rawBi * 0.9f + 0.1f + titleBoost - penalty));
+            } else if (kwMatch && rawBi > 0f) {
+                rankScore = Math.min(1.0f, Math.max(0.1f, rawBi * BM25_BI_WEIGHT + bm * BM25_BM_WEIGHT + titleBoost - penalty));
+            } else if (kwMatch) {
+                rankScore = Math.min(1.0f, Math.max(0.1f, Math.max(bm * 0.5f, 0.3f) + titleBoost - penalty));
+            } else {
+                rankScore = Math.min(1.0f, Math.max(0.1f, rawBi * BM25_BI_WEIGHT + bm * BM25_BM_WEIGHT - penalty));
+            }
+
+            rankList.add(new java.util.AbstractMap.SimpleEntry<>(file, rankScore));
+        }
+
+        rankList.sort((a, b) -> Float.compare(b.getValue(), a.getValue()));
+        log.info("[NoteIndex] BM25 重排结果: {}",
+                rankList.stream().limit(5)
+                        .map(e -> String.format("%.3f %s", e.getValue(), e.getKey()))
+                        .collect(Collectors.joining(", ")));
+
+        return rankList;
+    }
+
+    private String buildBm25Haystack(NoteEmbeddingEntity entity) {
+        StringBuilder sb = new StringBuilder();
+        if (entity.getTitle() != null) sb.append(entity.getTitle()).append(" ");
+        if (entity.getPathContext() != null) sb.append(entity.getPathContext()).append(" ");
+        if (entity.getContent() != null) sb.append(entity.getContent()).append(" ");
+        return sb.toString().toLowerCase();
+    }
+
+    /**
+     * 简化版 BM25 打分：TF(对数衰减) × IDF(log(N/df))，不做长度归一化。
+     */
+    private float computeBm25(String haystack, Set<String> terms, Map<String, Integer> docFreq, float totalChunks) {
+        float score = 0f;
+        int len = haystack.length();
+        for (String term : terms) {
+            String t = term.toLowerCase();
+            int tf = 0;
+            int idx = 0;
+            while ((idx = haystack.indexOf(t, idx)) != -1) {
+                tf++;
+                idx += t.length();
+            }
+            if (tf == 0) continue;
+
+            int df = docFreq.getOrDefault(term, 1);
+            float idf = (float) Math.log(1.0 + totalChunks / df);
+            float tfLog = (float) (1 + Math.log(tf));
+
+            score += tfLog * idf;
+        }
+        return score;
+    }
+
+    /**
+     * 查询分词：中文连续串 + 英文单词 + 数字。
+     */
+    private List<String> tokenizeQuery(String query) {
+        String q = query.trim();
+        if (q.isEmpty()) return List.of();
+
+        List<String> tokens = new ArrayList<>();
+
+        // 先用英文/数字边界切分
+        Matcher m = Pattern.compile("[a-zA-Z0-9]+|[\\u4e00-\\u9fff]+").matcher(q);
+        while (m.find()) {
+            String g = m.group();
+            if (g.length() >= 2) {
+                tokens.add(g);
+            } else if (g.length() == 1 && !tokens.isEmpty() && m.start() == tokens.get(tokens.size() - 1).length()) {
+                // 单字跳过，除非前面是中文串的一部分
+            }
+        }
+
+        // 额外：对中文串尝试所有连续 2-4 字组合（覆盖"北京本数科技"拆为 "北京/本数/科技/本数科技"）
+        Matcher cm = Pattern.compile("[\\u4e00-\\u9fff]{2,}").matcher(q);
+        while (cm.find()) {
+            String cjk = cm.group();
+            for (int len = 2; len <= Math.min(4, cjk.length()); len++) {
+                for (int i = 0; i + len <= cjk.length(); i++) {
+                    String sub = cjk.substring(i, i + len);
+                    if (!tokens.contains(sub)) {
+                        tokens.add(sub);
+                    }
+                }
+            }
+        }
+
+        return tokens.stream().distinct().filter(t -> t.length() >= 2).collect(Collectors.toList());
     }
 
     /**
@@ -650,7 +838,7 @@ public class NoteIndexService {
                 fileScores.put(key, score);
                 fileBestContent.put(key, content != null ? content : "");
                 filePathContext.put(key, entity.getPathContext());
-                fileTitle.put(key, entity.getTitle());
+                fileTitle.put(key, entity.getTitle() != null ? entity.getTitle() : "");
             }
         }
 
