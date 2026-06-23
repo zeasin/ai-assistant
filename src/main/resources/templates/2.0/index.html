@@ -10,7 +10,7 @@
 <div style="display:flex;gap:0;border-bottom:2px solid #e1e3e6;margin-bottom:20px;">
     <button class="tab-btn active" onclick="switchTab('chat')">💬 对话</button>
     <button class="tab-btn" onclick="switchTab('search')">🔍 搜索</button>
-    <button class="tab-btn" onclick="switchTab('analysis')">📊 分析</button>
+    <button class="tab-btn" onclick="switchTab('overview')">📊 概览</button>
 </div>
 
 <style>
@@ -149,8 +149,44 @@
 </div>
 
 <!-- ==================== Tab 3: 分析 ==================== -->
-<div id="tab-analysis" class="tab-panel">
-    <!-- 日报 -->
+<div id="tab-overview" class="tab-panel" style="max-width:1100px;margin:0 auto;">
+    <!-- 笔记库概览 -->
+    <div class="card" th:if="${currentKb != null}">
+        <h2>笔记库概览</h2>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
+            <div style="text-align:center;padding:16px;background:#f8f9fa;border-radius:8px;">
+                <div style="font-size:24px;font-weight:700;color:#7c5cfc;" th:text="${kbFileCount} ?: 0">0</div>
+                <div style="font-size:12px;color:#909296;margin-top:4px;">笔记文件</div>
+            </div>
+            <div style="text-align:center;padding:16px;background:#f8f9fa;border-radius:8px;">
+                <div style="font-size:24px;font-weight:700;color:#7c5cfc;" th:text="${kbIndexCount} ?: 0">0</div>
+                <div style="font-size:12px;color:#909296;margin-top:4px;">索引片段</div>
+            </div>
+            <div style="text-align:center;padding:16px;background:#f8f9fa;border-radius:8px;">
+                <div style="font-size:24px;font-weight:700;color:#7c5cfc;" th:text="${kbTotalMessages} ?: 0">0</div>
+                <div style="font-size:12px;color:#909296;margin-top:4px;">对话消息</div>
+            </div>
+        </div>
+        <div style="margin-top:16px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+            <a th:href="@{/kb/{id}/notes(id=${currentKb.id})}" class="card" style="text-decoration:none;text-align:center;padding:16px;cursor:pointer;border:1px solid #eef0f4;border-radius:8px;transition:all .15s;">
+                <div style="font-size:20px;margin-bottom:6px;">📂</div>
+                <div style="font-size:13px;font-weight:500;color:#1a1b1e;">笔记浏览</div>
+                <div style="font-size:11px;color:#909296;margin-top:2px;">查看和管理笔记文件</div>
+            </a>
+            <a th:href="@{/kb/{id}/data(id=${currentKb.id})}" class="card" style="text-decoration:none;text-align:center;padding:16px;cursor:pointer;border:1px solid #eef0f4;border-radius:8px;transition:all .15s;">
+                <div style="font-size:20px;margin-bottom:6px;">📈</div>
+                <div style="font-size:13px;font-weight:500;color:#1a1b1e;">数据概览</div>
+                <div style="font-size:11px;color:#909296;margin-top:2px;">数据统计与管理</div>
+            </a>
+            <a th:href="@{/kb/{id}/config(id=${currentKb.id})}" class="card" style="text-decoration:none;text-align:center;padding:16px;cursor:pointer;border:1px solid #eef0f4;border-radius:8px;transition:all .15s;">
+                <div style="font-size:20px;margin-bottom:6px;">⚙️</div>
+                <div style="font-size:13px;font-weight:500;color:#1a1b1e;">笔记库配置</div>
+                <div style="font-size:11px;color:#909296;margin-top:2px;">AGENTS.md 与排除规则</div>
+            </a>
+        </div>
+    </div>
+
+    <!-- 综合日报 -->
     <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
             <h2 style="margin:0;">综合日报</h2>
@@ -172,29 +208,6 @@
              style="margin-top:8px;padding:8px 12px;background:#fff3cd;border-radius:6px;font-size:13px;color:#856404;"
              th:text="${report_error}">错误</div>
     </div>
-
-    <!-- 笔记库统计 -->
-    <div class="card" th:if="${currentKb != null}">
-        <h2>笔记库概览</h2>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
-            <div style="text-align:center;padding:16px;background:#f8f9fa;border-radius:8px;">
-                <div style="font-size:24px;font-weight:700;color:#7c5cfc;" th:text="${kbFileCount} ?: 0">0</div>
-                <div style="font-size:12px;color:#909296;margin-top:4px;">笔记文件</div>
-            </div>
-            <div style="text-align:center;padding:16px;background:#f8f9fa;border-radius:8px;">
-                <div style="font-size:24px;font-weight:700;color:#7c5cfc;" th:text="${kbIndexCount} ?: 0">0</div>
-                <div style="font-size:12px;color:#909296;margin-top:4px;">索引片段</div>
-            </div>
-            <div style="text-align:center;padding:16px;background:#f8f9fa;border-radius:8px;">
-                <div style="font-size:24px;font-weight:700;color:#7c5cfc;" th:text="${kbTotalMessages} ?: 0">0</div>
-                <div style="font-size:12px;color:#909296;margin-top:4px;">对话消息</div>
-            </div>
-        </div>
-        <div style="margin-top:12px;display:flex;gap:8px;">
-            <a th:href="@{/kb/{id}/notes(id=${currentKb.id})}" class="btn btn-secondary" style="font-size:12px;">浏览笔记</a>
-            <a th:href="@{/kb/{id}/config(id=${currentKb.id})}" class="btn btn-secondary" style="font-size:12px;">配置</a>
-        </div>
-    </div>
 </div>
 
 <!-- ==================== JS ==================== -->
@@ -212,9 +225,7 @@ function switchTab(tab) {
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     event.target.classList.add('active');
     document.getElementById('tab-' + tab).classList.add('active');
-}
-
-// ========== 加载聊天记录 ==========
+}// ========== 加载聊天记录 ==========
 async function loadChatHistory() {
     if (!KB_ID) return;
     const box = document.getElementById('chatBox');
