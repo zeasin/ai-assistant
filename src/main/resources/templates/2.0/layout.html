@@ -290,6 +290,10 @@
                    th:classappend="${requestURI == '/image/general'} ? 'active' : ''">
                     <span class="nav-icon">🖼️</span><span>通用识别</span>
                 </a>
+                <a href="/image/generate"
+                   th:classappend="${requestURI == '/image/generate'} ? 'active' : ''">
+                    <span class="nav-icon">🎨</span><span>AI 绘图</span>
+                </a>
                 <a href="/image/solve"
                    th:classappend="${requestURI == '/image/solve'} ? 'active' : ''">
                     <span class="nav-icon">❓</span><span>识题</span>

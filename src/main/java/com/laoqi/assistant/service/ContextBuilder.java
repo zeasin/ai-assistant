@@ -16,6 +16,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 
 @Service
 public class ContextBuilder {
@@ -41,13 +42,19 @@ public class ContextBuilder {
      * 3. 读取规则文件
      */
     public ChatContext build(String sessionId, String userMessage, Long kbId) {
+        return build(sessionId, userMessage, kbId, null);
+    }
+
+    public ChatContext build(String sessionId, String userMessage, Long kbId, Consumer<String> statusCallback) {
         // 1. 注入历史对话
+        if (statusCallback != null) statusCallback.accept("正在加载历史对话...");
         String historyContext = sessionService.buildHistoryContext(sessionId, "knowledge", userMessage);
 
         // 2. 主动搜索相关笔记
         List<NoteSearchResult> relevantNotes = List.of();
         if (noteIndexService.isAvailable() && kbId != null) {
             try {
+                if (statusCallback != null) statusCallback.accept("正在搜索相关笔记...");
                 relevantNotes = noteIndexService.hybridSearch(kbId, userMessage, 10);
                 log.info("[ContextBuilder] 主动搜索完成，找到 {} 条相关笔记", relevantNotes.size());
             } catch (Exception e) {
@@ -56,6 +63,7 @@ public class ContextBuilder {
         }
 
         // 3. 读取规则文件
+        if (statusCallback != null) statusCallback.accept("正在读取规则文件...");
         String agentsMd = "";
         if (kbId != null) {
             try {
@@ -72,6 +80,7 @@ public class ContextBuilder {
         }
 
         // 4. 组合上下文
+        if (statusCallback != null) statusCallback.accept("上下文构建完成，正在请求 AI...");
         return new ChatContext(historyContext, relevantNotes, agentsMd);
     }
 

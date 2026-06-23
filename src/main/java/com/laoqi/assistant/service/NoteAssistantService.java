@@ -91,6 +91,11 @@ public class NoteAssistantService {
     }
 
     public String streamChat(String sessionId, String userMessage, String mode, Long kbId, String modelName, Consumer<String> chunkCallback) throws Exception {
+        return streamChat(sessionId, userMessage, mode, kbId, modelName, chunkCallback, null);
+    }
+
+    public String streamChat(String sessionId, String userMessage, String mode, Long kbId, String modelName,
+                             Consumer<String> chunkCallback, Consumer<String> statusCallback) throws Exception {
         if (!isAvailable()) {
             throw new IllegalStateException("LLM API Key 未配置，请在配置页填写");
         }
@@ -103,14 +108,19 @@ public class NoteAssistantService {
         NoteTools.setCurrentKbId(kbId);
         try {
             // 使用 ContextBuilder 构建完整上下文（主动搜索 + 历史对话 + 规则文件）
-            ContextBuilder.ChatContext context = contextBuilder.build(sessionId, userMessage, kbId);
+            if (statusCallback != null) statusCallback.accept("正在搜索笔记库...");
+            ContextBuilder.ChatContext context = contextBuilder.build(sessionId, userMessage, kbId, statusCallback);
+
+            if (statusCallback != null) statusCallback.accept("正在构建上下文...");
             String fullMessage = contextBuilder.merge(context, userMessage);
-            
+
             int noteCount = context.relevantNotes() != null ? context.relevantNotes().size() : 0;
             log.info("[编排] 上下文构建完成，总消息长度={}, 相关笔记={}", fullMessage.length(), noteCount);
 
             log.info("[编排] 用户: {} (session={}, kbId={}, model={})", userMessage, sessionId, kbId,
                     modelName != null ? modelName : "default");
+
+            if (statusCallback != null) statusCallback.accept("AI 正在生成回复...");
 
             StringBuilder fullReply = new StringBuilder();
             boolean[] isFirstChunk = {true};

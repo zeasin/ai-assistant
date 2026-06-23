@@ -242,6 +242,27 @@ public class ChatController {
                 log.info("[chat] KB={} 使用 NoteAssistant（含工具编排 + 历史上下文注入, model={})",
                         finalKbId, modelName.isEmpty() ? "default" : modelName);
 
+                // 启动心跳：每 5 秒发送一次 keepalive
+                final boolean[] heartbeatDone = {false};
+                Thread heartbeat = new Thread(() -> {
+                    while (!heartbeatDone[0]) {
+                        try {
+                            Thread.sleep(5000);
+                            if (!heartbeatDone[0]) {
+                                emitter.send(SseEmitter.event()
+                                        .data(mapper.writeValueAsString(Map.of("type", "heartbeat"))));
+                            }
+                        } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                            break;
+                        } catch (Exception e) {
+                            break;
+                        }
+                    }
+                }, "chat-heartbeat");
+                heartbeat.setDaemon(true);
+                heartbeat.start();
+
                 StringBuilder replyBuffer = new StringBuilder();
                 noteAssistantService.streamChat(sessionId, message, mode, finalKbId, modelName, chunk -> {
                     replyBuffer.append(chunk);
@@ -254,8 +275,11 @@ public class ChatController {
                     } catch (Exception e) {
                         log.warn("发送流式数据失败", e);
                     }
+                }, status -> {
+                    sendStatus(emitter, mode, status);
                 });
 
+                heartbeatDone[0] = true;
                 String replyText = replyBuffer.toString();
                 log.info("[chat] 收到回复, 长度={}", replyText.length());
                 sessionService.saveMessage(sessionId, "assistant", replyText, mode, "web");
