@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{2.0/layout}">
+<head>
+    <title>计划 · 任务与提醒</title>
+    <style>
+        .planner-page { max-width:1200px; margin:0 auto; padding:20px; }
+        .page-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; }
+        .page-header h2 { font-size:20px; font-weight:600; margin:0; }
+        .section-header {
+            display:flex; justify-content:space-between; align-items:center;
+            margin-bottom:16px; padding-bottom:12px; border-bottom:2px solid #e1e3e6;
+        }
+        .section-header h2 {
+            font-size:18px; font-weight:600; margin:0; display:flex; align-items:center; gap:8px;
+        }
+        .section-header .count {
+            font-size:12px; background:#f0edff; color:#7c5cfc; padding:2px 8px; border-radius:10px;
+        }
+
+        .task-column { background:#fff; border:1px solid #e1e3e6; border-radius:12px; overflow:hidden; min-height:200px; }
+        .column-header { padding:12px 16px; font-size:14px; font-weight:600; display:flex; align-items:center; justify-content:space-between; }
+        .task-count { font-size:12px; background:rgba(0,0,0,0.08); padding:2px 8px; border-radius:10px; }
+        .task-list { padding:8px; min-height:120px; }
+        .task-card { background:#fafafe; border:1px solid #eef0f4; border-radius:8px; padding:12px; margin-bottom:8px; cursor:pointer; transition:all .15s; position:relative; }
+        .task-card:hover { border-color:#d9d0ff; box-shadow:0 2px 8px rgba(0,0,0,0.06); }
+        .task-card .title { font-size:14px; font-weight:500; margin-bottom:4px; color:#1a1b1e; }
+        .task-card .meta { font-size:11px; color:#909296; display:flex; gap:8px; flex-wrap:wrap; }
+        .task-card .priority-dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:4px; }
+        .task-card .priority-high .priority-dot { background:#e03131; }
+        .task-card .priority-mid .priority-dot { background:#e8590c; }
+        .task-card .priority-low .priority-dot { background:#2b8a3e; }
+        .task-card .card-actions { position:absolute; top:8px; right:8px; display:none; gap:4px; }
+        .task-card:hover .card-actions { display:flex; }
+        .task-card .card-actions button { border:none; background:#fff; border-radius:4px; padding:2px 6px; font-size:12px; cursor:pointer; color:#5c5f66; border:1px solid #e1e3e6; }
+        .task-card .card-actions button:hover { background:#f0edff; color:#7c5cfc; }
+        .task-card .description { font-size:12px; color:#5c5f66; margin-top:4px; line-height:1.5; }
+        .status-btn { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; cursor:pointer; border:1px solid #e1e3e6; background:#fff; color:#5c5f66; margin-top:6px; }
+        .status-btn:hover { background:#f0edff; border-color:#d9d0ff; }
+        #task-board { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+        @media (max-width: 768px) { #task-board { grid-template-columns:1fr; } }
+
+        .reminder-card { background:#fff; border:1px solid #e1e3e6; border-radius:12px; padding:16px; transition:all .2s; position:relative; }
+        .reminder-card:hover { border-color:#d9d0ff; box-shadow:0 4px 12px rgba(0,0,0,0.06); }
+        .reminder-card.disabled { opacity:0.5; }
+        .reminder-card .header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; }
+        .reminder-card .name { font-size:15px; font-weight:600; color:#1a1b1e; }
+        .reminder-card .type-badge { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; background:#f0edff; color:#7c5cfc; margin-left:8px; }
+        .reminder-card .time { font-size:20px; font-weight:700; color:#7c5cfc; margin:8px 0; }
+        .reminder-card .schedule { font-size:13px; color:#5c5f66; margin-bottom:4px; }
+        .reminder-card .message { font-size:12px; color:#909296; padding:8px; background:#fafafe; border-radius:6px; margin-top:8px; }
+        .reminder-card .meta { display:flex; justify-content:space-between; align-items:center; margin-top:12px; padding-top:12px; border-top:1px solid #f0f0f0; font-size:11px; color:#909296; }
+        .reminder-card .actions { display:flex; gap:6px; }
+        .reminder-card .actions button { border:none; background:#f0f0f4; border-radius:6px; padding:4px 10px; font-size:12px; cursor:pointer; transition:all .15s; color:#5c5f66; }
+        .reminder-card .actions button:hover { background:#e0dcff; color:#7c5cfc; }
+        .reminder-card .actions button.danger:hover { background:#ffe0e0; color:#e03131; }
+        .toggle-switch { position:relative; width:40px; height:22px; background:#d9d0ff; border-radius:11px; cursor:pointer; transition:all .2s; flex-shrink:0; }
+        .toggle-switch.active { background:#7c5cfc; }
+        .toggle-switch::after { content:''; position:absolute; top:2px; left:2px; width:18px; height:18px; background:#fff; border-radius:50%; transition:all .2s; box-shadow:0 1px 3px rgba(0,0,0,0.2); }
+        .toggle-switch.active::after { left:20px; }
+        #reminder-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:16px; }
+
+        .section-divider { height:32px; }
+
+        /* 弹窗 */
+        .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:1000; justify-content:center; align-items:center; }
+        .modal-overlay.active { display:flex; }
+        .modal { background:#fff; border-radius:12px; padding:24px; box-shadow:0 8px 32px rgba(0,0,0,0.18); max-width:92vw; }
+        .modal h3 { margin:0 0 16px; font-size:16px; }
+        .form-group { display:flex; flex-direction:column; gap:4px; margin-bottom:14px; }
+        .form-group label { font-size:12px; color:#5c5f66; font-weight:500; }
+        .form-group input, .form-group select, .form-group textarea { padding:8px 10px; border:1px solid #e1e3e6; border-radius:6px; font-size:13px; outline:none; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color:#7c5cfc; }
+        .form-row { display:flex; gap:12px; }
+        .modal-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
+
+        .btn { display:inline-flex; align-items:center; gap:5px; padding:7px 14px; border:none; border-radius:6px; font-size:13px; cursor:pointer; transition:all .15s; }
+        .btn-primary { background:#7c5cfc; color:#fff; }
+        .btn-primary:hover { background:#6a4ae0; }
+        .btn-secondary { background:#f0f0f5; color:#5c5f66; }
+        .btn-secondary:hover { background:#e5e5ea; }
+        .btn-danger { background:#ffe0e0; color:#c92a2a; }
+        .btn-danger:hover { background:#ffd0d0; }
+    </style>
+</head>
+<body>
+<div layout:fragment="content">
+<div class="planner-page">
+    <div class="page-header">
+        <h2>📋 计划</h2>
+    </div>
+    <div style="margin-bottom:20px;font-size:13px;color:#909296;">
+        管理任务和定时提醒
+        <span th:if="${error}" style="color:#e03131;margin-left:8px;">⚠️ <span th:text="${error}">错误</span></span>
+    </div>
+
+    <!-- 任务看板 -->
+    <div class="section-header">
+        <h2>📋 任务看板 <span class="count" id="task-total-count" th:text="${tasks.size()}">0</span></h2>
+        <button class="btn btn-primary" onclick="showAddTaskModal()">+ 添加任务</button>
+    </div>
+    <div id="task-board-container"></div>
+
+    <div class="section-divider"></div>
+
+    <!-- 定时提醒 -->
+    <div class="section-header">
+        <h2>⏰ 定时提醒 <span class="count" id="reminder-total-count">0</span></h2>
+        <div style="display:flex;gap:8px;align-items:center;">
+            <span style="font-size:13px;color:#909296;">已启用: <span id="enabled-count">0</span></span>
+            <button class="btn btn-primary" onclick="showAddReminderModal()">+ 添加提醒</button>
+        </div>
+    </div>
+    <div id="reminder-grid"></div>
+    <div id="reminder-empty" style="display:none;text-align:center;padding:40px 20px;border:2px dashed #d9d0ff;background:#fafafe;border-radius:12px;">
+        <div style="font-size:48px;margin-bottom:12px;">⏰</div>
+        <div style="font-size:16px;font-weight:600;color:#7c5cfc;margin-bottom:8px;">暂无提醒</div>
+        <div style="color:#909296;margin-bottom:16px;">点击上方「添加提醒」按钮创建一个新的定时提醒</div>
+    </div>
+
+    <!-- 任务弹窗 -->
+    <div class="modal-overlay" id="task-modal">
+        <div class="modal" style="width:520px;">
+            <h3 id="task-modal-title">添加任务</h3>
+            <input type="hidden" id="task-id">
+            <div class="form-group"><label>标题 *</label><input type="text" id="task-title" placeholder="任务标题"></div>
+            <div class="form-group"><label>描述</label><textarea id="task-description" rows="3" placeholder="任务描述（可选）"></textarea></div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>优先级</label>
+                    <select id="task-priority">
+                        <option value="high">🔴 高优先级</option>
+                        <option value="mid" selected>🟡 中优先级</option>
+                        <option value="low">🟢 低优先级</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>截止日期</label>
+                    <input type="date" id="task-dueDate">
+                </div>
+            </div>
+            <div class="form-group" id="edit-status-group" style="display:none;">
+                <label>状态</label>
+                <select id="task-status">
+                    <option value="pending">📋 待办</option>
+                    <option value="in_progress">🔄 进行中</option>
+                    <option value="done">✅ 已完成</option>
+                </select>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeModal('task-modal')">取消</button>
+                <button class="btn btn-primary" onclick="saveTask()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 提醒弹窗 -->
+    <div class="modal-overlay" id="reminder-modal">
+        <div class="modal" style="width:560px;max-width:95vw;">
+            <h3 id="reminder-modal-title">添加提醒</h3>
+            <input type="hidden" id="reminder-id">
+            <div class="form-group"><label>提醒名称 *</label><input type="text" id="reminder-name" placeholder="例如：下班日报提醒"></div>
+            <div class="form-group"><label>提醒消息</label><textarea id="reminder-message" rows="3" placeholder="提醒内容（可选）"></textarea></div>
+            <div class="form-group">
+                <label>提醒类型 *</label>
+                <select id="reminder-type" onchange="onReminderTypeChange()">
+                    <option value="daily">📅 每天 - 每天定时提醒</option>
+                    <option value="once">🔔 一次 - 指定日期提醒</option>
+                    <option value="weekly">📆 每周 - 每周特定星期几提醒</option>
+                    <option value="monthly">📅 每月 - 每月特定几号提醒</option>
+                    <option value="yearly">🎂 每年 - 每年特定日期提醒</option>
+                </select>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:1;"><label>提醒时间 *</label><input type="time" id="reminder-time" value="09:00"></div>
+                <div class="form-group" id="reminder-weekday-group" style="flex:1;display:none;"><label>星期几</label><select id="reminder-dayOfWeek"><option value="1">周一</option><option value="2">周二</option><option value="3">周三</option><option value="4">周四</option><option value="5">周五</option><option value="6">周六</option><option value="7">周日</option></select></div>
+                <div class="form-group" id="reminder-once-group" style="flex:1;display:none;"><label>日期</label><input type="date" id="reminder-date"></div>
+                <div class="form-group" id="reminder-monthly-group" style="flex:1;display:none;"><label>几号</label><input type="number" id="reminder-dayOfMonth" min="1" max="31" placeholder="1-31"></div>
+                <div class="form-group" id="reminder-yearly-group" style="flex:2;display:none;"><label>几月几号</label><div style="display:flex;gap:8px;align-items:center;"><input type="number" id="reminder-yearMonth" min="1" max="12" placeholder="月" style="width:60px;"><span>月</span><input type="number" id="reminder-yearDay" min="1" max="31" placeholder="日" style="width:60px;"><span>日</span></div></div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeModal('reminder-modal')">取消</button>
+                <button class="btn btn-primary" onclick="saveReminder()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 删除确认弹窗 -->
+    <div class="modal-overlay" id="delete-modal">
+        <div class="modal" style="width:400px;">
+            <h3>确认删除</h3>
+            <p style="color:#909296;font-size:13px;">确定要删除这个提醒吗？此操作不可撤销。</p>
+            <input type="hidden" id="delete-id">
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeModal('delete-modal')">取消</button>
+                <button class="btn btn-danger" onclick="confirmDeleteReminder()">删除</button>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+    <script th:inline="javascript">
+        var tasks = /*[[${tasks}]]*/ [];
+        var reminders = /*[[${reminders}]]*/ [];
+        var isTaskEdit = false;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            renderTaskBoard();
+            renderReminders();
+        });
+
+        function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+        document.querySelectorAll('.modal-overlay').forEach(function(m) {
+            m.addEventListener('click', function(e) { if (e.target === this) this.classList.remove('active'); });
+        });
+
+        // ====== 任务看板 ======
+        function renderTaskBoard() {
+            var cols = { pending: [], in_progress: [], done: [] };
+            tasks.forEach(function(t) {
+                if (cols[t.status]) cols[t.status].push(t);
+                else cols.pending.push(t);
+            });
+
+            var html = '<div id="task-board">';
+            var defs = [
+                { k:'pending', l:'📋 待办', c:'#fff3e0', b:'#ff9800' },
+                { k:'in_progress', l:'🔄 进行中', c:'#e3f2fd', b:'#2196f3' },
+                { k:'done', l:'✅ 已完成', c:'#e8f5e9', b:'#4caf50' }
+            ];
+            defs.forEach(function(col) {
+                var items = cols[col.k];
+                html += '<div class="task-column"><div class="column-header" style="background:'+col.c+';border-bottom:3px solid '+col.b+';">'
+                    + '<span>'+col.l+'</span><span class="task-count">'+items.length+'</span></div><div class="task-list">';
+                if (items.length === 0) {
+                    html += '<div style="padding:20px;text-align:center;font-size:13px;color:#909296;">暂无任务</div>';
+                } else {
+                    for (var i=0; i<items.length; i++) {
+                        var t = items[i];
+                        var pL = {high:'🔴 高',mid:'🟡 中',low:'🟢 低'}[t.priority]||'🟡 中';
+                        html += '<div class="task-card" onclick="editTask(\''+t.id+'\')">'
+                            + '<div class="card-actions"><button onclick="event.stopPropagation();deleteTask(\''+t.id+'\')" title="删除">🗑️</button></div>'
+                            + '<div class="title">'+escHtml(t.title)+'</div>'
+                            + (t.description ? '<div class="description">'+escHtml(t.description)+'</div>' : '')
+                            + '<div class="meta"><span class="priority-'+t.priority+'"><span class="priority-dot"></span>'+pL+'</span>'
+                            + (t.dueDate ? '<span>📅 '+t.dueDate+'</span>' : '')+'</div>';
+                        var next = getNextStatuses(t.status);
+                        if (next.length > 0) {
+                            html += '<div style="margin-top:6px;display:flex;gap:4px;">';
+                            next.forEach(function(ns) {
+                                var nl = {pending:'📋 待办',in_progress:'🔄 进行中',done:'✅ 已完成'};
+                                html += '<button class="status-btn" onclick="event.stopPropagation();quickChangeStatus(\''+t.id+'\',\''+ns+'\')">'+nl[ns]+'</button>';
+                            });
+                            html += '</div>';
+                        }
+                        html += '</div>';
+                    }
+                }
+                html += '</div></div>';
+            });
+            html += '</div>';
+            document.getElementById('task-board-container').innerHTML = html;
+        }
+
+        function getNextStatuses(s) {
+            if (s === 'pending') return ['in_progress'];
+            if (s === 'in_progress') return ['done','pending'];
+            if (s === 'done') return ['pending'];
+            return [];
+        }
+
+        function showAddTaskModal() {
+            isTaskEdit = false;
+            document.getElementById('task-modal-title').textContent = '添加任务';
+            document.getElementById('task-id').value = '';
+            document.getElementById('task-title').value = '';
+            document.getElementById('task-description').value = '';
+            document.getElementById('task-priority').value = 'mid';
+            document.getElementById('task-dueDate').value = '';
+            document.getElementById('edit-status-group').style.display = 'none';
+            document.getElementById('task-modal').classList.add('active');
+            setTimeout(function(){document.getElementById('task-title').focus();},100);
+        }
+
+        function editTask(id) {
+            var t = tasks.find(function(x){return x.id===id;});
+            if (!t) return;
+            isTaskEdit = true;
+            document.getElementById('task-modal-title').textContent = '编辑任务';
+            document.getElementById('task-id').value = t.id;
+            document.getElementById('task-title').value = t.title;
+            document.getElementById('task-description').value = t.description||'';
+            document.getElementById('task-priority').value = t.priority;
+            document.getElementById('task-dueDate').value = t.dueDate||'';
+            document.getElementById('task-status').value = t.status;
+            document.getElementById('edit-status-group').style.display = 'block';
+            document.getElementById('task-modal').classList.add('active');
+        }
+
+        async function saveTask() {
+            var title = document.getElementById('task-title').value.trim();
+            if (!title) { toast('请输入任务标题','error'); return; }
+            var id = document.getElementById('task-id').value;
+            var desc = document.getElementById('task-description').value.trim();
+            var pri = document.getElementById('task-priority').value;
+            var due = document.getElementById('task-dueDate').value;
+            var fd = new URLSearchParams();
+            if (isTaskEdit) {
+                fd.append('id',id); fd.append('title',title); fd.append('description',desc);
+                fd.append('priority',pri); fd.append('dueDate',due);
+                fd.append('status',document.getElementById('task-status').value);
+            } else {
+                fd.append('title',title); fd.append('description',desc);
+                fd.append('priority',pri); fd.append('dueDate',due);
+            }
+            try {
+                var r = await fetch(isTaskEdit?'/api/tasks/update':'/api/tasks/add', {
+                    method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:fd
+                });
+                var d = await r.json();
+                if (d.ok) { toast(isTaskEdit?'✅ 任务已更新':'✅ 任务已添加'); closeModal('task-modal'); location.reload(); }
+                else { toast('❌ '+(d.error||'操作失败'),'error'); }
+            } catch(e) { toast('❌ 请求失败: '+e.message,'error'); }
+        }
+
+        async function quickChangeStatus(id,ns) {
+            var fd = new URLSearchParams(); fd.append('id',id); fd.append('status',ns);
+            try {
+                var r = await fetch('/api/tasks/update', { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:fd });
+                var d = await r.json();
+                if (d.ok) { toast('✅ 状态已更新'); location.reload(); }
+                else { toast('❌ '+(d.error||'更新失败'),'error'); }
+            } catch(e) { toast('❌ 请求失败: '+e.message,'error'); }
+        }
+
+        async function deleteTask(id) {
+            if (!confirm('确定要删除这个任务吗？')) return;
+            var fd = new URLSearchParams(); fd.append('id',id);
+            try {
+                var r = await fetch('/api/tasks/delete', { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:fd });
+                var d = await r.json();
+                if (d.ok) { toast('🗑️ 任务已删除'); location.reload(); }
+                else { toast('❌ '+(d.error||'删除失败'),'error'); }
+            } catch(e) { toast('❌ 请求失败: '+e.message,'error'); }
+        }
+
+        // ====== 提醒管理 ======
+        function renderReminders() {
+            var grid = document.getElementById('reminder-grid');
+            var empty = document.getElementById('reminder-empty');
+            var ec = 0;
+            if (!reminders||reminders.length===0) {
+                grid.style.display='none'; empty.style.display='block';
+                document.getElementById('enabled-count').textContent='0';
+                document.getElementById('reminder-total-count').textContent='0';
+                return;
+            }
+            grid.style.display='grid'; empty.style.display='none';
+            document.getElementById('reminder-total-count').textContent=reminders.length;
+            var tl = {daily:'每天',once:'一次',weekly:'每周',monthly:'每月',yearly:'每年'};
+            var h = '';
+            for (var i=0;i<reminders.length;i++) {
+                var r = reminders[i]; if (r.enabled) ec++;
+                var sd = r.description||(tl[r.type]||r.type)+' '+(r.time||'');
+                if (r.type==='weekly'&&r.weekdayLabel) sd+=' ('+r.weekdayLabel+')';
+                h += '<div class="reminder-card '+(r.enabled?'':'disabled')+'">';
+                h += '<div class="header"><div><span class="name">'+escHtml(r.name||'')+'</span><span class="type-badge">'+(tl[r.type]||r.type)+'</span></div>';
+                h += '<div class="toggle-switch '+(r.enabled?'active':'')+'" onclick="toggleReminder(\''+r.id+'\')" title="'+(r.enabled?'点击禁用':'点击启用')+'"></div></div>';
+                h += '<div class="time">'+(r.time||'09:00')+'</div><div class="schedule">'+escHtml(sd)+'</div>';
+                if (r.message) h+='<div class="message">'+escHtml(r.message)+'</div>';
+                h += '<div class="meta"><div>'+(r.lastTriggered?'上次触发: '+r.lastTriggered:'尚未触发')+'</div>';
+                h += '<div class="actions"><button onclick="triggerReminder(\''+r.id+'\')" title="立即触发">🚀</button>';
+                h += '<button onclick="editReminder(\''+r.id+'\')" title="编辑">✏️</button>';
+                h += '<button class="danger" onclick="showDeleteReminderModal(\''+r.id+'\')" title="删除">🗑️</button></div></div></div>';
+            }
+            grid.innerHTML = h;
+            document.getElementById('enabled-count').textContent = ec;
+        }
+
+        function onReminderTypeChange() {
+            var t = document.getElementById('reminder-type').value;
+            document.getElementById('reminder-once-group').style.display = t==='once'?'flex':'none';
+            document.getElementById('reminder-weekday-group').style.display = t==='weekly'?'flex':'none';
+            document.getElementById('reminder-monthly-group').style.display = t==='monthly'?'flex':'none';
+            document.getElementById('reminder-yearly-group').style.display = t==='yearly'?'flex':'none';
+        }
+
+        function showAddReminderModal() {
+            document.getElementById('reminder-modal-title').textContent = '添加提醒';
+            document.getElementById('reminder-id').value = '';
+            document.getElementById('reminder-name').value = '';
+            document.getElementById('reminder-message').value = '';
+            document.getElementById('reminder-type').value = 'daily';
+            document.getElementById('reminder-time').value = '09:00';
+            document.getElementById('reminder-date').value = new Date().toISOString().split('T')[0];
+            document.getElementById('reminder-dayOfWeek').value = '1';
+            document.getElementById('reminder-dayOfMonth').value = '';
+            document.getElementById('reminder-yearMonth').value = '';
+            document.getElementById('reminder-yearDay').value = '';
+            onReminderTypeChange();
+            document.getElementById('reminder-modal').classList.add('active');
+            setTimeout(function(){document.getElementById('reminder-name').focus();},100);
+        }
+
+        function editReminder(id) {
+            var r = reminders.find(function(x){return x.id===id;});
+            if (!r) return;
+            document.getElementById('reminder-modal-title').textContent = '编辑提醒';
+            document.getElementById('reminder-id').value = r.id;
+            document.getElementById('reminder-name').value = r.name||'';
+            document.getElementById('reminder-message').value = r.message||'';
+            document.getElementById('reminder-type').value = r.type||'daily';
+            document.getElementById('reminder-time').value = r.time||'09:00';
+            document.getElementById('reminder-date').value = r.date||new Date().toISOString().split('T')[0];
+            document.getElementById('reminder-dayOfWeek').value = r.dayOfWeek||'1';
+            document.getElementById('reminder-dayOfMonth').value = r.dayOfMonth||'';
+            if (r.monthDay) { var p=r.monthDay.split('-'); document.getElementById('reminder-yearMonth').value=p[0]||''; document.getElementById('reminder-yearDay').value=p[1]||''; }
+            else { document.getElementById('reminder-yearMonth').value=''; document.getElementById('reminder-yearDay').value=''; }
+            onReminderTypeChange();
+            document.getElementById('reminder-modal').classList.add('active');
+        }
+
+        async function saveReminder() {
+            var name = document.getElementById('reminder-name').value.trim();
+            if (!name) { toast('请输入提醒名称','error'); return; }
+            var id = document.getElementById('reminder-id').value;
+            var msg = document.getElementById('reminder-message').value.trim();
+            var type = document.getElementById('reminder-type').value;
+            var time = document.getElementById('reminder-time').value;
+            var date = document.getElementById('reminder-date').value;
+            var dow = document.getElementById('reminder-dayOfWeek').value;
+            var dom = document.getElementById('reminder-dayOfMonth').value;
+            var ym = document.getElementById('reminder-yearMonth').value;
+            var yd = document.getElementById('reminder-yearDay').value;
+            var md = (ym&&yd)?ym+'-'+yd:'';
+            var fd = new URLSearchParams();
+            if (id) fd.append('id',id);
+            fd.append('name',name); fd.append('message',msg); fd.append('type',type); fd.append('time',time);
+            if (type==='once') fd.append('date',date);
+            else if (type==='weekly') fd.append('dayOfWeek',dow);
+            else if (type==='monthly') fd.append('dayOfMonth',dom);
+            else if (type==='yearly') fd.append('monthDay',md);
+            try {
+                var r = await fetch(id?'/api/reminders/update':'/api/reminders/add', {
+                    method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:fd
+                });
+                var d = await r.json();
+                if (d.ok) { toast(id?'✅ 提醒已更新':'✅ 提醒已添加'); closeModal('reminder-modal'); location.reload(); }
+                else { toast('❌ '+(d.error||'操作失败'),'error'); }
+            } catch(e) { toast('❌ 请求失败: '+e.message,'error'); }
+        }
+
+        async function toggleReminder(id) {
+            try {
+                var r = await fetch('/api/reminders/toggle', { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:'id='+encodeURIComponent(id) });
+                var d = await r.json();
+                if (d.ok) location.reload();
+                else toast('❌ '+(d.error||'切换失败'),'error');
+            } catch(e) { toast('❌ 请求失败: '+e.message,'error'); }
+        }
+
+        function showDeleteReminderModal(id) { document.getElementById('delete-id').value=id; document.getElementById('delete-modal').classList.add('active'); }
+
+        async function confirmDeleteReminder() {
+            var id = document.getElementById('delete-id').value;
+            try {
+                var r = await fetch('/api/reminders/delete', { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:'id='+encodeURIComponent(id) });
+                var d = await r.json();
+                if (d.ok) { toast('🗑️ 提醒已删除'); closeModal('delete-modal'); location.reload(); }
+                else { toast('❌ '+(d.error||'删除失败'),'error'); }
+            } catch(e) { toast('❌ 请求失败: '+e.message,'error'); }
+        }
+
+        async function triggerReminder(id) {
+            try {
+                var r = await fetch('/api/reminders/trigger', { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:'id='+encodeURIComponent(id) });
+                var d = await r.json();
+                if (d.ok) toast('🚀 提醒已触发');
+                else toast('❌ '+(d.error||'触发失败'),'error');
+            } catch(e) { toast('❌ 请求失败: '+e.message,'error'); }
+        }
+
+        function escHtml(s) { if (!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    </script>
+</div>
+</body>
+</html>
