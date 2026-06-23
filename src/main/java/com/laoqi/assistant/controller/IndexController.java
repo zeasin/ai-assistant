@@ -37,6 +37,15 @@ public class IndexController {
     }
 
     @GetMapping("/")
+    public String home() {
+        var first = kbService.getFirst();
+        if (first != null) {
+            return "redirect:/v2?kbId=" + first.getId();
+        }
+        return "redirect:/v2";
+    }
+
+    @GetMapping("/v1")
     public String index(Model model) {
         List<KnowledgeBaseEntity> allKbs = kbService.getAll();
 

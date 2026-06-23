@@ -40,18 +40,25 @@ public class IndexV2Controller {
 
     @GetMapping("/v2")
     public String index(@RequestParam(required = false) Long kbId, Model model) {
-        // 默认取第一个 KB
-        KnowledgeBaseEntity currentKb = null;
-        if (kbId != null) {
-            currentKb = kbService.getById(kbId);
+        // 必须带 kbId，否则重定向
+        if (kbId == null) {
+            var first = kbService.getFirst();
+            if (first != null) {
+                return "redirect:/v2?kbId=" + first.getId();
+            }
+            return "redirect:/v1";
         }
+
+        KnowledgeBaseEntity currentKb = kbService.getById(kbId);
         if (currentKb == null) {
-            currentKb = kbService.getFirst();
+            var first = kbService.getFirst();
+            if (first != null) {
+                return "redirect:/v2?kbId=" + first.getId();
+            }
+            return "redirect:/v1";
         }
-        if (currentKb != null) {
-            model.addAttribute("currentKb", currentKb);
-            model.addAttribute("kbId", currentKb.getId());
-        }
+        model.addAttribute("currentKb", currentKb);
+        model.addAttribute("kbId", currentKb.getId());
 
         // 对话 Tab - 模型列表
         List<LlmProfileEntity> chatModels = llmConfigResolver.getAllProfiles()

@@ -282,19 +282,19 @@
             </ul>
         </div>
 
-        <!-- 笔记库相关功能（选中 KB 后显示） -->
-        <nav class="sidebar-nav" th:if="${currentKb != null}">
+        <!-- 导航菜单（始终显示） -->
+        <nav class="sidebar-nav">
             <div class="sidebar-group">
                 <div class="sidebar-group-label">工具</div>
-                <a th:href="@{/image/general(kbId=${currentKb.id})}"
+                <a href="/image/general"
                    th:classappend="${requestURI == '/image/general'} ? 'active' : ''">
                     <span class="nav-icon">🖼️</span><span>通用识别</span>
                 </a>
-                <a th:href="@{/image/solve}"
+                <a href="/image/solve"
                    th:classappend="${requestURI == '/image/solve'} ? 'active' : ''">
                     <span class="nav-icon">❓</span><span>识题</span>
                 </a>
-                <a th:href="@{/image/exam}"
+                <a href="/image/exam"
                    th:classappend="${requestURI == '/image/exam'} ? 'active' : ''">
                     <span class="nav-icon">📝</span><span>试卷识别</span>
                 </a>
@@ -302,7 +302,7 @@
 
             <div class="sidebar-group">
                 <div class="sidebar-group-label">数据</div>
-                <a th:href="@{/data(kbId=${currentKb.id})}"
+                <a href="/data"
                    th:classappend="${requestURI.startsWith('/data')} ? 'active' : ''">
                     <span class="nav-icon">📥</span><span>数据导入</span>
                 </a>
@@ -313,13 +313,6 @@
                    th:classappend="${requestURI == '/planner'} ? 'active' : ''">
                     <span class="nav-icon">📋</span><span>计划</span>
                 </a>
-            </div>
-        </nav>
-
-        <!-- 未选中 KB 时的提示 -->
-        <nav class="sidebar-nav" th:unless="${currentKb != null}">
-            <div style="padding:16px;text-align:center;color:#909296;font-size:12px;">
-                请先选择一个笔记库
             </div>
         </nav>
 
