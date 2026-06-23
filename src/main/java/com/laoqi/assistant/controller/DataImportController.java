@@ -8,6 +8,6 @@ public class DataImportController {
 
     @GetMapping("/data/import")
     public String importPage() {
-        return "data_import";
+        return "1.0/data_import";
     }
 }

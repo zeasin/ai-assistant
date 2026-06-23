@@ -40,6 +40,6 @@ public class ConfigController {
         List<LlmProfileEntity> allProfiles = llmConfigResolver.getAllProfiles();
         model.addAttribute("llm_models", allProfiles);
 
-        return "config";
+        return "1.0/config";
     }
 }

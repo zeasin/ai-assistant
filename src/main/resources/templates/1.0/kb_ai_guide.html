@@ -1,6 +1,6 @@
 <html xmlns:th="http://www.thymeleaf.org"
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
-      layout:decorate="~{layout}">
+      layout:decorate="~{1.0/layout}">
 <head>
     <title layout:fragment="title">AI 指南</title>
     <style>
@@ -114,7 +114,7 @@
 <body>
 <th:block layout:fragment="content">
 
-<th:block th:replace="~{kb_tab_bar :: kb-tabs('config', ${kb}, ${labels})}" />
+<th:block th:replace="~{1.0/kb_tab_bar :: kb-tabs('config', ${kb}, ${labels})}" />
 
 <div class="card">
     <h2>AI 指南</h2>

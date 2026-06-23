@@ -43,7 +43,7 @@ public class ExamController {
                 .filter(LlmProfileEntity::isMultimodal)
                 .collect(Collectors.toList());
         model.addAttribute("visionModels", visionModels);
-        return "exam";
+        return "1.0/exam";
     }
 
     @PostMapping("/api/recognize")

@@ -8,6 +8,6 @@ public class HelpController {
 
     @GetMapping("/help")
     public String helpPage() {
-        return "help";
+        return "1.0/help";
     }
 }

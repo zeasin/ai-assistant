@@ -123,7 +123,7 @@ public class KbListPageController {
         model.addAttribute("totalReminders", totalReminders);
         model.addAttribute("totalDirs", totalDirs);
         model.addAttribute("totalFiles", totalFiles);
-        return "kb_list";
+        return "1.0/kb_list";
     }
 
     private int[] countDirsAndFiles(Path dir) {

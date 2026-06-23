@@ -29,7 +29,7 @@ public class AiGuideController {
 
     @GetMapping("/ai-guide")
     public String aiGuidePage(@RequestParam(required = false) Long kbId) {
-        return "kb_ai_guide";
+        return "1.0/kb_ai_guide";
     }
 
     // ---- AGENTS.md ----

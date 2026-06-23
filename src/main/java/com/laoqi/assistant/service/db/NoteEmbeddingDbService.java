@@ -19,9 +19,11 @@ public class NoteEmbeddingDbService extends ServiceImpl<NoteEmbeddingMapper, Not
         long count = lambdaQuery()
                 .eq(NoteEmbeddingEntity::getKbId, kbId)
                 .select(NoteEmbeddingEntity::getFilePath)
-                .groupBy(NoteEmbeddingEntity::getFilePath)
                 .list()
-                .size();
+                .stream()
+                .map(NoteEmbeddingEntity::getFilePath)
+                .distinct()
+                .count();
         return (int) count;
     }
     

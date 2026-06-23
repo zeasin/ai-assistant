@@ -112,7 +112,7 @@ public class KnowledgeBaseController {
             model.put("report_error", err);
         }
 
-        return "kb_overview";
+        return "1.0/kb_overview";
     }
 
     // 任务/提醒页面已迁移到 /planner
@@ -126,7 +126,7 @@ public class KnowledgeBaseController {
         model.put("kbId", id);
         model.put("labels", parseLabels(kb.getLabels()));
 
-        return "kb_index";
+        return "1.0/kb_index";
     }
 
     @GetMapping("/kb/{id}/data")
@@ -138,7 +138,7 @@ public class KnowledgeBaseController {
         model.put("labels", parseLabels(kb.getLabels()));
         model.put("kbId", id);
 
-        return "kb_data_overview";
+        return "1.0/kb_data_overview";
     }
 
     @GetMapping("/kb/{id}/data/detail")
@@ -155,7 +155,7 @@ public class KnowledgeBaseController {
         model.put("dir", dir);
         model.put("file", file);
 
-        return "kb_data_detail";
+        return "1.0/kb_data_detail";
     }
 
     // ========== 目录分析 ==========
@@ -172,7 +172,7 @@ public class KnowledgeBaseController {
 
         if (kb.getNotesDir() == null || kb.getNotesDir().isBlank()) {
             model.put("error", "未配置笔记库路径");
-            return "kb_browse";
+            return "1.0/kb_browse";
         }
 
         Path base = kbDir(kb);
@@ -184,7 +184,7 @@ public class KnowledgeBaseController {
             model.put("breadcrumbPaths", List.of());
             model.put("rel", "");
             model.put("parent", "");
-            return "kb_browse";
+            return "1.0/kb_browse";
         }
 
         Path target = safeResolve(base, dir);
@@ -205,7 +205,7 @@ public class KnowledgeBaseController {
         Path dataDir = target.resolve("data");
         model.put("jsonFiles", directoryDataService.listJsonFiles(dataDir));
 
-        return "kb_browse";
+        return "1.0/kb_browse";
     }
 
     @GetMapping("/kb/{id}/notes/view")
@@ -233,7 +233,7 @@ public class KnowledgeBaseController {
         model.put("content", html);
         model.put("parent", parent);
         model.put("breadcrumbLinks", buildBreadcrumbLinks(parent));
-        return "view";
+        return "1.0/view";
     }
 
     // ========== 目录分析 API ==========
@@ -687,7 +687,7 @@ public class KnowledgeBaseController {
         if (kb == null) return "redirect:/config";
         model.put("kb", kb);
         model.put("labels", parseLabels(kb.getLabels()));
-        return "kb_ai_guide";
+        return "1.0/kb_ai_guide";
     }
 
     // ========== KB 范围的任务 API ==========

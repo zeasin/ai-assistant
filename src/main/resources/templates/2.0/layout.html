@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 助理</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #f5f5f7; color: #1a1b1e; min-height: 100vh;
+            display: flex;
+        }
+
+        /* ========== 侧边栏 ========== */
+        .sidebar {
+            width: 220px; min-width: 220px;
+            background: #fff; border-right: 1px solid #e1e3e6;
+            display: flex; flex-direction: column;
+            height: 100vh; position: fixed; left: 0; top: 0; z-index: 100;
+        }
+        .sidebar-header {
+            padding: 16px 16px 12px;
+            border-bottom: 1px solid #eef0f4;
+        }
+        .sidebar-header .app-title {
+            font-size: 16px; font-weight: 700; color: #1a1b1e;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .sidebar-header .app-version {
+            font-size: 11px; color: #909296; font-weight: 400;
+        }
+
+        /* 笔记库列表区 */
+        .sidebar-kb-section {
+            padding: 8px 0; border-bottom: 1px solid #eef0f4;
+        }
+        .sidebar-kb-header {
+            padding: 4px 16px 8px; font-size: 11px; font-weight: 600;
+            color: #909296; text-transform: uppercase; letter-spacing: 0.5px;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .sidebar-kb-header .add-btn {
+            width: 20px; height: 20px; border-radius: 4px; border: none;
+            background: #f0edff; color: #7c5cfc; cursor: pointer;
+            font-size: 14px; display: flex; align-items: center; justify-content: center;
+        }
+        .sidebar-kb-header .add-btn:hover { background: #e0d4ff; }
+        .sidebar-kb-list {
+            list-style: none; max-height: 200px; overflow-y: auto;
+        }
+        .sidebar-kb-list li a {
+            display: flex; align-items: center; gap: 8px;
+            padding: 6px 16px; font-size: 13px; color: #5c5f66;
+            text-decoration: none; transition: all .1s;
+        }
+        .sidebar-kb-list li a:hover { background: #f5f5f7; color: #1a1b1e; }
+        .sidebar-kb-list li a.active { background: #f0edff; color: #7c5cfc; font-weight: 500; }
+        .sidebar-kb-list li a .kb-dot {
+            width: 6px; height: 6px; border-radius: 50%; background: #c2c5cc; flex-shrink: 0;
+        }
+        .sidebar-kb-list li a.active .kb-dot { background: #7c5cfc; }
+
+        /* 导航菜单 */
+        .sidebar-nav {
+            flex: 1; overflow-y: auto; padding: 8px 0;
+        }
+        .sidebar-group { margin-bottom: 4px; }
+        .sidebar-group-label {
+            padding: 8px 16px 4px; font-size: 11px; font-weight: 600;
+            color: #909296; text-transform: uppercase; letter-spacing: 0.5px;
+        }
+        .sidebar-nav a {
+            display: flex; align-items: center; gap: 10px;
+            padding: 8px 16px; font-size: 13px; color: #5c5f66;
+            text-decoration: none; transition: all .1s; border-radius: 0;
+        }
+        .sidebar-nav a:hover { background: #f5f5f7; color: #1a1b1e; }
+        .sidebar-nav a.active { background: #f0edff; color: #7c5cfc; font-weight: 500; }
+        .sidebar-nav a .nav-icon { width: 18px; text-align: center; font-size: 14px; }
+
+        /* 底部系统区 */
+        .sidebar-footer {
+            border-top: 1px solid #eef0f4; padding: 8px 0;
+        }
+
+        /* ========== 主内容区 ========== */
+        .main-content {
+            flex: 1; margin-left: 220px; min-height: 100vh;
+        }
+        .main-header {
+            background: #fff; border-bottom: 1px solid #e1e3e6;
+            padding: 0 24px; height: 48px;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .main-header .page-title {
+            font-size: 15px; font-weight: 600; color: #1a1b1e;
+        }
+        .main-header .header-actions { display: flex; align-items: center; gap: 8px; }
+
+        .main-body { padding: 24px; }
+
+        /* ========== 通用组件 ========== */
+        .card {
+            background: #fff; border: 1px solid #e1e3e6; border-radius: 12px;
+            padding: 20px; margin-bottom: 16px;
+        }
+        .card h2 { font-size: 16px; margin-bottom: 12px; color: #1a1b1e; }
+
+        .btn {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 8px 20px; border: none; border-radius: 8px;
+            font-size: 14px; cursor: pointer; transition: all .15s;
+            text-decoration: none;
+        }
+        .btn-primary { background: #7c5cfc; color: #fff; }
+        .btn-primary:hover { background: #6b4de6; }
+        .btn-secondary { background: #e8e8ed; color: #1a1b1e; }
+        .btn-secondary:hover { background: #d5d5dc; }
+        .btn-danger { background: #e03131; color: #fff; }
+        .btn-danger:hover { background: #c92a2a; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .badge {
+            display: inline-block; padding: 2px 8px; border-radius: 6px;
+            font-size: 12px; font-weight: 500; border: 1px solid;
+            white-space: nowrap;
+        }
+        .badge-ok { background: #d3f9d8; color: #2b8a3e; border-color: #8ce99a; }
+        .badge-fail { background: #ffe0e0; color: #c92a2a; border-color: #ff8787; }
+        .badge-info { background: #d0ebff; color: #1971c2; border-color: #74c0fc; }
+
+        .port-banner {
+            background: #fff3cd; border-bottom: 1px solid #ffc107;
+            padding: 8px 24px; display: flex; align-items: center; gap: 10px;
+            font-size: 13px; color: #856404; flex-wrap: wrap;
+        }
+        .port-close {
+            margin-left: auto; border: none; background: none;
+            cursor: pointer; font-size: 14px; color: #856404;
+        }
+
+        /* 对话样式 */
+        .chat-box {
+            border: 1px solid #e1e3e6; border-radius: 12px;
+            background: #fff; min-height: 300px; max-height: 800px;
+            overflow-y: auto; padding: 16px; margin-bottom: 12px;
+        }
+        .chat-msg {
+            margin-bottom: 12px; padding: 10px 14px; border-radius: 8px;
+            max-width: 85%;
+        }
+        .chat-msg.user { background: #f0edff; margin-left: auto; border: 1px solid #d9d0ff; }
+        .chat-msg.ai { background: #f5f5f7; margin-right: auto; }
+        .chat-msg .label { font-size: 11px; color: #909296; margin-bottom: 4px; }
+        .chat-msg .text { font-size: 14px; line-height: 1.6; white-space: pre-wrap; }
+        .chat-input { display: flex; gap: 8px; }
+        .chat-input input {
+            flex: 1; padding: 10px 14px; border: 1px solid #e1e3e6; border-radius: 8px;
+            background: #fff; color: #1a1b1e; font-size: 14px; outline: none;
+        }
+        .chat-input input:focus { border-color: #7c5cfc; }
+
+        /* 报告样式 */
+        .report { line-height: 1.8; color: #1a1b1e; font-size: 15px; }
+        .report h1 { font-size: 26px; font-weight: 700; margin: 28px 0 16px; }
+        .report h2 { font-size: 20px; font-weight: 600; margin: 24px 0 12px; }
+        .report h3 { font-size: 17px; font-weight: 600; margin: 20px 0 10px; }
+        .report p { margin: 0 0 14px; }
+        .report ul, .report ol { margin: 10px 0; padding-left: 24px; }
+        .report li { margin: 4px 0; line-height: 1.7; }
+        .report blockquote {
+            margin: 14px 0; padding: 12px 16px;
+            background: #f8f7ff; border-left: 4px solid #7c5cfc;
+            border-radius: 0 8px 8px 0;
+        }
+        .report code {
+            background: #f0edff; padding: 2px 6px; border-radius: 4px;
+            font-size: 13px; font-family: "SF Mono", "Fira Code", monospace;
+        }
+        .report pre {
+            background: #1e1e2e; color: #cdd6f4;
+            padding: 16px 20px; border-radius: 10px;
+            overflow-x: auto; margin: 14px 0; font-size: 13px;
+        }
+        .report pre code { background: none; color: inherit; }
+        .report table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 14px; }
+        .report th, .report td { padding: 10px 14px; border: 1px solid #e1e3e6; text-align: left; }
+        .report th { background: #f8f7ff; font-weight: 600; color: #5c3dcf; }
+
+        /* Modal */
+        .modal-overlay {
+            display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+            z-index: 100; justify-content: center; align-items: center;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: #fff; border-radius: 12px; padding: 28px; width: 640px;
+            max-width: 92vw; max-height: 88vh; overflow-y: auto;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+        }
+        .modal h3 { font-size: 16px; margin-bottom: 16px; }
+        .modal .form-row { display: flex; gap: 12px; margin-bottom: 12px; }
+        .modal .form-group { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+        .modal .form-group label { font-size: 12px; color: #5c5f66; font-weight: 500; }
+        .modal .form-group input, .modal .form-group select, .modal .form-group textarea {
+            padding: 8px 10px; border: 1px solid #e1e3e6; border-radius: 6px;
+            font-size: 13px; outline: none; background: #fff; color: #1a1b1e;
+        }
+        .modal .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+
+        /* 状态栏 */
+        .status-bar { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+        .status-item {
+            background: #fff; border: 1px solid #e1e3e6; border-radius: 8px;
+            padding: 12px 16px; flex: 1; min-width: 120px;
+        }
+        .status-item .label { font-size: 11px; color: #5c5f66; }
+        .status-item .value { font-size: 18px; font-weight: 600; margin-top: 4px; }
+        .status-item .value.status-up { color: #69db7c; }
+        .status-item .value.status-down { color: #ff6b6b; }
+
+        .text-muted { color: #5c5f66; font-size: 13px; }
+        .mt-2 { margin-top: 8px; }
+        .mb-2 { margin-bottom: 8px; }
+        .flex { display: flex; align-items: center; gap: 8px; }
+
+        /* 日志表格 */
+        .log-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .log-table th {
+            text-align: left; padding: 8px 12px; border-bottom: 1px solid #e1e3e6;
+            color: #5c5f66; font-weight: 500; white-space: nowrap;
+        }
+        .log-table td { padding: 8px 12px; border-bottom: 1px solid #e1e3e6; }
+        .log-table tr:hover { background: #f5f5f7; }
+
+        /* 响应式 */
+        @media (max-width: 768px) {
+            .sidebar { width: 60px; min-width: 60px; }
+            .sidebar-header .app-title span,
+            .sidebar-kb-header,
+            .sidebar-kb-list li a span:not(.kb-dot),
+            .sidebar-group-label,
+            .sidebar-nav a span:not(.nav-icon) { display: none; }
+            .sidebar-nav a { justify-content: center; padding: 10px; }
+            .main-content { margin-left: 60px; }
+        }
+    </style>
+</head>
+<body>
+    <div th:if="${!ollamaAvailable}" class="port-banner">
+        <span>Ollama 未启动，语义检索不可用</span>
+        <button class="port-close" onclick="this.parentElement.remove()">✕</button>
+    </div>
+
+    <!-- ========== 侧边栏 ========== -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <div class="app-title">AI 助理 <span class="app-version">v2.0</span></div>
+        </div>
+
+        <!-- 笔记库列表 -->
+        <div class="sidebar-kb-section">
+            <div class="sidebar-kb-header">
+                笔记库
+                <button class="add-btn" onclick="location.href='/'" title="管理笔记库">+</button>
+            </div>
+            <ul class="sidebar-kb-list">
+                <li th:each="kb : ${kbList}">
+                    <a th:href="@{/v2(kbId=${kb.id})}"
+                       th:classappend="${currentKb != null and currentKb.id == kb.id} ? 'active' : ''">
+                        <span class="kb-dot"></span>
+                        <span th:text="${kb.name}">笔记库名</span>
+                    </a>
+                </li>
+                <li th:unless="${#lists.size(kbList) > 0}">
+                    <a href="/" style="color:#909296;font-size:12px;">暂无笔记库</a>
+                </li>
+            </ul>
+        </div>
+
+        <!-- 导航菜单 -->
+        <nav class="sidebar-nav">
+            <div class="sidebar-group">
+                <a th:classappend="${requestURI == '/chat'} ? 'active' : ''" href="/chat">
+                    <span class="nav-icon">💬</span><span>对话</span>
+                </a>
+            </div>
+
+            <div class="sidebar-group">
+                <div class="sidebar-group-label">识图</div>
+                <a th:classappend="${requestURI == '/image/general'} ? 'active' : ''" href="/image/general">
+                    <span class="nav-icon">🖼️</span><span>通用识别</span>
+                </a>
+                <a th:classappend="${requestURI == '/image/solve'} ? 'active' : ''" href="/image/solve">
+                    <span class="nav-icon">❓</span><span>识题</span>
+                </a>
+                <a th:classappend="${requestURI == '/image/exam'} ? 'active' : ''" href="/image/exam">
+                    <span class="nav-icon">📝</span><span>试卷识别</span>
+                </a>
+            </div>
+
+            <div class="sidebar-group">
+                <div class="sidebar-group-label">数据</div>
+                <a th:classappend="${requestURI == '/data/import'} ? 'active' : ''" href="/data/import">
+                    <span class="nav-icon">📥</span><span>数据导入</span>
+                </a>
+                <a th:classappend="${requestURI == '/data/collector'} ? 'active' : ''" href="/data/collector">
+                    <span class="nav-icon">🔧</span><span>数据采集</span>
+                </a>
+                <a th:classappend="${requestURI == '/data/processing'} ? 'active' : ''" href="/data/processing">
+                    <span class="nav-icon">📋</span><span>数据加工</span>
+                </a>
+            </div>
+
+            <div class="sidebar-group">
+                <a th:classappend="${requestURI == '/planner'} ? 'active' : ''" href="/planner">
+                    <span class="nav-icon">📋</span><span>计划</span>
+                </a>
+                <a th:if="${codingEnabled}" th:classappend="${requestURI == '/coding'} ? 'active' : ''" href="/coding">
+                    <span class="nav-icon">💻</span><span>编程AI</span>
+                </a>
+            </div>
+        </nav>
+
+        <!-- 底部系统 -->
+        <div class="sidebar-footer">
+            <a th:classappend="${#strings.startsWith(requestURI, '/config')} ? 'active' : ''" href="/config"
+               style="display:flex;align-items:center;gap:10px;padding:8px 16px;font-size:13px;color:#5c5f66;text-decoration:none;">
+                <span class="nav-icon" style="width:18px;text-align:center;font-size:14px;">⚙️</span><span>配置</span>
+            </a>
+            <a th:classappend="${requestURI == '/log'} ? 'active' : ''" href="/log"
+               style="display:flex;align-items:center;gap:10px;padding:8px 16px;font-size:13px;color:#5c5f66;text-decoration:none;">
+                <span class="nav-icon" style="width:18px;text-align:center;font-size:14px;">📝</span><span>日志</span>
+            </a>
+            <a th:classappend="${requestURI == '/help'} ? 'active' : ''" href="/help"
+               style="display:flex;align-items:center;gap:10px;padding:8px 16px;font-size:13px;color:#5c5f66;text-decoration:none;">
+                <span class="nav-icon" style="width:18px;text-align:center;font-size:14px;">❓</span><span>帮助</span>
+            </a>
+        </div>
+    </aside>
+
+    <!-- ========== 主内容区 ========== -->
+    <main class="main-content">
+        <div class="main-body">
+            <th:block layout:fragment="content" />
+        </div>
+    </main>
+
+    <script>
+        if (window.self !== window.top) {
+            document.querySelector('.sidebar').style.display = 'none';
+            document.querySelector('.main-content').style.marginLeft = '0';
+        }
+        function toast(msg, type) {
+            const t = document.createElement('div');
+            t.style.cssText = `
+                position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+                padding: 10px 24px; border-radius: 8px; font-size: 14px; z-index: 999;
+                background: ${type === 'error' ? '#e03131' : '#2b8a3e'};
+                color: #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            `;
+            t.textContent = msg;
+            document.body.appendChild(t);
+            setTimeout(() => t.remove(), 2500);
+        }
+    </script>
+</body>
+</html>

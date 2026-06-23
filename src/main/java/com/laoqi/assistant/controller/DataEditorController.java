@@ -9,6 +9,6 @@ public class DataEditorController {
 
     @GetMapping("/data-editor")
     public String dataEditorPage(@RequestParam(required = false, defaultValue = "customer") String type) {
-        return "data_editor";
+        return "1.0/data_editor";
     }
 }

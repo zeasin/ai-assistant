@@ -41,18 +41,14 @@ public class ContextBuilder {
      * 3. 读取规则文件
      */
     public ChatContext build(String sessionId, String userMessage, Long kbId) {
-        return build(sessionId, userMessage, kbId, "knowledge");
-    }
-
-    public ChatContext build(String sessionId, String userMessage, Long kbId, String mode) {
         // 1. 注入历史对话
-        String historyContext = sessionService.buildHistoryContext(sessionId, mode, userMessage);
+        String historyContext = sessionService.buildHistoryContext(sessionId, "knowledge", userMessage);
 
         // 2. 主动搜索相关笔记
         List<NoteSearchResult> relevantNotes = List.of();
         if (noteIndexService.isAvailable() && kbId != null) {
             try {
-                relevantNotes = noteIndexService.hybridSearch(kbId, userMessage, 5);
+                relevantNotes = noteIndexService.hybridSearch(kbId, userMessage, 10);
                 log.info("[ContextBuilder] 主动搜索完成，找到 {} 条相关笔记", relevantNotes.size());
             } catch (Exception e) {
                 log.warn("[ContextBuilder] 搜索笔记失败: {}", e.getMessage());
@@ -68,10 +64,6 @@ public class ContextBuilder {
                     Path agentsFile = Paths.get(notesDir, "AGENTS.md");
                     if (agentsFile.toFile().exists()) {
                         agentsMd = FileUtil.readText(agentsFile);
-                        if (agentsMd.length() > 3000) {
-                            log.info("[ContextBuilder] AGENTS.md 超过 3000 字，截断注入");
-                            agentsMd = agentsMd.substring(0, 3000) + "\n\n（内容过长，已截断）";
-                        }
                     }
                 }
             } catch (Exception e) {
@@ -84,40 +76,32 @@ public class ContextBuilder {
     }
 
     /**
-     * 将上下文合并为 system 消息和 user 消息两部分。
-     * system 消息：先注入相关笔记，再以 AGENTS.md 规则收尾（LLM 对最近读到的内容记忆更强）。
-     * user 消息：历史对话 + 用户最新消息。
+     * 将上下文合并为完整的消息
      */
-    public MergedContext merge(ChatContext context, String userMessage) {
-        StringBuilder systemPart = new StringBuilder();
-        StringBuilder userPart = new StringBuilder();
+    public String merge(ChatContext context, String userMessage) {
+        StringBuilder sb = new StringBuilder();
 
-        // 相关笔记搜索结果 → system 消息（先注入，作为参考资料）
-        if (context.relevantNotes() != null && !context.relevantNotes().isEmpty()) {
-            systemPart.append(formatNotesContext(context.relevantNotes())).append("\n\n");
-        }
-
-        // 规则文件 → system 消息（放在 system 消息最后，LLM 对最近内容记忆更强，规则更受重视）
+        // 规则文件
         if (context.agentsMd() != null && !context.agentsMd().isBlank()) {
-            systemPart.append("== 规则文件 (AGENTS.md) ==\n");
-            systemPart.append(context.agentsMd()).append("\n\n");
+            sb.append("== 规则文件 (AGENTS.md) ==\n");
+            sb.append(context.agentsMd()).append("\n\n");
         }
 
-        // 历史对话 → user 消息
+        // 相关笔记搜索结果
+        if (context.relevantNotes() != null && !context.relevantNotes().isEmpty()) {
+            sb.append(formatNotesContext(context.relevantNotes())).append("\n\n");
+        }
+
+        // 历史对话
         if (context.historyContext() != null && !context.historyContext().isBlank()) {
-            userPart.append(context.historyContext()).append("\n\n");
+            sb.append(context.historyContext()).append("\n\n");
         }
 
-        // 用户最新消息 → user 消息
-        userPart.append("---\n\n用户最新消息:\n").append(userMessage);
+        // 用户最新消息
+        sb.append("---\n\n用户最新消息:\n").append(userMessage);
 
-        return new MergedContext(systemPart.toString(), userPart.toString());
+        return sb.toString();
     }
-
-    /**
-     * 合并后的上下文
-     */
-    public record MergedContext(String systemContext, String userMessage) {}
 
     /**
      * 格式化搜索结果为上下文（去重+筛选）
@@ -125,11 +109,10 @@ public class ContextBuilder {
     private String formatNotesContext(List<NoteSearchResult> notes) {
         if (notes == null || notes.isEmpty()) return "";
 
-        // 按文件去重，只保留每个文件最高分的一条；排除 AGENTS.md（已作为规则文件主动注入）
+        // 按文件去重，只保留每个文件最高分的一条
         Map<String, NoteSearchResult> bestResults = new LinkedHashMap<>();
         for (NoteSearchResult note : notes) {
             String key = note.filePath();
-            if (key != null && key.toLowerCase().endsWith("agents.md")) continue;
             if (!bestResults.containsKey(key) || note.score() > bestResults.get(key).score()) {
                 bestResults.put(key, note);
             }
@@ -146,7 +129,7 @@ public class ContextBuilder {
             
             String content = note.content();
             if (content.length() > 800) {
-                content = truncateToLastSentence(content, 800);
+                content = content.substring(0, 800);
             }
             
             // 内容去重：检查是否与已添加的内容高度相似
@@ -162,11 +145,7 @@ public class ContextBuilder {
             if (isDuplicate) continue;
             
             addedContents.add(content);
-            sb.append("【来源: ").append(note.filePath()).append("】");
-            if (note.title() != null && !note.title().isBlank()) {
-                sb.append(" 标题: ").append(note.title());
-            }
-            sb.append("\n");
+            sb.append("【来源: ").append(note.filePath()).append("】\n");
             sb.append(content).append("\n\n");
             count++;
         }
@@ -177,7 +156,7 @@ public class ContextBuilder {
     }
 
     /**
-     * 检查两段内容是否高度相似（基于前200字符的编辑距离）
+     * 检查两段内容是否高度相似（简单实现：基于关键词重叠率）
      */
     private boolean isContentSimilar(String content1, String content2) {
         if (content1 == null || content2 == null) return false;
@@ -185,52 +164,24 @@ public class ContextBuilder {
         // 取前200字进行比较
         String c1 = content1.length() > 200 ? content1.substring(0, 200) : content1;
         String c2 = content2.length() > 200 ? content2.substring(0, 200) : content2;
-
-        if (c1.equals(c2)) return true;
-
-        // 计算公共子串比例
-        int commonLen = longestCommonSubstring(c1, c2);
-        double ratio = (double) commonLen / Math.min(c1.length(), c2.length());
-        return ratio > 0.6;
-    }
-
-    private int longestCommonSubstring(String a, String b) {
-        int m = a.length(), n = b.length();
-        int maxLen = 0;
-        int[] dp = new int[n + 1];
-        for (int i = 1; i <= m; i++) {
-            int prev = 0;
-            for (int j = 1; j <= n; j++) {
-                int temp = dp[j];
-                if (a.charAt(i - 1) == b.charAt(j - 1)) {
-                    dp[j] = prev + 1;
-                    maxLen = Math.max(maxLen, dp[j]);
-                } else {
-                    dp[j] = 0;
-                }
-                prev = temp;
+        
+        // 计算字符重叠率
+        Set<Character> chars1 = new HashSet<>();
+        for (char c : c1.toCharArray()) {
+            if (Character.isLetterOrDigit(c)) chars1.add(c);
+        }
+        
+        int overlap = 0;
+        for (char c : c2.toCharArray()) {
+            if (Character.isLetterOrDigit(c) && chars1.contains(c)) {
+                overlap++;
             }
         }
-        return maxLen;
-    }
-
-    /**
-     * 截断到最后一个完整句子边界，避免在中间切断
-     */
-    private String truncateToLastSentence(String text, int maxLen) {
-        if (text.length() <= maxLen) return text;
-        String truncated = text.substring(0, maxLen);
-        // 找最后一个句子分隔符：。！？! ? . \n
-        int lastPeriod = Math.max(
-                Math.max(truncated.lastIndexOf('。'), truncated.lastIndexOf('！')),
-                Math.max(truncated.lastIndexOf('？'), truncated.lastIndexOf('.'))
-        );
-        int lastNewline = truncated.lastIndexOf('\n');
-        int cutPoint = Math.max(lastPeriod, lastNewline);
-        if (cutPoint > maxLen / 2) {
-            return truncated.substring(0, cutPoint + 1);
-        }
-        return truncated;
+        
+        int total = Math.min(c1.length(), c2.length());
+        double similarity = (double) overlap / total;
+        
+        return similarity > 0.7;  // 超过70%相似度认为重复
     }
 
     /**

@@ -170,9 +170,6 @@ public class NoteTools {
             for (int i = 0; i < results.size(); i++) {
                 NoteIndexService.NoteSearchResult r = results.get(i);
                 sb.append("📄 ").append(r.filePath());
-                if (r.title() != null && !r.title().isBlank()) {
-                    sb.append(" («").append(r.title()).append("»)");
-                }
                 sb.append(" (相似度: ").append(String.format("%.2f", r.score())).append(")\n");
 
                 String contentPreview = r.content();

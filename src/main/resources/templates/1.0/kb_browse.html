@@ -1,13 +1,13 @@
 <html xmlns:th="http://www.thymeleaf.org"
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
-      layout:decorate="~{layout}">
+      layout:decorate="~{1.0/layout}">
 <head>
     <title layout:fragment="title">文件浏览</title>
 </head>
 <body>
 <th:block layout:fragment="content">
 
-<th:block th:replace="~{kb_tab_bar :: kb-tabs('notes', ${kb}, ${labels})}" />
+<th:block th:replace="~{1.0/kb_tab_bar :: kb-tabs('notes', ${kb}, ${labels})}" />
 
 <div class="card">
     <div th:if="${error != null and !error.isEmpty()}" class="alert alert-error" style="background:#fff0f0;color:#c92a2a;padding:10px 16px;border-radius:8px;margin-bottom:12px;font-size:14px;border:1px solid #ffc9c9;" th:text="${error}">错误</div>

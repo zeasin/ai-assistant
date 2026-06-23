@@ -55,7 +55,7 @@ public class SolveController {
         LlmProfileEntity defaultProfile = llmConfigResolver.getDefaultProfile();
         model.addAttribute("defaultModel", defaultProfile != null ? defaultProfile.getName() : "");
         model.addAttribute("sessions", getRecentSessions());
-        return "solve";
+        return "1.0/solve";
     }
 
     @PostMapping("/api/recognize")

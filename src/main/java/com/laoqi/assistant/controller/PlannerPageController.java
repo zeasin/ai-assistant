@@ -59,6 +59,6 @@ public class PlannerPageController {
             model.addAttribute("reminders", List.of());
             model.addAttribute("error", e.getMessage());
         }
-        return "planner";
+        return "1.0/planner";
     }
 }

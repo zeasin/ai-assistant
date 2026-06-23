@@ -104,6 +104,6 @@ public class IndexController {
         model.addAttribute("totalTasks", totalTasks);
         model.addAttribute("totalReminders", totalReminders);
 
-        return "index";
+        return "1.0/index";
     }
 }

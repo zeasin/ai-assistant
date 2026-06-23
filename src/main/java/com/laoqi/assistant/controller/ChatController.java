@@ -148,7 +148,7 @@ public class ChatController {
 
         model.addAttribute("aiProvider", "direct");
 
-        return "chat";
+        return "1.0/chat";
     }
 
     // ========== API: 加载消息（分页） ==========

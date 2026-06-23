@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org"
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
-      layout:decorate="~{layout}">
+      layout:decorate="~{1.0/layout}">
 <th:block layout:fragment="content">
-<th:block th:replace="~{kb_tab_bar :: kb-tabs('index', ${kb}, ${labels})}" />
+<th:block th:replace="~{1.0/kb_tab_bar :: kb-tabs('index', ${kb}, ${labels})}" />
 
     <div class="card">
         <h2>📊 笔记索引管理</h2>

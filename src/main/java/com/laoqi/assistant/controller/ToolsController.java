@@ -8,6 +8,6 @@ public class ToolsController {
 
     @GetMapping("/tools")
     public String toolsPage() {
-        return "tools";
+        return "1.0/tools";
     }
 }

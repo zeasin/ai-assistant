@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{2.0/layout}">
+<head><title>AI 助理</title></head>
+<body>
+<th:block layout:fragment="content">
+
+<!-- Tab 切换 -->
+<div style="display:flex;gap:0;border-bottom:2px solid #e1e3e6;margin-bottom:20px;">
+    <button class="tab-btn active" onclick="switchTab('chat')">💬 对话</button>
+    <button class="tab-btn" onclick="switchTab('search')">🔍 搜索</button>
+    <button class="tab-btn" onclick="switchTab('analysis')">📊 分析</button>
+</div>
+
+<style>
+    .tab-btn {
+        padding: 10px 24px; border: none; background: none;
+        font-size: 14px; font-weight: 500; color: #5c5f66;
+        cursor: pointer; border-bottom: 2px solid transparent;
+        margin-bottom: -2px; transition: all .15s;
+    }
+    .tab-btn:hover { color: #1a1b1e; }
+    .tab-btn.active { color: #7c5cfc; border-bottom-color: #7c5cfc; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+</style>
+
+<!-- ==================== Tab 1: 对话 ==================== -->
+<div id="tab-chat" class="tab-panel active">
+    <div class="card" style="padding:0;overflow:hidden;height:calc(100vh - 120px);display:flex;flex-direction:column;max-width:1100px;margin:0 auto;">
+        <!-- 对话头部 -->
+        <div style="padding:12px 16px;border-bottom:1px solid #eef0f4;display:flex;align-items:center;justify-content:space-between;">
+            <div style="display:flex;align-items:center;gap:8px;">
+                <span style="font-size:14px;font-weight:600;">AI 对话</span>
+                <span th:if="${currentKb != null}" class="badge badge-info" style="font-size:11px;" th:text="${currentKb.name}">笔记库名</span>
+                <span th:unless="${currentKb != null}" class="badge" style="background:#fff3cd;color:#856404;border-color:#ffc107;font-size:11px;">未选择笔记库</span>
+            </div>
+            <div style="display:flex;gap:6px;">
+                <select id="chatModel" style="padding:4px 8px;border:1px solid #e1e3e6;border-radius:6px;font-size:12px;background:#fff;">
+                    <option th:each="m : ${chatModels}" th:value="${m.name}" th:text="${m.name}">模型</option>
+                </select>
+                <button onclick="clearChat()" class="btn btn-secondary" style="padding:4px 12px;font-size:12px;">清空</button>
+            </div>
+        </div>
+        <!-- 消息区 -->
+        <div id="chatBox" class="chat-box" style="border:none;border-radius:0;flex:1;overflow-y:auto;">
+            <div th:if="${currentKb == null}" style="text-align:center;padding:60px 20px;color:#909296;">
+                <div style="font-size:36px;margin-bottom:12px;">💬</div>
+                <div>请先从左侧选择一个笔记库</div>
+            </div>
+        </div>
+        <!-- 输入区 -->
+        <div style="padding:12px 16px;border-top:1px solid #eef0f4;margin-top:auto;">
+            <div class="chat-input">
+                <input id="chatInput" type="text" placeholder="输入消息..."
+                       onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat();}"
+                       th:disabled="${currentKb == null}">
+                <button class="btn btn-primary" onclick="sendChat()" th:disabled="${currentKb == null}">发送</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== Tab 2: 搜索 ==================== -->
+<div id="tab-search" class="tab-panel">
+    <div class="card">
+        <div style="display:flex;gap:8px;margin-bottom:16px;">
+            <input id="searchInput" type="text" placeholder="搜索笔记内容..."
+                   style="flex:1;padding:10px 14px;border:1px solid #e1e3e6;border-radius:8px;font-size:14px;outline:none;"
+                   onkeydown="if(event.key==='Enter')doSearch();">
+            <button class="btn btn-primary" onclick="doSearch()">搜索</button>
+        </div>
+        <div id="searchStatus" style="font-size:13px;color:#909296;margin-bottom:12px;display:none;"></div>
+        <div id="searchResults"></div>
+        <div id="searchEmpty" style="text-align:center;padding:40px 20px;color:#909296;">
+            <div style="font-size:36px;margin-bottom:12px;">🔍</div>
+            <div>输入关键词搜索笔记库内容</div>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== Tab 3: 分析 ==================== -->
+<div id="tab-analysis" class="tab-panel">
+    <!-- 日报 -->
+    <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+            <h2 style="margin:0;">综合日报</h2>
+            <div style="display:flex;gap:6px;">
+                <span th:if="${currentKb != null}" class="text-muted" th:text="${report_time}">时间</span>
+                <button th:if="${currentKb != null}" class="btn btn-primary" style="padding:5px 14px;font-size:12px;"
+                        onclick="generateReport()">重新生成</button>
+            </div>
+        </div>
+        <div th:if="${currentKb == null}" style="text-align:center;padding:30px;color:#909296;">
+            请先从左侧选择一个笔记库
+        </div>
+        <div th:if="${currentKb != null and (report == null or report == '')}" style="text-align:center;padding:30px;color:#909296;">
+            <div style="margin-bottom:8px;">暂无日报</div>
+            <button class="btn btn-primary" onclick="generateReport()">生成今日日报</button>
+        </div>
+        <div th:if="${currentKb != null and report != null and report != ''}" class="report" th:utext="${report}"></div>
+        <div th:if="${currentKb != null and report_error != null and report_error != ''}"
+             style="margin-top:8px;padding:8px 12px;background:#fff3cd;border-radius:6px;font-size:13px;color:#856404;"
+             th:text="${report_error}">错误</div>
+    </div>
+
+    <!-- 笔记库统计 -->
+    <div class="card" th:if="${currentKb != null}">
+        <h2>笔记库概览</h2>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
+            <div style="text-align:center;padding:16px;background:#f8f9fa;border-radius:8px;">
+                <div style="font-size:24px;font-weight:700;color:#7c5cfc;" th:text="${kbFileCount} ?: 0">0</div>
+                <div style="font-size:12px;color:#909296;margin-top:4px;">笔记文件</div>
+            </div>
+            <div style="text-align:center;padding:16px;background:#f8f9fa;border-radius:8px;">
+                <div style="font-size:24px;font-weight:700;color:#7c5cfc;" th:text="${kbIndexCount} ?: 0">0</div>
+                <div style="font-size:12px;color:#909296;margin-top:4px;">索引片段</div>
+            </div>
+            <div style="text-align:center;padding:16px;background:#f8f9fa;border-radius:8px;">
+                <div style="font-size:24px;font-weight:700;color:#7c5cfc;" th:text="${kbTotalMessages} ?: 0">0</div>
+                <div style="font-size:12px;color:#909296;margin-top:4px;">对话消息</div>
+            </div>
+        </div>
+        <div style="margin-top:12px;display:flex;gap:8px;">
+            <a th:href="@{/kb/{id}/index(id=${currentKb.id})}" class="btn btn-secondary" style="font-size:12px;">索引管理</a>
+            <a th:href="@{/kb/{id}/notes(id=${currentKb.id})}" class="btn btn-secondary" style="font-size:12px;">浏览笔记</a>
+            <a th:href="@{/kb/{id}/config(id=${currentKb.id})}" class="btn btn-secondary" style="font-size:12px;">配置</a>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== JS ==================== -->
+<script th:inline="javascript">
+/*<![CDATA[*/
+const KB_ID = /*[[${currentKb?.id}]]*/ null;
+const KB_NAME = /*[[${currentKb?.name}]]*/ '';
+/*]]>*/
+
+let chatMessages = [];
+let chatSessionId = null;
+
+function switchTab(tab) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    event.target.classList.add('active');
+    document.getElementById('tab-' + tab).classList.add('active');
+}
+
+// ========== 加载聊天记录 ==========
+async function loadChatHistory() {
+    if (!KB_ID) return;
+    const box = document.getElementById('chatBox');
+    box.innerHTML = '<div style="text-align:center;padding:20px;color:#909296;">加载中...</div>';
+    try {
+        const resp = await fetch('/chat/api/kb/' + KB_ID + '/messages?limit=60');
+        const data = await resp.json();
+        box.innerHTML = '';
+        if (data.messages && data.messages.length > 0) {
+            data.messages.forEach(m => {
+                appendMsg(m.role === 'user' ? 'user' : 'ai', m.content);
+            });
+            chatSessionId = data.sessionId || null;
+        }
+    } catch(e) {
+        box.innerHTML = '';
+    }
+}
+// 页面加载后自动加载聊天记录
+if (KB_ID) loadChatHistory();
+
+// ========== 对话 ==========
+// ========== 发送消息（SSE 流式） ==========
+async function sendChat() {
+    const input = document.getElementById('chatInput');
+    const msg = input.value.trim();
+    if (!msg || !KB_ID) return;
+
+    input.value = '';
+    appendMsg('user', msg);
+
+    const model = document.getElementById('chatModel').value;
+    const aiId = 'ai-' + Date.now();
+    const box = document.getElementById('chatBox');
+    box.innerHTML += '<div class="chat-msg ai" id="' + aiId + '">'
+        + '<div class="label">AI</div>'
+        + '<div class="text" id="reply-' + aiId + '"><span style="color:#909296;">正在处理...</span></div></div>';
+    box.scrollTop = box.scrollHeight;
+
+    const fd = new FormData();
+    fd.append('message', msg);
+    fd.append('kbId', KB_ID);
+    fd.append('modelName', model);
+
+    let replyText = '';
+    try {
+        const res = await fetch('/chat/send', { method: 'POST', body: fd });
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = '';
+        while (true) {
+            const r = await reader.read();
+            if (r.done) break;
+            buf += decoder.decode(r.value, { stream: true });
+            const parts = buf.split('\n\n');
+            buf = parts.pop() || '';
+            for (const p of parts) {
+                if (p.indexOf('data:') !== 0) continue;
+                try {
+                    const d = JSON.parse(p.replace(/^data:\s*/, ''));
+                    if (d.type === 'text') {
+                        replyText += d.content;
+                        const el = document.getElementById('reply-' + aiId);
+                        if (el) el.innerHTML = marked.parse(replyText);
+                        box.scrollTop = box.scrollHeight;
+                    } else if (d.type === 'done') {
+                        const el = document.getElementById('reply-' + aiId);
+                        if (el && replyText) el.innerHTML = marked.parse(replyText);
+                    } else if (d.type === 'error') {
+                        const el = document.getElementById('reply-' + aiId);
+                        if (el) el.innerHTML = '<span style="color:#e03131;">' + d.content + '</span>';
+                    }
+                } catch (e) {}
+            }
+        }
+    } catch(e) {
+        const el = document.getElementById('reply-' + aiId);
+        if (el) el.innerHTML = '<span style="color:#e03131;">请求失败: ' + e.message + '</span>';
+    }
+}
+
+function appendMsg(role, text) {
+    const box = document.getElementById('chatBox');
+    const div = document.createElement('div');
+    div.className = 'chat-msg ' + role;
+    div.innerHTML = '<div class="label">' + (role === 'user' ? '你' : 'AI') + '</div>'
+        + '<div class="text">' + (role === 'ai' ? marked.parse(text) : text) + '</div>';
+    box.appendChild(div);
+    box.scrollTop = box.scrollHeight;
+}
+
+function clearChat() {
+    chatMessages = [];
+    chatSessionId = null;
+    document.getElementById('chatBox').innerHTML = '';
+}
+
+// ========== 搜索 ==========
+async function doSearch() {
+    const query = document.getElementById('searchInput').value.trim();
+    if (!query || !KB_ID) return;
+
+    const status = document.getElementById('searchStatus');
+    const results = document.getElementById('searchResults');
+    const empty = document.getElementById('searchEmpty');
+
+    status.style.display = 'block';
+    status.textContent = '搜索中...';
+    results.innerHTML = '';
+    empty.style.display = 'none';
+
+    try {
+        const resp = await fetch('/kb/' + KB_ID + '/api/index/search', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: new URLSearchParams({query: query, limit: 10})
+        });
+        const data = await resp.json();
+
+        if (data.ok && data.results && data.results.length > 0) {
+            status.textContent = '找到 ' + data.results.length + ' 条结果';
+            data.results.forEach(r => {
+                const score = (r.score * 100).toFixed(0);
+                results.innerHTML += '<div style="border:1px solid #eef0f4;border-radius:8px;padding:12px;margin-bottom:8px;cursor:pointer;" '
+                    + 'onclick="location.href=\'/kb/' + KB_ID + '/notes/view?path=' + encodeURIComponent(r.filePath) + '\'">'
+                    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">'
+                    + '<span style="font-size:13px;font-weight:500;color:#7c5cfc;">📄 ' + r.filePath + '</span>'
+                    + '<span style="font-size:11px;color:#909296;">' + score + '%</span>'
+                    + '</div>'
+                    + '<div style="font-size:13px;color:#5c5f66;line-height:1.5;">' + (r.content || '').substring(0, 200) + '</div>'
+                    + '</div>';
+            });
+        } else {
+            status.textContent = '未找到相关结果';
+            empty.style.display = 'block';
+            empty.innerHTML = '<div style="font-size:36px;margin-bottom:12px;">😔</div><div>未找到与「' + query + '」相关的笔记</div>';
+        }
+    } catch(e) {
+        status.textContent = '搜索失败: ' + e.message;
+    }
+}
+
+// ========== 日报 ==========
+async function generateReport() {
+    if (!KB_ID) return;
+    const card = event.target.closest('.card');
+    const btn = event.target;
+    btn.disabled = true;
+    btn.textContent = '生成中...';
+    try {
+        const resp = await fetch('/kb/' + KB_ID + '/api/report/generate', {method: 'POST'});
+        const data = await resp.json();
+        if (data.ok) {
+            location.reload();
+        } else {
+            alert('生成失败: ' + (data.error || ''));
+        }
+    } catch(e) {
+        alert('请求失败: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '重新生成';
+    }
+}
+</script>
+
+</th:block>
+</body>
+</html>

@@ -1,6 +1,6 @@
 <html xmlns:th="http://www.thymeleaf.org"
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
-      layout:decorate="~{layout}">
+      layout:decorate="~{1.0/layout}">
 <head>
     <title th:text="${kb.name} + ' - 数据 - AI助理'">数据</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -32,7 +32,7 @@
 <body>
 <th:block layout:fragment="content">
 
-<th:block th:replace="~{kb_tab_bar :: kb-tabs('data', ${kb}, ${labels})}" />
+<th:block th:replace="~{1.0/kb_tab_bar :: kb-tabs('data', ${kb}, ${labels})}" />
 
 <!-- 数据概览 -->
 <div class="card">

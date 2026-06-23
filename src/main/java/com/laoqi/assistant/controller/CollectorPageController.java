@@ -8,6 +8,6 @@ public class CollectorPageController {
 
     @GetMapping("/data/collector")
     public String collectorPage() {
-        return "collector";
+        return "1.0/collector";
     }
 }
