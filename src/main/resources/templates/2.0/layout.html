@@ -286,21 +286,13 @@
         <nav class="sidebar-nav">
             <div class="sidebar-group">
                 <div class="sidebar-group-label">工具</div>
-                <a href="/image/general"
-                   th:classappend="${requestURI == '/image/general'} ? 'active' : ''">
-                    <span class="nav-icon">🖼️</span><span>通用识别</span>
-                </a>
                 <a href="/image/generate"
                    th:classappend="${requestURI == '/image/generate'} ? 'active' : ''">
                     <span class="nav-icon">🎨</span><span>AI 绘图</span>
                 </a>
                 <a href="/image/solve"
                    th:classappend="${requestURI == '/image/solve'} ? 'active' : ''">
-                    <span class="nav-icon">❓</span><span>识题</span>
-                </a>
-                <a href="/image/exam"
-                   th:classappend="${requestURI == '/image/exam'} ? 'active' : ''">
-                    <span class="nav-icon">📝</span><span>试卷识别</span>
+                    <span class="nav-icon">📷</span><span>拍照解题</span>
                 </a>
             </div>
 
