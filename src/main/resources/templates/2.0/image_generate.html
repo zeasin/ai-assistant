@@ -20,16 +20,19 @@
             <div class="form-group" style="flex:1;margin:0;">
                 <label style="font-size:12px;color:#5c5f66;font-weight:500;margin-bottom:4px;display:block;">尺寸</label>
                 <select id="genSize" style="width:100%;padding:8px;border:1px solid #e1e3e6;border-radius:6px;font-size:13px;">
-                    <option value="2752x1536">2752×1536 (高清横版)</option>
-                    <option value="1536x2752">1536×2752 (高清竖版)</option>
-                    <option value="1024x1024">1024×1024 (正方形)</option>
+                    <option value="2048x2048">2048×2048 (正方形)</option>
+                    <option value="2752x1536">2752×1536 (横版)</option>
+                    <option value="1536x2752">1536×2752 (竖版)</option>
+                    <option value="2496x1664">2496×1664 (横版)</option>
+                    <option value="1664x2496">1664×2496 (竖版)</option>
+                    <option value="3072x1376">3072×1376 (超宽)</option>
+                    <option value="1344x3136">1344×3136 (超高)</option>
                 </select>
             </div>
             <div class="form-group" style="flex:1;margin:0;">
                 <label style="font-size:12px;color:#5c5f66;font-weight:500;margin-bottom:4px;display:block;">模型</label>
                 <select id="genModel" style="width:100%;padding:8px;border:1px solid #e1e3e6;border-radius:6px;font-size:13px;">
-                    <option value="sd-turbo">SD Turbo</option>
-                    <option value="sd-xl">SD XL</option>
+                    <option value="sensenova-u1-fast">SenseNova U1 Fast</option>
                 </select>
             </div>
             <button id="genBtn" class="btn btn-primary" onclick="doGenerate()" style="margin-top:18px;padding:10px 28px;">

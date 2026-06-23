@@ -25,7 +25,7 @@ public class ImageGenerateController {
     @ResponseBody
     public Map<String, Object> generate(@RequestBody Map<String, String> body) {
         String prompt = body.get("prompt");
-        String size = body.getOrDefault("size", "2752x1536");
+        String size = body.getOrDefault("size", "2048x2048");
         String model = body.getOrDefault("model", "sd-turbo");
 
         if (prompt == null || prompt.isBlank()) {

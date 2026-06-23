@@ -28,7 +28,7 @@ public class ImageGenerateService {
     public String generate(String prompt, String size, String model) {
         String url = BASE_URL + "/images/generations";
         String useModel = (model != null && !model.isBlank()) ? model : "sensenova-u1-fast";
-        String useSize = (size != null && !size.isBlank()) ? size : "2752x1536";
+        String useSize = (size != null && !size.isBlank()) ? size : "2048x2048";
 
         try {
             String body = mapper.writeValueAsString(java.util.Map.of(
