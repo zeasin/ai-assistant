@@ -9,8 +9,8 @@
 
 <div class="alert" th:classappend="${!ollama_available} ? 'alert-warning' : 'alert-ok'" th:if="${!ollama_available}" style="margin-bottom:16px;">
     <strong>⚠️ Ollama 未运行</strong> — 语义检索不可用，将回退最近 3 轮对话。
-    请确保 <code>ollama serve</code> 已启动并已拉取 <code>nomic-embed-text</code> 模型：
-    <code style="display:block;margin-top:4px;">ollama pull nomic-embed-text</code>
+    请确保 <code>ollama serve</code> 已启动并已拉取 <code>bge-m3</code> 模型：
+    <code style="display:block;margin-top:4px;">ollama pull bge-m3</code>
 </div>
 
 <div class="status-bar" style="margin-bottom:16px;">
@@ -216,7 +216,7 @@
         </div>
         <div class="form-group" style="flex:0 0 200px;">
             <label style="font-size:12px;">模型名</label>
-            <input type="text" id="embeddingModel" value="nomic-embed-text" style="width:100%;padding:8px 10px;border:1px solid #e1e3e6;border-radius:6px;font-size:13px;font-family:monospace;">
+            <input type="text" id="embeddingModel" value="bge-m3" style="width:100%;padding:8px 10px;border:1px solid #e1e3e6;border-radius:6px;font-size:13px;font-family:monospace;">
         </div>
         <div class="form-group" style="flex:1;min-width:200px;">
             <label style="font-size:12px;">API Key <span class="text-muted" style="font-weight:400;">(留空=Ollama)</span></label>
@@ -700,7 +700,7 @@ function loadEmbeddingModel() {
 }
 
 async function saveEmbeddingModel() {
-    const model = document.getElementById('embeddingModel').value.trim() || 'nomic-embed-text';
+    const model = document.getElementById('embeddingModel').value.trim() || 'bge-m3';
     const baseUrl = document.getElementById('embeddingBaseUrl').value.trim() || 'http://127.0.0.1:11434';
     const apiKey = document.getElementById('embeddingApiKey').value.trim();
     const provider = document.getElementById('embeddingProvider').value.trim();

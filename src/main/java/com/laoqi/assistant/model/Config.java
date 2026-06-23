@@ -21,7 +21,7 @@ public class Config {
     private Map<String, Map<String, List<String>>> columnSettings = new HashMap<>();
 
     // 语义向量模型配置（直接存 config.json，不经过 llm_profiles）
-    private String embeddingModel = "nomic-embed-text";
+    private String embeddingModel = "bge-m3";
     private String embeddingBaseUrl = "http://127.0.0.1:11434";
     private String embeddingApiKey = "";
     private String embeddingProvider = "";

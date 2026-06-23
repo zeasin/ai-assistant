@@ -33,7 +33,7 @@ public class AppConfig {
 
     // Ollama embedding config
     private String ollamaBaseUrl = "http://127.0.0.1:11434";
-    private String ollamaModel = "nomic-embed-text";
+    private String ollamaModel = "bge-m3";
     private int ollamaTimeoutSeconds = 30;
 
     public String getOllamaBaseUrl() { return ollamaBaseUrl; }

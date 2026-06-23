@@ -110,7 +110,7 @@ java -jar target/ai-assistant-1.0.0.jar
     </table>
     <h3 style="font-size:13px;font-weight:600;margin:12px 0 8px;color:#5c5f66;">语义检索 / 长期记忆</h3>
     <ul style="padding-left:20px;margin:8px 0;">
-        <li style="font-size:13px;line-height:1.7;color:#333;margin-bottom:3px;"><strong>Ollama 本地</strong> — 不填 API Key，使用本地 Ollama（推荐 <code>nomic-embed-text</code>）</li>
+        <li style="font-size:13px;line-height:1.7;color:#333;margin-bottom:3px;"><strong>Ollama 本地</strong> — 不填 API Key，使用本地 Ollama（推荐 <code>bge-m3</code>）</li>
         <li style="font-size:13px;line-height:1.7;color:#333;margin-bottom:3px;"><strong>API 模式</strong> — 填入 API Key，支持硅基流动等 OpenAI 兼容服务</li>
     </ul>
     <p style="font-size:13px;line-height:1.7;color:#333;margin:0 0 8px;">AI 回复后自动生成向量并跨会话检索相似轮次（余弦相似度阈值 0.5），最多从 8 轮最相关的历史中提取上下文。不可用时回退最近 3 轮对话。</p>
@@ -278,7 +278,7 @@ export LLM_MODEL=deepseek-chat</pre>
         <tr><td>框架</td><td>Spring Boot 4.1.0 + Spring AI 2.0.0 + Java 17</td></tr>
         <tr><td>AI 引擎</td><td>ChatClient 直连 LLM（OpenAI 兼容协议）</td></tr>
         <tr><td>工具编排</td><td>@Tool 注解 + ToolCallingAdvisor（自动路由）</td></tr>
-        <tr><td>语义检索</td><td>Ollama（nomic-embed-text）或 API（BAAI/bge-m3 等）</td></tr>
+        <tr><td>语义检索</td><td>Ollama（·bge-m3 等）</td></tr>
         <tr><td>会话存储</td><td>SQLite（MyBatis-Plus）— sessions / messages / turn_embeddings</td></tr>
         <tr><td>笔记库存储</td><td>JSON / Markdown 文件（本地文件系统）</td></tr>
         <tr><td>前端</td><td>Thymeleaf 模板</td></tr>
