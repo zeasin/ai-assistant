@@ -4,6 +4,7 @@ import com.laoqi.assistant.entity.KnowledgeBaseEntity;
 import com.laoqi.assistant.entity.MessageEntity;
 import com.laoqi.assistant.service.NoteIndexService.NoteSearchResult;
 import com.laoqi.assistant.util.FileUtil;
+import com.laoqi.assistant.util.TimeUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -89,6 +90,13 @@ public class ContextBuilder {
      */
     public String merge(ChatContext context, String userMessage) {
         StringBuilder sb = new StringBuilder();
+
+        // 注入当前日期时间（让 AI 知道"今天"、"本周"的真实含义）
+        String dateStr = TimeUtil.todayStr();
+        String weekday = TimeUtil.weekdayCn(TimeUtil.now());
+        sb.append("== 当前时间 ==\n");
+        sb.append("日期: ").append(dateStr).append(" (").append(weekday).append(")\n");
+        sb.append("请以当前日期为基准理解'今天'、'本周'、'本月'等时间概念。\n\n");
 
         // 规则文件
         if (context.agentsMd() != null && !context.agentsMd().isBlank()) {

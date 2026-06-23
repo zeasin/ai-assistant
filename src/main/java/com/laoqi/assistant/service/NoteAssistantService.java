@@ -122,6 +122,11 @@ public class NoteAssistantService {
 
             if (statusCallback != null) statusCallback.accept("AI 正在生成回复...");
 
+            // 将 statusCallback 注入 NoteTools，工具方法执行时会主动上报状态
+            if (statusCallback != null) {
+                NoteTools.setStatusCallback(statusCallback);
+            }
+
             StringBuilder fullReply = new StringBuilder();
             boolean[] isFirstChunk = {true};
             client.prompt()
@@ -151,6 +156,7 @@ public class NoteAssistantService {
             return reply.isEmpty() ? "（AI 未返回回复）" : reply;
         } finally {
             NoteTools.clearCurrentKbId();
+            NoteTools.clearStatusCallback();
         }
     }
 
@@ -267,11 +273,12 @@ public class NoteAssistantService {
             5. listDir(path) - 列出目录
 
             == 工作流程 ==
-            1. 理解用户意图
-            2. 用 searchNotes 搜索相关笔记内容（主动搜索，不要等用户说"搜"）
-            3. 用 readFile 读取 AGENTS.md 了解数据格式
-            4. 综合搜索结果，给出完整回复
-            5. 需要时用 writeFile 保存新笔记
+            1. 注意上下文中的"当前时间"信息，以此为准理解"今天"等时间概念
+            2. 理解用户意图
+            3. 用 searchNotes 搜索相关笔记内容（主动搜索，不要等用户说"搜"）
+            4. 用 readFile 读取 AGENTS.md 了解数据格式
+            5. 综合搜索结果，给出完整回复
+            6. 需要时用 writeFile 保存新笔记
 
             == 重要原则 ==
             - 主动使用 searchNotes 搜索相关内容，不要假设用户知道要搜什么

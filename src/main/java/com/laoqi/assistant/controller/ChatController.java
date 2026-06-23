@@ -226,11 +226,19 @@ public class ChatController {
         // 获取或创建会话
         String sessionId = getOrCreateKbSession(finalKbId, mode);
 
+        // 客户端断开/超时标志，避免往已完成的 emitter 继续发数据
+        final boolean[] emitterDone = {false};
+        emitter.onCompletion(() -> emitterDone[0] = true);
+        emitter.onTimeout(() -> emitterDone[0] = true);
+        emitter.onError(e -> emitterDone[0] = true);
+
         chatExecutor.execute(() -> {
             try {
+                if (emitterDone[0]) return;
                 emitter.send(SseEmitter.event().data(mapper.writeValueAsString(
                         Map.of("type", "session", "sessionId", sessionId))));
 
+                if (emitterDone[0]) return;
                 sendStatus(emitter, mode, "正在处理...");
 
                 sessionService.saveMessage(sessionId, "user", message, mode, "web");
@@ -245,10 +253,10 @@ public class ChatController {
                 // 启动心跳：每 5 秒发送一次 keepalive
                 final boolean[] heartbeatDone = {false};
                 Thread heartbeat = new Thread(() -> {
-                    while (!heartbeatDone[0]) {
+                    while (!heartbeatDone[0] && !emitterDone[0]) {
                         try {
                             Thread.sleep(5000);
-                            if (!heartbeatDone[0]) {
+                            if (!heartbeatDone[0] && !emitterDone[0]) {
                                 emitter.send(SseEmitter.event()
                                         .data(mapper.writeValueAsString(Map.of("type", "heartbeat"))));
                             }
@@ -263,8 +271,34 @@ public class ChatController {
                 heartbeat.setDaemon(true);
                 heartbeat.start();
 
+                // 兜底：AI 流式期间超过 3 秒无新状态时，显示进度提示
+                final boolean[] firstChunkArrived = {false};
+                final long[] lastStatusTime = {System.currentTimeMillis()};
+                Thread thinkingStatus = new Thread(() -> {
+                    String[] tips = {"⏳ AI 处理中", "⏳ 正在分析", "⏳ 即将完成"};
+                    int idx = 0;
+                    while (!firstChunkArrived[0] && !emitterDone[0]) {
+                        try { Thread.sleep(3000); } catch (InterruptedException e) { break; }
+                        if (!firstChunkArrived[0] && !emitterDone[0]) {
+                            // 只有距离上次状态更新超过 3 秒才显示兜底消息
+                            long elapsed = System.currentTimeMillis() - lastStatusTime[0];
+                            if (elapsed >= 3000) {
+                                String dot = ".".repeat((idx % 3) + 1);
+                                String msg = tips[idx % tips.length] + dot + "（上一步已完成）";
+                                log.info("[chat] 兜底状态: {}", msg);
+                                sendStatus(emitter, mode, msg);
+                                idx++;
+                            }
+                        }
+                    }
+                }, "chat-thinking-status");
+                thinkingStatus.setDaemon(true);
+                thinkingStatus.start();
+
                 StringBuilder replyBuffer = new StringBuilder();
                 noteAssistantService.streamChat(sessionId, message, mode, finalKbId, modelName, chunk -> {
+                    if (emitterDone[0]) return;
+                    firstChunkArrived[0] = true;
                     replyBuffer.append(chunk);
                     Map<String, Object> data = new LinkedHashMap<>();
                     data.put("type", "text");
@@ -274,12 +308,18 @@ public class ChatController {
                         emitter.send(SseEmitter.event().data(mapper.writeValueAsString(data)));
                     } catch (Exception e) {
                         log.warn("发送流式数据失败", e);
+                        emitterDone[0] = true;
                     }
                 }, status -> {
-                    sendStatus(emitter, mode, status);
+                    if (!emitterDone[0]) {
+                        lastStatusTime[0] = System.currentTimeMillis();
+                        log.info("[chat] 状态更新: {}", status);
+                        sendStatus(emitter, mode, status);
+                    }
                 });
 
                 heartbeatDone[0] = true;
+                if (emitterDone[0]) return;
                 String replyText = replyBuffer.toString();
                 log.info("[chat] 收到回复, 长度={}", replyText.length());
                 sessionService.saveMessage(sessionId, "assistant", replyText, mode, "web");

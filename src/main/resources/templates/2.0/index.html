@@ -270,6 +270,7 @@ async function sendChat() {
     fd.append('modelName', model);
 
     let replyText = '';
+    let hasRealContent = false;
     try {
         const res = await fetch('/chat/send', { method: 'POST', body: fd });
         const reader = res.body.getReader();
@@ -287,16 +288,29 @@ async function sendChat() {
                     const d = JSON.parse(p.replace(/^data:\s*/, ''));
                     if (d.type === 'text') {
                         replyText += d.content;
-                        const el = document.getElementById('reply-' + aiId);
-                        if (el) el.innerHTML = marked.parse(replyText);
-                        box.scrollTop = box.scrollHeight;
+                        // 优化1：只有非空白内容才替换"正在处理..."
+                        if (replyText.trim()) {
+                            hasRealContent = true;
+                            const el = document.getElementById('reply-' + aiId);
+                            if (el) el.innerHTML = marked.parse(replyText);
+                            box.scrollTop = box.scrollHeight;
+                        }
+                    } else if (d.type === 'status') {
+                        // 优化2：显示思考过程（如"正在读取笔记..."）
+                        // 仅当还没有实际内容时才显示状态
+                        if (!hasRealContent && d.content) {
+                            const el = document.getElementById('reply-' + aiId);
+                            if (el) el.innerHTML = '<span style="color:#909296;">' + d.content + '</span>';
+                            box.scrollTop = box.scrollHeight;
+                        }
                     } else if (d.type === 'done') {
                         const el = document.getElementById('reply-' + aiId);
-                        if (el && replyText) el.innerHTML = marked.parse(replyText);
+                        if (el && replyText.trim()) el.innerHTML = marked.parse(replyText);
                     } else if (d.type === 'error') {
                         const el = document.getElementById('reply-' + aiId);
                         if (el) el.innerHTML = '<span style="color:#e03131;">' + d.content + '</span>';
                     }
+                    // session / heartbeat 类型忽略
                 } catch (e) {}
             }
         }
