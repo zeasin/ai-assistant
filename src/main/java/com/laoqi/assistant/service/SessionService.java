@@ -36,7 +36,7 @@ public class SessionService {
     private static final float COSINE_THRESHOLD = 0.5f;
     private static final int MAX_TURNS_PER_SESSION = 4;
     private static final int MAX_GLOBAL_TURNS = 5;
-    private static final int DEFAULT_FALLBACK_TURNS = 3;
+    private static final int DEFAULT_FALLBACK_TURNS = 10;
     private static final int EMBEDDING_DIM = 768;
 
     private final DataSource dataSource;
@@ -506,27 +506,30 @@ public class SessionService {
             return ctx;
         }
 
-        float[] queryEmb = ollamaEmbeddingService.embed(currentQuery);
-        if (queryEmb == null) {
-            String ctx = buildSimpleContext(filtered);
-            log.info("[ctx] 嵌入失败，回退全部历史（{} 条消息）", filtered.size());
-            return ctx;
-        }
-
-        String globalContext = searchGlobalContext(queryEmb, sessionId, currentQuery);
-        if (globalContext != null) {
-            log.info("[ctx] 命中跨会话语义检索");
-            return globalContext;
-        }
-
+        // 1. 始终包含最近的上下文（当前会话的最近轮次）
+        String recentCtx;
         if (filtered.size() <= DEFAULT_FALLBACK_TURNS * 2) {
-            String ctx = buildSimpleContext(filtered);
+            recentCtx = buildSimpleContext(filtered);
             log.info("[ctx] 消息少（{}），使用全部历史", filtered.size());
-            return ctx;
+        } else {
+            recentCtx = buildRecentContext(filtered);
+            log.info("[ctx] 最近 {} 轮基础上下文", DEFAULT_FALLBACK_TURNS);
         }
-        String ctx = buildRecentContext(filtered);
-        log.info("[ctx] 无语义命中，回退最近 {} 轮", DEFAULT_FALLBACK_TURNS);
-        return ctx;
+
+        // 2. 额外补充：向量召回跨会话相关记忆
+        float[] queryEmb = ollamaEmbeddingService.embed(currentQuery);
+        if (queryEmb != null) {
+            String globalCtx = searchGlobalContext(queryEmb, sessionId, currentQuery);
+            if (globalCtx != null) {
+                // 合并：最近上下文 + 跨会话记忆
+                log.info("[ctx] 命中跨会话语义检索，合并到基础上下文中");
+                return recentCtx + "\n\n" + globalCtx;
+            }
+        } else {
+            log.info("[ctx] Ollama 嵌入不可用，仅使用最近上下文");
+        }
+
+        return recentCtx;
     }
 
     private String searchGlobalContext(float[] queryEmb, String currentSessionId, String query) {
