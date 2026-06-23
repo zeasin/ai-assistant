@@ -119,13 +119,37 @@ public class NoteTools {
         if (!file.startsWith(baseDir())) return "路径越界: " + path;
         if (!Files.isRegularFile(file)) return "文件不存在: " + path;
 
-        String content = FileUtil.readText(file);
+        // 大文件只读前 12000 字符，避免拖慢响应；小文件全量读取
+        String content;
+        int MAX_CHARS = 12_000;
+        try {
+            long fileSize = Files.size(file);
+            if (fileSize > 100_000) {
+                // 超大文件(>100KB)：用 BufferedReader 只读开头部分
+                StringBuilder sb = new StringBuilder();
+                try (var reader = Files.newBufferedReader(file, java.nio.charset.StandardCharsets.UTF_8)) {
+                    char[] buf = new char[4096];
+                    int total = 0;
+                    while (total < MAX_CHARS) {
+                        int n = reader.read(buf, 0, Math.min(buf.length, MAX_CHARS - total));
+                        if (n == -1) break;
+                        sb.append(buf, 0, n);
+                        total += n;
+                    }
+                }
+                content = sb.toString() + "\n\n...（文件过大，仅显示前 " + MAX_CHARS + " 字符）";
+            } else {
+                content = FileUtil.readText(file);
+                if (content.length() > MAX_CHARS) {
+                    content = content.substring(0, MAX_CHARS) + "\n\n...（文件过长，仅显示前 " + MAX_CHARS + " 字符）";
+                }
+            }
+        } catch (IOException e) {
+            return "读取文件失败: " + e.getMessage();
+        }
+
         reportStatus("📖 文件已读取，正在分析...");
         if (content.isEmpty()) return "（空文件）";
-
-        if (content.length() > 8000) {
-            return content.substring(0, 8000) + "\n\n...（文件过长，仅显示前 8000 字符）";
-        }
         return content;
     }
 

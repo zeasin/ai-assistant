@@ -271,23 +271,27 @@ public class ChatController {
                 heartbeat.setDaemon(true);
                 heartbeat.start();
 
-                // 兜底：AI 流式期间超过 3 秒无新状态时，显示进度提示
+                // 兜底：AI 流式期间无新状态时，按时间递进显示进度
                 final boolean[] firstChunkArrived = {false};
                 final long[] lastStatusTime = {System.currentTimeMillis()};
                 Thread thinkingStatus = new Thread(() -> {
-                    String[] tips = {"⏳ AI 处理中", "⏳ 正在分析", "⏳ 即将完成"};
-                    int idx = 0;
                     while (!firstChunkArrived[0] && !emitterDone[0]) {
                         try { Thread.sleep(3000); } catch (InterruptedException e) { break; }
                         if (!firstChunkArrived[0] && !emitterDone[0]) {
-                            // 只有距离上次状态更新超过 3 秒才显示兜底消息
                             long elapsed = System.currentTimeMillis() - lastStatusTime[0];
                             if (elapsed >= 3000) {
-                                String dot = ".".repeat((idx % 3) + 1);
-                                String msg = tips[idx % tips.length] + dot + "（上一步已完成）";
+                                String msg;
+                                if (elapsed < 6000) {
+                                    msg = "⏳ 正在分析获取到的信息...";
+                                } else if (elapsed < 10000) {
+                                    msg = "✍️ AI 正在组织回复...";
+                                } else if (elapsed < 15000) {
+                                    msg = "📝 即将完成...";
+                                } else {
+                                    msg = "⏳ 处理中，请稍候...";
+                                }
                                 log.info("[chat] 兜底状态: {}", msg);
                                 sendStatus(emitter, mode, msg);
-                                idx++;
                             }
                         }
                     }
