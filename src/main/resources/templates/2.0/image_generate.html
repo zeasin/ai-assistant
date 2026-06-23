@@ -10,48 +10,54 @@
     <div class="card">
         <h2 style="margin:0 0 16px;font-size:16px;">🎨 AI 绘图</h2>
 
-        <div class="form-group" style="margin-bottom:12px;">
-            <label style="font-size:12px;color:#5c5f66;font-weight:500;margin-bottom:4px;display:block;">描述你想生成的图片</label>
-            <textarea id="genPrompt" rows="3" placeholder="例如：一只橘猫坐在书桌上，窗外是夕阳，日系插画风格"
-                      style="width:100%;padding:10px;border:1px solid #e1e3e6;border-radius:8px;font-size:14px;resize:vertical;outline:none;box-sizing:border-box;"></textarea>
+        <div th:if="${#lists.isEmpty(imageProfiles)}" style="text-align:center;padding:30px;background:#fff3cd;border-radius:8px;color:#856404;font-size:13px;">
+            未配置图片生成模型，请先到 <a href="/config" style="color:#7c5cfc;">配置页</a> 添加类型为「生成图片」的模型
         </div>
 
-        <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;">
-            <div class="form-group" style="flex:1;margin:0;">
-                <label style="font-size:12px;color:#5c5f66;font-weight:500;margin-bottom:4px;display:block;">尺寸</label>
-                <select id="genSize" style="width:100%;padding:8px;border:1px solid #e1e3e6;border-radius:6px;font-size:13px;">
-                    <option value="2048x2048">2048×2048 (正方形)</option>
-                    <option value="2752x1536">2752×1536 (横版)</option>
-                    <option value="1536x2752">1536×2752 (竖版)</option>
-                    <option value="2496x1664">2496×1664 (横版)</option>
-                    <option value="1664x2496">1664×2496 (竖版)</option>
-                    <option value="3072x1376">3072×1376 (超宽)</option>
-                    <option value="1344x3136">1344×3136 (超高)</option>
-                </select>
+        <div th:unless="${#lists.isEmpty(imageProfiles)}">
+            <div class="form-group" style="margin-bottom:12px;">
+                <label style="font-size:12px;color:#5c5f66;font-weight:500;margin-bottom:4px;display:block;">描述你想生成的图片</label>
+                <textarea id="genPrompt" rows="3" placeholder="例如：一只橘猫坐在书桌上，窗外是夕阳，日系插画风格"
+                          style="width:100%;padding:10px;border:1px solid #e1e3e6;border-radius:8px;font-size:14px;resize:vertical;outline:none;box-sizing:border-box;"></textarea>
             </div>
-            <div class="form-group" style="flex:1;margin:0;">
-                <label style="font-size:12px;color:#5c5f66;font-weight:500;margin-bottom:4px;display:block;">模型</label>
-                <select id="genModel" style="width:100%;padding:8px;border:1px solid #e1e3e6;border-radius:6px;font-size:13px;">
-                    <option value="sensenova-u1-fast">SenseNova U1 Fast</option>
-                </select>
+
+            <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;">
+                <div class="form-group" style="flex:1;margin:0;">
+                    <label style="font-size:12px;color:#5c5f66;font-weight:500;margin-bottom:4px;display:block;">模型</label>
+                    <select id="genProfile" style="width:100%;padding:8px;border:1px solid #e1e3e6;border-radius:6px;font-size:13px;">
+                        <option th:each="p : ${imageProfiles}" th:value="${p.name}" th:text="${p.name} + ' (' + ${p.model} + ')'">模型</option>
+                    </select>
+                </div>
+                <div class="form-group" style="flex:1;margin:0;">
+                    <label style="font-size:12px;color:#5c5f66;font-weight:500;margin-bottom:4px;display:block;">尺寸</label>
+                    <select id="genSize" style="width:100%;padding:8px;border:1px solid #e1e3e6;border-radius:6px;font-size:13px;">
+                        <option value="2048x2048">2048×2048 (正方形)</option>
+                        <option value="2752x1536">2752×1536 (横版)</option>
+                        <option value="1536x2752">1536×2752 (竖版)</option>
+                        <option value="2496x1664">2496×1664 (横版)</option>
+                        <option value="1664x2496">1664×2496 (竖版)</option>
+                        <option value="3072x1376">3072×1376 (超宽)</option>
+                        <option value="1344x3136">1344×3136 (超高)</option>
+                    </select>
+                </div>
+                <button id="genBtn" class="btn btn-primary" onclick="doGenerate()" style="margin-top:18px;padding:10px 28px;">
+                    生成
+                </button>
             </div>
-            <button id="genBtn" class="btn btn-primary" onclick="doGenerate()" style="margin-top:18px;padding:10px 28px;">
-                生成
-            </button>
-        </div>
 
-        <div id="genStatus" style="display:none;margin-bottom:12px;"></div>
+            <div id="genStatus" style="display:none;margin-bottom:12px;"></div>
 
-        <div id="genResult" style="display:none;text-align:center;">
-            <img id="genImage" style="max-width:100%;border-radius:8px;border:1px solid #e1e3e6;" />
-            <div style="margin-top:10px;">
-                <a id="genDownload" class="btn btn-secondary" download="ai-image.png" target="_blank" style="font-size:13px;">下载图片</a>
+            <div id="genResult" style="display:none;text-align:center;">
+                <img id="genImage" style="max-width:100%;border-radius:8px;border:1px solid #e1e3e6;" />
+                <div style="margin-top:10px;">
+                    <a id="genDownload" class="btn btn-secondary" download="ai-image.png" target="_blank" style="font-size:13px;">下载图片</a>
+                </div>
             </div>
-        </div>
 
-        <div id="genEmpty" style="text-align:center;padding:40px;color:#909296;">
-            <div style="font-size:36px;margin-bottom:8px;">🎨</div>
-            <div style="font-size:13px;">输入描述，AI 为你生成图片</div>
+            <div id="genEmpty" style="text-align:center;padding:40px;color:#909296;">
+                <div style="font-size:36px;margin-bottom:8px;">🎨</div>
+                <div style="font-size:13px;">输入描述，AI 为你生成图片</div>
+            </div>
         </div>
     </div>
 </div>
@@ -65,7 +71,7 @@ async function doGenerate() {
     var st = document.getElementById('genStatus');
     btn.disabled = true; btn.textContent = '⏳ 生成中...';
     st.style.display = 'block';
-    st.innerHTML = '<div class="status-msg info">⏳ 正在生成图片，请稍候...</div>';
+    st.innerHTML = '<div style="padding:8px 12px;background:#f0edff;border-radius:6px;font-size:13px;color:#5c3dcf;">⏳ 正在生成图片，请稍候...</div>';
     document.getElementById('genResult').style.display = 'none';
     document.getElementById('genEmpty').style.display = 'none';
 
@@ -76,20 +82,20 @@ async function doGenerate() {
             body: JSON.stringify({
                 prompt: prompt,
                 size: document.getElementById('genSize').value,
-                model: document.getElementById('genModel').value
+                profile: document.getElementById('genProfile').value
             })
         });
         var data = await resp.json();
         if (data.ok) {
-            st.innerHTML = '<div class="status-msg success">✅ 生成完成</div>';
+            st.innerHTML = '<div style="padding:8px 12px;background:#d3f9d8;border-radius:6px;font-size:13px;color:#2b8a3e;">✅ 生成完成</div>';
             document.getElementById('genImage').src = data.url;
             document.getElementById('genDownload').href = data.url;
             document.getElementById('genResult').style.display = 'block';
         } else {
-            st.innerHTML = '<div class="status-msg error">❌ ' + (data.error || '生成失败') + '</div>';
+            st.innerHTML = '<div style="padding:8px 12px;background:#ffe0e0;border-radius:6px;font-size:13px;color:#c92a2a;">❌ ' + (data.error || '生成失败') + '</div>';
         }
     } catch(e) {
-        st.innerHTML = '<div class="status-msg error">❌ 请求失败: ' + e.message + '</div>';
+        st.innerHTML = '<div style="padding:8px 12px;background:#ffe0e0;border-radius:6px;font-size:13px;color:#c92a2a;">❌ 请求失败: ' + e.message + '</div>';
     } finally {
         btn.disabled = false; btn.textContent = '生成';
     }

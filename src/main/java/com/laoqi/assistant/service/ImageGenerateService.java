@@ -2,6 +2,7 @@ package com.laoqi.assistant.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.laoqi.assistant.entity.LlmProfileEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -11,6 +12,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.List;
 
 @Service
 public class ImageGenerateService {
@@ -21,27 +23,65 @@ public class ImageGenerateService {
             .connectTimeout(Duration.ofSeconds(30))
             .build();
 
-    // SenseNova 测试配置
-    private static final String API_KEY = "sk-mcMWLtBbj4KmnLh3am9O1XpVQozSDxKL";
-    private static final String BASE_URL = "https://token.sensenova.cn/v1";
+    private final LlmConfigResolver configResolver;
 
-    public String generate(String prompt, String size, String model) {
-        String url = BASE_URL + "/images/generations";
-        String useModel = (model != null && !model.isBlank()) ? model : "sensenova-u1-fast";
+    public ImageGenerateService(LlmConfigResolver configResolver) {
+        this.configResolver = configResolver;
+    }
+
+    /**
+     * 获取所有可用的图片生成模型
+     */
+    public List<LlmProfileEntity> getImageProfiles() {
+        return configResolver.getAllProfiles().stream()
+                .filter(p -> LlmProfileEntity.TYPE_IMAGE.equals(p.getModelType()))
+                .toList();
+    }
+
+    /**
+     * 根据 profile 生成图片
+     */
+    public String generate(String prompt, String size, String profileName) {
+        LlmProfileEntity profile = null;
+
+        if (profileName != null && !profileName.isBlank()) {
+            profile = configResolver.getProfileByName(profileName);
+        }
+        if (profile == null) {
+            profile = getImageProfiles().stream().findFirst().orElse(null);
+        }
+        if (profile == null) {
+            throw new IllegalStateException("未配置图片生成模型，请在配置页添加");
+        }
+
+        String apiKey = profile.getApiKey();
+        String baseUrl = profile.getBaseUrl();
+        String model = profile.getModel();
+
+        if (apiKey == null || apiKey.isBlank()) {
+            throw new IllegalStateException("模型「" + profile.getName() + "」未配置 API Key");
+        }
+        if (baseUrl == null || baseUrl.isBlank()) {
+            throw new IllegalStateException("模型「" + profile.getName() + "」未配置 API 地址");
+        }
+
+        String url = baseUrl.replaceAll("/$", "") + "/images/generations";
         String useSize = (size != null && !size.isBlank()) ? size : "2048x2048";
 
         try {
             String body = mapper.writeValueAsString(java.util.Map.of(
-                    "model", useModel,
+                    "model", model != null ? model : "sensenova-u1-fast",
                     "prompt", prompt,
                     "n", 1,
                     "size", useSize
             ));
 
+            log.info("[ImageGen] 调用: profile={}, model={}, url={}", profile.getName(), model, url);
+
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
                     .header("Content-Type", "application/json")
-                    .header("Authorization", "Bearer " + API_KEY)
+                    .header("Authorization", "Bearer " + apiKey)
                     .POST(HttpRequest.BodyPublishers.ofString(body))
                     .timeout(Duration.ofSeconds(120))
                     .build();
@@ -50,7 +90,7 @@ public class ImageGenerateService {
 
             if (response.statusCode() != 200) {
                 log.error("[ImageGen] API 错误: status={}, body={}", response.statusCode(), response.body());
-                throw new RuntimeException("图片生成失败: HTTP " + response.statusCode());
+                throw new RuntimeException("图片生成失败: HTTP " + response.statusCode() + " - " + response.body());
             }
 
             JsonNode root = mapper.readTree(response.body());
@@ -66,6 +106,8 @@ public class ImageGenerateService {
             }
 
             throw new RuntimeException("图片生成失败: 响应格式异常");
+        } catch (RuntimeException e) {
+            throw e;
         } catch (Exception e) {
             log.error("[ImageGen] 生成失败", e);
             throw new RuntimeException("图片生成失败: " + e.getMessage(), e);

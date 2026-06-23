@@ -11,6 +11,7 @@ public class LlmProfileEntity {
     public static final String TYPE_TEXT = "text";
     public static final String TYPE_MULTIMODAL = "multimodal";
     public static final String TYPE_EMBEDDING = "embedding";
+    public static final String TYPE_IMAGE = "image";
 
     @TableId(type = IdType.AUTO)
     private Long id;

@@ -18,6 +18,7 @@ public class ImageGenerateController {
 
     @GetMapping("/image/generate")
     public String page(Model model) {
+        model.addAttribute("imageProfiles", imageGenerateService.getImageProfiles());
         return "2.0/image_generate";
     }
 
@@ -26,14 +27,14 @@ public class ImageGenerateController {
     public Map<String, Object> generate(@RequestBody Map<String, String> body) {
         String prompt = body.get("prompt");
         String size = body.getOrDefault("size", "2048x2048");
-        String model = body.getOrDefault("model", "sd-turbo");
+        String profileName = body.get("profile");
 
         if (prompt == null || prompt.isBlank()) {
             return Map.of("ok", false, "error", "请输入描述");
         }
 
         try {
-            String imageUrl = imageGenerateService.generate(prompt, size, model);
+            String imageUrl = imageGenerateService.generate(prompt, size, profileName);
             return Map.of("ok", true, "url", imageUrl);
         } catch (Exception e) {
             return Map.of("ok", false, "error", e.getMessage());

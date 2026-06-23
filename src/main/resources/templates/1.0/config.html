@@ -195,6 +195,7 @@
                     <option value="text">文本模型</option>
                     <option value="multimodal">多模态</option>
                     <option value="embedding">向量模型</option>
+                    <option value="image">生成图片</option>
                 </select>
             </div>
         </div>
@@ -528,9 +529,9 @@ function renderLlmModels() {
         '</tr></thead><tbody>';
     llmModels.forEach(function(m) {
         const isDefault = m.isDefault;
-        const typeMap = {'text': '文本模型', 'multimodal': '多模态', 'embedding': '向量模型'};
+        const typeMap = {'text': '文本模型', 'multimodal': '多模态', 'embedding': '向量模型', 'image': '生成图片'};
         const typeLabel = typeMap[m.modelType] || typeMap['text'];
-        const typeBadge = {'text': '#7c5cfc', 'multimodal': '#10b981', 'embedding': '#f59e0b'};
+        const typeBadge = {'text': '#7c5cfc', 'multimodal': '#10b981', 'embedding': '#f59e0b', 'image': '#ec4899'};
         const badgeColor = typeBadge[m.modelType] || '#909296';
         html += '<tr id="lm-row-' + m.id + '">';
         html += '<td><strong>' + escapeHtml(m.name) + '</strong></td>';
