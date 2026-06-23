@@ -2,7 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org"
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{2.0/layout}">
-<head><title>数据导入 - AI 助理</title>
+<head><title>数据 - AI 助理</title>
 <style>
     .data-layout { display:flex; gap:0; height:calc(100vh - 120px); overflow:hidden; max-width:1200px; margin:0 auto; border:1px solid #e1e3e6; border-radius:12px; background:#fff; }
     .data-sidebar { width:240px; min-width:240px; border-right:1px solid #e1e3e6; display:flex; flex-direction:column; background:#fafbfc; }
@@ -15,6 +15,9 @@
     .ds-item .ds-icon { font-size:14px; }
     .ds-item .ds-name { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .ds-item .ds-count { font-size:11px; color:#909296; }
+    .module-group { margin-bottom:4px; }
+    .module-header { font-weight:500; }
+    .dataset-item { font-size:12px; }
     .data-main { flex:1; display:flex; flex-direction:column; min-width:0; }
     .data-main-header { padding:12px 16px; border-bottom:1px solid #eef0f4; display:flex; align-items:center; justify-content:space-between; }
     .data-main-tabs { display:flex; gap:0; border-bottom:1px solid #eef0f4; }
@@ -57,11 +60,14 @@
 <th:block layout:fragment="content">
 
 <div class="data-layout">
-    <!-- 左侧：数据集列表 -->
+    <!-- 左侧：模块和数据集列表 -->
     <div class="data-sidebar">
         <div class="data-sidebar-header">
-            <h3>📦 数据集</h3>
-            <button class="btn btn-primary btn-sm" onclick="showCreateDs()">+ 新建</button>
+            <h3>📦 数据模块</h3>
+            <div style="display:flex;gap:4px;">
+                <button class="btn btn-secondary btn-sm" onclick="showCreateModule()" title="新建模块">📁+</button>
+                <button class="btn btn-primary btn-sm" onclick="showCreateDs()">+ 新建</button>
+            </div>
         </div>
         <div class="ds-list" id="dsList">
             <div class="data-empty" style="padding:30px;font-size:12px;">加载中...</div>
@@ -118,6 +124,12 @@
             <textarea id="dsDesc" rows="2" placeholder="数据集用途说明" style="resize:vertical;"></textarea>
         </div>
         <div class="form-group" style="margin-bottom:10px;">
+            <label>归属模块</label>
+            <select id="dsModule">
+                <option value="">不归属模块</option>
+            </select>
+        </div>
+        <div class="form-group" style="margin-bottom:10px;">
             <label>存储目录</label>
             <input id="dsDir" type="text" placeholder="相对于笔记库根目录（可选）">
         </div>
@@ -139,7 +151,19 @@ const KB_ID = /*[[${kbId}]]*/ null;
 
 const API = '/api/datacenter';
 let datasets = [];
+let modules = [];
 let currentDs = null;
+let currentModule = null;
+
+// ========== 模块 CRUD ==========
+async function loadModules() {
+    try {
+        const r = await fetch(API + '/modules');
+        const d = await r.json();
+        modules = d.ok ? d.data : [];
+        await loadDatasets();
+    } catch(e) { console.error(e); }
+}
 
 // ========== 数据集 CRUD ==========
 async function loadDatasets() {
@@ -153,17 +177,108 @@ async function loadDatasets() {
 
 function renderDsList() {
     const el = document.getElementById('dsList');
-    if (!datasets.length) {
-        el.innerHTML = '<div class="data-empty" style="padding:30px;font-size:12px;">暂无数据集<br>点击上方「+ 新建」</div>';
-        return;
+    
+    // 按模块分组
+    const moduleMap = {};
+    modules.forEach(m => { moduleMap[m.id] = {...m, datasets: []}; });
+    
+    // 未分组的数据集
+    const ungrouped = [];
+    datasets.forEach(ds => {
+        if (ds.moduleId && moduleMap[ds.moduleId]) {
+            moduleMap[ds.moduleId].datasets.push(ds);
+        } else {
+            ungrouped.push(ds);
+        }
+    });
+    
+    let html = '';
+    
+    // 渲染模块
+    for (const moduleId in moduleMap) {
+        const m = moduleMap[moduleId];
+        const isExpanded = currentModule === moduleId;
+        html += '<div class="module-group">'
+            + '<div class="ds-item module-header' + (isExpanded ? ' active' : '') + '" onclick="toggleModule(\'' + moduleId + '\')">'
+            + '<span class="ds-icon">' + (m.icon || '📁') + '</span>'
+            + '<span class="ds-name">' + m.name + '</span>'
+            + '<span class="ds-count">' + m.datasets.length + '</span>'
+            + '</div>';
+        if (isExpanded) {
+            m.datasets.forEach(ds => {
+                html += '<div class="ds-item dataset-item' + (currentDs && currentDs.id === ds.id ? ' active' : '') + '" onclick="selectDs(\'' + ds.id + '\')" style="padding-left:36px;">'
+                    + '<span class="ds-icon">📦</span>'
+                    + '<span class="ds-name">' + ds.name + '</span>'
+                    + '<span class="ds-count">' + (ds.recordCount || 0) + '</span>'
+                    + '</div>';
+            });
+        }
+        html += '</div>';
     }
-    el.innerHTML = datasets.map(ds =>
-        '<div class="ds-item' + (currentDs && currentDs.id === ds.id ? ' active' : '') + '" onclick="selectDs(\'' + ds.id + '\')">'
-        + '<span class="ds-icon">📦</span>'
-        + '<span class="ds-name">' + ds.name + '</span>'
-        + '<span class="ds-count">' + (ds.recordCount || 0) + '</span>'
-        + '</div>'
-    ).join('');
+    
+    // 渲染未分组的数据集
+    if (ungrouped.length > 0) {
+        html += '<div class="module-group">'
+            + '<div class="ds-item module-header" style="color:#909296;">'
+            + '<span class="ds-icon">📋</span>'
+            + '<span class="ds-name">未分组</span>'
+            + '<span class="ds-count">' + ungrouped.length + '</span>'
+            + '</div>';
+        ungrouped.forEach(ds => {
+            html += '<div class="ds-item dataset-item' + (currentDs && currentDs.id === ds.id ? ' active' : '') + '" onclick="selectDs(\'' + ds.id + '\')" style="padding-left:36px;">'
+                + '<span class="ds-icon">📦</span>'
+                + '<span class="ds-name">' + ds.name + '</span>'
+                + '<span class="ds-count">' + (ds.recordCount || 0) + '</span>'
+                + '</div>';
+        });
+        html += '</div>';
+    }
+    
+    if (!html) {
+        html = '<div class="data-empty" style="padding:30px;font-size:12px;">暂无数据<br>点击上方「+ 新建」</div>';
+    }
+    
+    el.innerHTML = html;
+}
+
+function toggleModule(moduleId) {
+    currentModule = currentModule === moduleId ? null : moduleId;
+    renderDsList();
+}
+
+function showCreateModule() {
+    document.getElementById('createModuleModal').style.display = 'flex';
+}
+
+async function createModule() {
+    const name = document.getElementById('moduleName').value.trim();
+    if (!name) { toast('请输入模块名称', 'error'); return; }
+    try {
+        const r = await fetch(API + '/modules', {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({
+                name: name,
+                description: document.getElementById('moduleDesc').value.trim(),
+                icon: document.getElementById('moduleIcon').value.trim() || '📁'
+            })
+        });
+        const d = await r.json();
+        if (d.ok) {
+            closeModal('createModuleModal');
+            toast('模块已创建');
+            await loadModules();
+        } else { toast(d.error || '创建失败', 'error'); }
+    } catch(e) { toast('请求失败', 'error'); }
+}
+
+async function deleteModule(moduleId) {
+    if (!confirm('确定删除此模块？（数据集不会被删除）')) return;
+    try {
+        await fetch(API + '/modules/' + moduleId, {method:'DELETE'});
+        currentModule = null;
+        await loadModules();
+        toast('模块已删除');
+    } catch(e) { toast('删除失败', 'error'); }
 }
 
 async function selectDs(id) {
@@ -194,6 +309,17 @@ function showCreateDs() {
     document.getElementById('dsDesc').value = '';
     document.getElementById('dsDir').value = '';
     document.getElementById('dsSchema').value = '';
+    
+    // 填充模块选择器
+    const moduleSelect = document.getElementById('dsModule');
+    moduleSelect.innerHTML = '<option value="">不归属模块</option>';
+    modules.forEach(m => {
+        moduleSelect.innerHTML += '<option value="' + m.id + '">' + (m.icon || '📁') + ' ' + m.name + '</option>';
+    });
+    if (currentModule) {
+        moduleSelect.value = currentModule;
+    }
+    
     document.getElementById('dsName').focus();
 }
 
@@ -207,6 +333,7 @@ async function createDataset() {
     if (!name) { toast('请输入名称', 'error'); return; }
     const schemaText = document.getElementById('dsSchema').value.trim();
     const fields = schemaText ? schemaText.split('\n').filter(l => l.trim()).map(l => ({name: l.trim(), type: 'string'})) : [];
+    const moduleId = document.getElementById('dsModule').value || null;
     try {
         const r = await fetch(API + '/datasets', {
             method: 'POST', headers: {'Content-Type':'application/json'},
@@ -214,6 +341,7 @@ async function createDataset() {
                 name: name,
                 description: document.getElementById('dsDesc').value.trim(),
                 outputDir: document.getElementById('dsDir').value.trim(),
+                moduleId: moduleId,
                 schema: { fields: fields }
             })
         });
@@ -221,7 +349,7 @@ async function createDataset() {
         if (d.ok) {
             closeModal('createDsModal');
             toast('数据集已创建');
-            await loadDatasets();
+            await loadModules();
             selectDs(d.data.id);
         } else { toast(d.error || '创建失败', 'error'); }
     } catch(e) { toast('请求失败', 'error'); }
@@ -500,8 +628,31 @@ async function doExport() {
 function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 // ========== 初始化 ==========
-loadDatasets();
+loadModules();
 </script>
+
+<!-- 新建模块弹窗 -->
+<div id="createModuleModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1000;justify-content:center;align-items:center;" onclick="closeModal('createModuleModal',event)">
+    <div style="background:#fff;border-radius:12px;padding:24px;width:400px;max-width:92vw;box-shadow:0 8px 32px rgba(0,0,0,0.15);" onclick="event.stopPropagation()">
+        <h3 style="margin:0 0 16px;font-size:16px;">新建数据模块</h3>
+        <div class="form-group" style="margin-bottom:10px;">
+            <label>模块名称 *</label>
+            <input id="moduleName" type="text" placeholder="如：客户管理">
+        </div>
+        <div class="form-group" style="margin-bottom:10px;">
+            <label>描述</label>
+            <input id="moduleDesc" type="text" placeholder="模块用途说明">
+        </div>
+        <div class="form-group" style="margin-bottom:16px;">
+            <label>图标</label>
+            <input id="moduleIcon" type="text" placeholder="📁" value="📁">
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button class="btn btn-secondary" onclick="closeModal('createModuleModal')">取消</button>
+            <button class="btn btn-primary" onclick="createModule()">创建</button>
+        </div>
+    </div>
+</div>
 
 </th:block>
 </body>

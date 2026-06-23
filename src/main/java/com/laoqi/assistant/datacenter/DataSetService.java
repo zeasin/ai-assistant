@@ -72,6 +72,7 @@ public class DataSetService {
                     description     TEXT,
                     schema_json     TEXT,
                     import_configs_json TEXT,
+                    module_id       TEXT,
                     created_at      TEXT NOT NULL,
                     updated_at      TEXT NOT NULL
                 )
@@ -89,6 +90,14 @@ public class DataSetService {
                 """);
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_records_dataset ON data_center_records(dataset_id)");
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_records_hash ON data_center_records(dataset_id, content_hash)");
+
+            // Add module_id column if not exists (for existing databases)
+            try {
+                stmt.execute("ALTER TABLE data_center_datasets ADD COLUMN module_id TEXT");
+            } catch (Exception e) {
+                // Column already exists, ignore
+            }
+
             log.info("Data center tables initialized");
         } catch (Exception e) {
             throw new RuntimeException("Failed to create data center tables", e);
@@ -179,6 +188,7 @@ public class DataSetService {
         if (update.getDescription() != null) existing.setDescription(update.getDescription());
         if (update.getSchema() != null) existing.setSchema(update.getSchema());
         if (update.getImportConfigs() != null) existing.setImportConfigs(update.getImportConfigs());
+        if (update.getModuleId() != null) existing.setModuleId(update.getModuleId());
         existing.setUpdatedAt(TimeUtil.nowStr());
 
         saveDatasetToDb(existing);
@@ -283,6 +293,7 @@ public class DataSetService {
                 existing.setDescription(ds.getDescription());
                 existing.setSchemaJson(schemaJson);
                 existing.setImportConfigsJson(importJson);
+                existing.setModuleId(ds.getModuleId());
                 existing.setUpdatedAt(ds.getUpdatedAt());
                 dataSetDbService.updateById(existing);
             } else {
@@ -292,6 +303,7 @@ public class DataSetService {
                 entity.setDescription(ds.getDescription());
                 entity.setSchemaJson(schemaJson);
                 entity.setImportConfigsJson(importJson);
+                entity.setModuleId(ds.getModuleId());
                 entity.setCreatedAt(ds.getCreatedAt());
                 entity.setUpdatedAt(ds.getUpdatedAt());
                 dataSetDbService.save(entity);
@@ -324,6 +336,7 @@ public class DataSetService {
         ds.setId(entity.getDatasetId());
         ds.setName(entity.getName());
         ds.setDescription(entity.getDescription());
+        ds.setModuleId(entity.getModuleId());
         ds.setCreatedAt(entity.getCreatedAt());
         ds.setUpdatedAt(entity.getUpdatedAt());
         try {

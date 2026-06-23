@@ -2,6 +2,7 @@ package com.laoqi.assistant.controller;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.laoqi.assistant.datacenter.DataModuleService;
 import com.laoqi.assistant.datacenter.DataSetImportService;
 import com.laoqi.assistant.datacenter.DataSetService;
 import com.laoqi.assistant.datacenter.model.*;
@@ -29,15 +30,18 @@ public class DataSetController {
     private static final Pattern JSON_BLOCK = Pattern.compile("```(?:json)?\\s*([\\s\\S]*?)\\s*```");
 
     private final DataSetService dataSetService;
+    private final DataModuleService moduleService;
     private final DataSetImportService importService;
     private final LlmService llmService;
     private final ConfigService configService;
 
     public DataSetController(DataSetService dataSetService,
+                             DataModuleService moduleService,
                              DataSetImportService importService,
                              LlmService llmService,
                              ConfigService configService) {
         this.dataSetService = dataSetService;
+        this.moduleService = moduleService;
         this.importService = importService;
         this.llmService = llmService;
         this.configService = configService;
@@ -48,6 +52,70 @@ public class DataSetController {
             throw new IllegalStateException("LLM API Key 未配置");
         }
         return llmService.chat(systemPrompt, userMessage);
+    }
+
+    // ========== Module APIs ==========
+
+    @GetMapping("/modules")
+    public ResponseEntity<Map<String, Object>> listModules() {
+        return ResponseEntity.ok(Map.of("ok", true, "data", moduleService.getAllModules()));
+    }
+
+    @GetMapping("/modules/{id}")
+    public ResponseEntity<Map<String, Object>> getModule(@PathVariable String id) {
+        Map<String, Object> module = moduleService.getModule(id);
+        if (module == null) {
+            return ResponseEntity.ok(Map.of("ok", false, "error", "模块不存在"));
+        }
+        return ResponseEntity.ok(Map.of("ok", true, "data", module));
+    }
+
+    @PostMapping("/modules")
+    public ResponseEntity<Map<String, Object>> createModule(@RequestBody Map<String, String> body) {
+        try {
+            String name = body.get("name");
+            String description = body.get("description");
+            String icon = body.get("icon");
+            Map<String, Object> module = moduleService.createModule(name, description, icon);
+            return ResponseEntity.ok(Map.of("ok", true, "data", module));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("ok", false, "error", e.getMessage()));
+        }
+    }
+
+    @PutMapping("/modules/{id}")
+    public ResponseEntity<Map<String, Object>> updateModule(@PathVariable String id, @RequestBody Map<String, Object> body) {
+        try {
+            String name = (String) body.get("name");
+            String description = (String) body.get("description");
+            String icon = (String) body.get("icon");
+            Integer sortOrder = body.get("sortOrder") != null ? ((Number) body.get("sortOrder")).intValue() : null;
+            Map<String, Object> module = moduleService.updateModule(id, name, description, icon, sortOrder);
+            if (module == null) {
+                return ResponseEntity.ok(Map.of("ok", false, "error", "模块不存在"));
+            }
+            return ResponseEntity.ok(Map.of("ok", true, "data", module));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("ok", false, "error", e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/modules/{id}")
+    public ResponseEntity<Map<String, Object>> deleteModule(@PathVariable String id) {
+        boolean deleted = moduleService.deleteModule(id);
+        if (!deleted) {
+            return ResponseEntity.ok(Map.of("ok", false, "error", "模块不存在"));
+        }
+        return ResponseEntity.ok(Map.of("ok", true));
+    }
+
+    @GetMapping("/modules/{id}/datasets")
+    public ResponseEntity<Map<String, Object>> getModuleDatasets(@PathVariable String id) {
+        List<DataSet> allDatasets = dataSetService.getAllDatasets();
+        List<DataSet> moduleDatasets = allDatasets.stream()
+            .filter(ds -> id.equals(ds.getModuleId()))
+            .toList();
+        return ResponseEntity.ok(Map.of("ok", true, "data", moduleDatasets, "total", moduleDatasets.size()));
     }
 
     @GetMapping("/datasets")
