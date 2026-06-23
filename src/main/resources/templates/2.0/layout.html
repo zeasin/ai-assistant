@@ -266,7 +266,7 @@
         <div class="sidebar-kb-section">
             <div class="sidebar-kb-header">
                 笔记库
-                <button class="add-btn" onclick="location.href='/'" title="管理笔记库">+</button>
+                <button class="add-btn" onclick="showAddKbModal()" title="新建笔记库">+</button>
             </div>
             <ul class="sidebar-kb-list">
                 <li th:each="kb : ${kbList}">
@@ -277,43 +277,49 @@
                     </a>
                 </li>
                 <li th:unless="${#lists.size(kbList) > 0}">
-                    <a href="/" style="color:#909296;font-size:12px;">暂无笔记库</a>
+                    <a href="javascript:void(0)" onclick="showAddKbModal()" style="color:#909296;font-size:12px;">暂无笔记库，点击添加</a>
                 </li>
             </ul>
         </div>
 
-        <!-- 导航菜单 -->
-        <nav class="sidebar-nav">
+        <!-- 笔记库相关功能（选中 KB 后显示） -->
+        <nav class="sidebar-nav" th:if="${currentKb != null}">
             <div class="sidebar-group">
-                <div class="sidebar-group-label">识图</div>
-                <a th:classappend="${requestURI == '/image/general'} ? 'active' : ''" href="/image/general">
+                <div class="sidebar-group-label">工具</div>
+                <a th:href="@{/image/general(kbId=${currentKb.id})}"
+                   th:classappend="${requestURI == '/image/general'} ? 'active' : ''">
                     <span class="nav-icon">🖼️</span><span>通用识别</span>
                 </a>
-                <a th:classappend="${requestURI == '/image/solve'} ? 'active' : ''" href="/image/solve">
+                <a th:href="@{/image/solve}"
+                   th:classappend="${requestURI == '/image/solve'} ? 'active' : ''">
                     <span class="nav-icon">❓</span><span>识题</span>
                 </a>
-                <a th:classappend="${requestURI == '/image/exam'} ? 'active' : ''" href="/image/exam">
+                <a th:href="@{/image/exam}"
+                   th:classappend="${requestURI == '/image/exam'} ? 'active' : ''">
                     <span class="nav-icon">📝</span><span>试卷识别</span>
                 </a>
             </div>
 
             <div class="sidebar-group">
                 <div class="sidebar-group-label">数据</div>
-                <a th:classappend="${requestURI == '/data/import'} ? 'active' : ''" href="/data/import">
+                <a th:href="@{/data(kbId=${currentKb.id})}"
+                   th:classappend="${requestURI.startsWith('/data')} ? 'active' : ''">
                     <span class="nav-icon">📥</span><span>数据导入</span>
-                </a>
-                <a th:classappend="${requestURI == '/data/collector'} ? 'active' : ''" href="/data/collector">
-                    <span class="nav-icon">🔧</span><span>数据采集</span>
-                </a>
-                <a th:classappend="${requestURI == '/data/processing'} ? 'active' : ''" href="/data/processing">
-                    <span class="nav-icon">📋</span><span>数据加工</span>
                 </a>
             </div>
 
             <div class="sidebar-group">
-                <a th:classappend="${requestURI == '/planner'} ? 'active' : ''" href="/planner">
+                <a href="/planner"
+                   th:classappend="${requestURI == '/planner'} ? 'active' : ''">
                     <span class="nav-icon">📋</span><span>计划</span>
                 </a>
+            </div>
+        </nav>
+
+        <!-- 未选中 KB 时的提示 -->
+        <nav class="sidebar-nav" th:unless="${currentKb != null}">
+            <div style="padding:16px;text-align:center;color:#909296;font-size:12px;">
+                请先选择一个笔记库
             </div>
         </nav>
 
@@ -338,6 +344,25 @@
         </div>
     </aside>
 
+    <!-- 新建笔记库弹窗 -->
+    <div id="addKbModal" class="modal-overlay" onclick="closeAddKbModal(event)">
+        <div class="modal" onclick="event.stopPropagation()">
+            <h3>新建笔记库</h3>
+            <div class="form-group" style="margin-bottom:12px;">
+                <label>名称</label>
+                <input id="newKbName" type="text" placeholder="如：工作笔记">
+            </div>
+            <div class="form-group" style="margin-bottom:16px;">
+                <label>笔记库路径</label>
+                <input id="newKbDir" type="text" placeholder="如：/Users/me/notes">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeAddKbModal()">取消</button>
+                <button class="btn btn-primary" onclick="createKb()">创建</button>
+            </div>
+        </div>
+    </div>
+
     <!-- ========== 主内容区 ========== -->
     <main class="main-content">
         <div class="main-body">
@@ -361,6 +386,38 @@
             t.textContent = msg;
             document.body.appendChild(t);
             setTimeout(() => t.remove(), 2500);
+        }
+
+        function showAddKbModal() {
+            document.getElementById('addKbModal').classList.add('active');
+            document.getElementById('newKbName').value = '';
+            document.getElementById('newKbDir').value = '';
+            document.getElementById('newKbName').focus();
+        }
+        function closeAddKbModal(e) {
+            if (e && e.target !== e.currentTarget) return;
+            document.getElementById('addKbModal').classList.remove('active');
+        }
+        async function createKb() {
+            var name = document.getElementById('newKbName').value.trim();
+            var dir = document.getElementById('newKbDir').value.trim();
+            if (!name || !dir) { toast('请填写名称和路径', 'error'); return; }
+            try {
+                var resp = await fetch('/api/kb/save', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({name: name, notesDir: dir})
+                });
+                var data = await resp.json();
+                if (data.ok) {
+                    toast('笔记库已创建');
+                    location.reload();
+                } else {
+                    toast(data.error || '创建失败', 'error');
+                }
+            } catch(e) {
+                toast('请求失败: ' + e.message, 'error');
+            }
         }
     </script>
 </body>
