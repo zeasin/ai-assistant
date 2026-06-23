@@ -285,12 +285,6 @@
         <!-- 导航菜单 -->
         <nav class="sidebar-nav">
             <div class="sidebar-group">
-                <a th:classappend="${requestURI == '/chat'} ? 'active' : ''" href="/chat">
-                    <span class="nav-icon">💬</span><span>对话</span>
-                </a>
-            </div>
-
-            <div class="sidebar-group">
                 <div class="sidebar-group-label">识图</div>
                 <a th:classappend="${requestURI == '/image/general'} ? 'active' : ''" href="/image/general">
                     <span class="nav-icon">🖼️</span><span>通用识别</span>
@@ -320,9 +314,6 @@
                 <a th:classappend="${requestURI == '/planner'} ? 'active' : ''" href="/planner">
                     <span class="nav-icon">📋</span><span>计划</span>
                 </a>
-                <a th:if="${codingEnabled}" th:classappend="${requestURI == '/coding'} ? 'active' : ''" href="/coding">
-                    <span class="nav-icon">💻</span><span>编程AI</span>
-                </a>
             </div>
         </nav>
 
@@ -331,6 +322,10 @@
             <a th:classappend="${#strings.startsWith(requestURI, '/config')} ? 'active' : ''" href="/config"
                style="display:flex;align-items:center;gap:10px;padding:8px 16px;font-size:13px;color:#5c5f66;text-decoration:none;">
                 <span class="nav-icon" style="width:18px;text-align:center;font-size:14px;">⚙️</span><span>配置</span>
+            </a>
+            <a th:if="${codingEnabled}" th:classappend="${requestURI == '/coding'} ? 'active' : ''" href="/coding"
+               style="display:flex;align-items:center;gap:10px;padding:8px 16px;font-size:13px;color:#5c5f66;text-decoration:none;">
+                <span class="nav-icon" style="width:18px;text-align:center;font-size:14px;">💻</span><span>编程AI</span>
             </a>
             <a th:classappend="${requestURI == '/log'} ? 'active' : ''" href="/log"
                style="display:flex;align-items:center;gap:10px;padding:8px 16px;font-size:13px;color:#5c5f66;text-decoration:none;">
