@@ -2,6 +2,7 @@ package com.laoqi.assistant.controller;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.laoqi.assistant.datacenter.AiAnalysisCache;
 import com.laoqi.assistant.datacenter.DataModuleService;
 import com.laoqi.assistant.datacenter.DataSetImportService;
 import com.laoqi.assistant.datacenter.DataSetService;
@@ -34,17 +35,20 @@ public class DataSetController {
     private final DataSetImportService importService;
     private final LlmService llmService;
     private final ConfigService configService;
+    private final AiAnalysisCache analysisCache;
 
     public DataSetController(DataSetService dataSetService,
                              DataModuleService moduleService,
                              DataSetImportService importService,
                              LlmService llmService,
-                             ConfigService configService) {
+                             ConfigService configService,
+                             AiAnalysisCache analysisCache) {
         this.dataSetService = dataSetService;
         this.moduleService = moduleService;
         this.importService = importService;
         this.llmService = llmService;
         this.configService = configService;
+        this.analysisCache = analysisCache;
     }
 
     private String doAiChat(String systemPrompt, String userMessage) throws Exception {
@@ -52,6 +56,79 @@ public class DataSetController {
             throw new IllegalStateException("LLM API Key 未配置");
         }
         return llmService.chat(systemPrompt, userMessage);
+    }
+
+    // ========== LLM Chat API ==========
+    @PostMapping("/llm/chat")
+    public ResponseEntity<Map<String, Object>> llmChat(@RequestBody Map<String, String> body) {
+        try {
+            String system = body.getOrDefault("system", "你是一个数据分析助手。");
+            String user = body.get("user");
+            if (user == null || user.isBlank()) {
+                return ResponseEntity.ok(Map.of("ok", false, "error", "消息不能为空"));
+            }
+            String reply = doAiChat(system, user);
+            return ResponseEntity.ok(Map.of("ok", true, "reply", reply));
+        } catch (Exception e) {
+            return ResponseEntity.ok(Map.of("ok", false, "error", e.getMessage()));
+        }
+    }
+
+    // ========== AI Analysis API ==========
+    @GetMapping("/modules/{moduleId}/analysis")
+    public ResponseEntity<Map<String, Object>> getModuleAnalysis(@PathVariable String moduleId) {
+        String cached = analysisCache.get(moduleId);
+        Map<String, Object> result = new HashMap<>();
+        result.put("ok", true);
+        result.put("cached", cached != null);
+        result.put("reply", cached);
+        return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/modules/{moduleId}/analysis")
+    public ResponseEntity<Map<String, Object>> generateModuleAnalysis(
+            @PathVariable String moduleId,
+            @RequestBody Map<String, Object> body) {
+        try {
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> datasets = (List<Map<String, Object>>) body.get("datasets");
+
+            StringBuilder summary = new StringBuilder();
+            summary.append("模块数据概览分析：\n\n");
+
+            if (datasets != null) {
+                for (Map<String, Object> ds : datasets) {
+                    summary.append("数据集：").append(ds.get("name")).append("（").append(ds.get("count")).append("条记录）\n");
+                    if (ds.get("fields") != null) {
+                        summary.append("字段：").append(ds.get("fields")).append("\n");
+                    }
+                    if (ds.get("sample") != null) {
+                        summary.append("样本数据：").append(ds.get("sample")).append("\n");
+                    }
+                    summary.append("\n");
+                }
+            }
+
+            String systemPrompt = "你是一个数据分析助手。请根据提供的数据生成简要的分析报告，包括：\n"
+                    + "1. 数据概览（总量、分布）\n"
+                    + "2. 关键发现（亮点、异常）\n"
+                    + "3. 趋势分析（如有时间维度）\n"
+                    + "4. 建议（基于数据的建议）\n"
+                    + "使用简洁的中文，用HTML格式输出（用<h4>、<p>、<ul><li>等标签）。";
+
+            String reply = doAiChat(systemPrompt, summary.toString());
+            analysisCache.put(moduleId, reply);
+
+            return ResponseEntity.ok(Map.of("ok", true, "reply", reply, "cached", false));
+        } catch (Exception e) {
+            return ResponseEntity.ok(Map.of("ok", false, "error", e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/modules/{moduleId}/analysis")
+    public ResponseEntity<Map<String, Object>> clearModuleAnalysis(@PathVariable String moduleId) {
+        analysisCache.invalidate(moduleId);
+        return ResponseEntity.ok(Map.of("ok", true));
     }
 
     // ========== Module APIs ==========

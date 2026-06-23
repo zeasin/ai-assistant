@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{2.0/layout}">
+<head><title id="pageTitle">模块 - 数据</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+    .data-page { max-width:1200px; margin:0 auto; padding:20px; }
+    .page-header { display:flex; align-items:center; gap:12px; margin-bottom:20px; }
+    .page-back { font-size:20px; color:#7c5cfc; text-decoration:none; }
+    .page-back:hover { opacity:0.8; }
+    .page-title { font-size:20px; font-weight:600; margin:0; }
+    .page-desc { font-size:13px; color:#909296; }
+    .page-stats { display:flex; gap:20px; margin-left:auto; }
+    .stat-item { text-align:center; }
+    .stat-value { font-size:18px; font-weight:600; color:#7c5cfc; }
+    .stat-label { font-size:11px; color:#909296; }
+    .page-actions { display:flex; gap:8px; }
+
+    .btn { display:inline-flex; align-items:center; gap:5px; padding:7px 14px; border:none; border-radius:6px; font-size:13px; cursor:pointer; transition:all .15s; }
+    .btn-primary { background:#7c5cfc; color:#fff; }
+    .btn-primary:hover { background:#6a4ae0; }
+    .btn-secondary { background:#f0f0f5; color:#5c5f66; }
+    .btn-secondary:hover { background:#e5e5ea; }
+    .btn-danger { background:#ffe0e0; color:#c92a2a; }
+    .btn-sm { padding:5px 10px; font-size:12px; }
+
+    /* Tab导航 */
+    .tabs-nav { display:flex; gap:0; border-bottom:2px solid #eef0f4; margin-bottom:0; }
+    .tab-btn { padding:12px 20px; font-size:14px; cursor:pointer; border:none; background:none; color:#5c5f66; border-bottom:2px solid transparent; margin-bottom:-2px; transition:all .15s; display:flex; align-items:center; gap:6px; }
+    .tab-btn:hover { color:#1a1b1e; }
+    .tab-btn.active { color:#7c5cfc; border-bottom-color:#7c5cfc; font-weight:600; }
+    .tab-btn .tab-icon { font-size:16px; }
+    .tab-btn .tab-count { font-size:11px; color:#909296; background:#f0f0f5; padding:1px 6px; border-radius:8px; }
+    .tab-btn-add { color:#909296; }
+    .tab-btn-add:hover { color:#7c5cfc; }
+
+    .tab-content { background:#fff; border:1px solid #eef0f4; border-top:none; border-radius:0 0 12px 12px; padding:20px; min-height:400px; }
+
+    /* 概览 */
+    .overview-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:16px; margin-bottom:20px; }
+    .overview-card { background:#fafbfc; border:1px solid #eef0f4; border-radius:10px; padding:16px; }
+    .overview-card h4 { margin:0 0 12px; font-size:14px; color:#1a1b1e; }
+    .overview-chart { height:240px; }
+    .ai-analysis { background:linear-gradient(135deg, #f8f6ff 0%, #fafbfc 100%); border:1px solid #e8dff5; border-radius:10px; padding:20px; }
+    .ai-analysis h4 { margin:0 0 12px; font-size:14px; color:#7c5cfc; display:flex; align-items:center; gap:6px; }
+    .ai-analysis-content { font-size:13px; line-height:1.8; color:#3d3d3d; }
+    .ai-loading { text-align:center; color:#909296; padding:40px; }
+
+    /* 工具栏 */
+    .toolbar { display:flex; gap:10px; align-items:center; margin-bottom:16px; padding:12px 16px; background:#fafbfc; border:1px solid #eef0f4; border-radius:10px; }
+    .search-box { position:relative; flex:1; max-width:300px; }
+    .search-box input { width:100%; padding:8px 12px 8px 32px; border:1px solid #e1e3e6; border-radius:6px; font-size:13px; outline:none; }
+    .search-box input:focus { border-color:#7c5cfc; }
+    .search-box::before { content:"🔍"; position:absolute; left:10px; top:50%; transform:translateY(-50%); font-size:12px; }
+
+    /* 表格 */
+    .data-table { width:100%; border-collapse:collapse; font-size:13px; }
+    .data-table th { text-align:left; padding:9px 12px; border-bottom:2px solid #e1e3e6; color:#5c5f66; font-weight:600; font-size:12px; background:#fafbfc; white-space:nowrap; position:sticky; top:0; }
+    .data-table td { padding:8px 12px; border-bottom:1px solid #f0f0f0; max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .data-table tr:hover td { background:#fafafe; }
+
+    /* 弹窗 */
+    .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:1000; justify-content:center; align-items:center; }
+    .modal-box { background:#fff; border-radius:12px; box-shadow:0 8px 32px rgba(0,0,0,0.18); max-width:92vw; }
+    .modal-header { padding:16px 20px; border-bottom:1px solid #eef0f4; display:flex; justify-content:space-between; align-items:center; }
+    .modal-header h3 { margin:0; font-size:16px; }
+    .modal-body { padding:20px; max-height:70vh; overflow-y:auto; }
+    .modal-footer { padding:12px 20px; border-top:1px solid #eef0f4; display:flex; justify-content:flex-end; gap:8px; }
+    .form-group { display:flex; flex-direction:column; gap:4px; margin-bottom:14px; }
+    .form-group label { font-size:12px; color:#5c5f66; font-weight:500; }
+    .form-group input, .form-group select, .form-group textarea { padding:8px 10px; border:1px solid #e1e3e6; border-radius:6px; font-size:13px; outline:none; }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color:#7c5cfc; }
+
+    .msg { padding:8px 12px; border-radius:6px; font-size:13px; margin-bottom:10px; }
+    .msg-success { background:#f0fdf4; color:#27ae60; }
+    .msg-error { background:#fff5f5; color:#d32f2f; }
+    .msg-info { background:#f0edff; color:#5c3dcf; }
+    .badge { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; }
+    .badge-gray { background:#f0f0f0; color:#909296; }
+
+    .empty-state { text-align:center; color:#909296; padding:40px; }
+    .empty-state .icon { font-size:36px; margin-bottom:10px; }
+</style>
+</head>
+<body>
+<th:block layout:fragment="content">
+
+<div class="data-page">
+    <div class="page-header">
+        <a href="/data" class="page-back">←</a>
+        <span id="moduleIcon" style="font-size:28px;"></span>
+        <h2 class="page-title" id="moduleName"></h2>
+        <span class="page-desc" id="moduleDesc"></span>
+        <div class="page-stats">
+            <div class="stat-item"><div class="stat-value" id="statDs">0</div><div class="stat-label">数据集</div></div>
+            <div class="stat-item"><div class="stat-value" id="statRecords">0</div><div class="stat-label">总记录</div></div>
+        </div>
+        <div class="page-actions">
+            <button class="btn btn-secondary" onclick="showEditModule()">✏️ 编辑模块</button>
+        </div>
+    </div>
+
+    <div class="tabs-nav" id="tabsNav">
+        <button class="tab-btn active" onclick="switchTab('overview',this)">
+            <span class="tab-icon">📊</span> 概览
+        </button>
+    </div>
+
+    <div class="tab-content" id="tabContent"></div>
+</div>
+
+<!-- 编辑模块弹窗 -->
+<div id="moduleModal" class="modal-overlay" onclick="closeModal('moduleModal',event)">
+    <div class="modal-box" style="width:420px;" onclick="event.stopPropagation()">
+        <div class="modal-header"><h3>编辑模块</h3><button class="btn btn-secondary" onclick="closeModal('moduleModal')">✕</button></div>
+        <div class="modal-body">
+            <div class="form-group"><label>模块名称 *</label><input id="editModName" type="text"></div>
+            <div class="form-group"><label>描述</label><input id="editModDesc" type="text"></div>
+            <div class="form-group"><label>图标</label><input id="editModIcon" type="text"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('moduleModal')">取消</button>
+            <button class="btn btn-primary" onclick="saveModule()">保存</button>
+        </div>
+    </div>
+</div>
+
+<!-- 新建数据集弹窗 -->
+<div id="dsModal" class="modal-overlay" onclick="closeModal('dsModal',event)">
+    <div class="modal-box" style="width:520px;" onclick="event.stopPropagation()">
+        <div class="modal-header"><h3 id="dsModalTitle">新建数据集</h3><button class="btn btn-secondary" onclick="closeModal('dsModal')">✕</button></div>
+        <div class="modal-body">
+            <input type="hidden" id="editDsId">
+            <div class="form-group"><label>名称 *</label><input id="dsName" type="text" placeholder="如：客户信息"></div>
+            <div class="form-group"><label>描述</label><textarea id="dsDesc" rows="2" style="resize:vertical;"></textarea></div>
+            <div class="form-group"><label>Schema 字段（每行一个）</label><textarea id="dsSchema" rows="4" style="resize:vertical;font-family:monospace;font-size:12px;" placeholder="name&#10;phone&#10;company"></textarea></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('dsModal')">取消</button>
+            <button class="btn btn-primary" onclick="saveDataset()">保存</button>
+        </div>
+    </div>
+</div>
+
+<!-- 记录表单弹窗 -->
+<div id="recordModal" class="modal-overlay" onclick="closeModal('recordModal',event)">
+    <div class="modal-box" style="width:520px;" onclick="event.stopPropagation()">
+        <div class="modal-header"><h3 id="recordModalTitle">新增记录</h3><button class="btn btn-secondary" onclick="closeModal('recordModal')">✕</button></div>
+        <div class="modal-body" id="recordFormBody"></div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('recordModal')">取消</button>
+            <button class="btn btn-primary" onclick="saveRecord()">保存</button>
+        </div>
+    </div>
+</div>
+
+<script th:inline="javascript">
+/*<![CDATA[*/
+const MODULE_ID = /*[[${moduleId}]]*/ '';
+const KB_ID = /*[[${kbId}]]*/ null;
+/*]]>*/
+
+const API = '/api/datacenter';
+let moduleData = null, datasets = [], currentDs = null, currentTab = 'overview';
+let allRecords = {};
+let charts = {};
+
+async function loadAll() {
+    const [mRes, dRes] = await Promise.all([fetch(API+'/modules/'+MODULE_ID), fetch(API+'/modules/'+MODULE_ID+'/datasets')]);
+    const md = await mRes.json(), dd = await dRes.json();
+    if (md.ok) {
+        moduleData = md.data;
+        document.getElementById('moduleIcon').textContent = moduleData.icon || '📁';
+        document.getElementById('moduleName').textContent = moduleData.name;
+        document.getElementById('moduleDesc').textContent = moduleData.description || '';
+        document.getElementById('pageTitle').textContent = moduleData.name + ' - 数据';
+    }
+    datasets = dd.ok ? dd.data : [];
+    const totalRecords = datasets.reduce((s,d) => s + (d.recordCount||0), 0);
+    document.getElementById('statDs').textContent = datasets.length;
+    document.getElementById('statRecords').textContent = totalRecords;
+
+    // 加载所有数据集的记录
+    allRecords = {};
+    await Promise.all(datasets.map(async ds => {
+        const r = await fetch(API+'/datasets/'+ds.id+'/records');
+        const d = await r.json();
+        allRecords[ds.id] = d.ok ? d.data : [];
+    }));
+
+    renderTabs();
+    switchTab(currentTab, document.querySelector('.tab-btn.active'));
+}
+
+function renderTabs() {
+    const nav = document.getElementById('tabsNav');
+    let html = '<button class="tab-btn'+(currentTab==='overview'?' active':'')+'" onclick="switchTab(\'overview\',this)"><span class="tab-icon">📊</span> 概览</button>';
+    datasets.forEach(ds => {
+        html += '<button class="tab-btn'+(currentTab===ds.id?' active':'')+'" onclick="switchTab(\''+ds.id+'\',this)">'
+            + '<span class="tab-icon">📦</span> '+ds.name
+            + '<span class="tab-count">'+(ds.recordCount||0)+'</span>'
+            + '</button>';
+    });
+    html += '<button class="tab-btn tab-btn-add" onclick="showCreateDs()">+</button>';
+    nav.innerHTML = html;
+}
+
+function switchTab(tab, btn) {
+    currentTab = tab;
+    document.querySelectorAll('.tab-btn').forEach(t=>t.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    else document.querySelector('.tab-btn').classList.add('active');
+
+    if (tab === 'overview') renderOverview();
+    else renderDatasetTab(tab);
+}
+
+// ========== 概览 ==========
+function renderOverview() {
+    const el = document.getElementById('tabContent');
+    if (datasets.length === 0) {
+        el.innerHTML = '<div class="empty-state"><div class="icon">📦</div><p>暂无数据集</p></div>';
+        return;
+    }
+
+    // 汇总统计
+    let totalRecords = 0;
+    datasets.forEach(ds => { totalRecords += (allRecords[ds.id]||[]).length; });
+
+    let html = '<div class="overview-grid">'
+        // 数据集统计卡片
+        + '<div class="overview-card"><h4>📦 数据集分布</h4><div class="overview-chart"><canvas id="chartDs"></canvas></div></div>'
+        // 记录数统计
+        + '<div class="overview-card"><h4>📈 记录数统计</h4><div class="overview-chart"><canvas id="chartRecords"></canvas></div></div>'
+        + '</div>';
+
+    // AI分析区域
+    html += '<div class="ai-analysis">'
+        + '<h4>🤖 AI 数据分析 <button class="btn btn-secondary btn-sm" onclick="refreshAnalysis()" style="margin-left:8px;font-size:11px;">🔄 刷新分析</button></h4>'
+        + '<div id="aiAnalysisContent" class="ai-analysis-content"><div class="ai-loading">正在分析数据...</div></div>'
+        + '</div>';
+
+    el.innerHTML = html;
+
+    // 渲染图表
+    setTimeout(() => {
+        renderDsChart();
+        renderRecordsChart();
+        generateAiAnalysis();
+    }, 100);
+}
+
+function renderDsChart() {
+    const ctx = document.getElementById('chartDs');
+    if (!ctx) return;
+    if (charts.ds) charts.ds.destroy();
+    const labels = datasets.map(d => d.name);
+    const data = datasets.map(d => (allRecords[d.id]||[]).length);
+    const colors = ['#7c5cfc','#f59e0b','#10b981','#ef4444','#3b82f6','#8b5cf6','#ec4899','#06b6d4'];
+    charts.ds = new Chart(ctx, {
+        type: 'doughnut',
+        data: { labels, datasets: [{ data, backgroundColor: colors.slice(0, labels.length), borderWidth: 0 }] },
+        options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom',labels:{padding:12,font:{size:12}}}} }
+    });
+}
+
+function renderRecordsChart() {
+    const ctx = document.getElementById('chartRecords');
+    if (!ctx) return;
+    if (charts.records) charts.records.destroy();
+    const labels = datasets.map(d => d.name);
+    const data = datasets.map(d => (allRecords[d.id]||[]).length);
+    charts.records = new Chart(ctx, {
+        type: 'bar',
+        data: { labels, datasets: [{ label:'记录数', data, backgroundColor:'#7c5cfc', borderRadius:6 }] },
+        options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true,ticks:{stepSize:1}}} }
+    });
+}
+
+async function generateAiAnalysis() {
+    const el = document.getElementById('aiAnalysisContent');
+
+    // 先检查缓存
+    try {
+        const cacheRes = await fetch(API + '/modules/' + MODULE_ID + '/analysis');
+        const cacheData = await cacheRes.json();
+        if (cacheData.ok && cacheData.reply) {
+            el.innerHTML = cacheData.reply;
+            return;
+        }
+    } catch(e) {}
+
+    // 无缓存，生成分析
+    await doGenerateAnalysis(el);
+}
+
+async function refreshAnalysis() {
+    const el = document.getElementById('aiAnalysisContent');
+    // 清除缓存
+    await fetch(API + '/modules/' + MODULE_ID + '/analysis', { method: 'DELETE' });
+    el.innerHTML = '<div class="ai-loading">正在重新分析...</div>';
+    await doGenerateAnalysis(el);
+}
+
+async function doGenerateAnalysis(el) {
+    // 构建分析数据
+    const dsInfo = datasets.map(ds => {
+        const records = allRecords[ds.id] || [];
+        const fields = ds.schema && ds.schema.fields ? ds.schema.fields.map(f=>f.name).join('、') : '';
+        const sample = records.slice(0, 3).map(r => {
+            const fieldNames = ds.schema && ds.schema.fields ? ds.schema.fields.map(f=>f.name) : Object.keys(r).filter(k=>!k.startsWith('_'));
+            return fieldNames.slice(0, 5).map(f => f + ':' + (r[f]||'')).join(', ');
+        }).join(' | ');
+        return { name: ds.name, count: records.length, fields, sample };
+    });
+
+    try {
+        const r = await fetch(API + '/modules/' + MODULE_ID + '/analysis', {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ datasets: dsInfo })
+        });
+        const d = await r.json();
+        if (d.ok && d.reply) {
+            el.innerHTML = d.reply;
+        } else {
+            el.innerHTML = generateLocalAnalysis();
+        }
+    } catch(e) {
+        el.innerHTML = generateLocalAnalysis();
+    }
+}
+
+function generateLocalAnalysis() {
+    let html = '<h4 style="font-size:14px;margin-bottom:8px;">📊 数据概览</h4><ul>';
+    html += '<li>模块包含 <strong>' + datasets.length + '</strong> 个数据集</li>';
+    let total = 0;
+    datasets.forEach(ds => { total += (allRecords[ds.id]||[]).length; });
+    html += '<li>总计 <strong>' + total + '</strong> 条记录</li>';
+    datasets.forEach(ds => {
+        html += '<li>' + ds.name + '：' + (allRecords[ds.id]||[]).length + ' 条</li>';
+    });
+    html += '</ul>';
+    html += '<p style="color:#909296;font-size:12px;margin-top:12px;">💡 AI分析需要配置LLM API Key</p>';
+    return html;
+}
+
+// ========== 数据集Tab ==========
+function renderDatasetTab(dsId) {
+    currentDs = datasets.find(d => d.id === dsId);
+    if (!currentDs) return;
+    const records = allRecords[dsId] || [];
+    const el = document.getElementById('tabContent');
+
+    let html = '<div class="toolbar">'
+        + '<div class="search-box"><input type="text" id="recordSearch" placeholder="搜索记录..." oninput="filterRecords()"></div>'
+        + '<button class="btn btn-primary btn-sm" onclick="showAddRecord()">+ 新增</button>'
+        + '<button class="btn btn-secondary btn-sm" onclick="showEditDs()">✏️ 编辑数据集</button>'
+        + '<button class="btn btn-secondary btn-sm" onclick="showImport()">📥 导入</button>'
+        + '<button class="btn btn-secondary btn-sm" onclick="doExport()">📤 导出</button>'
+        + '<button class="btn btn-danger btn-sm" onclick="deleteDs()">🗑️ 删除</button>'
+        + '<button class="btn btn-secondary btn-sm" onclick="loadAll()">🔄</button>'
+        + '</div>';
+
+    if (records.length === 0) {
+        html += '<div class="empty-state"><div class="icon">📭</div><p>暂无数据</p></div>';
+    } else {
+        const cols = Object.keys(records[0]).filter(k=>!k.startsWith('_'));
+        html += '<div style="overflow-x:auto;max-height:60vh;overflow-y:auto;"><table class="data-table"><thead><tr>'
+            + cols.map(c=>'<th>'+c+'</th>').join('')
+            + '<th style="width:80px;">操作</th></tr></thead><tbody id="recordsBody">';
+        records.forEach(rec => {
+            html += '<tr data-search="'+JSON.stringify(rec).toLowerCase()+'">'
+                + cols.map(c=>'<td title="'+esc(String(rec[c]||''))+'">'+esc(String(rec[c]||'').substring(0,150))+'</td>').join('')
+                + '<td style="white-space:nowrap;">'
+                + '<button class="btn btn-secondary btn-sm" onclick="showEditRecord(\''+rec.id+'\')">✏️</button> '
+                + '<button class="btn btn-danger btn-sm" onclick="deleteRecord(\''+rec.id+'\')">🗑️</button>'
+                + '</td></tr>';
+        });
+        html += '</tbody></table></div>';
+    }
+
+    el.innerHTML = html;
+}
+
+function filterRecords() {
+    const q = document.getElementById('recordSearch').value.toLowerCase();
+    document.querySelectorAll('#recordsBody tr').forEach(tr => { tr.style.display = tr.dataset.search.includes(q)?'':'none'; });
+}
+
+// ========== 记录CRUD ==========
+function showAddRecord() { showRecordForm(null); }
+
+function showEditRecord(rid) {
+    const rec = allRecords[currentDs.id].find(r=>r.id===rid);
+    showRecordForm(rec);
+}
+
+function showRecordForm(rec) {
+    const fields = currentDs.schema && currentDs.schema.fields ? currentDs.schema.fields : [];
+    document.getElementById('recordModalTitle').textContent = rec ? '编辑记录' : '新增记录';
+    let html = '';
+    fields.forEach(f => {
+        const val = rec ? (rec[f.name]||'') : '';
+        html += '<div class="form-group"><label>'+f.name+'</label>'
+            + '<input id="rf_'+f.name+'" value="'+esc(String(val))+'"></div>';
+    });
+    document.getElementById('recordFormBody').innerHTML = html;
+    document.getElementById('recordModal').dataset.rid = rec ? rec.id : '';
+    openModal('recordModal');
+}
+
+async function saveRecord() {
+    const rid = document.getElementById('recordModal').dataset.rid;
+    const fields = currentDs.schema && currentDs.schema.fields ? currentDs.schema.fields : [];
+    const data = {};
+    fields.forEach(f => { data[f.name] = document.getElementById('rf_'+f.name).value || null; });
+    const body = { data: [data] };
+    const r = await fetch(API+'/datasets/'+currentDs.id+'/import/json', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+    const d = await r.json();
+    if (d.ok) { closeModal('recordModal'); toast('已保存'); loadAll(); }
+    else toast(d.error||'失败','error');
+}
+
+async function deleteRecord(rid) {
+    if (!confirm('确定删除？')) return;
+    await fetch(API+'/datasets/'+currentDs.id+'/records/'+rid, {method:'DELETE'});
+    toast('已删除'); loadAll();
+}
+
+// ========== 数据集操作 ==========
+function showCreateDs() {
+    document.getElementById('dsModalTitle').textContent = '新建数据集';
+    document.getElementById('editDsId').value = '';
+    document.getElementById('dsName').value = '';
+    document.getElementById('dsDesc').value = '';
+    document.getElementById('dsSchema').value = '';
+    openModal('dsModal');
+}
+
+function showEditDs() {
+    if (!currentDs) return;
+    document.getElementById('dsModalTitle').textContent = '编辑数据集';
+    document.getElementById('editDsId').value = currentDs.id;
+    document.getElementById('dsName').value = currentDs.name;
+    document.getElementById('dsDesc').value = currentDs.description || '';
+    const schemaText = currentDs.schema && currentDs.schema.fields ? currentDs.schema.fields.map(f=>f.name).join('\n') : '';
+    document.getElementById('dsSchema').value = schemaText;
+    openModal('dsModal');
+}
+
+async function saveDataset() {
+    const id = document.getElementById('editDsId').value;
+    const name = document.getElementById('dsName').value.trim();
+    if (!name) { toast('请输入名称','error'); return; }
+    const schemaText = document.getElementById('dsSchema').value.trim();
+    const fields = schemaText ? schemaText.split('\n').filter(l=>l.trim()).map(l=>({name:l.trim(),type:'string'})) : [];
+    const body = { name, description: document.getElementById('dsDesc').value.trim(), moduleId: MODULE_ID, schema: {fields} };
+    const r = id ? await fetch(API+'/datasets/'+id, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)})
+                 : await fetch(API+'/datasets', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+    const d = await r.json();
+    if (d.ok) { closeModal('dsModal'); toast(id?'已更新':'已创建'); loadAll(); }
+    else toast(d.error||'失败','error');
+}
+
+async function deleteDs() {
+    if (!currentDs || !confirm('确定删除数据集「'+currentDs.name+'」及所有数据？')) return;
+    await fetch(API+'/datasets/'+currentDs.id, {method:'DELETE'});
+    toast('已删除'); currentTab = 'overview'; loadAll();
+}
+
+// ========== 导入导出 ==========
+function showImport() {
+    let html = '<div style="border:2px dashed #d0d0d0;border-radius:10px;padding:30px;text-align:center;">'
+        + '<div style="font-size:36px;margin-bottom:10px;">📥</div>'
+        + '<p style="font-size:13px;margin-bottom:12px;color:#5c5f66;">支持 JSON 格式</p>'
+        + '<input type="file" id="importFile" accept=".json" style="display:none;" onchange="doImport(this)">'
+        + '<button class="btn btn-primary btn-sm" onclick="document.getElementById(\'importFile\').click()">选择文件</button>'
+        + '<div id="importResult" style="margin-top:12px;"></div></div>';
+
+    const box = document.createElement('div');
+    box.className = 'modal-overlay'; box.style.display = 'flex'; box.id = 'importModal';
+    box.onclick = function(e) { if (e.target===box) box.remove(); };
+    box.innerHTML = '<div class="modal-box" style="width:460px;" onclick="event.stopPropagation()">'
+        + '<div class="modal-header"><h3>导入数据</h3><button class="btn btn-secondary" onclick="document.getElementById(\'importModal\').remove()">✕</button></div>'
+        + '<div class="modal-body">'+html+'</div></div>';
+    document.body.appendChild(box);
+}
+
+async function doImport(input) {
+    const file = input.files[0]; if (!file) return;
+    const st = document.getElementById('importResult');
+    st.innerHTML = '<div class="msg msg-info">导入中...</div>';
+    try {
+        const text = await file.text();
+        let data = JSON.parse(text);
+        if (!Array.isArray(data)) data = [data];
+        const r = await fetch(API+'/datasets/'+currentDs.id+'/import/json', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({data})});
+        const d = await r.json();
+        st.innerHTML = d.ok ? '<div class="msg msg-success">✅ '+d.message+'</div>' : '<div class="msg msg-error">❌ '+d.error+'</div>';
+        if (d.ok) { setTimeout(()=>{ document.getElementById('importModal').remove(); loadAll(); }, 1000); }
+    } catch(e) { st.innerHTML = '<div class="msg msg-error">❌ '+e.message+'</div>'; }
+}
+
+async function doExport() {
+    const records = allRecords[currentDs.id] || [];
+    if (!records.length) { toast('无数据可导出','error'); return; }
+    const blob = new Blob([JSON.stringify(records,null,2)], {type:'application/json'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = currentDs.name+'.json'; a.click();
+    toast('导出成功');
+}
+
+// ========== 模块操作 ==========
+function showEditModule() {
+    document.getElementById('editModName').value = moduleData.name;
+    document.getElementById('editModDesc').value = moduleData.description || '';
+    document.getElementById('editModIcon').value = moduleData.icon || '📁';
+    openModal('moduleModal');
+}
+
+async function saveModule() {
+    const name = document.getElementById('editModName').value.trim();
+    if (!name) { toast('请输入名称','error'); return; }
+    const r = await fetch(API+'/modules/'+MODULE_ID, {
+        method:'PUT', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ name, description: document.getElementById('editModDesc').value.trim(), icon: document.getElementById('editModIcon').value.trim() })
+    });
+    const d = await r.json();
+    if (d.ok) { closeModal('moduleModal'); toast('已更新'); loadAll(); }
+    else toast(d.error||'失败','error');
+}
+
+function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+function closeModal(id, e) { if (e && e.target!==e.currentTarget) return; document.getElementById(id).style.display = 'none'; }
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function toast(msg, type) {
+    const d = document.createElement('div');
+    d.className = 'msg msg-'+(type||'success'); d.textContent = msg;
+    d.style.cssText = 'position:fixed;top:20px;right:20px;z-index:9999;';
+    document.body.appendChild(d); setTimeout(()=>d.remove(), 3000);
+}
+
+loadAll();
+</script>
+
+</th:block>
+</body>
+</html>

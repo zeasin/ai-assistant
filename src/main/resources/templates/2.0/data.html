@@ -4,655 +4,161 @@
       layout:decorate="~{2.0/layout}">
 <head><title>数据 - AI 助理</title>
 <style>
-    .data-layout { display:flex; gap:0; height:calc(100vh - 120px); overflow:hidden; max-width:1200px; margin:0 auto; border:1px solid #e1e3e6; border-radius:12px; background:#fff; }
-    .data-sidebar { width:240px; min-width:240px; border-right:1px solid #e1e3e6; display:flex; flex-direction:column; background:#fafbfc; }
-    .data-sidebar-header { padding:12px 14px; border-bottom:1px solid #eef0f4; display:flex; justify-content:space-between; align-items:center; }
-    .data-sidebar-header h3 { font-size:14px; margin:0; }
-    .ds-list { flex:1; overflow-y:auto; padding:4px 0; }
-    .ds-item { display:flex; align-items:center; padding:9px 14px; cursor:pointer; transition:all .1s; gap:8px; border-left:3px solid transparent; font-size:13px; color:#5c5f66; }
-    .ds-item:hover { background:#f0edff; }
-    .ds-item.active { background:#f0edff; border-left-color:#7c5cfc; color:#7c5cfc; font-weight:500; }
-    .ds-item .ds-icon { font-size:14px; }
-    .ds-item .ds-name { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .ds-item .ds-count { font-size:11px; color:#909296; }
-    .module-group { margin-bottom:4px; }
-    .module-header { font-weight:500; }
-    .dataset-item { font-size:12px; }
-    .data-main { flex:1; display:flex; flex-direction:column; min-width:0; }
-    .data-main-header { padding:12px 16px; border-bottom:1px solid #eef0f4; display:flex; align-items:center; justify-content:space-between; }
-    .data-main-tabs { display:flex; gap:0; border-bottom:1px solid #eef0f4; }
-    .data-tab { padding:9px 18px; font-size:13px; cursor:pointer; border:none; background:none; color:#5c5f66; border-bottom:2px solid transparent; margin-bottom:-1px; transition:all .15s; }
-    .data-tab:hover { color:#1a1b1e; }
-    .data-tab.active { color:#7c5cfc; border-bottom-color:#7c5cfc; font-weight:500; }
-    .data-content { flex:1; overflow-y:auto; padding:16px; }
-    .data-empty { text-align:center; color:#909296; padding:60px 20px; }
-    .data-empty .icon { font-size:36px; margin-bottom:10px; }
-    .data-table { width:100%; border-collapse:collapse; font-size:13px; }
-    .data-table th { text-align:left; padding:8px 10px; border-bottom:2px solid #e1e3e6; color:#5c5f66; font-weight:600; font-size:12px; background:#fafbfc; white-space:nowrap; }
-    .data-table td { padding:7px 10px; border-bottom:1px solid #f0f0f0; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .data-table tr:hover td { background:#fafafe; }
-    .form-row { display:flex; gap:10px; margin-bottom:10px; }
-    .form-group { flex:1; display:flex; flex-direction:column; gap:3px; }
-    .form-group label { font-size:11px; color:#5c5f66; font-weight:500; }
-    .form-group input, .form-group select, .form-group textarea { padding:7px 9px; border:1px solid #e1e3e6; border-radius:6px; font-size:13px; outline:none; }
-    .form-group input:focus, .form-group select:focus { border-color:#7c5cfc; }
-    .btn { display:inline-flex; align-items:center; gap:4px; padding:6px 14px; border:none; border-radius:6px; font-size:13px; cursor:pointer; transition:all .15s; }
+    .data-page { max-width:1200px; margin:0 auto; padding:20px; }
+    .page-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; }
+    .page-header h2 { font-size:20px; font-weight:600; margin:0; }
+    .page-actions { display:flex; gap:8px; }
+    .btn { display:inline-flex; align-items:center; gap:5px; padding:7px 14px; border:none; border-radius:6px; font-size:13px; cursor:pointer; transition:all .15s; }
     .btn-primary { background:#7c5cfc; color:#fff; }
     .btn-primary:hover { background:#6a4ae0; }
-    .btn-secondary { background:#e8e8ed; color:#1a1b1e; }
-    .btn-secondary:hover { background:#d5d5dc; }
+    .btn-secondary { background:#f0f0f5; color:#5c5f66; }
+    .btn-secondary:hover { background:#e5e5ea; }
     .btn-danger { background:#ffe0e0; color:#c92a2a; }
-    .btn-sm { padding:4px 10px; font-size:12px; }
-    .upload-area { border:2px dashed #d0d0d0; border-radius:8px; padding:24px; text-align:center; cursor:pointer; transition:border-color .2s; }
-    .upload-area:hover { border-color:#7c5cfc; }
-    .upload-area.dragover { border-color:#7c5cfc; background:#f8f5ff; }
-    .badge { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; }
-    .badge-green { background:#d3f9d8; color:#2b8a3e; }
-    .badge-gray { background:#f0f0f0; color:#909296; }
-    .badge-purple { background:#e8dff5; color:#7c5cfc; }
-    .status-msg { padding:8px 12px; border-radius:6px; font-size:13px; margin-bottom:10px; }
-    .status-msg.success { background:#f0fdf4; color:#27ae60; }
-    .status-msg.error { background:#fff5f5; color:#d32f2f; }
-    .status-msg.info { background:#f0edff; color:#5c3dcf; }
+    .btn-sm { padding:5px 10px; font-size:12px; }
+
+    .modules-list { display:grid; grid-template-columns:repeat(auto-fill, minmax(340px, 1fr)); gap:16px; }
+    .module-card { background:#fff; border:1px solid #e1e3e6; border-radius:12px; overflow:hidden; transition:all .2s; cursor:pointer; text-decoration:none; color:inherit; display:block; }
+    .module-card:hover { border-color:#7c5cfc; box-shadow:0 4px 16px rgba(124,92,252,0.12); transform:translateY(-2px); }
+    .module-card-top { padding:20px; display:flex; align-items:center; gap:14px; }
+    .module-card-icon { font-size:32px; width:52px; height:52px; background:#f8f5ff; border-radius:12px; display:flex; align-items:center; justify-content:center; }
+    .module-card-info { flex:1; }
+    .module-card-name { font-size:16px; font-weight:600; color:#1a1b1e; margin-bottom:4px; }
+    .module-card-desc { font-size:12px; color:#909296; line-height:1.4; }
+    .module-card-bottom { padding:14px 20px; background:#fafbfc; border-top:1px solid #f0f0f5; display:flex; justify-content:space-between; align-items:center; }
+    .module-card-stats { display:flex; gap:16px; }
+    .module-card-stat { font-size:12px; color:#5c5f66; }
+    .module-card-stat strong { color:#7c5cfc; font-size:14px; }
+    .module-card-actions { display:flex; gap:4px; }
+    .module-card-actions .btn { pointer-events:auto; }
+
+    .empty-state { text-align:center; color:#909296; padding:80px 20px; }
+    .empty-state .icon { font-size:48px; margin-bottom:16px; }
+    .empty-state p { font-size:14px; margin-bottom:20px; }
+
+    .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:1000; justify-content:center; align-items:center; }
+    .modal-box { background:#fff; border-radius:12px; box-shadow:0 8px 32px rgba(0,0,0,0.18); max-width:92vw; }
+    .modal-header { padding:16px 20px; border-bottom:1px solid #eef0f4; display:flex; justify-content:space-between; align-items:center; }
+    .modal-header h3 { margin:0; font-size:16px; }
+    .modal-body { padding:20px; }
+    .modal-footer { padding:12px 20px; border-top:1px solid #eef0f4; display:flex; justify-content:flex-end; gap:8px; }
+    .form-group { display:flex; flex-direction:column; gap:4px; margin-bottom:14px; }
+    .form-group label { font-size:12px; color:#5c5f66; font-weight:500; }
+    .form-group input, .form-group select, .form-group textarea { padding:8px 10px; border:1px solid #e1e3e6; border-radius:6px; font-size:13px; outline:none; }
+    .form-group input:focus, .form-group select:focus { border-color:#7c5cfc; }
+    .msg { padding:8px 12px; border-radius:6px; font-size:13px; margin-bottom:10px; }
+    .msg-success { background:#f0fdf4; color:#27ae60; }
+    .msg-error { background:#fff5f5; color:#d32f2f; }
 </style>
 </head>
 <body>
 <th:block layout:fragment="content">
 
-<div class="data-layout">
-    <!-- 左侧：模块和数据集列表 -->
-    <div class="data-sidebar">
-        <div class="data-sidebar-header">
-            <h3>📦 数据模块</h3>
-            <div style="display:flex;gap:4px;">
-                <button class="btn btn-secondary btn-sm" onclick="showCreateModule()" title="新建模块">📁+</button>
-                <button class="btn btn-primary btn-sm" onclick="showCreateDs()">+ 新建</button>
-            </div>
-        </div>
-        <div class="ds-list" id="dsList">
-            <div class="data-empty" style="padding:30px;font-size:12px;">加载中...</div>
+<div class="data-page">
+    <div class="page-header">
+        <h2>📦 数据中心</h2>
+        <div class="page-actions">
+            <button class="btn btn-primary" onclick="showCreateModule()">+ 新建模块</button>
         </div>
     </div>
-
-    <!-- 右侧 -->
-    <div class="data-main">
-        <!-- 无数据集选中 -->
-        <div id="dataEmpty" class="data-empty" style="flex:1;">
-            <div class="icon">📦</div>
-            <p style="font-size:14px;margin-bottom:8px;">从左侧选择一个数据集</p>
-            <p style="font-size:12px;">或点击「+ 新建」创建新数据集</p>
-        </div>
-
-        <!-- 数据集详情（选中后显示） -->
-        <div id="dataPanel" style="display:none;flex:1;display:flex;flex-direction:column;">
-            <div class="data-main-header">
-                <div>
-                    <span id="dsTitle" style="font-size:15px;font-weight:600;"></span>
-                    <span id="dsRecordCount" class="badge badge-gray" style="margin-left:8px;"></span>
-                </div>
-                <div style="display:flex;gap:6px;">
-                    <button class="btn btn-secondary btn-sm" onclick="refreshRecords()">刷新</button>
-                    <button class="btn btn-danger btn-sm" onclick="deleteDataset()">删除</button>
-                </div>
-            </div>
-            <div class="data-main-tabs">
-                <button class="data-tab active" onclick="switchDTab('browse')">📋 浏览</button>
-                <button class="data-tab" onclick="switchDTab('import')">📥 导入</button>
-                <button class="data-tab" onclick="switchDTab('collector')">🔧 采集</button>
-                <button class="data-tab" onclick="switchDTab('export')">📤 导出</button>
-            </div>
-            <div class="data-content">
-                <div id="dtab-browse" class="dtab-panel active"></div>
-                <div id="dtab-import" class="dtab-panel"></div>
-                <div id="dtab-collector" class="dtab-panel"></div>
-                <div id="dtab-export" class="dtab-panel"></div>
-            </div>
-        </div>
-    </div>
+    <div id="modulesList"></div>
 </div>
 
-<!-- 新建数据集弹窗 -->
-<div id="createDsModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1000;justify-content:center;align-items:center;" onclick="closeModal('createDsModal',event)">
-    <div style="background:#fff;border-radius:12px;padding:24px;width:560px;max-width:92vw;box-shadow:0 8px 32px rgba(0,0,0,0.15);" onclick="event.stopPropagation()">
-        <h3 style="margin:0 0 16px;font-size:16px;">新建数据集</h3>
-        <div class="form-group" style="margin-bottom:10px;">
-            <label>名称 *</label>
-            <input id="dsName" type="text" placeholder="如：CSDN文章数据">
+<div id="moduleModal" class="modal-overlay" onclick="closeModal('moduleModal',event)">
+    <div class="modal-box" style="width:420px;" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <h3>新建模块</h3>
+            <button class="btn btn-secondary" onclick="closeModal('moduleModal')">✕</button>
         </div>
-        <div class="form-group" style="margin-bottom:10px;">
-            <label>描述</label>
-            <textarea id="dsDesc" rows="2" placeholder="数据集用途说明" style="resize:vertical;"></textarea>
+        <div class="modal-body">
+            <div class="form-group"><label>模块名称 *</label><input id="modName" type="text" placeholder="如：客户管理"></div>
+            <div class="form-group"><label>描述</label><input id="modDesc" type="text" placeholder="模块用途说明"></div>
+            <div class="form-group"><label>图标</label><input id="modIcon" type="text" value="📁"></div>
         </div>
-        <div class="form-group" style="margin-bottom:10px;">
-            <label>归属模块</label>
-            <select id="dsModule">
-                <option value="">不归属模块</option>
-            </select>
-        </div>
-        <div class="form-group" style="margin-bottom:10px;">
-            <label>存储目录</label>
-            <input id="dsDir" type="text" placeholder="相对于笔记库根目录（可选）">
-        </div>
-        <div class="form-group" style="margin-bottom:16px;">
-            <label>Schema 字段（每行一个字段名）</label>
-            <textarea id="dsSchema" rows="3" placeholder="title&#10;url&#10;content" style="resize:vertical;font-family:monospace;"></textarea>
-        </div>
-        <div style="display:flex;gap:8px;justify-content:flex-end;">
-            <button class="btn btn-secondary" onclick="closeModal('createDsModal')">取消</button>
-            <button class="btn btn-primary" onclick="createDataset()">创建</button>
-        </div>
-    </div>
-</div>
-
-<script th:inline="javascript">
-/*<![CDATA[*/
-const KB_ID = /*[[${kbId}]]*/ null;
-/*]]>*/
-
-const API = '/api/datacenter';
-let datasets = [];
-let modules = [];
-let currentDs = null;
-let currentModule = null;
-
-// ========== 模块 CRUD ==========
-async function loadModules() {
-    try {
-        const r = await fetch(API + '/modules');
-        const d = await r.json();
-        modules = d.ok ? d.data : [];
-        await loadDatasets();
-    } catch(e) { console.error(e); }
-}
-
-// ========== 数据集 CRUD ==========
-async function loadDatasets() {
-    try {
-        const r = await fetch(API + '/datasets');
-        const d = await r.json();
-        datasets = d.ok ? d.data : [];
-        renderDsList();
-    } catch(e) { console.error(e); }
-}
-
-function renderDsList() {
-    const el = document.getElementById('dsList');
-    
-    // 按模块分组
-    const moduleMap = {};
-    modules.forEach(m => { moduleMap[m.id] = {...m, datasets: []}; });
-    
-    // 未分组的数据集
-    const ungrouped = [];
-    datasets.forEach(ds => {
-        if (ds.moduleId && moduleMap[ds.moduleId]) {
-            moduleMap[ds.moduleId].datasets.push(ds);
-        } else {
-            ungrouped.push(ds);
-        }
-    });
-    
-    let html = '';
-    
-    // 渲染模块
-    for (const moduleId in moduleMap) {
-        const m = moduleMap[moduleId];
-        const isExpanded = currentModule === moduleId;
-        html += '<div class="module-group">'
-            + '<div class="ds-item module-header' + (isExpanded ? ' active' : '') + '" onclick="toggleModule(\'' + moduleId + '\')">'
-            + '<span class="ds-icon">' + (m.icon || '📁') + '</span>'
-            + '<span class="ds-name">' + m.name + '</span>'
-            + '<span class="ds-count">' + m.datasets.length + '</span>'
-            + '</div>';
-        if (isExpanded) {
-            m.datasets.forEach(ds => {
-                html += '<div class="ds-item dataset-item' + (currentDs && currentDs.id === ds.id ? ' active' : '') + '" onclick="selectDs(\'' + ds.id + '\')" style="padding-left:36px;">'
-                    + '<span class="ds-icon">📦</span>'
-                    + '<span class="ds-name">' + ds.name + '</span>'
-                    + '<span class="ds-count">' + (ds.recordCount || 0) + '</span>'
-                    + '</div>';
-            });
-        }
-        html += '</div>';
-    }
-    
-    // 渲染未分组的数据集
-    if (ungrouped.length > 0) {
-        html += '<div class="module-group">'
-            + '<div class="ds-item module-header" style="color:#909296;">'
-            + '<span class="ds-icon">📋</span>'
-            + '<span class="ds-name">未分组</span>'
-            + '<span class="ds-count">' + ungrouped.length + '</span>'
-            + '</div>';
-        ungrouped.forEach(ds => {
-            html += '<div class="ds-item dataset-item' + (currentDs && currentDs.id === ds.id ? ' active' : '') + '" onclick="selectDs(\'' + ds.id + '\')" style="padding-left:36px;">'
-                + '<span class="ds-icon">📦</span>'
-                + '<span class="ds-name">' + ds.name + '</span>'
-                + '<span class="ds-count">' + (ds.recordCount || 0) + '</span>'
-                + '</div>';
-        });
-        html += '</div>';
-    }
-    
-    if (!html) {
-        html = '<div class="data-empty" style="padding:30px;font-size:12px;">暂无数据<br>点击上方「+ 新建」</div>';
-    }
-    
-    el.innerHTML = html;
-}
-
-function toggleModule(moduleId) {
-    currentModule = currentModule === moduleId ? null : moduleId;
-    renderDsList();
-}
-
-function showCreateModule() {
-    document.getElementById('createModuleModal').style.display = 'flex';
-}
-
-async function createModule() {
-    const name = document.getElementById('moduleName').value.trim();
-    if (!name) { toast('请输入模块名称', 'error'); return; }
-    try {
-        const r = await fetch(API + '/modules', {
-            method: 'POST', headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({
-                name: name,
-                description: document.getElementById('moduleDesc').value.trim(),
-                icon: document.getElementById('moduleIcon').value.trim() || '📁'
-            })
-        });
-        const d = await r.json();
-        if (d.ok) {
-            closeModal('createModuleModal');
-            toast('模块已创建');
-            await loadModules();
-        } else { toast(d.error || '创建失败', 'error'); }
-    } catch(e) { toast('请求失败', 'error'); }
-}
-
-async function deleteModule(moduleId) {
-    if (!confirm('确定删除此模块？（数据集不会被删除）')) return;
-    try {
-        await fetch(API + '/modules/' + moduleId, {method:'DELETE'});
-        currentModule = null;
-        await loadModules();
-        toast('模块已删除');
-    } catch(e) { toast('删除失败', 'error'); }
-}
-
-async function selectDs(id) {
-    try {
-        const r = await fetch(API + '/datasets/' + id);
-        const d = await r.json();
-        if (!d.ok) return;
-        currentDs = d.data;
-        renderDsList();
-        document.getElementById('dataEmpty').style.display = 'none';
-        const panel = document.getElementById('dataPanel');
-        panel.style.display = 'flex';
-        panel.style.flexDirection = 'column';
-        document.getElementById('dsTitle').textContent = currentDs.name;
-        document.getElementById('dsRecordCount').textContent = (currentDs.recordCount || 0) + ' 条记录';
-        // 重置 tab
-        document.querySelectorAll('.data-tab').forEach(t => t.classList.remove('active'));
-        document.querySelectorAll('.dtab-panel').forEach(p => p.classList.remove('active'));
-        document.querySelector('.data-tab').classList.add('active');
-        document.getElementById('dtab-browse').classList.add('active');
-        loadBrowse();
-    } catch(e) { console.error(e); }
-}
-
-function showCreateDs() {
-    document.getElementById('createDsModal').style.display = 'flex';
-    document.getElementById('dsName').value = '';
-    document.getElementById('dsDesc').value = '';
-    document.getElementById('dsDir').value = '';
-    document.getElementById('dsSchema').value = '';
-    
-    // 填充模块选择器
-    const moduleSelect = document.getElementById('dsModule');
-    moduleSelect.innerHTML = '<option value="">不归属模块</option>';
-    modules.forEach(m => {
-        moduleSelect.innerHTML += '<option value="' + m.id + '">' + (m.icon || '📁') + ' ' + m.name + '</option>';
-    });
-    if (currentModule) {
-        moduleSelect.value = currentModule;
-    }
-    
-    document.getElementById('dsName').focus();
-}
-
-function closeModal(id, e) {
-    if (e && e.target !== e.currentTarget) return;
-    document.getElementById(id).style.display = 'none';
-}
-
-async function createDataset() {
-    const name = document.getElementById('dsName').value.trim();
-    if (!name) { toast('请输入名称', 'error'); return; }
-    const schemaText = document.getElementById('dsSchema').value.trim();
-    const fields = schemaText ? schemaText.split('\n').filter(l => l.trim()).map(l => ({name: l.trim(), type: 'string'})) : [];
-    const moduleId = document.getElementById('dsModule').value || null;
-    try {
-        const r = await fetch(API + '/datasets', {
-            method: 'POST', headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({
-                name: name,
-                description: document.getElementById('dsDesc').value.trim(),
-                outputDir: document.getElementById('dsDir').value.trim(),
-                moduleId: moduleId,
-                schema: { fields: fields }
-            })
-        });
-        const d = await r.json();
-        if (d.ok) {
-            closeModal('createDsModal');
-            toast('数据集已创建');
-            await loadModules();
-            selectDs(d.data.id);
-        } else { toast(d.error || '创建失败', 'error'); }
-    } catch(e) { toast('请求失败', 'error'); }
-}
-
-async function deleteDataset() {
-    if (!currentDs || !confirm('确定删除数据集「' + currentDs.name + '」？')) return;
-    try {
-        await fetch(API + '/datasets/' + currentDs.id, {method:'DELETE'});
-        currentDs = null;
-        document.getElementById('dataPanel').style.display = 'none';
-        document.getElementById('dataEmpty').style.display = 'block';
-        loadDatasets();
-        toast('已删除');
-    } catch(e) { toast('删除失败', 'error'); }
-}
-
-// ========== Tab 切换 ==========
-function switchDTab(tab) {
-    document.querySelectorAll('.data-tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.dtab-panel').forEach(p => p.classList.remove('active'));
-    event.target.classList.add('active');
-    document.getElementById('dtab-' + tab).classList.add('active');
-    if (tab === 'browse') loadBrowse();
-    else if (tab === 'import') loadImport();
-    else if (tab === 'collector') loadCollector();
-    else if (tab === 'export') loadExport();
-}
-
-// ========== 浏览 ==========
-async function loadBrowse() {
-    if (!currentDs) return;
-    const el = document.getElementById('dtab-browse');
-    el.innerHTML = '<div style="color:#909296;font-size:13px;">加载中...</div>';
-    try {
-        const r = await fetch(API + '/datasets/' + currentDs.id + '/records');
-        const d = await r.json();
-        if (!d.ok || !d.data.length) {
-            el.innerHTML = '<div class="data-empty"><div class="icon">📭</div><p>暂无数据，请先导入</p></div>';
-            return;
-        }
-        const records = d.data;
-        const cols = Object.keys(records[0]).filter(k => k !== 'id' && k !== '_source' && k !== '_importedAt');
-        let html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">'
-            + '<span style="font-size:13px;color:#5c5f66;">共 ' + records.length + ' 条</span>'
-            + '<input id="browseSearch" type="text" placeholder="搜索..." oninput="filterBrowse()" '
-            + 'style="padding:5px 10px;border:1px solid #e1e3e6;border-radius:6px;font-size:12px;width:180px;">'
-            + '</div>'
-            + '<div style="overflow-x:auto;"><table class="data-table"><thead><tr>'
-            + cols.map(c => '<th>' + c + '</th>').join('')
-            + '<th>操作</th></tr></thead><tbody id="browseBody">';
-        records.forEach(rec => {
-            html += '<tr data-search="' + JSON.stringify(rec).toLowerCase() + '">'
-                + cols.map(c => '<td title="' + escHtml(String(rec[c]||'')) + '">' + escHtml(String(rec[c]||'').substring(0,80)) + '</td>').join('')
-                + '<td><button class="btn btn-danger btn-sm" onclick="deleteRecord(\'' + rec.id + '\')">删</button></td>'
-                + '</tr>';
-        });
-        html += '</tbody></table></div>';
-        el.innerHTML = html;
-    } catch(e) { el.innerHTML = '<div style="color:#e03131;">加载失败</div>'; }
-}
-
-function filterBrowse() {
-    const q = document.getElementById('browseSearch').value.toLowerCase();
-    document.querySelectorAll('#browseBody tr').forEach(tr => {
-        tr.style.display = tr.dataset.search.includes(q) ? '' : 'none';
-    });
-}
-
-async function deleteRecord(recordId) {
-    if (!currentDs || !confirm('确定删除这条记录？')) return;
-    await fetch(API + '/datasets/' + currentDs.id + '/records/' + recordId, {method:'DELETE'});
-    loadBrowse();
-    selectDs(currentDs.id);
-}
-
-// ========== 导入 ==========
-function loadImport() {
-    const el = document.getElementById('dtab-import');
-    el.innerHTML = '<div id="importStatus"></div>'
-        + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">'
-        // Excel
-        + '<div class="card" style="margin:0;">'
-        + '<h3 style="font-size:14px;margin:0 0 10px;">📊 Excel 导入</h3>'
-        + '<div class="upload-area" id="excelUpload" ondragover="event.preventDefault();this.classList.add(\'dragover\')" ondragleave="this.classList.remove(\'dragover\')" ondrop="handleExcelDrop(event)">'
-        + '<input type="file" id="excelFile" accept=".xlsx,.xls,.csv" style="display:none" onchange="uploadExcel()">'
-        + '<p style="font-size:13px;color:#5c5f66;">拖拽文件到此处<br>或点击选择</p>'
-        + '</div>'
-        + '<button class="btn btn-primary btn-sm" style="margin-top:8px;width:100%;" onclick="document.getElementById(\'excelFile\').click()">选择文件</button>'
-        + '</div>'
-        // JSON
-        + '<div class="card" style="margin:0;">'
-        + '<h3 style="font-size:14px;margin:0 0 10px;">📋 JSON 导入</h3>'
-        + '<textarea id="jsonInput" rows="6" placeholder=\'粘贴 JSON 数组\n[\n  {"name":"张三","age":25},\n  {"name":"李四","age":30}\n]\' '
-        + 'style="width:100%;padding:8px;border:1px solid #e1e3e6;border-radius:6px;font-size:12px;font-family:monospace;resize:vertical;box-sizing:border-box;"></textarea>'
-        + '<button class="btn btn-primary btn-sm" style="margin-top:8px;width:100%;" onclick="importJson()">导入</button>'
-        + '</div>'
-        // URL
-        + '<div class="card" style="margin:0;">'
-        + '<h3 style="font-size:14px;margin:0 0 10px;">🔗 URL 导入</h3>'
-        + '<div class="form-group" style="margin-bottom:8px;">'
-        + '<input id="urlInput" type="url" placeholder="https://example.com/data">'
-        + '</div>'
-        + '<button class="btn btn-primary btn-sm" style="width:100%;" onclick="importUrl()">AI 提取并导入</button>'
-        + '<p style="font-size:11px;color:#909296;margin-top:6px;">AI 将访问 URL 并提取结构化数据</p>'
-        + '</div>'
-        + '</div>';
-    // click handler for upload area
-    document.getElementById('excelUpload').onclick = () => document.getElementById('excelFile').click();
-}
-
-function handleExcelDrop(e) {
-    e.preventDefault();
-    e.currentTarget.classList.remove('dragover');
-    const file = e.dataTransfer.files[0];
-    if (file) uploadExcelFile(file);
-}
-
-async function uploadExcel() {
-    const file = document.getElementById('excelFile').files[0];
-    if (file) uploadExcelFile(file);
-}
-
-async function uploadExcelFile(file) {
-    if (!currentDs) return;
-    const st = document.getElementById('importStatus');
-    st.innerHTML = '<div class="status-msg info">⏳ 正在导入 Excel...</div>';
-    const fd = new FormData();
-    fd.append('file', file);
-    try {
-        const r = await fetch(API + '/datasets/' + currentDs.id + '/import/excel', {method:'POST', body:fd});
-        const d = await r.json();
-        if (d.ok) {
-            st.innerHTML = '<div class="status-msg success">✅ ' + d.message + '</div>';
-            selectDs(currentDs.id);
-        } else { st.innerHTML = '<div class="status-msg error">❌ ' + d.error + '</div>'; }
-    } catch(e) { st.innerHTML = '<div class="status-msg error">❌ 请求失败</div>'; }
-}
-
-async function importJson() {
-    if (!currentDs) return;
-    const text = document.getElementById('jsonInput').value.trim();
-    if (!text) { toast('请输入 JSON 数据', 'error'); return; }
-    const st = document.getElementById('importStatus');
-    st.innerHTML = '<div class="status-msg info">⏳ 正在导入...</div>';
-    try {
-        const data = JSON.parse(text);
-        const r = await fetch(API + '/datasets/' + currentDs.id + '/import/json', {
-            method:'POST', headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({data: data})
-        });
-        const d = await r.json();
-        if (d.ok) {
-            st.innerHTML = '<div class="status-msg success">✅ ' + d.message + '</div>';
-            document.getElementById('jsonInput').value = '';
-            selectDs(currentDs.id);
-        } else { st.innerHTML = '<div class="status-msg error">❌ ' + d.error + '</div>'; }
-    } catch(e) { st.innerHTML = '<div class="status-msg error">❌ JSON 格式错误</div>'; }
-}
-
-async function importUrl() {
-    if (!currentDs) return;
-    const url = document.getElementById('urlInput').value.trim();
-    if (!url) { toast('请输入 URL', 'error'); return; }
-    const st = document.getElementById('importStatus');
-    st.innerHTML = '<div class="status-msg info">⏳ AI 正在访问 URL 并提取数据...</div>';
-    try {
-        const r = await fetch(API + '/datasets/' + currentDs.id + '/import/url', {
-            method:'POST', headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({url: url})
-        });
-        const d = await r.json();
-        if (d.ok) {
-            st.innerHTML = '<div class="status-msg success">✅ ' + d.message + '</div>';
-            document.getElementById('urlInput').value = '';
-            selectDs(currentDs.id);
-        } else { st.innerHTML = '<div class="status-msg error">❌ ' + d.error + '</div>'; }
-    } catch(e) { st.innerHTML = '<div class="status-msg error">❌ 请求失败</div>'; }
-}
-
-// ========== 采集器 ==========
-async function loadCollector() {
-    const el = document.getElementById('dtab-collector');
-    el.innerHTML = '<div style="color:#909296;font-size:13px;">加载中...</div>';
-    try {
-        const r = await fetch('/api/collector/tasks');
-        const d = await r.json();
-        const tasks = d.ok ? d.data : [];
-        let html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">'
-            + '<span style="font-size:13px;color:#5c5f66;">采集任务（' + tasks.length + '）</span>'
-            + '<button class="btn btn-primary btn-sm" onclick="showCreateCollector()">+ 新建任务</button>'
-            + '</div>';
-        if (!tasks.length) {
-            html += '<div class="data-empty"><div class="icon">🔧</div><p>暂无采集任务</p></div>';
-        } else {
-            tasks.forEach(t => {
-                html += '<div style="border:1px solid #eef0f4;border-radius:8px;padding:12px;margin-bottom:8px;">'
-                    + '<div style="display:flex;justify-content:space-between;align-items:center;">'
-                    + '<div><span style="font-weight:500;font-size:13px;">' + escHtml(t.name) + '</span>'
-                    + '<span class="badge ' + (t.enabled ? 'badge-green' : 'badge-gray') + '" style="margin-left:6px;">' + (t.enabled ? '启用' : '停用') + '</span>'
-                    + '<span class="badge badge-purple" style="margin-left:4px;">' + escHtml(t.cron || '手动') + '</span></div>'
-                    + '<div style="display:flex;gap:4px;">'
-                    + '<button class="btn btn-primary btn-sm" onclick="runCollector(\'' + t.id + '\')">▶ 执行</button>'
-                    + '<button class="btn btn-danger btn-sm" onclick="deleteCollector(\'' + t.id + '\')">删</button>'
-                    + '</div></div>'
-                    + '<div style="font-size:12px;color:#909296;margin-top:4px;">目标: ' + escHtml(t.promptTemplate || '-') + '</div>'
-                    + '</div>';
-            });
-        }
-        el.innerHTML = html;
-    } catch(e) { el.innerHTML = '<div style="color:#e03131;">加载失败</div>'; }
-}
-
-async function runCollector(taskId) {
-    toast('正在执行采集...');
-    try {
-        const r = await fetch('/api/collector/tasks/' + taskId + '/run', {method:'POST'});
-        const d = await r.json();
-        if (d.ok) toast('采集完成'); else toast(d.error || '采集失败', 'error');
-    } catch(e) { toast('执行失败', 'error'); }
-}
-
-async function deleteCollector(taskId) {
-    if (!confirm('确定删除此采集任务？')) return;
-    await fetch('/api/collector/tasks/' + taskId, {method:'DELETE'});
-    loadCollector();
-}
-
-function showCreateCollector() { toast('请在采集器页面创建任务', 'info'); }
-
-// ========== 导出 ==========
-function loadExport() {
-    const el = document.getElementById('dtab-export');
-    if (!currentDs) return;
-    el.innerHTML = '<div style="max-width:500px;">'
-        + '<h3 style="font-size:14px;margin:0 0 12px;">📤 导出到笔记库</h3>'
-        + '<div class="form-group" style="margin-bottom:10px;">'
-        + '<label>目标目录</label>'
-        + '<input id="exportDir" type="text" placeholder="如：data/客户信息" value="' + escHtml(currentDs.outputDir || '') + '">'
-        + '</div>'
-        + '<div class="form-group" style="margin-bottom:10px;">'
-        + '<label>导出格式</label>'
-        + '<select id="exportFormat"><option value="json">JSON</option><option value="markdown">Markdown</option></select>'
-        + '</div>'
-        + '<div class="form-group" style="margin-bottom:16px;">'
-        + '<label>AI 转换提示词（可选）</label>'
-        + '<textarea id="exportPrompt" rows="3" placeholder="留空则直接导出原始数据"></textarea>'
-        + '</div>'
-        + '<div id="exportStatus"></div>'
-        + '<button class="btn btn-primary" onclick="doExport()" id="exportBtn">📤 导出</button>'
-        + '</div>';
-}
-
-async function doExport() {
-    if (!currentDs) return;
-    const btn = document.getElementById('exportBtn');
-    btn.disabled = true; btn.textContent = '⏳ 导出中...';
-    const st = document.getElementById('exportStatus');
-    try {
-        const r = await fetch(API + '/datasets/' + currentDs.id + '/export', {
-            method:'POST', headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({
-                outputDir: document.getElementById('exportDir').value.trim(),
-                format: document.getElementById('exportFormat').value,
-                prompt: document.getElementById('exportPrompt').value.trim()
-            })
-        });
-        const d = await r.json();
-        if (d.ok) st.innerHTML = '<div class="status-msg success">✅ ' + (d.message || '导出成功') + '</div>';
-        else st.innerHTML = '<div class="status-msg error">❌ ' + d.error + '</div>';
-    } catch(e) { st.innerHTML = '<div class="status-msg error">❌ 导出失败</div>'; }
-    btn.disabled = false; btn.textContent = '📤 导出';
-}
-
-// ========== 工具函数 ==========
-function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-
-// ========== 初始化 ==========
-loadModules();
-</script>
-
-<!-- 新建模块弹窗 -->
-<div id="createModuleModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1000;justify-content:center;align-items:center;" onclick="closeModal('createModuleModal',event)">
-    <div style="background:#fff;border-radius:12px;padding:24px;width:400px;max-width:92vw;box-shadow:0 8px 32px rgba(0,0,0,0.15);" onclick="event.stopPropagation()">
-        <h3 style="margin:0 0 16px;font-size:16px;">新建数据模块</h3>
-        <div class="form-group" style="margin-bottom:10px;">
-            <label>模块名称 *</label>
-            <input id="moduleName" type="text" placeholder="如：客户管理">
-        </div>
-        <div class="form-group" style="margin-bottom:10px;">
-            <label>描述</label>
-            <input id="moduleDesc" type="text" placeholder="模块用途说明">
-        </div>
-        <div class="form-group" style="margin-bottom:16px;">
-            <label>图标</label>
-            <input id="moduleIcon" type="text" placeholder="📁" value="📁">
-        </div>
-        <div style="display:flex;gap:8px;justify-content:flex-end;">
-            <button class="btn btn-secondary" onclick="closeModal('createModuleModal')">取消</button>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('moduleModal')">取消</button>
             <button class="btn btn-primary" onclick="createModule()">创建</button>
         </div>
     </div>
 </div>
+
+<script>
+const API = '/api/datacenter';
+let modules = [];
+
+async function loadAll() {
+    const [mRes, dRes] = await Promise.all([fetch(API+'/modules'), fetch(API+'/datasets')]);
+    const md = await mRes.json(), dd = await dRes.json();
+    modules = md.ok ? md.data : [];
+    const datasets = dd.ok ? dd.data : [];
+    renderModules(datasets);
+}
+
+function renderModules(datasets) {
+    const el = document.getElementById('modulesList');
+    if (modules.length === 0) {
+        el.innerHTML = '<div class="empty-state">'
+            + '<div class="icon">📦</div>'
+            + '<p>暂无数据模块</p>'
+            + '<button class="btn btn-primary" onclick="showCreateModule()">+ 新建模块</button></div>';
+        return;
+    }
+
+    const dsMap = {};
+    datasets.forEach(ds => {
+        const mid = ds.moduleId || '';
+        if (!dsMap[mid]) dsMap[mid] = [];
+        dsMap[mid].push(ds);
+    });
+
+    el.innerHTML = '<div class="modules-list">' + modules.map(m => {
+        const dsList = dsMap[m.id] || [];
+        const totalRecords = dsList.reduce((s,d) => s + (d.recordCount||0), 0);
+        return '<a href="/data/module/'+m.id+'" class="module-card">'
+            + '<div class="module-card-top">'
+            + '<div class="module-card-icon">'+(m.icon||'📁')+'</div>'
+            + '<div class="module-card-info">'
+            + '<div class="module-card-name">'+m.name+'</div>'
+            + '<div class="module-card-desc">'+(m.description||'暂无描述')+'</div>'
+            + '</div></div>'
+            + '<div class="module-card-bottom">'
+            + '<div class="module-card-stats">'
+            + '<span class="module-card-stat"><strong>'+dsList.length+'</strong> 数据集</span>'
+            + '<span class="module-card-stat"><strong>'+totalRecords+'</strong> 记录</span>'
+            + '</div></div></a>';
+    }).join('') + '</div>';
+}
+
+function showCreateModule() {
+    document.getElementById('modName').value = '';
+    document.getElementById('modDesc').value = '';
+    document.getElementById('modIcon').value = '📁';
+    openModal('moduleModal');
+    document.getElementById('modName').focus();
+}
+
+async function createModule() {
+    const name = document.getElementById('modName').value.trim();
+    if (!name) { toast('请输入模块名称','error'); return; }
+    const r = await fetch(API+'/modules', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ name, description: document.getElementById('modDesc').value.trim(), icon: document.getElementById('modIcon').value.trim()||'📁' })
+    });
+    const d = await r.json();
+    if (d.ok) { closeModal('moduleModal'); toast('模块已创建'); loadAll(); }
+    else toast(d.error||'失败','error');
+}
+
+function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+function closeModal(id, e) { if (e && e.target!==e.currentTarget) return; document.getElementById(id).style.display = 'none'; }
+function toast(msg, type) {
+    const d = document.createElement('div');
+    d.className = 'msg msg-'+(type||'success'); d.textContent = msg;
+    d.style.cssText = 'position:fixed;top:20px;right:20px;z-index:9999;';
+    document.body.appendChild(d); setTimeout(()=>d.remove(), 3000);
+}
+
+loadAll();
+</script>
 
 </th:block>
 </body>
