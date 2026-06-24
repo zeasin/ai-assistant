@@ -20,8 +20,9 @@ public class ToolRegistry {
     private final List<Object> tools = new ArrayList<>();
     private final Map<String, ToolMeta> toolIndex = new ConcurrentHashMap<>();
 
-    public ToolRegistry(NoteTools noteTools) {
+    public ToolRegistry(NoteTools noteTools, DataTools dataTools) {
         register(noteTools);
+        register(dataTools);
         log.info("[ToolRegistry] 初始化完成，已注册 {} 个工具集: {}", tools.size(), toolIndex.keySet());
     }
 

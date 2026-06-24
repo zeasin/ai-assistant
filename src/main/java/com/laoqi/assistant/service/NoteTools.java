@@ -159,7 +159,7 @@ public class NoteTools {
         return readFile(path);
     }
 
-    @Tool(description = "将数据写入笔记库指定文件。如果文件已存在，需要先读取原有内容，合并后再写入")
+    @Tool(description = "将Markdown内容写入笔记库文件。注意：这是写入笔记文件，不是操作数据集。如果要操作数据集请使用addRecord工具")
     public String writeFile(
             @ToolParam(description = "文件路径，相对于笔记库根目录") String path,
             @ToolParam(description = "要写入的完整文件内容") String content) {
@@ -174,7 +174,7 @@ public class NoteTools {
         return "写入成功: " + path;
     }
 
-    @Tool(description = "在笔记库中搜索文件名包含指定关键词的文件和目录（仅搜索文件名，不搜索文件内容），搜索结果限制 20 条")
+    @Tool(description = "在笔记库中搜索文件名包含指定关键词的文件和目录。注意：这是搜索笔记文件，不是搜索数据集。如果要搜索数据集请使用searchRecords工具")
     public String searchFiles(@ToolParam(description = "搜索关键词，如 BUG、客户、日报") String keyword) {
         reportStatus("🔎 正在搜索文件...");
         if (keyword == null || keyword.isEmpty()) return "搜索关键词不能为空";
