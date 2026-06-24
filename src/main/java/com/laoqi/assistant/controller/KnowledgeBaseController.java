@@ -172,19 +172,19 @@ public class KnowledgeBaseController {
 
         if (kb.getNotesDir() == null || kb.getNotesDir().isBlank()) {
             model.put("error", "未配置笔记库路径");
-            return "1.0/kb_browse";
+            return "2.0/kb_browse";
         }
 
         Path base = kbDir(kb);
 
         if (dir.isEmpty()) {
-            model.put("dirs", listTopDirsAsFiles(base));
-            model.put("files", List.of());
-            model.put("breadcrumbs", List.of());
-            model.put("breadcrumbPaths", List.of());
-            model.put("rel", "");
-            model.put("parent", "");
-            return "1.0/kb_browse";
+        model.put("dirs", listTopDirsAsFiles(base));
+                model.put("files", List.of());
+                model.put("breadcrumbs", List.of());
+                model.put("breadcrumbPaths", List.of());
+                model.put("rel", "");
+                model.put("parent", "");
+                return "2.0/kb_browse";
         }
 
         Path target = safeResolve(base, dir);
@@ -205,7 +205,7 @@ public class KnowledgeBaseController {
         Path dataDir = target.resolve("data");
         model.put("jsonFiles", directoryDataService.listJsonFiles(dataDir));
 
-        return "1.0/kb_browse";
+        return "2.0/kb_browse";
     }
 
     @GetMapping("/kb/{id}/notes/view")
@@ -687,7 +687,7 @@ public class KnowledgeBaseController {
         if (kb == null) return "redirect:/config";
         model.put("kb", kb);
         model.put("labels", parseLabels(kb.getLabels()));
-        return "1.0/kb_ai_guide";
+        return "2.0/kb_ai_guide";
     }
 
     // ========== KB 范围的任务 API ==========

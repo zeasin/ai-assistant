@@ -1,0 +1,302 @@
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{2.0/layout}">
+<head>
+    <title layout:fragment="title">文件浏览</title>
+    <style>
+        .browse-page { max-width:1200px; margin:0 auto; padding:20px; }
+        .page-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
+        .page-header h2 { font-size:20px; font-weight:600; margin:0; }
+        .page-actions { display:flex; gap:8px; }
+
+        .btn { display:inline-flex; align-items:center; gap:5px; padding:7px 14px; border:none; border-radius:6px; font-size:13px; cursor:pointer; transition:all .15s; text-decoration:none; }
+        .btn-primary { background:#7c5cfc; color:#fff; }
+        .btn-primary:hover { background:#6a4ae0; }
+        .btn-secondary { background:#f0f0f5; color:#5c5f66; }
+        .btn-secondary:hover { background:#e5e5ea; }
+        .btn-danger { background:#ffe0e0; color:#c92a2a; }
+        .btn-sm { padding:5px 10px; font-size:12px; }
+
+        .card { background:#fff; border:1px solid #e1e3e6; border-radius:12px; padding:20px; margin-bottom:16px; }
+        .card h2 { font-size:16px; margin-bottom:12px; color:#1a1b1e; }
+
+        .breadcrumb { font-size:13px; color:#5c5f66; margin-bottom:16px; }
+        .breadcrumb a { color:#7c5cfc; text-decoration:none; }
+        .breadcrumb a:hover { text-decoration:underline; }
+
+        .file-table { width:100%; border-collapse:collapse; font-size:13px; }
+        .file-table th { text-align:left; padding:10px 12px; border-bottom:2px solid #e1e3e6; color:#5c5f66; font-weight:600; font-size:12px; background:#fafbfc; }
+        .file-table td { padding:10px 12px; border-bottom:1px solid #f0f0f0; }
+        .file-table tr:hover td { background:#fafafe; }
+
+        .report-card { background:linear-gradient(135deg,#f0edff,#fafafe); border:1px solid #d9d0ff; border-radius:12px; padding:20px; margin-top:16px; }
+        .report-card h2 { margin-bottom:8px; font-size:16px; }
+
+        .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:1000; justify-content:center; align-items:center; }
+        .modal-overlay.active { display:flex; }
+        .modal { background:#fff; border-radius:12px; padding:24px; width:600px; max-width:90vw; max-height:80vh; overflow-y:auto; box-shadow:0 8px 32px rgba(0,0,0,0.18); }
+        .modal h3 { margin:0 0 16px; font-size:16px; }
+        .form-group { margin-bottom:12px; }
+        .form-group label { display:block; font-size:12px; font-weight:500; color:#5c5f66; margin-bottom:4px; }
+        .form-group input, .form-group textarea { width:100%; padding:8px 12px; border:1px solid #e1e3e6; border-radius:6px; font-size:13px; outline:none; box-sizing:border-box; }
+        .form-group input:focus, .form-group textarea:focus { border-color:#7c5cfc; }
+        .form-group textarea { resize:vertical; font-family:"SF Mono","Fira Code",monospace; }
+        .modal-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
+
+        .analyze-result { max-height:400px; overflow-y:auto; padding:12px; background:#f9f9fb; border-radius:8px; font-size:13px; line-height:1.6; }
+
+        /* Report 样式 */
+        .report { line-height:1.8; color:#1a1b1e; font-size:15px; }
+        .report h1 { font-size:26px; font-weight:700; margin:28px 0 16px; padding-bottom:8px; border-bottom:2px solid #7c5cfc; }
+        .report h2 { font-size:20px; font-weight:600; margin:24px 0 12px; padding-left:10px; border-left:3px solid #7c5cfc; }
+        .report h3 { font-size:17px; font-weight:600; margin:20px 0 10px; }
+        .report p { margin:0 0 14px; }
+        .report blockquote { margin:14px 0; padding:12px 16px; background:#f8f7ff; border-left:4px solid #7c5cfc; border-radius:0 8px 8px 0; color:#444; }
+        .report blockquote p { margin:0; }
+        .report code { background:#f0edff; padding:2px 6px; border-radius:4px; font-size:13px; color:#5c3dcf; font-family:"SF Mono","Fira Code",monospace; }
+        .report pre { background:#1e1e2e; color:#cdd6f4; padding:16px 20px; border-radius:10px; overflow-x:auto; margin:14px 0; font-size:13px; line-height:1.6; }
+        .report pre code { background:none; padding:0; color:inherit; font-size:inherit; }
+        .report table { width:100%; border-collapse:collapse; margin:14px 0; font-size:14px; border-radius:10px; overflow:hidden; box-shadow:0 1px 4px rgba(0,0,0,0.04); }
+        .report th, .report td { padding:10px 14px; border:1px solid #e1e3e6; text-align:left; }
+        .report th { background:#f8f7ff; font-weight:600; color:#5c3dcf; }
+        .report tr:nth-child(even) { background:#fafafa; }
+        .report ul, .report ol { margin:10px 0; padding-left:24px; }
+        .report li { margin:4px 0; line-height:1.7; }
+        .report hr { border:none; border-top:1px solid #e1e3e6; margin:24px 0; }
+        .report .section-divider { border:none; height:3px; background:linear-gradient(90deg,#7c5cfc 0%,#b8a9ff 50%,#e8e8ed 100%); margin:28px 0; border-radius:4px; }
+        .report .section-badge { display:inline-flex; align-items:center; gap:6px; background:linear-gradient(135deg,#7c5cfc,#9b7ffc); color:#fff; font-size:13px; font-weight:600; padding:4px 14px; border-radius:20px; letter-spacing:0.3px; }
+        .report .section-header { display:flex; align-items:center; gap:12px; margin:32px 0 16px; }
+        .report .section-header .section-title { font-size:17px; font-weight:600; color:#1a1b1e; }
+        .report .report-section { background:#fafafe; border:1px solid #eef0f4; border-radius:12px; padding:16px 20px; margin:16px 0; border-left:3px solid #7c5cfc; }
+        .report .report-section h3 { font-size:14px; font-weight:600; margin:0 0 10px; color:#5c3dcf; display:flex; align-items:center; gap:6px; }
+        .report .report-section > *:last-child { margin-bottom:0; }
+        .report .inline-section { font-weight:700; font-size:15px; color:#5c3dcf; display:block; margin:20px 0 10px; padding-bottom:6px; border-bottom:2px solid #e8e3ff; }
+        .report li:has(> .priority-dot) { list-style:none; margin-left:-24px; }
+        .report .priority-dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; }
+        .report .priority-high .priority-dot { background:#e03131; }
+        .report .priority-mid .priority-dot { background:#e8590c; }
+        .report .priority-low .priority-dot { background:#2b8a3e; }
+    </style>
+</head>
+<body>
+<th:block layout:fragment="content">
+
+<div class="browse-page">
+    <div class="page-header">
+        <h2>📂 笔记文件浏览</h2>
+        <div class="page-actions">
+            <button class="btn btn-primary" onclick="showNewModal()">✏️ 新建</button>
+            <button th:if="${rel != null and !rel.isEmpty()}" class="btn btn-secondary" onclick="openAnalyzeModal()">🤖 AI 分析</button>
+            <a th:if="${rel != null && !rel.isEmpty()}" class="btn btn-secondary"
+               th:with="parentDir=${parent != null && !parent.isEmpty() ? '?dir=' + parent : ''}"
+               th:href="@{|/kb/${kb.id}/notes${parentDir}|}">← 上级目录</a>
+        </div>
+    </div>
+
+    <div th:if="${error != null and !error.isEmpty()}" style="background:#fff5f5;color:#d32f2f;padding:10px 16px;border-radius:8px;margin-bottom:12px;font-size:13px;border:1px solid #ffcdd2;" th:text="${error}">错误</div>
+
+    <th:block th:if="${breadcrumbs != null and #lists.size(breadcrumbs) > 0}">
+    <div class="breadcrumb">
+        / <a th:href="@{|/kb/${kb.id}/notes|}">root</a>
+        <th:block th:each="crumb, iterStat : ${breadcrumbs}">
+            / <a th:href="@{|/kb/${kb.id}/notes?dir=${breadcrumbPaths[iterStat.index]}|}" th:text="${crumb}">folder</a>
+        </th:block>
+    </div>
+    </th:block>
+
+    <div class="card">
+        <th:block th:if="${dirs != null and files != null and (#lists.size(dirs) > 0 or #lists.size(files) > 0)}">
+        <table class="file-table">
+            <thead>
+                <tr>
+                    <th>名称</th>
+                    <th>修改时间</th>
+                    <th style="width:120px;">操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="d : ${dirs}">
+                    <td>
+                        📁 <strong th:text="${d.name}">目录名</strong>
+                        <span th:if="${d['hasReport']}" style="background:#d3f9d8;color:#2b8a3e;padding:2px 6px;border-radius:4px;font-size:11px;margin-left:6px;">已分析</span>
+                    </td>
+                    <td th:text="${d.modified}">时间</td>
+                    <td>
+                        <a class="btn btn-secondary btn-sm"
+                           th:with="dirPath=${rel != null && !rel.isEmpty() ? rel + '/' + d.name : d.name}"
+                           th:href="@{|/kb/${kb.id}/notes?dir=${dirPath}|}">打开</a>
+                    </td>
+                </tr>
+                <tr th:each="f : ${files}">
+                    <td>
+                        <span th:if="${#strings.endsWith(f.name, '.md')}">📄</span>
+                        <span th:unless="${#strings.endsWith(f.name, '.md')}">📎</span>
+                        <span th:text="${f.name}">文件名</span>
+                    </td>
+                    <td th:text="${f.modified}">时间</td>
+                    <td>
+                        <a th:if="${#strings.endsWith(f.name, '.md')}" class="btn btn-primary btn-sm"
+                           th:with="filePath=${rel != null && !rel.isEmpty() ? rel + '/' + f.name : f.name}"
+                           th:href="@{|/kb/${kb.id}/notes/view?path=${filePath}|}">查看</a>
+                        <button th:if="${#strings.endsWith(f.name, '.md')}" class="btn btn-danger btn-sm"
+                                th:data-path="${rel != null && !rel.isEmpty() ? rel + '/' + f.name : f.name}"
+                                onclick="deleteFile(this.getAttribute('data-path'))"
+                                style="margin-left:4px;">删除</button>
+                        <span th:unless="${#strings.endsWith(f.name, '.md')}" style="color:#909296;">—</span>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+        </th:block>
+        <th:block th:if="${dirs == null or files == null or (#lists.size(dirs) == 0 and #lists.size(files) == 0)}">
+        <div style="text-align:center;color:#909296;padding:40px;">空目录</div>
+        </th:block>
+    </div>
+
+    <th:block th:if="${rel != null and !rel.isEmpty() and latestReport != null}">
+    <div class="report-card">
+        <h2>📊 AI 分析报告</h2>
+        <div class="report" th:utext="${latestReport}"></div>
+    </div>
+    </th:block>
+</div>
+
+<!-- 新建文件弹窗 -->
+<div class="modal-overlay" id="newModal">
+    <div class="modal">
+        <h3>✏️ 新建 Markdown 文件</h3>
+        <form id="newForm" onsubmit="return submitNew(event)">
+            <input type="hidden" name="dir" th:value="${rel}">
+            <div class="form-group">
+                <label>文件名</label>
+                <input type="text" id="filename" placeholder="文件名（无需 .md）" required>
+            </div>
+            <div class="form-group">
+                <label>内容 (Markdown)</label>
+                <textarea id="content" rows="12" placeholder="在此输入 Markdown 内容…"></textarea>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="hideNewModal()">取消</button>
+                <button type="submit" class="btn btn-primary">创建</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- AI 分析弹窗 -->
+<div class="modal-overlay" id="analyzeModal">
+    <div class="modal">
+        <h3>🤖 AI 分析 - <span id="analyzeDirName"></span></h3>
+        <textarea id="analyzePrompt" rows="3" placeholder="输入分析提示词（可留空，AI 将自行决定分析内容）"></textarea>
+        <div id="analyzeResult" style="margin-top:12px;display:none;">
+            <div class="analyze-result" id="analyzeResultContent"></div>
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-secondary" onclick="closeAnalyzeModal()">取消</button>
+            <button class="btn btn-primary" id="analyzeBtn" onclick="startAnalysis()">🚀 开始分析</button>
+        </div>
+    </div>
+</div>
+
+<script th:inline="javascript">
+const KB_ID = [[${kb.id}]];
+const CURRENT_DIR = [[${rel}]];
+
+document.querySelectorAll('.modal-overlay').forEach(function(m) {
+    m.addEventListener('click', function(e) { if (e.target === this) this.classList.remove('active'); });
+});
+
+function showNewModal() {
+    document.getElementById('newModal').classList.add('active');
+    document.getElementById('filename').focus();
+}
+function hideNewModal() {
+    document.getElementById('newModal').classList.remove('active');
+}
+async function submitNew(e) {
+    e.preventDefault();
+    const filename = document.getElementById('filename').value.trim();
+    const content = document.getElementById('content').value;
+    if (!filename) { toast('请输入文件名', 'error'); return; }
+
+    const form = new FormData();
+    form.set('dir', CURRENT_DIR);
+    form.set('filename', filename);
+    form.set('content', content);
+
+    const res = await fetch('/kb/' + KB_ID + '/notes/new', { method: 'POST', body: form });
+    const data = await res.json();
+    if (data.ok) {
+        toast('创建成功！', 'success');
+        hideNewModal();
+        setTimeout(() => location.reload(), 300);
+    } else {
+        toast('创建失败：' + (data.error || '未知错误'), 'error');
+    }
+    return false;
+}
+async function deleteFile(path) {
+    if (!confirm('确定要删除这个文件吗？')) return;
+    const res = await fetch('/kb/' + KB_ID + '/notes/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'path=' + encodeURIComponent(path),
+    });
+    const data = await res.json();
+    if (data.ok) {
+        toast('已删除', 'success');
+        location.reload();
+    } else {
+        toast('删除失败：' + (data.error || '未知错误'), 'error');
+    }
+}
+
+function openAnalyzeModal() {
+    document.getElementById('analyzeDirName').textContent = CURRENT_DIR;
+    document.getElementById('analyzePrompt').value = '';
+    document.getElementById('analyzeResult').style.display = 'none';
+    document.getElementById('analyzeBtn').disabled = false;
+    document.getElementById('analyzeBtn').textContent = '🚀 开始分析';
+    document.getElementById('analyzeModal').classList.add('active');
+}
+
+function closeAnalyzeModal() {
+    document.getElementById('analyzeModal').classList.remove('active');
+}
+
+function startAnalysis() {
+    var btn = document.getElementById('analyzeBtn');
+    btn.disabled = true; btn.textContent = '⏳ 分析中...';
+    var resultDiv = document.getElementById('analyzeResult');
+    var resultContent = document.getElementById('analyzeResultContent');
+    resultDiv.style.display = 'block';
+    resultContent.innerHTML = 'AI 正在探索目录并分析内容...';
+
+    var prompt = document.getElementById('analyzePrompt').value;
+    var url = '/kb/' + KB_ID + '/api/analyze-dir?dir=' + encodeURIComponent(CURRENT_DIR)
+              + '&prompt=' + encodeURIComponent(prompt);
+
+    var evtSource = new EventSource(url);
+    evtSource.onmessage = function(e) {
+        var data = JSON.parse(e.data);
+        if (data.type === 'text') {
+            resultContent.innerHTML = data.content.replace(/\n/g, '<br>');
+            btn.textContent = '✅ 分析完成';
+            setTimeout(function() { location.reload(); }, 1000);
+        } else if (data.type === 'error') {
+            resultContent.innerHTML = '<span style="color:red;">' + data.content + '</span>';
+            btn.disabled = false; btn.textContent = '🚀 重新分析';
+        } else if (data.type === 'done') {
+            evtSource.close();
+        }
+    };
+    evtSource.onerror = function() {
+        evtSource.close();
+        btn.disabled = false; btn.textContent = '🚀 重新分析';
+    };
+}
+</script>
+
+</th:block>
+</body>
+</html>
