@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{2.0/layout}">
+<head>
+    <title layout:fragment="title">新建笔记</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        .editor-page { max-width:1200px; margin:0 auto; padding:20px; }
+        .page-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
+        .page-header h2 { font-size:20px; font-weight:600; margin:0; }
+        .page-actions { display:flex; gap:8px; }
+
+        .btn { display:inline-flex; align-items:center; gap:5px; padding:7px 14px; border:none; border-radius:6px; font-size:13px; cursor:pointer; transition:all .15s; text-decoration:none; }
+        .btn-primary { background:#7c5cfc; color:#fff; }
+        .btn-primary:hover { background:#6a4ae0; }
+        .btn-secondary { background:#f0f0f5; color:#5c5f66; }
+        .btn-secondary:hover { background:#e5e5ea; }
+
+        .editor-toolbar { display:flex; gap:4px; padding:8px 12px; background:#fafbfc; border:1px solid #e1e3e6; border-bottom:none; border-radius:8px 8px 0 0; flex-wrap:wrap; }
+        .toolbar-btn { padding:6px 10px; border:none; background:none; border-radius:4px; cursor:pointer; font-size:13px; color:#5c5f66; transition:all .1s; }
+        .toolbar-btn:hover { background:#f0edff; color:#7c5cfc; }
+        .toolbar-btn.active { background:#7c5cfc; color:#fff; }
+        .toolbar-divider { width:1px; background:#e1e3e6; margin:0 4px; }
+
+        .editor-container { display:flex; gap:0; border:1px solid #e1e3e6; border-radius:8px; overflow:hidden; height:calc(100vh - 280px); min-height:400px; }
+        .editor-pane { flex:1; display:flex; flex-direction:column; min-width:0; }
+        .editor-pane-header { padding:8px 12px; background:#fafbfc; border-bottom:1px solid #e1e3e6; font-size:12px; color:#909296; font-weight:500; }
+        .editor-input { flex:1; width:100%; border:none; padding:16px; font-family:"SF Mono","Fira Code","Consolas",monospace; font-size:14px; line-height:1.8; resize:none; outline:none; }
+        .preview-pane { flex:1; border-left:1px solid #e1e3e6; display:flex; flex-direction:column; }
+        .preview-content { flex:1; overflow-y:auto; padding:16px 20px; background:#fff; line-height:1.8; font-size:15px; }
+
+        .preview-content h1 { font-size:24px; font-weight:700; margin:20px 0 12px; padding-bottom:8px; border-bottom:2px solid #7c5cfc; }
+        .preview-content h2 { font-size:20px; font-weight:600; margin:18px 0 10px; padding-left:10px; border-left:3px solid #7c5cfc; }
+        .preview-content h3 { font-size:17px; font-weight:600; margin:14px 0 8px; }
+        .preview-content p { margin:0 0 12px; }
+        .preview-content blockquote { margin:12px 0; padding:12px 16px; background:#f8f7ff; border-left:4px solid #7c5cfc; border-radius:0 8px 8px 0; color:#444; }
+        .preview-content code { background:#f0edff; padding:2px 6px; border-radius:4px; font-size:13px; color:#5c3dcf; font-family:"SF Mono","Fira Code",monospace; }
+        .preview-content pre { background:#1e1e2e; color:#cdd6f4; padding:14px 18px; border-radius:8px; overflow-x:auto; margin:12px 0; font-size:13px; line-height:1.6; }
+        .preview-content pre code { background:none; padding:0; color:inherit; }
+        .preview-content table { width:100%; border-collapse:collapse; margin:12px 0; font-size:14px; }
+        .preview-content th, .preview-content td { padding:8px 12px; border:1px solid #e1e3e6; text-align:left; }
+        .preview-content th { background:#f8f7ff; font-weight:600; color:#5c3dcf; }
+        .preview-content ul, .preview-content ol { margin:10px 0; padding-left:24px; }
+        .preview-content li { margin:4px 0; }
+        .preview-content hr { border:none; border-top:1px solid #e1e3e6; margin:20px 0; }
+        .preview-content img { max-width:100%; border-radius:8px; }
+
+        .form-row { display:flex; gap:12px; margin-bottom:16px; }
+        .form-group { flex:1; }
+        .form-group label { display:block; font-size:12px; font-weight:500; color:#5c5f66; margin-bottom:4px; }
+        .form-group input { width:100%; padding:8px 12px; border:1px solid #e1e3e6; border-radius:6px; font-size:13px; outline:none; }
+        .form-group input:focus { border-color:#7c5cfc; }
+
+        .status-bar { display:flex; justify-content:space-between; align-items:center; padding:8px 12px; background:#fafbfc; border:1px solid #e1e3e6; border-top:none; border-radius:0 0 8px 8px; font-size:12px; color:#909296; }
+    </style>
+</head>
+<body>
+<th:block layout:fragment="content">
+
+<div class="editor-page">
+    <div class="page-header">
+        <h2>✏️ 新建笔记</h2>
+        <div class="page-actions">
+            <a class="btn btn-secondary" th:href="@{|/kb/${kb.id}/notes?dir=${dir}|}">← 返回</a>
+            <button class="btn btn-primary" onclick="saveNote()">💾 保存</button>
+        </div>
+    </div>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label>文件名 *</label>
+            <input type="text" id="filename" placeholder="输入文件名（无需 .md 后缀）">
+        </div>
+        <div class="form-group" style="flex:0 0 200px;">
+            <label>保存路径</label>
+            <input type="text" id="savePath" th:value="${dir}" readonly style="background:#fafbfc;">
+        </div>
+    </div>
+
+    <div class="editor-toolbar">
+        <button class="toolbar-btn" onclick="insertFormat('heading')" title="标题">H</button>
+        <button class="toolbar-btn" onclick="insertFormat('bold')" title="加粗"><b>B</b></button>
+        <button class="toolbar-btn" onclick="insertFormat('italic')" title="斜体"><i>I</i></button>
+        <button class="toolbar-btn" onclick="insertFormat('strikethrough')" title="删除线"><s>S</s></button>
+        <div class="toolbar-divider"></div>
+        <button class="toolbar-btn" onclick="insertFormat('ul')" title="无序列表">• 列表</button>
+        <button class="toolbar-btn" onclick="insertFormat('ol')" title="有序列表">1. 列表</button>
+        <button class="toolbar-btn" onclick="insertFormat('checklist')" title="任务列表">☑ 任务</button>
+        <div class="toolbar-divider"></div>
+        <button class="toolbar-btn" onclick="insertFormat('code')" title="行内代码">&lt;/&gt;</button>
+        <button class="toolbar-btn" onclick="insertFormat('codeblock')" title="代码块">{ }</button>
+        <button class="toolbar-btn" onclick="insertFormat('quote')" title="引用">"</button>
+        <div class="toolbar-divider"></div>
+        <button class="toolbar-btn" onclick="insertFormat('link')" title="链接">🔗</button>
+        <button class="toolbar-btn" onclick="insertFormat('image')" title="图片">🖼️</button>
+        <button class="toolbar-btn" onclick="insertFormat('table')" title="表格">▦</button>
+        <button class="toolbar-btn" onclick="insertFormat('hr')" title="分割线">—</button>
+    </div>
+
+    <div class="editor-container">
+        <div class="editor-pane">
+            <div class="editor-pane-header">📝 Markdown 编辑</div>
+            <textarea id="editor" class="editor-input" placeholder="在这里输入 Markdown 内容...&#10;&#10;支持的语法：&#10;# 标题&#10;**加粗** *斜体*&#10;- 列表&#10;> 引用&#10;```代码块```&#10;[链接](url)&#10;![图片](url)"></textarea>
+        </div>
+        <div class="preview-pane">
+            <div class="editor-pane-header">👁️ 实时预览</div>
+            <div id="preview" class="preview-content"></div>
+        </div>
+    </div>
+
+    <div class="status-bar">
+        <span id="charCount">0 字符</span>
+        <span id="saveStatus"></span>
+    </div>
+</div>
+
+<script th:inline="javascript">
+const KB_ID = [[${kb.id}]];
+const CURRENT_DIR = [[${dir}]];
+
+const editor = document.getElementById('editor');
+const preview = document.getElementById('preview');
+
+// 实时预览
+editor.addEventListener('input', function() {
+    updatePreview();
+    updateCharCount();
+});
+
+function updatePreview() {
+    const content = editor.value;
+    if (content.trim()) {
+        preview.innerHTML = marked.parse(content);
+    } else {
+        preview.innerHTML = '<div style="color:#909296;text-align:center;padding:40px;">开始输入内容，实时预览将显示在这里</div>';
+    }
+}
+
+function updateCharCount() {
+    document.getElementById('charCount').textContent = editor.value.length + ' 字符';
+}
+
+// 插入格式
+function insertFormat(type) {
+    const start = editor.selectionStart;
+    const end = editor.selectionEnd;
+    const selected = editor.value.substring(start, end);
+    let before = '', after = '', replacement = '';
+
+    switch(type) {
+        case 'heading':
+            before = '## '; replacement = selected || '标题'; break;
+        case 'bold':
+            before = '**'; after = '**'; replacement = selected || '加粗文本'; break;
+        case 'italic':
+            before = '*'; after = '*'; replacement = selected || '斜体文本'; break;
+        case 'strikethrough':
+            before = '~~'; after = '~~'; replacement = selected || '删除线文本'; break;
+        case 'ul':
+            before = '- '; replacement = selected || '列表项'; break;
+        case 'ol':
+            before = '1. '; replacement = selected || '列表项'; break;
+        case 'checklist':
+            before = '- [ ] '; replacement = selected || '任务项'; break;
+        case 'code':
+            before = '`'; after = '`'; replacement = selected || '代码'; break;
+        case 'codeblock':
+            before = '```\n'; after = '\n```'; replacement = selected || '代码块'; break;
+        case 'quote':
+            before = '> '; replacement = selected || '引用内容'; break;
+        case 'link':
+            before = '['; after = '](url)'; replacement = selected || '链接文本'; break;
+        case 'image':
+            before = '!['; after = '](图片URL)'; replacement = selected || '图片描述'; break;
+        case 'table':
+            replacement = '| 列1 | 列2 | 列3 |\n|------|------|------|\n| 内容 | 内容 | 内容 |'; break;
+        case 'hr':
+            replacement = '\n---\n'; break;
+    }
+
+    const newText = before + replacement + after;
+    editor.setRangeText(newText, start, end, 'end');
+    editor.focus();
+    updatePreview();
+    updateCharCount();
+}
+
+// 保存笔记
+async function saveNote() {
+    const filename = document.getElementById('filename').value.trim();
+    if (!filename) { toast('请输入文件名', 'error'); return; }
+
+    const content = editor.value;
+    const dir = CURRENT_DIR;
+
+    const form = new FormData();
+    form.set('dir', dir);
+    form.set('filename', filename);
+    form.set('content', content);
+
+    document.getElementById('saveStatus').textContent = '⏳ 保存中...';
+
+    try {
+        const res = await fetch('/kb/' + KB_ID + '/notes/new', { method: 'POST', body: form });
+        const data = await res.json();
+        if (data.ok) {
+            toast('✅ 保存成功', 'success');
+            document.getElementById('saveStatus').textContent = '✅ 已保存';
+            setTimeout(() => {
+                window.location.href = '/kb/' + KB_ID + '/notes/view?path=' + encodeURIComponent(data.path);
+            }, 500);
+        } else {
+            toast('保存失败: ' + (data.error || '未知错误'), 'error');
+            document.getElementById('saveStatus').textContent = '❌ 保存失败';
+        }
+    } catch(e) {
+        toast('保存失败: ' + e.message, 'error');
+        document.getElementById('saveStatus').textContent = '❌ 保存失败';
+    }
+}
+
+// Ctrl+S 快捷键保存
+document.addEventListener('keydown', function(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        saveNote();
+    }
+});
+
+// 初始化
+updatePreview();
+updateCharCount();
+</script>
+
+</th:block>
+</body>
+</html>

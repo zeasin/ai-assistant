@@ -85,7 +85,7 @@
     <div class="page-header">
         <h2>📂 笔记文件浏览</h2>
         <div class="page-actions">
-            <button class="btn btn-primary" onclick="showNewModal()">✏️ 新建</button>
+            <a class="btn btn-primary" th:href="@{|/kb/${kb.id}/notes/new?dir=${rel}|}">✏️ 新建</a>
             <button th:if="${rel != null and !rel.isEmpty()}" class="btn btn-secondary" onclick="openAnalyzeModal()">🤖 AI 分析</button>
             <a th:if="${rel != null && !rel.isEmpty()}" class="btn btn-secondary"
                th:with="parentDir=${parent != null && !parent.isEmpty() ? '?dir=' + parent : ''}"
@@ -161,28 +161,6 @@
     </th:block>
 </div>
 
-<!-- 新建文件弹窗 -->
-<div class="modal-overlay" id="newModal">
-    <div class="modal">
-        <h3>✏️ 新建 Markdown 文件</h3>
-        <form id="newForm" onsubmit="return submitNew(event)">
-            <input type="hidden" name="dir" th:value="${rel}">
-            <div class="form-group">
-                <label>文件名</label>
-                <input type="text" id="filename" placeholder="文件名（无需 .md）" required>
-            </div>
-            <div class="form-group">
-                <label>内容 (Markdown)</label>
-                <textarea id="content" rows="12" placeholder="在此输入 Markdown 内容…"></textarea>
-            </div>
-            <div class="modal-actions">
-                <button type="button" class="btn btn-secondary" onclick="hideNewModal()">取消</button>
-                <button type="submit" class="btn btn-primary">创建</button>
-            </div>
-        </form>
-    </div>
-</div>
-
 <!-- AI 分析弹窗 -->
 <div class="modal-overlay" id="analyzeModal">
     <div class="modal">
@@ -206,35 +184,6 @@ document.querySelectorAll('.modal-overlay').forEach(function(m) {
     m.addEventListener('click', function(e) { if (e.target === this) this.classList.remove('active'); });
 });
 
-function showNewModal() {
-    document.getElementById('newModal').classList.add('active');
-    document.getElementById('filename').focus();
-}
-function hideNewModal() {
-    document.getElementById('newModal').classList.remove('active');
-}
-async function submitNew(e) {
-    e.preventDefault();
-    const filename = document.getElementById('filename').value.trim();
-    const content = document.getElementById('content').value;
-    if (!filename) { toast('请输入文件名', 'error'); return; }
-
-    const form = new FormData();
-    form.set('dir', CURRENT_DIR);
-    form.set('filename', filename);
-    form.set('content', content);
-
-    const res = await fetch('/kb/' + KB_ID + '/notes/new', { method: 'POST', body: form });
-    const data = await res.json();
-    if (data.ok) {
-        toast('创建成功！', 'success');
-        hideNewModal();
-        setTimeout(() => location.reload(), 300);
-    } else {
-        toast('创建失败：' + (data.error || '未知错误'), 'error');
-    }
-    return false;
-}
 async function deleteFile(path) {
     if (!confirm('确定要删除这个文件吗？')) return;
     const res = await fetch('/kb/' + KB_ID + '/notes/delete', {

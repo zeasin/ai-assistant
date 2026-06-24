@@ -208,6 +208,19 @@ public class KnowledgeBaseController {
         return "2.0/kb_browse";
     }
 
+    @GetMapping("/kb/{id}/notes/new")
+    public String newNote(@PathVariable Long id,
+                          @RequestParam(required = false, defaultValue = "") String dir,
+                          Map<String, Object> model) {
+        KnowledgeBaseEntity kb = kbService.getById(id);
+        if (kb == null) return "redirect:/config";
+
+        model.put("kb", kb);
+        model.put("labels", parseLabels(kb.getLabels()));
+        model.put("dir", dir);
+        return "2.0/kb_note_edit";
+    }
+
     @GetMapping("/kb/{id}/notes/view")
     public String viewFile(@PathVariable Long id, @RequestParam(defaultValue = "") String path,
                            Map<String, Object> model) {
