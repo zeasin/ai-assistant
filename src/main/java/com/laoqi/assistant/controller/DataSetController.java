@@ -263,6 +263,37 @@ public class DataSetController {
         return ResponseEntity.ok(Map.of("ok", true));
     }
 
+    @PutMapping("/datasets/{id}/records/{recordId}")
+    public ResponseEntity<Map<String, Object>> updateRecord(
+            @PathVariable String id,
+            @PathVariable String recordId,
+            @RequestBody Map<String, Object> body) {
+        try {
+            DataSet ds = dataSetService.getDataset(id);
+            if (ds == null) {
+                return ResponseEntity.ok(Map.of("ok", false, "error", "数据集不存在"));
+            }
+
+            // 删除旧记录
+            boolean deleted = dataSetService.deleteRecord(id, recordId);
+            if (!deleted) {
+                return ResponseEntity.ok(Map.of("ok", false, "error", "记录不存在"));
+            }
+
+            // 添加新记录
+            @SuppressWarnings("unchecked")
+            Map<String, Object> data = (Map<String, Object>) body.get("data");
+            if (data != null) {
+                data.put("更新时间", java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                dataSetService.addRecords(id, List.of(data), "web_update");
+            }
+
+            return ResponseEntity.ok(Map.of("ok", true));
+        } catch (Exception e) {
+            return ResponseEntity.ok(Map.of("ok", false, "error", e.getMessage()));
+        }
+    }
+
     @PostMapping("/datasets/{id}/import/excel")
     public ResponseEntity<Map<String, Object>> importExcel(
             @PathVariable String id,

@@ -373,8 +373,8 @@ function renderDatasetTab(dsId) {
             html += '<tr data-search="'+JSON.stringify(rec).toLowerCase()+'">'
                 + cols.map(c=>'<td title="'+esc(String(rec[c]||''))+'">'+esc(String(rec[c]||'').substring(0,150))+'</td>').join('')
                 + '<td style="white-space:nowrap;">'
-                + '<button class="btn btn-secondary btn-sm" onclick="showEditRecord(\''+rec.id+'\')">✏️</button> '
-                + '<button class="btn btn-danger btn-sm" onclick="deleteRecord(\''+rec.id+'\')">🗑️</button>'
+                + '<button class="btn btn-secondary btn-sm" onclick="showEditRecord(\''+rec._id+'\')">✏️</button> '
+                + '<button class="btn btn-danger btn-sm" onclick="deleteRecord(\''+rec._id+'\')">🗑️</button>'
                 + '</td></tr>';
         });
         html += '</tbody></table></div>';
@@ -392,7 +392,7 @@ function filterRecords() {
 function showAddRecord() { showRecordForm(null); }
 
 function showEditRecord(rid) {
-    const rec = allRecords[currentDs.id].find(r=>r.id===rid);
+    const rec = allRecords[currentDs.id].find(r=>r._id===rid);
     showRecordForm(rec);
 }
 
@@ -406,7 +406,7 @@ function showRecordForm(rec) {
             + '<input id="rf_'+f.name+'" value="'+esc(String(val))+'"></div>';
     });
     document.getElementById('recordFormBody').innerHTML = html;
-    document.getElementById('recordModal').dataset.rid = rec ? rec.id : '';
+    document.getElementById('recordModal').dataset.rid = rec ? rec._id : '';
     openModal('recordModal');
 }
 
@@ -415,8 +415,24 @@ async function saveRecord() {
     const fields = currentDs.schema && currentDs.schema.fields ? currentDs.schema.fields : [];
     const data = {};
     fields.forEach(f => { data[f.name] = document.getElementById('rf_'+f.name).value || null; });
-    const body = { data: [data] };
-    const r = await fetch(API+'/datasets/'+currentDs.id+'/import/json', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+    
+    let r;
+    if (rid) {
+        // 编辑模式：调用更新API
+        r = await fetch(API+'/datasets/'+currentDs.id+'/records/'+rid, {
+            method: 'PUT',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({data})
+        });
+    } else {
+        // 新增模式：调用导入API
+        r = await fetch(API+'/datasets/'+currentDs.id+'/import/json', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({data: [data]})
+        });
+    }
+    
     const d = await r.json();
     if (d.ok) { closeModal('recordModal'); toast('已保存'); loadAll(); }
     else toast(d.error||'失败','error');
