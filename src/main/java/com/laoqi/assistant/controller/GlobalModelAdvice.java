@@ -2,6 +2,7 @@ package com.laoqi.assistant.controller;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.laoqi.assistant.config.AppConfig;
+import com.laoqi.assistant.datacenter.DataModuleService;
 import com.laoqi.assistant.entity.KnowledgeBaseEntity;
 import com.laoqi.assistant.service.ConfigService;
 import com.laoqi.assistant.service.KnowledgeBaseService;
@@ -25,14 +26,17 @@ public class GlobalModelAdvice {
     private final ConfigService configService;
     private final KnowledgeBaseService kbService;
     private final OllamaEmbeddingService ollamaEmbeddingService;
+    private final DataModuleService moduleService;
 
     public GlobalModelAdvice(AppConfig appConfig, ConfigService configService,
                              KnowledgeBaseService kbService,
-                             OllamaEmbeddingService ollamaEmbeddingService) {
+                             OllamaEmbeddingService ollamaEmbeddingService,
+                             DataModuleService moduleService) {
         this.appConfig = appConfig;
         this.configService = configService;
         this.kbService = kbService;
         this.ollamaEmbeddingService = ollamaEmbeddingService;
+        this.moduleService = moduleService;
     }
 
     @ModelAttribute("requestURI")
@@ -78,6 +82,20 @@ public class GlobalModelAdvice {
     public boolean codingEnabled() {
         var config = configService.load();
         return Boolean.TRUE.equals(config.isCodingPiEnabled());
+    }
+
+    @ModelAttribute("dataSets")
+    public List<Map<String, Object>> dataSets() {
+        return moduleService.getAllModules();
+    }
+
+    @ModelAttribute("currentModuleId")
+    public String currentModuleId(HttpServletRequest request) {
+        String uri = request.getRequestURI();
+        if (uri.startsWith("/data/module/")) {
+            return uri.substring("/data/module/".length());
+        }
+        return null;
     }
 
     private Map<String, String> parseLabels(String labelsJson) {

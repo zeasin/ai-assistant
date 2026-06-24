@@ -298,16 +298,21 @@
 
             <div class="sidebar-group">
                 <div class="sidebar-group-label">数据</div>
-                <a href="/data"
-                   th:classappend="${requestURI.startsWith('/data')} ? 'active' : ''">
-                    <span class="nav-icon">📦</span><span>数据</span>
-                </a>
+                <th:block th:each="ds : ${dataSets}">
+                    <a th:href="'/data/module/' + ${ds['id']}"
+                       th:classappend="${currentModuleId != null and currentModuleId == ds['id']} ? 'active' : ''">
+                        <span class="nav-icon" th:text="${ds['icon'] ?: '📁'}">📁</span>
+                        <span th:text="${ds['name']}">数据集</span>
+                        <span style="font-size:11px;color:#909296;margin-left:auto;" th:text="${ds['datasetCount']}">0</span>
+                    </a>
+                </th:block>
             </div>
 
             <div class="sidebar-group">
+                <div class="sidebar-group-label">计划</div>
                 <a href="/planner"
                    th:classappend="${requestURI == '/planner'} ? 'active' : ''">
-                    <span class="nav-icon">📋</span><span>计划</span>
+                    <span class="nav-icon">📋</span><span>任务与提醒</span>
                 </a>
             </div>
         </nav>
