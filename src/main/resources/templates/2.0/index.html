@@ -9,6 +9,7 @@
 <!-- Tab 切换 -->
 <div style="display:flex;gap:0;border-bottom:2px solid #e1e3e6;margin-bottom:20px;">
     <button class="tab-btn active" onclick="switchTab('chat')">💬 对话</button>
+    <button class="tab-btn" onclick="switchTab('notes')">📝 笔记</button>
     <button class="tab-btn" onclick="switchTab('search')">🔍 搜索</button>
     <button class="tab-btn" onclick="switchTab('overview')">📊 概览</button>
 </div>
@@ -64,6 +65,17 @@
             </div>
         </div>
     </div>
+</div>
+
+<!-- ==================== Tab: 笔记 ==================== -->
+<div id="tab-notes" class="tab-panel" style="height:calc(100vh - 180px);">
+    <div th:if="${currentKb == null}" style="text-align:center;padding:40px;color:#909296;">
+        请先从左侧选择一个笔记库
+    </div>
+    <iframe th:if="${currentKb != null}" 
+            th:src="@{/kb/{id}/notes(id=${currentKb.id})}" 
+            style="width:100%;height:100%;border:none;border-radius:12px;"
+            id="notesFrame"></iframe>
 </div>
 
 <!-- ==================== Tab 2: 搜索 ==================== -->
@@ -225,7 +237,9 @@ function switchTab(tab) {
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     event.target.classList.add('active');
     document.getElementById('tab-' + tab).classList.add('active');
-}// ========== 加载聊天记录 ==========
+}
+
+// ========== 加载聊天记录 ==========
 async function loadChatHistory() {
     if (!KB_ID) return;
     const box = document.getElementById('chatBox');

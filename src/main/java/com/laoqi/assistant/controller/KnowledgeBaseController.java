@@ -28,6 +28,7 @@ import java.nio.file.*;
 import java.time.ZoneId;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Controller
 public class KnowledgeBaseController {
@@ -50,13 +51,15 @@ public class KnowledgeBaseController {
     private final ConfigService configService;
     private final AgentAnalysisService agentAnalysisService;
     private final DirectoryDataService directoryDataService;
+    private final com.laoqi.assistant.service.LlmService llmService;
 
     public KnowledgeBaseController(KnowledgeBaseService kbService,
                                    LogService logService, TaskService taskService,
                                    ReminderService reminderService, ReportService reportService,
                                    ConfigService configService,
                                    AgentAnalysisService agentAnalysisService,
-                                   DirectoryDataService directoryDataService) {
+                                   DirectoryDataService directoryDataService,
+                                   com.laoqi.assistant.service.LlmService llmService) {
         this.kbService = kbService;
         this.logService = logService;
         this.taskService = taskService;
@@ -65,6 +68,7 @@ public class KnowledgeBaseController {
         this.configService = configService;
         this.agentAnalysisService = agentAnalysisService;
         this.directoryDataService = directoryDataService;
+        this.llmService = llmService;
     }
 
     private Path kbDir(KnowledgeBaseEntity kb) {
@@ -158,67 +162,26 @@ public class KnowledgeBaseController {
         return "1.0/kb_data_detail";
     }
 
-    // ========== 目录分析 ==========
-
-    @GetMapping("/kb/{id}/notes")
-    public String notes(@PathVariable Long id,
-                        @RequestParam(required = false, defaultValue = "") String dir,
-                        Map<String, Object> model) {
-        KnowledgeBaseEntity kb = kbService.getById(id);
-        if (kb == null) return "redirect:/config";
-
-        model.put("kb", kb);
-        model.put("labels", parseLabels(kb.getLabels()));
-
-        if (kb.getNotesDir() == null || kb.getNotesDir().isBlank()) {
-            model.put("error", "未配置笔记库路径");
-            return "2.0/kb_browse";
-        }
-
-        Path base = kbDir(kb);
-
-        if (dir.isEmpty()) {
-        model.put("dirs", listTopDirsAsFiles(base));
-                model.put("files", List.of());
-                model.put("breadcrumbs", List.of());
-                model.put("breadcrumbPaths", List.of());
-                model.put("rel", "");
-                model.put("parent", "");
-                return "2.0/kb_browse";
-        }
-
-        Path target = safeResolve(base, dir);
-        if (!Files.isDirectory(target)) {
-            return "redirect:/kb/" + id + "/notes";
-        }
-
-        model.put("dirs", listSubDirs(target));
-        model.put("files", listFiles(target));
-        model.put("breadcrumbs", buildBreadcrumbs(dir));
-        model.put("breadcrumbPaths", buildBreadcrumbPaths(dir));
-        model.put("rel", dir);
-        model.put("parent", parentDir(dir));
-
-        Path analysisDir = target.resolve("AI分析");
-        model.put("latestReport", readLatestReport(analysisDir));
-
-        Path dataDir = target.resolve("data");
-        model.put("jsonFiles", directoryDataService.listJsonFiles(dataDir));
-
-        return "2.0/kb_browse";
+    // ========== 笔记库选择页面 ==========
+    @GetMapping("/notes")
+    public String notesIndex(Map<String, Object> model) {
+        var kbList = kbService.getAll();
+        model.put("kbList", kbList);
+        return "2.0/notes_select";
     }
 
-    @GetMapping("/kb/{id}/notes/new")
-    public String newNote(@PathVariable Long id,
-                          @RequestParam(required = false, defaultValue = "") String dir,
-                          Map<String, Object> model) {
+    // ========== 笔记浏览页面（树结构） ==========
+    @GetMapping("/kb/{id}/notes")
+    public String notesTree(@PathVariable Long id,
+                            @RequestParam(required = false, defaultValue = "") String dir,
+                            Map<String, Object> model) {
         KnowledgeBaseEntity kb = kbService.getById(id);
         if (kb == null) return "redirect:/config";
 
         model.put("kb", kb);
         model.put("labels", parseLabels(kb.getLabels()));
-        model.put("dir", dir);
-        return "2.0/kb_note_edit";
+        model.put("rel", dir);
+        return "2.0/notes";
     }
 
     @GetMapping("/kb/{id}/notes/view")
@@ -446,6 +409,209 @@ public class KnowledgeBaseController {
     }
 
     // ========== 笔记 API ==========
+
+    @ResponseBody
+    @GetMapping("/kb/{id}/api/notes/list")
+    public Map<String, Object> listNotes(@PathVariable Long id) {
+        KnowledgeBaseEntity kb = kbService.getById(id);
+        if (kb == null) return Map.of("ok", false, "error", "知识库不存在");
+
+        Path base = kbDir(kb);
+        if (kb.getNotesDir() == null || kb.getNotesDir().isBlank()) {
+            return Map.of("ok", true, "files", List.of());
+        }
+
+        List<Map<String, String>> files = new ArrayList<>();
+        try (Stream<Path> stream = Files.walk(base, 3)) {
+            stream.filter(p -> p.toString().endsWith(".md"))
+                  .filter(p -> !p.toString().contains("/AI/") && !p.toString().contains("\\AI\\"))
+                  .filter(p -> !p.toString().contains("/.git/") && !p.toString().contains("\\.git\\"))
+                  .sorted(Comparator.comparing(p -> p.getFileName().toString()))
+                  .limit(50)
+                  .forEach((Path p) -> {
+                      Map<String, String> file = new LinkedHashMap<>();
+                      file.put("name", p.getFileName().toString());
+                      file.put("path", base.relativize(p).toString().replace("\\", "/"));
+                      try {
+                          var lastModified = Files.getLastModifiedTime(p);
+                          file.put("modified", lastModified.toInstant()
+                              .atZone(ZoneId.systemDefault())
+                              .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
+                      } catch (IOException e) {
+                          file.put("modified", "");
+                      }
+                      files.add(file);
+                  });
+        } catch (IOException e) {
+            return Map.of("ok", false, "error", "扫描文件失败");
+        }
+        return Map.of("ok", true, "files", files);
+    }
+
+    @ResponseBody
+    @GetMapping("/kb/{id}/api/notes/tree")
+    public Map<String, Object> getNotesTree(@PathVariable Long id) {
+        KnowledgeBaseEntity kb = kbService.getById(id);
+        if (kb == null) return Map.of("ok", false, "error", "知识库不存在");
+
+        Path base = kbDir(kb);
+        if (kb.getNotesDir() == null || kb.getNotesDir().isBlank()) {
+            return Map.of("ok", true, "tree", Map.of());
+        }
+
+        Map<String, Object> tree = buildFileTree(base, base);
+        return Map.of("ok", true, "tree", tree);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> buildFileTree(Path root, Path current) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        List<Map<String, Object>> dirs = new ArrayList<>();
+        List<Map<String, String>> files = new ArrayList<>();
+
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(current)) {
+            List<Path> entries = new ArrayList<>();
+            stream.forEach(entries::add);
+            
+            // 排序：目录在前，文件在后，各自按名称排序
+            entries.sort((a, b) -> {
+                boolean aIsDir = Files.isDirectory(a);
+                boolean bIsDir = Files.isDirectory(b);
+                if (aIsDir != bIsDir) return aIsDir ? -1 : 1;
+                return a.getFileName().toString().compareToIgnoreCase(b.getFileName().toString());
+            });
+
+            for (Path entry : entries) {
+                String name = entry.getFileName().toString();
+                
+                // 跳过隐藏文件和特殊目录
+                if (name.startsWith(".") || name.equals("__pycache__")) continue;
+                
+                String relativePath = root.relativize(entry).toString().replace("\\", "/");
+
+                if (Files.isDirectory(entry)) {
+                    // 跳过AI、.git等目录
+                    if (name.equals("AI") || name.equals(".git") || name.equals(".obsidian")) continue;
+                    
+                    Map<String, Object> dir = new LinkedHashMap<>();
+                    dir.put("name", name);
+                    dir.put("path", relativePath);
+                    dir.put("children", buildFileTree(root, entry));
+                    dirs.add(dir);
+                } else if (name.endsWith(".md")) {
+                    Map<String, String> file = new LinkedHashMap<>();
+                    file.put("name", name);
+                    file.put("path", relativePath);
+                    files.add(file);
+                }
+            }
+        } catch (IOException e) {
+            log.warn("Failed to list directory: {}", current);
+        }
+
+        result.put("dirs", dirs);
+        result.put("files", files);
+        return result;
+    }
+
+    @ResponseBody
+    @GetMapping("/kb/{id}/api/notes/read")
+    public Map<String, Object> readNote(@PathVariable Long id, @RequestParam String path) {
+        KnowledgeBaseEntity kb = kbService.getById(id);
+        if (kb == null) return Map.of("ok", false, "error", "知识库不存在");
+
+        Path base = kbDir(kb);
+        Path file = safeResolve(base, path);
+        
+        if (!Files.isRegularFile(file)) {
+            return Map.of("ok", false, "error", "文件不存在");
+        }
+
+        try {
+            String content = FileUtil.readText(file);
+            content = MarkdownUtil.stripFrontmatter(content);
+            return Map.of("ok", true, "content", content);
+        } catch (Exception e) {
+            return Map.of("ok", false, "error", "读取失败");
+        }
+    }
+
+    @ResponseBody
+    @GetMapping("/kb/{id}/api/notes/stats")
+    public Map<String, Object> getNotesStats(@PathVariable Long id) {
+        KnowledgeBaseEntity kb = kbService.getById(id);
+        if (kb == null) return Map.of("ok", false, "error", "知识库不存在");
+
+        Path base = kbDir(kb);
+        if (kb.getNotesDir() == null || kb.getNotesDir().isBlank()) {
+            return Map.of("ok", true, "totalChars", 0);
+        }
+
+        long totalChars = 0;
+        try (Stream<Path> stream = Files.walk(base, 5)) {
+            totalChars = stream
+                .filter(p -> p.toString().endsWith(".md"))
+                .filter(p -> !p.toString().contains("/AI/") && !p.toString().contains("\\AI\\"))
+                .filter(p -> !p.toString().contains("/.git/") && !p.toString().contains("\\.git\\"))
+                .mapToLong(p -> {
+                    try {
+                        return Files.size(p);
+                    } catch (IOException e) {
+                        return 0;
+                    }
+                })
+                .sum();
+        } catch (IOException e) {
+            return Map.of("ok", false, "error", "统计失败");
+        }
+        return Map.of("ok", true, "totalChars", totalChars);
+    }
+
+    @ResponseBody
+    @PostMapping("/kb/{id}/api/notes/ai-report")
+    public Map<String, Object> generateAiReport(@PathVariable Long id, @RequestBody Map<String, String> body) {
+        KnowledgeBaseEntity kb = kbService.getById(id);
+        if (kb == null) return Map.of("ok", false, "error", "知识库不存在");
+
+        try {
+            Path base = kbDir(kb);
+            StringBuilder summary = new StringBuilder();
+            summary.append("笔记库名称：").append(kb.getName()).append("\n\n");
+            summary.append("笔记库路径：").append(kb.getNotesDir()).append("\n\n");
+            
+            // 收集文件列表和部分内容
+            List<String> fileList = new ArrayList<>();
+            try (Stream<Path> stream = Files.walk(base, 3)) {
+                stream.filter(p -> p.toString().endsWith(".md"))
+                      .filter(p -> !p.toString().contains("/AI/") && !p.toString().contains("\\AI\\"))
+                      .filter(p -> !p.toString().contains("/.git/"))
+                      .limit(20)
+                      .forEach(p -> {
+                          String relPath = base.relativize(p).toString().replace("\\", "/");
+                          fileList.add(relPath);
+                          try {
+                              String content = FileUtil.readText(p);
+                              if (content.length() > 500) content = content.substring(0, 500) + "...";
+                              summary.append("文件：").append(relPath).append("\n");
+                              summary.append("内容摘要：").append(content).append("\n\n");
+                          } catch (Exception e) {}
+                      });
+            }
+            
+            if (fileList.isEmpty()) {
+                return Map.of("ok", true, "report", "笔记库为空，暂无内容可分析。");
+            }
+            
+            String prompt = body.getOrDefault("prompt", "请分析这个笔记库的内容结构，给出总结和建议。");
+            String systemPrompt = "你是一个笔记分析助手。请根据提供的笔记库内容，给出简要的分析报告。包括：内容概览、主要主题、结构建议。用中文回复，使用HTML格式。";
+            String userMessage = prompt + "\n\n笔记库包含 " + fileList.size() + " 个文件：\n" + String.join("\n", fileList) + "\n\n" + summary.toString();
+            
+            String report = llmService.chat(systemPrompt, userMessage);
+            return Map.of("ok", true, "report", report != null ? report : "暂无分析结果");
+        } catch (Exception e) {
+            return Map.of("ok", false, "error", "生成报告失败: " + e.getMessage());
+        }
+    }
 
     @ResponseBody
     @PostMapping("/kb/{id}/notes/new")
