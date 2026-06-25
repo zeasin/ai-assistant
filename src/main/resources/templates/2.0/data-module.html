@@ -72,12 +72,18 @@
     .form-group input, .form-group select, .form-group textarea { padding:8px 10px; border:1px solid #e1e3e6; border-radius:6px; font-size:13px; outline:none; }
     .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color:#7c5cfc; }
 
-    .msg { padding:8px 12px; border-radius:6px; font-size:13px; margin-bottom:10px; }
+    .detail-row { display:flex; padding:8px 0; border-bottom:1px solid #f0f0f5; }
+	    .detail-row:last-child { border-bottom:none; }
+	    .detail-row label { font-size:12px; color:#5c5f66; font-weight:500; min-width:100px; flex-shrink:0; padding-top:2px; }
+	    .detail-row span { font-size:13px; color:#1a1b1e; word-break:break-word; }
+
+	    .msg { padding:8px 12px; border-radius:6px; font-size:13px; margin-bottom:10px; }
     .msg-success { background:#f0fdf4; color:#27ae60; }
     .msg-error { background:#fff5f5; color:#d32f2f; }
     .msg-info { background:#f0edff; color:#5c3dcf; }
     .badge { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; }
     .badge-gray { background:#f0f0f0; color:#909296; }
+    .badge-new { background:#e8f5e9; color:#2e7d32; font-weight:500; }
 
     .empty-state { text-align:center; color:#909296; padding:40px; }
     .empty-state .icon { font-size:36px; margin-bottom:10px; }
@@ -139,6 +145,19 @@
         <div class="modal-footer">
             <button class="btn btn-secondary" onclick="closeModal('dsModal')">取消</button>
             <button class="btn btn-primary" onclick="saveDataset()">保存</button>
+        </div>
+    </div>
+</div>
+
+<!-- 记录详情弹窗 -->
+<div id="detailModal" class="modal-overlay" onclick="closeModal('detailModal',event)">
+    <div class="modal-box" style="width:540px;" onclick="event.stopPropagation()">
+        <div class="modal-header"><h3 id="detailModalTitle">记录详情</h3><button class="btn btn-secondary" onclick="closeModal('detailModal')">✕</button></div>
+        <div class="modal-body" id="detailBody"></div>
+        <div class="modal-footer">
+            <button class="btn btn-danger" onclick="deleteFromDetail()">🗑️ 删除</button>
+            <button class="btn btn-primary" onclick="editFromDetail()">✏️ 编辑</button>
+            <button class="btn btn-secondary" onclick="closeModal('detailModal')">关闭</button>
         </div>
     </div>
 </div>
@@ -370,9 +389,9 @@ function renderDatasetTab(dsId) {
             + cols.map(c=>'<th>'+c+'</th>').join('')
             + '<th style="width:80px;">操作</th></tr></thead><tbody id="recordsBody">';
         records.forEach(rec => {
-            html += '<tr data-search="'+JSON.stringify(rec).toLowerCase()+'">'
+            html += '<tr data-search="'+JSON.stringify(rec).toLowerCase()+'" style="cursor:pointer;" onclick="showRecordDetail(\''+rec._id+'\')">'
                 + cols.map(c=>'<td title="'+esc(String(rec[c]||''))+'">'+esc(String(rec[c]||'').substring(0,150))+'</td>').join('')
-                + '<td style="white-space:nowrap;">'
+                + '<td style="white-space:nowrap;" onclick="event.stopPropagation()">'
                 + '<button class="btn btn-secondary btn-sm" onclick="showEditRecord(\''+rec._id+'\')">✏️</button> '
                 + '<button class="btn btn-danger btn-sm" onclick="deleteRecord(\''+rec._id+'\')">🗑️</button>'
                 + '</td></tr>';
@@ -397,13 +416,35 @@ function showEditRecord(rid) {
 }
 
 function showRecordForm(rec) {
-    const fields = currentDs.schema && currentDs.schema.fields ? currentDs.schema.fields : [];
+    // 编辑时：合并记录已有字段 + 数据集Schema定义的字段（补全新字段）
+    // 新增时：使用数据集Schema定义的字段
+    let fieldNames;
+    if (rec) {
+        // 取记录自身字段（去元字段）
+        const recordFields = Object.keys(rec).filter(k => !k.startsWith('_'));
+        // 取Schema定义的字段名
+        const schemaFields = currentDs.schema && currentDs.schema.fields ? currentDs.schema.fields.map(f => f.name) : [];
+        // 合并：先显示记录已有字段，再追加schema中有但记录中没有的新字段
+        const allFields = [...recordFields];
+        schemaFields.forEach(fn => {
+            if (!allFields.includes(fn)) {
+                allFields.push(fn);
+            }
+        });
+        fieldNames = allFields;
+    } else {
+        fieldNames = currentDs.schema && currentDs.schema.fields ? currentDs.schema.fields.map(f => f.name) : [];
+    }
     document.getElementById('recordModalTitle').textContent = rec ? '编辑记录' : '新增记录';
     let html = '';
-    fields.forEach(f => {
-        const val = rec ? (rec[f.name]||'') : '';
-        html += '<div class="form-group"><label>'+f.name+'</label>'
-            + '<input id="rf_'+f.name+'" value="'+esc(String(val))+'"></div>';
+    fieldNames.forEach(fn => {
+        const val = rec ? (rec[fn] !== null && rec[fn] !== undefined ? String(rec[fn]) : '') : '';
+        // 标记新增字段（记录中没有但schema中有）
+        const isNewField = rec && (!(fn in rec) || rec[fn] === null || rec[fn] === undefined);
+        html += '<div class="form-group"><label>' + esc(fn)
+            + (isNewField ? ' <span class="badge badge-new">新增</span>' : '')
+            + '</label>'
+            + '<input id="rf_'+esc(fn)+'" value="'+esc(val)+'"></div>';
     });
     document.getElementById('recordFormBody').innerHTML = html;
     document.getElementById('recordModal').dataset.rid = rec ? rec._id : '';
@@ -412,9 +453,12 @@ function showRecordForm(rec) {
 
 async function saveRecord() {
     const rid = document.getElementById('recordModal').dataset.rid;
-    const fields = currentDs.schema && currentDs.schema.fields ? currentDs.schema.fields : [];
+    const inputs = document.querySelectorAll('#recordFormBody input[id^="rf_"]');
     const data = {};
-    fields.forEach(f => { data[f.name] = document.getElementById('rf_'+f.name).value || null; });
+    inputs.forEach(input => {
+        const fieldName = input.id.substring(3); // 去掉 "rf_" 前缀
+        data[fieldName] = input.value || null;
+    });
     
     let r;
     if (rid) {
@@ -442,6 +486,37 @@ async function deleteRecord(rid) {
     if (!confirm('确定删除？')) return;
     await fetch(API+'/datasets/'+currentDs.id+'/records/'+rid, {method:'DELETE'});
     toast('已删除'); loadAll();
+}
+
+// ========== 记录详情弹窗 ==========
+function showRecordDetail(rid) {
+    const rec = allRecords[currentDs.id].find(r => r._id === rid);
+    if (!rec) return;
+
+    // 获取所有非元数据字段（去掉 _id, _source, _importTime 等前缀带 _ 的字段）
+    const fields = Object.keys(rec).filter(k => !k.startsWith('_'));
+    document.getElementById('detailModalTitle').textContent = '📄 记录详情';
+    let html = '';
+    fields.forEach(f => {
+        const val = rec[f] !== null && rec[f] !== undefined ? String(rec[f]) : '';
+        html += '<div class="detail-row"><label>' + esc(f) + '</label><span>' + esc(val) + '</span></div>';
+    });
+    document.getElementById('detailBody').innerHTML = html;
+    document.getElementById('detailModal').dataset.rid = rid;
+    openModal('detailModal');
+}
+
+function editFromDetail() {
+    const rid = document.getElementById('detailModal').dataset.rid;
+    closeModal('detailModal');
+    showEditRecord(rid);
+}
+
+function deleteFromDetail() {
+    const rid = document.getElementById('detailModal').dataset.rid;
+    closeModal('detailModal');
+    // 延迟一下等待弹窗关闭动画
+    setTimeout(() => deleteRecord(rid), 150);
 }
 
 // ========== 数据集操作 ==========

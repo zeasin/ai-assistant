@@ -1,10 +1,12 @@
 package com.laoqi.assistant.controller;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.laoqi.assistant.config.AppConfig;
+import com.laoqi.assistant.dto.ApiResult;
+import com.laoqi.assistant.dto.ColumnSettingsResult;
+import com.laoqi.assistant.dto.DataFileInfo;
+import com.laoqi.assistant.dto.DataListResult;
 import com.laoqi.assistant.model.Config;
 import com.laoqi.assistant.service.ConfigService;
-import com.laoqi.assistant.util.FileUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
@@ -22,7 +24,6 @@ import java.util.stream.Collectors;
 public class DataController {
 
     private static final Logger log = LoggerFactory.getLogger(DataController.class);
-    private static final TypeReference<Map<String, Object>> mapType = new TypeReference<Map<String, Object>>() {};
 
     private final ConfigService configService;
     private final AppConfig appConfig;
@@ -38,87 +39,69 @@ public class DataController {
     }
 
     @GetMapping(value = "/list", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<Map<String, Object>> listData(
+    public ResponseEntity<DataListResult> listData(
             @RequestParam(required = false) Long kbId,
             @RequestParam String dir) {
-        
-        Map<String, Object> result = new LinkedHashMap<>();
-        
+
         Path baseDir;
         try {
             baseDir = getNotesDir(kbId);
         } catch (IllegalStateException e) {
-            result.put("ok", false);
-            result.put("error", e.getMessage());
-            return ResponseEntity.ok(result);
+            return ResponseEntity.ok(DataListResult.fail(e.getMessage()));
         }
-        
+
         Path targetDir = baseDir.resolve(dir).resolve("data").normalize();
         Path base = baseDir.normalize();
         if (!targetDir.startsWith(base)) {
-            result.put("ok", false);
-            result.put("error", "路径越界");
-            return ResponseEntity.ok(result);
+            return ResponseEntity.ok(DataListResult.fail("路径越界"));
         }
-        
-        result.put("directory", dir);
-        result.put("fullPath", targetDir.toString());
-        
+
         if (!Files.exists(targetDir)) {
-            result.put("ok", false);
-            result.put("error", "目录不存在: " + targetDir);
-            result.put("exists", false);
-            return ResponseEntity.ok(result);
+            return ResponseEntity.ok(DataListResult.notExists(dir, targetDir.toString()));
         }
-        
-        result.put("exists", true);
-        
+
         try {
-            List<Map<String, Object>> fileList = new ArrayList<>();
-            
+            List<DataFileInfo> fileList = new ArrayList<>();
+
             try (java.util.stream.Stream<Path> stream = Files.list(targetDir)) {
                 List<Path> jsonFiles = stream
                     .filter(f -> f.getFileName().toString().endsWith(".json"))
                     .sorted()
                     .collect(Collectors.toList());
-                
+
                 for (Path f : jsonFiles) {
                     String fileName = f.getFileName().toString().replace(".json", "");
-                    Map<String, Object> fileInfo = new LinkedHashMap<>();
-                    fileInfo.put("name", fileName);
-                    fileInfo.put("path", f.toString());
-                    fileInfo.put("size", Files.size(f));
-                    fileInfo.put("lastModified", Files.getLastModifiedTime(f).toMillis());
-                    fileList.add(fileInfo);
+                    fileList.add(new DataFileInfo(
+                        fileName,
+                        f.toString(),
+                        Files.size(f),
+                        Files.getLastModifiedTime(f).toMillis()
+                    ));
                 }
             }
-            
-            result.put("ok", true);
-            result.put("files", fileList);
-            result.put("fileCount", fileList.size());
-            
+
+            return ResponseEntity.ok(DataListResult.success(dir, targetDir.toString(), fileList));
+
         } catch (Exception e) {
             log.error("读取目录失败: {}", targetDir, e);
-            result.put("ok", false);
-            result.put("error", "读取目录失败: " + e.getMessage());
+            return ResponseEntity.ok(DataListResult.fail("读取目录失败: " + e.getMessage()));
         }
-        
-        return ResponseEntity.ok(result);
     }
 
     @GetMapping(value = "/column-settings", produces = MediaType.APPLICATION_JSON_VALUE)
-    public Map<String, Object> getColumnSettings(@RequestParam(required = false, defaultValue = "customer") String type) {
+    public ColumnSettingsResult getColumnSettings(
+            @RequestParam(required = false, defaultValue = "customer") String type) {
         Config config = configService.load();
         Map<String, Map<String, List<String>>> allSettings = config.getColumnSettings();
         if (allSettings == null) {
             allSettings = new HashMap<>();
         }
         Map<String, List<String>> typeSettings = allSettings.getOrDefault(type, new HashMap<>());
-        return Map.of("ok", true, "settings", typeSettings);
+        return ColumnSettingsResult.success(type, typeSettings);
     }
 
     @PostMapping(value = "/column-settings", produces = MediaType.APPLICATION_JSON_VALUE)
-    public Map<String, Object> saveColumnSettings(
+    public ApiResult<Void> saveColumnSettings(
             @RequestParam(required = false, defaultValue = "customer") String type,
             @RequestBody Map<String, List<String>> settings) {
         try {
@@ -130,9 +113,9 @@ public class DataController {
             allSettings.put(type, settings);
             config.setColumnSettings(allSettings);
             configService.save(config);
-            return Map.of("ok", true);
+            return ApiResult.success();
         } catch (Exception e) {
-            return Map.of("ok", false, "error", e.getMessage());
+            return ApiResult.fail(e.getMessage());
         }
     }
 }

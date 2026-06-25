@@ -6,7 +6,7 @@
     <title layout:fragment="title">笔记</title>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
-        .notes-page { display:flex; flex-direction:column; height:calc(100vh - 120px); overflow:hidden; }
+        .notes-page { display:flex; flex-direction:column; height:100vh; overflow:hidden; }
         .notes-stats { display:flex; gap:12px; padding:12px 16px; background:#fff; border:1px solid #e1e3e6; border-radius:12px 12px 0 0; border-bottom:none; }
         .stat-card { flex:1; display:flex; align-items:center; gap:10px; padding:10px 14px; background:#fafbfc; border-radius:8px; border:1px solid #eef0f4; }
         .stat-card .icon { font-size:20px; }
@@ -14,7 +14,7 @@
         .stat-card .value { font-size:16px; font-weight:600; color:#1a1b1e; }
         .stat-card .label { font-size:11px; color:#909296; }
         .notes-menu { display:flex; gap:6px; align-items:center; }
-        .notes-layout { display:flex; flex:1; overflow:hidden; background:#fff; border:1px solid #e1e3e6; border-radius:0 0 12px 12px; }
+        .notes-layout { display:flex; flex:1; min-height:0; overflow:hidden; background:#fff; border:1px solid #e1e3e6; border-radius:0 0 12px 12px; }
         
         /* 左侧树 */
         .notes-sidebar { width:280px; min-width:280px; border-right:1px solid #e1e3e6; display:flex; flex-direction:column; background:#fafbfc; }
@@ -33,9 +33,11 @@
         .tree-indent { padding-left:20px; }
         
         /* 右侧内容 */
-        .notes-main { flex:1; display:flex; flex-direction:column; min-width:0; }
+        .notes-main { flex:1; display:flex; flex-direction:column; min-width:0; min-height:0; }
         .notes-main-header { padding:12px 16px; border-bottom:1px solid #eef0f4; display:flex; align-items:center; justify-content:space-between; }
-        .notes-main-content { flex:1; overflow-y:auto; }
+        .notes-main-content { flex:1; overflow-y:auto; min-height:0; }
+        /* Flex 子项必须允许缩小，否则 overflow-y:auto 永不触发 */
+        #noteView, #editorView { min-height:0; }
         
         /* 查看模式 */
         .note-view { padding:24px 32px; max-width:900px; margin:0 auto; }
@@ -61,9 +63,9 @@
         .toolbar-btn { padding:5px 8px; border:none; background:none; border-radius:4px; cursor:pointer; font-size:12px; color:#5c5f66; }
         .toolbar-btn:hover { background:#f0edff; color:#7c5cfc; }
         .toolbar-divider { width:1px; background:#e1e3e6; margin:0 4px; }
-        .editor-split { display:flex; flex:1; overflow:hidden; }
+        .editor-split { display:flex; flex:1; overflow:hidden; min-height:0; }
         .editor-input { flex:1; border:none; padding:16px; font-family:"SF Mono","Fira Code",monospace; font-size:14px; line-height:1.8; resize:none; outline:none; }
-        .editor-preview { flex:1; border-left:1px solid #e1e3e6; overflow-y:auto; padding:16px 20px; background:#fff; font-size:15px; line-height:1.8; }
+        .editor-preview { flex:1; border-left:1px solid #e1e3e6; overflow-y:auto; padding:16px 20px; background:#fff; font-size:15px; line-height:1.8; min-height:0; }
         
         /* 欢迎/空状态 */
         .empty-state { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:#909296; }
@@ -428,13 +430,16 @@ function showView(viewId) {
     document.getElementById('welcomeView').style.display = 'none';
     document.getElementById('noteView').style.display = 'none';
     document.getElementById('editorView').style.display = 'none';
-    
+
     const view = document.getElementById(viewId);
     if (viewId === 'welcomeView') {
         view.style.display = 'flex';
     } else {
         view.style.display = 'flex';
     }
+
+    // 切换后重新计算 iframe 高度
+    setTimeout(syncHeight, 50);
 }
 
 // ========== 编辑器工具栏 ==========
@@ -551,6 +556,29 @@ document.addEventListener('keydown', function(e) {
         saveNote();
     }
 });
+
+// ========== iframe 高度自适应 ==========
+// 在 iframe 中，100vh 可能引用父窗口视口导致溢出。
+// 改用 getBoundingClientRect() 精确计算可用高度。
+function syncHeight() {
+    var el = document.querySelector('.notes-page');
+    if (!el) return;
+    if (window !== window.top) {
+        // 在 iframe 内：利用 getBoundingClientRect 计算精确可用高度
+        // rect.top 已包含 main-body padding 等偏移量
+        var rect = el.getBoundingClientRect();
+        var available = Math.max(Math.floor(window.innerHeight - rect.top), 300);
+        el.style.height = available + 'px';
+    } else {
+        // 独立页面：用 vh
+        el.style.height = 'calc(100vh - 120px)';
+    }
+}
+window.addEventListener('resize', syncHeight);
+// 初始延迟调用，确保 getBoundingClientRect 返回正确布局值
+setTimeout(syncHeight, 100);
+// load 完成后再次校准
+window.addEventListener('load', syncHeight);
 
 // 初始化
 loadTree();
