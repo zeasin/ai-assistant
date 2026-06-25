@@ -369,63 +369,64 @@ public class NoteIndexService {
         // 查询扩展：生成多个相关查询
         List<String> expandedQueries = expandQuery(query);
         log.info("[NoteIndex] 查询扩展: 原始={}, 扩展={}", query, expandedQueries);
-        
-        // 对每个扩展查询进行搜索
-        Set<String> seenFiles = new HashSet<>();
+
         Map<String, NoteSearchResult> resultMap = new HashMap<>();
         Map<String, Double> scores = new HashMap<>();
 
+        // 1. 只对原始查询做语义搜索（embedding 很慢，只做一次）
+        List<NoteSearchResult> semanticResults = search(kbId, query, limit * 2);
+
+        for (NoteSearchResult r : semanticResults) {
+            String key = r.filePath();
+            double score = r.score();
+
+            // 检查路径是否包含查询关键词
+            String pathLower = r.pathContext() != null ? r.pathContext().toLowerCase() : "";
+            boolean pathMatch = isPathMatchPath(pathLower, query.toLowerCase());
+
+            if (pathMatch) {
+                score = Math.max(score, 0.9);
+            }
+
+            scores.put(key, score);
+            resultMap.put(key, r);
+        }
+
+        // 2. 原始查询走关键词兜底（embedding 可能漏掉的精确匹配）
+        List<NoteSearchResult> originalKeywordResults = keywordSearch(kbId, query, limit * 2);
+        for (NoteSearchResult r : originalKeywordResults) {
+            String key = r.filePath();
+            if (!scores.containsKey(key)) {
+                String pathLower = r.pathContext() != null ? r.pathContext().toLowerCase() : "";
+                boolean pathMatch = isPathMatchPath(pathLower, query.toLowerCase());
+                scores.put(key, pathMatch ? 0.85 : 0.5);
+                resultMap.put(key, r);
+            }
+        }
+
+        // 3. 扩展查询只用关键词搜索（瞬间完成），对已有结果加分或补充新结果
         for (String q : expandedQueries) {
-            List<NoteSearchResult> semanticResults = search(kbId, q, limit * 2);
+            if (q.equals(query)) continue; // 原始查询已处理
+
             List<NoteSearchResult> keywordResults = keywordSearch(kbId, q, limit * 2);
 
-            // 收集所有包含关键词的文件路径
-            Set<String> keywordMatchedFiles = new HashSet<>();
             for (NoteSearchResult r : keywordResults) {
-                keywordMatchedFiles.add(r.filePath());
-            }
-
-            // 对语义结果进行评分调整
-            for (NoteSearchResult r : semanticResults) {
                 String key = r.filePath();
-                double score = r.score();
-                
-                // 检查路径是否包含查询关键词
-                String pathLower = r.pathContext() != null ? r.pathContext().toLowerCase() : "";
-                String queryLower = q.toLowerCase();
-                
-                // 智能匹配：检查路径是否包含查询的所有关键词
-                boolean pathMatch = isPathMatchPath(pathLower, queryLower);
-                
-                if (pathMatch) {
-                    // 路径匹配，给高分
-                    score = Math.max(score, 0.9);
-                } else if (keywordMatchedFiles.contains(r.filePath())) {
-                    // 关键词也匹配，加分
-                    score = Math.min(1.0, score * 0.7 + 0.3);
+
+                if (scores.containsKey(key)) {
+                    // 已被语义搜索覆盖，关键词加分
+                    String pathLower = r.pathContext() != null ? r.pathContext().toLowerCase() : "";
+                    boolean pathMatch = isPathMatchPath(pathLower, q.toLowerCase());
+                    double bonus = pathMatch ? 0.4 : 0.2;
+                    double newScore = Math.min(1.0, scores.get(key) + bonus);
+                    scores.put(key, newScore);
                 } else {
-                    // 只有语义匹配，适当降分
-                    score = score * 0.5;
-                }
-                
-                // 取多个查询中的最高分
-                if (!scores.containsKey(key) || score > scores.get(key)) {
-                    scores.put(key, score);
-                    resultMap.put(key, r);
-                }
-            }
-
-            // 关键词匹配但语义未匹配的结果
-            for (NoteSearchResult r : keywordResults) {
-                String key = r.filePath();
-                if (!scores.containsKey(key)) {
+                    // 语义未命中但关键词命中的结果
                     String pathLower = r.pathContext() != null ? r.pathContext().toLowerCase() : "";
                     boolean pathMatch = isPathMatchPath(pathLower, q.toLowerCase());
                     double score = pathMatch ? 0.85 : 0.5;
-                    if (!scores.containsKey(key) || score > scores.get(key)) {
-                        scores.put(key, score);
-                        resultMap.put(key, r);
-                    }
+                    scores.put(key, score);
+                    resultMap.put(key, r);
                 }
             }
         }
@@ -470,10 +471,10 @@ public class NoteIndexService {
             }
         }
 
-        // 策略2：添加常见后缀
-        String[] suffixes = {"项目", "文档", "记录", "合同", "需求", "客户"};
+        // 策略2：添加常见后缀（仅限有意义的前2个，避免过多无用查询）
+        String[] suffixes = {"项目", "记录"};
         for (String suffix : suffixes) {
-            if (!query.contains(suffix)) {
+            if (!query.endsWith(suffix)) {
                 queries.add(query + suffix);
             }
         }
