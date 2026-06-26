@@ -1,8 +1,9 @@
 package com.laoqi.assistant.service;
 
 import com.laoqi.assistant.config.AppConfig;
+import com.laoqi.assistant.entity.AiAnalysisEntity;
 import com.laoqi.assistant.entity.KnowledgeBaseEntity;
-import com.laoqi.assistant.util.FileUtil;
+import com.laoqi.assistant.service.db.AiAnalysisDbService;
 import com.laoqi.assistant.util.MarkdownUtil;
 import com.laoqi.assistant.util.TimeUtil;
 import org.slf4j.Logger;
@@ -16,7 +17,6 @@ import java.nio.file.Paths;
 public class ReportService {
 
     private static final Logger log = LoggerFactory.getLogger(ReportService.class);
-    private static final String PROMPT_FILENAME = "分析提示词.md";
     private static final String DEFAULT_PROMPT = "现在是{date} {weekday}。请根据我的工作笔记生成今天的综合日报。内容需要涵盖：今日重点工作、客户沟通情况、开发进展、文章发布情况、明日计划。请按以下格式输出：\n\n【今日重点】\n...\n\n【客户沟通】\n...\n\n【开发进展】\n...\n\n【文章发布】\n...\n\n【明日计划】\n...\n\n注意：如果某个板块没有相关信息，请写\"暂无\"。请使用中文回复。";
 
     private final AppConfig appConfig;
@@ -25,6 +25,7 @@ public class ReportService {
     private final AgentAnalysisService agentAnalysisService;
     private final ConfigService configService;
     private final KnowledgeBaseService kbService;
+    private final AiAnalysisDbService aiAnalysisDbService;
 
     private volatile String latestReport = "";
     private volatile String latestReportTime = "";
@@ -35,53 +36,30 @@ public class ReportService {
                           LogService logService,
                           AgentAnalysisService agentAnalysisService,
                           ConfigService configService,
-                          KnowledgeBaseService kbService) {
+                          KnowledgeBaseService kbService,
+                          AiAnalysisDbService aiAnalysisDbService) {
         this.appConfig = appConfig;
         this.feishuService = feishuService;
         this.logService = logService;
         this.agentAnalysisService = agentAnalysisService;
         this.configService = configService;
         this.kbService = kbService;
+        this.aiAnalysisDbService = aiAnalysisDbService;
     }
 
-    private Path getComprehensiveReportDir() {
-        return getComprehensiveReportDir(configService.getNotesDir());
-    }
-
-    private Path getComprehensiveReportDir(Long kbId) {
-        return getComprehensiveReportDir(kbService.getNotesDirById(kbId));
-    }
-
-    private Path getComprehensiveReportDir(String notesDir) {
-        return Paths.get(notesDir).resolve("AI").resolve("综合日报");
-    }
-
-    private Path getPromptsDir() {
-        return getComprehensiveReportDir();
-    }
-
-    private Path getPromptsDir(Long kbId) {
-        return getComprehensiveReportDir(kbId);
-    }
+    // ==================== 提示词 ====================
 
     public String readPrompt() {
         return readPrompt((Long) null);
     }
 
     public String readPrompt(Long kbId) {
-        Path dir = getPromptsDir(kbId);
-        if (dir == null) return DEFAULT_PROMPT;
-        Path file = dir.resolve(PROMPT_FILENAME);
-        if (FileUtil.exists(file)) {
-            return FileUtil.readText(file);
+        if (kbId != null) {
+            AiAnalysisEntity entity = aiAnalysisDbService.getDailyReportPrompt(kbId);
+            if (entity != null) {
+                return entity.getContent();
+            }
         }
-        try {
-            java.nio.file.Files.createDirectories(dir);
-        } catch (Exception e) {
-            log.warn("Failed to create prompts dir: {}", e.getMessage());
-        }
-        FileUtil.writeText(file, DEFAULT_PROMPT);
-        log.info("已创建综合日报提示词文件: {}", file);
         return DEFAULT_PROMPT;
     }
 
@@ -90,16 +68,13 @@ public class ReportService {
     }
 
     public void writePrompt(String content, Long kbId) {
-        Path dir = getPromptsDir(kbId);
-        if (dir == null) return;
-        try {
-            java.nio.file.Files.createDirectories(dir);
-        } catch (Exception e) {
-            log.warn("Failed to create prompts dir: {}", e.getMessage());
+        if (kbId != null) {
+            aiAnalysisDbService.saveDailyReportPrompt(kbId, content);
+            log.info("已保存日报提示词到 SQLite, kbId={}", kbId);
         }
-        Path file = dir.resolve(PROMPT_FILENAME);
-        FileUtil.writeText(file, content);
     }
+
+    // ==================== 日报生成 ====================
 
     public static class ReportResult {
         public String report;
@@ -157,72 +132,36 @@ public class ReportService {
     public String getLatestReportTime() { return latestReportTime; }
     public String getLatestError() { return latestError; }
 
+    // ==================== 日报读取（纯 SQLite） ====================
+
     public String readTodayReport() {
-        return readTodayReport(configService.getNotesDir());
+        return readTodayReport((Long) null);
     }
 
-    public String readTodayReport(String notesDir) {
-        return readLatestReport(notesDir);
-    }
-
-    public String readLatestReport(String notesDir) {
-        Path dir = getComprehensiveReportDir(notesDir);
-        if (!java.nio.file.Files.isDirectory(dir)) return null;
-
-        // 优先读取今天的
-        String date = TimeUtil.todayStr();
-        Path todayFile = dir.resolve(date + ".md");
-        if (FileUtil.exists(todayFile)) {
-            String raw = FileUtil.readText(todayFile);
-            return MarkdownUtil.stripFrontmatter(raw);
+    public String readTodayReport(Long kbId) {
+        if (kbId == null) return null;
+        AiAnalysisEntity entity = aiAnalysisDbService.getTodayReport(kbId);
+        if (entity != null) {
+            return MarkdownUtil.stripFrontmatter(entity.getContent());
         }
-
-        // 没有今天的，读取最近一份（排除提示词文件）
-        try (java.util.stream.Stream<Path> files = java.nio.file.Files.list(dir)) {
-            return files
-                    .filter(p -> p.toString().endsWith(".md"))
-                    .filter(p -> !p.getFileName().toString().equals(PROMPT_FILENAME))
-                    .sorted(java.util.Comparator.reverseOrder())
-                    .findFirst()
-                    .map(p -> {
-                        String raw = FileUtil.readText(p);
-                        return MarkdownUtil.stripFrontmatter(raw);
-                    })
-                    .orElse(null);
-        } catch (Exception e) {
-            return null;
-        }
+        return null;
     }
 
-    public String getLatestReportDate(String notesDir) {
-        Path dir = getComprehensiveReportDir(notesDir);
-        if (!java.nio.file.Files.isDirectory(dir)) return null;
-
-        // 优先今天的
-        String today = TimeUtil.todayStr();
-        if (FileUtil.exists(dir.resolve(today + ".md"))) {
-            return today;
+    public String readLatestReport(Long kbId) {
+        if (kbId == null) return null;
+        AiAnalysisEntity entity = aiAnalysisDbService.getLatestReport(kbId);
+        if (entity != null) {
+            return MarkdownUtil.stripFrontmatter(entity.getContent());
         }
-
-        // 否则取最近文件名（排除提示词文件）
-        try (java.util.stream.Stream<Path> files = java.nio.file.Files.list(dir)) {
-            return files
-                    .filter(p -> p.toString().endsWith(".md"))
-                    .filter(p -> !p.getFileName().toString().equals(PROMPT_FILENAME))
-                    .sorted(java.util.Comparator.reverseOrder())
-                    .findFirst()
-                    .map(p -> p.getFileName().toString().replace(".md", ""))
-                    .orElse(null);
-        } catch (Exception e) {
-            return null;
-        }
+        return null;
     }
 
-    public Path getTodayReportPath() {
-        Path dir = getComprehensiveReportDir();
-        String date = TimeUtil.todayStr();
-        return dir.resolve(date + ".md");
+    public String getLatestReportDate(Long kbId) {
+        if (kbId == null) return null;
+        return aiAnalysisDbService.getLatestReportDate(kbId);
     }
+
+    // ==================== 日报推送与保存 ====================
 
     public void generateAndPush() {
         generateAndPush((Long) null);
@@ -241,11 +180,9 @@ public class ReportService {
             }
             String title = TimeUtil.greetingEmoji() + " 老齐" + TimeUtil.greetingText() + " · " + today + " · " + wd + kbLabel;
 
-            // 检查飞书推送开关（默认开启）
             boolean feishuPush = kb != null && (kb.getFeishuPush() == null || kb.getFeishuPush() == 1);
 
             if (feishuPush) {
-                // 使用卡片格式推送
                 String markdownContent = r.report
                     .replace("\\n", "\n")
                     .replace("\n", "\\n")
@@ -269,9 +206,21 @@ public class ReportService {
     }
 
     public void saveComprehensiveReport(String report, Long kbId) {
-        Path dir = getComprehensiveReportDir(kbId);
-        String date = TimeUtil.todayStr();
-        Path file = dir.resolve(date + ".md");
-        FileUtil.writeText(file, report);
+        String today = TimeUtil.todayStr();
+        String now = TimeUtil.nowStr();
+
+        AiAnalysisEntity entity = new AiAnalysisEntity();
+        entity.setKbId(kbId);
+        entity.setType("daily_report");
+        entity.setContent(report);
+        entity.setReportDate(today);
+        entity.setCreatedAt(now);
+        entity.setUpdatedAt(now);
+        aiAnalysisDbService.save(entity);
+
+        // 自动清理7天前的日报
+        aiAnalysisDbService.cleanOldReports(kbId, 7);
+
+        log.info("日报已保存到 SQLite, kbId={}, date={}", kbId, today);
     }
 }

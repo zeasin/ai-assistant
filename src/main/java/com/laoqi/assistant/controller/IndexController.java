@@ -88,10 +88,9 @@ public class IndexController {
 
             // 日报
             try {
-                String notesDir = kb.getNotesDir();
-                if (notesDir != null && !notesDir.isBlank()) {
-                    String report = reportService.readLatestReport(notesDir);
-                    String reportDate = reportService.getLatestReportDate(notesDir);
+                if (kb.getId() != null) {
+                    String report = reportService.readLatestReport(kb.getId());
+                    String reportDate = reportService.getLatestReportDate(kb.getId());
                     summary.put("hasReport", report != null && !report.isEmpty());
                     summary.put("reportHtml", report != null ? MarkdownUtil.toHtml(report) : "");
                     summary.put("reportDate", reportDate);

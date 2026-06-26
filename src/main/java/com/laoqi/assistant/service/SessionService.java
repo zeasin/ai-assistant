@@ -331,6 +331,26 @@ public class SessionService {
             try { stmt.execute("ALTER TABLE note_embeddings ADD COLUMN path_context TEXT NOT NULL DEFAULT ''"); } catch (Exception ignored) {}
             log.info("Table note_embeddings initialized");
 
+            // AI 分析结果与提示词表
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS ai_analysis (
+                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                    kb_id       INTEGER NOT NULL,
+                    type        TEXT NOT NULL,
+                    content     TEXT NOT NULL,
+                    prompt      TEXT,
+                    dir_path    TEXT,
+                    report_date TEXT,
+                    created_at  TEXT NOT NULL,
+                    updated_at  TEXT
+                )
+                """);
+            // 迁移：为旧表补充 prompt 列（兼容旧数据库）
+            try { stmt.execute("ALTER TABLE ai_analysis ADD COLUMN prompt TEXT"); } catch (Exception ignored) {}
+            stmt.execute("CREATE INDEX IF NOT EXISTS idx_ai_analysis_kb_type ON ai_analysis(kb_id, type)");
+            stmt.execute("CREATE INDEX IF NOT EXISTS idx_ai_analysis_kb_date ON ai_analysis(kb_id, report_date)");
+            log.info("Table ai_analysis initialized");
+
         } catch (SQLException e) {
             throw new RuntimeException("Failed to create new tables", e);
         }

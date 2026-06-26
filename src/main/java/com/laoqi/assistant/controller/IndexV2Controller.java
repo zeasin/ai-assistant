@@ -71,18 +71,23 @@ public class IndexV2Controller {
 
         // 分析 Tab - 日报
         if (currentKb != null) {
-            String todayReport = reportService.readTodayReport(currentKb.getNotesDir());
+            String todayReport = reportService.readTodayReport(currentKb.getId());
             if (todayReport != null && !todayReport.isEmpty()) {
                 model.addAttribute("report", MarkdownUtil.toHtml(todayReport));
                 model.addAttribute("report_time", "今日");
                 model.addAttribute("report_error", "");
             } else {
-                String report = reportService.getLatestReport();
-                String rt = reportService.getLatestReportTime();
-                String err = reportService.getLatestError();
-                model.addAttribute("report", report != null ? MarkdownUtil.toHtml(report) : "");
-                model.addAttribute("report_time", rt.isEmpty() ? "尚未生成" : rt);
-                model.addAttribute("report_error", err);
+                String latestReport = reportService.readLatestReport(currentKb.getId());
+                String latestDate = reportService.getLatestReportDate(currentKb.getId());
+                if (latestReport != null && !latestReport.isEmpty()) {
+                    model.addAttribute("report", MarkdownUtil.toHtml(latestReport));
+                    model.addAttribute("report_time", latestDate != null ? latestDate : "");
+                    model.addAttribute("report_error", "");
+                } else {
+                    model.addAttribute("report", "");
+                    model.addAttribute("report_time", "尚未生成");
+                    model.addAttribute("report_error", "");
+                }
             }
 
             // 分析 Tab - KB 统计

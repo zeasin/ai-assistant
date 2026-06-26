@@ -94,10 +94,9 @@ public class KbListPageController {
             }
 
             try {
-                String notesDir = kb.getNotesDir();
-                if (notesDir != null && !notesDir.isBlank()) {
-                    String latestReport = reportService.readLatestReport(notesDir);
-                    String reportDate = reportService.getLatestReportDate(notesDir);
+                if (kb.getId() != null) {
+                    String latestReport = reportService.readLatestReport(kb.getId());
+                    String reportDate = reportService.getLatestReportDate(kb.getId());
                     info.put("hasReport", latestReport != null && !latestReport.isEmpty());
                     info.put("latestReport", latestReport);
                     info.put("reportDate", reportDate);

@@ -2,6 +2,7 @@ package com.laoqi.assistant.controller;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.laoqi.assistant.config.AppConfig;
+import com.laoqi.assistant.entity.AiAnalysisEntity;
 import com.laoqi.assistant.entity.KnowledgeBaseEntity;
 import com.laoqi.assistant.model.ReminderData.Reminder;
 import com.laoqi.assistant.model.TaskData.TaskItem;
@@ -13,6 +14,7 @@ import com.laoqi.assistant.service.LogService;
 import com.laoqi.assistant.service.ReportService;
 import com.laoqi.assistant.service.TaskService;
 import com.laoqi.assistant.service.ReminderService;
+import com.laoqi.assistant.service.db.AiAnalysisDbService;
 import com.laoqi.assistant.util.FileUtil;
 import com.laoqi.assistant.util.MarkdownUtil;
 import com.laoqi.assistant.util.TimeUtil;
@@ -52,6 +54,7 @@ public class KnowledgeBaseController {
     private final AgentAnalysisService agentAnalysisService;
     private final DirectoryDataService directoryDataService;
     private final com.laoqi.assistant.service.LlmService llmService;
+    private final AiAnalysisDbService aiAnalysisDbService;
 
     public KnowledgeBaseController(KnowledgeBaseService kbService,
                                    LogService logService, TaskService taskService,
@@ -59,7 +62,8 @@ public class KnowledgeBaseController {
                                    ConfigService configService,
                                    AgentAnalysisService agentAnalysisService,
                                    DirectoryDataService directoryDataService,
-                                   com.laoqi.assistant.service.LlmService llmService) {
+                                   com.laoqi.assistant.service.LlmService llmService,
+                                   AiAnalysisDbService aiAnalysisDbService) {
         this.kbService = kbService;
         this.logService = logService;
         this.taskService = taskService;
@@ -69,6 +73,7 @@ public class KnowledgeBaseController {
         this.agentAnalysisService = agentAnalysisService;
         this.directoryDataService = directoryDataService;
         this.llmService = llmService;
+        this.aiAnalysisDbService = aiAnalysisDbService;
     }
 
     private Path kbDir(KnowledgeBaseEntity kb) {
@@ -98,7 +103,7 @@ public class KnowledgeBaseController {
         model.put("taskCount", activeTaskCount);
         model.put("reminderCount", reminderService.getAllReminders(kb.getNotesDir()).size());
 
-        String todayReport = reportService.readTodayReport(kb.getNotesDir());
+        String todayReport = reportService.readTodayReport(kb.getId());
         if (todayReport != null) {
             model.put("report", MarkdownUtil.toHtml(todayReport));
             model.put("report_time", reportService.getLatestReportTime().isEmpty() ? "今日已生成" : reportService.getLatestReportTime());
@@ -214,6 +219,9 @@ public class KnowledgeBaseController {
 
     // ========== 目录分析 API ==========
 
+    // 目录分析内存缓存: key = "kbId:dirPath", value = 分析结果
+    private final Map<String, String> dirAnalysisCache = new java.util.concurrent.ConcurrentHashMap<>();
+
     @GetMapping("/kb/{id}/api/analyze-dir")
     public SseEmitter analyzeDir(@PathVariable Long id,
                                  @RequestParam String dir,
@@ -242,10 +250,13 @@ public class KnowledgeBaseController {
 
                 String result = agentAnalysisService.analyze(scopeDir, prompt, systemPrompt);
 
-                // 保存分析结果
-                Path analysisDir = scopeDir.resolve("AI分析");
-                java.nio.file.Files.createDirectories(analysisDir);
-                FileUtil.writeText(analysisDir.resolve(TimeUtil.todayStr() + ".md"), result);
+                // 缓存到内存（不落库）
+                dirAnalysisCache.put(id + ":" + dir, result);
+
+                // 仅保存提示词（用户自定义的提示词需要持久化）
+                if (!prompt.isBlank()) {
+                    aiAnalysisDbService.saveDirAnalysisPrompt(id, prompt);
+                }
 
                 emitter.send(SseEmitter.event().data(mapper.writeValueAsString(
                         Map.of("type", "text", "content", result))));
@@ -1378,92 +1389,6 @@ public class KnowledgeBaseController {
         if (dir == null || dir.isEmpty()) return "";
         int lastSlash = dir.lastIndexOf('/');
         return lastSlash > 0 ? dir.substring(0, lastSlash) : "";
-    }
-
-    private String readLatestReport(Path analysisDir) {
-        if (!Files.exists(analysisDir)) return null;
-
-        // 优先读取当天
-        String date = TimeUtil.todayStr();
-        Path todayFile = analysisDir.resolve(date + ".md");
-        if (FileUtil.exists(todayFile)) {
-            return MarkdownUtil.toHtml(FileUtil.readText(todayFile));
-        }
-
-        // 否则读取最新的
-        try (var stream = Files.list(analysisDir)) {
-            Path latest = stream
-                    .filter(p -> p.getFileName().toString().endsWith(".md"))
-                    .filter(p -> !p.getFileName().toString().startsWith("."))
-                    .sorted(Comparator.reverseOrder())
-                    .findFirst()
-                    .orElse(null);
-            if (latest != null) {
-                return MarkdownUtil.toHtml(FileUtil.readText(latest));
-            }
-        } catch (Exception ignored) {}
-        return null;
-    }
-
-    private List<Map<String, Object>> listTopDirsAsFiles(Path base) {
-        List<Map<String, Object>> result = new ArrayList<>();
-        if (!Files.exists(base)) return result;
-        try (var stream = Files.list(base)) {
-            stream.filter(Files::isDirectory)
-                    .filter(p -> !IGNORED_DIRS.contains(p.getFileName().toString()))
-                    .sorted(Comparator.comparing(p -> p.getFileName().toString()))
-                    .forEach(p -> {
-                        Map<String, Object> entry = new LinkedHashMap<>();
-                        entry.put("name", p.getFileName().toString());
-                        try {
-                            entry.put("modified", java.time.LocalDateTime
-                                    .ofInstant(Files.getLastModifiedTime(p).toInstant(),
-                                            ZoneId.of("Asia/Shanghai"))
-                                    .format(java.time.format.DateTimeFormatter.ofPattern("MM-dd HH:mm")));
-                        } catch (IOException e) {
-                            entry.put("modified", "");
-                        }
-                        Path analysisDir = p.resolve("AI分析");
-                        entry.put("hasReport", Files.exists(analysisDir) && hasAnalysisReport(analysisDir));
-                        result.add(entry);
-                    });
-        } catch (Exception e) {
-            log.error("遍历根目录失败", e);
-        }
-        return result;
-    }
-
-    private boolean hasAnalysisReport(Path analysisDir) {
-        try (var stream = Files.list(analysisDir)) {
-            return stream.anyMatch(p -> p.getFileName().toString().endsWith(".md"));
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
-    private List<Map<String, Object>> listSubDirs(Path dir) {
-        List<Map<String, Object>> result = new ArrayList<>();
-        try (var stream = Files.list(dir)) {
-            stream.filter(Files::isDirectory)
-                    .filter(p -> !IGNORED_DIRS.contains(p.getFileName().toString()))
-                    .sorted(Comparator.comparing(p -> p.getFileName().toString()))
-                    .forEach(p -> {
-                        Map<String, Object> entry = new LinkedHashMap<>();
-                        entry.put("name", p.getFileName().toString());
-                        try {
-                            entry.put("modified", java.time.LocalDateTime
-                                    .ofInstant(Files.getLastModifiedTime(p).toInstant(),
-                                            ZoneId.of("Asia/Shanghai"))
-                                    .format(java.time.format.DateTimeFormatter.ofPattern("MM-dd HH:mm")));
-                        } catch (IOException e) {
-                            entry.put("modified", "");
-                        }
-                        result.add(entry);
-                    });
-        } catch (Exception e) {
-            log.error("遍历目录失败: {}", dir, e);
-        }
-        return result;
     }
 
     private List<Map<String, Object>> listFiles(Path dir) {

@@ -157,6 +157,17 @@ public class KnowledgeBaseService {
         return getNotesDir();
     }
 
+    /** 根据笔记库路径查找 kbId（用于兼容旧版 notesDir 调用方） */
+    public Long getKbIdByNotesDir(String notesDir) {
+        if (notesDir == null || notesDir.isBlank()) return null;
+        return kbDbService.lambdaQuery()
+                .eq(KnowledgeBaseEntity::getNotesDir, notesDir)
+                .last("LIMIT 1")
+                .oneOpt()
+                .map(KnowledgeBaseEntity::getId)
+                .orElse(null);
+    }
+
     private static String str(Object o) {
         return o == null ? "" : o.toString();
     }
