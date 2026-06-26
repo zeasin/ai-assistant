@@ -285,11 +285,18 @@ async function loadChatHistory() {
 if (KB_ID) loadChatHistory();
 
 // ========== 对话 ==========
+let chatSending = false;
+
 // ========== 发送消息（SSE 流式） ==========
 async function sendChat() {
     const input = document.getElementById('chatInput');
     const msg = input.value.trim();
-    if (!msg || !KB_ID) return;
+    if (!msg || !KB_ID || chatSending) return;
+
+    // 禁用发送按钮，防止重复提交
+    chatSending = true;
+    const btn = document.querySelector('#tab-chat .btn-primary');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
 
     input.value = '';
     appendMsg('user', msg);
@@ -354,6 +361,11 @@ async function sendChat() {
     } catch(e) {
         const el = document.getElementById('reply-' + aiId);
         if (el) el.innerHTML = '<span style="color:#e03131;">请求失败: ' + e.message + '</span>';
+    } finally {
+        // 恢复发送按钮
+        chatSending = false;
+        if (btn) { btn.disabled = false; btn.textContent = '发送'; }
+        input.focus();
     }
 }
 
