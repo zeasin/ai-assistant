@@ -100,18 +100,7 @@ public class CollectorService {
 
     private Path getCollectorDir() {
         try {
-            String baseDir;
-            try {
-                baseDir = configService.getNotesDir();
-            } catch (Exception e) {
-                baseDir = null;
-            }
-            Path dir;
-            if (baseDir != null && !baseDir.isEmpty()) {
-                dir = Paths.get(baseDir).resolve("AI").resolve("数据中心").resolve("collector");
-            } else {
-                dir = Paths.get(System.getProperty("user.dir")).resolve("AI").resolve("数据中心").resolve("collector");
-            }
+            Path dir = Paths.get(System.getProperty("user.dir")).resolve("data").resolve("collector");
             if (!Files.exists(dir)) {
                 Files.createDirectories(dir);
             }

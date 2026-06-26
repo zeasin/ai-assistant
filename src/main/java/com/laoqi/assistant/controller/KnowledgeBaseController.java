@@ -1114,6 +1114,45 @@ public class KnowledgeBaseController {
 
     // ========== 日报 API ==========
 
+    @GetMapping("/kb/{id}/api/report/config")
+    @ResponseBody
+    public Map<String, Object> getReportConfig(@PathVariable Long id) {
+        KnowledgeBaseEntity kb = kbService.getById(id);
+        if (kb == null) return Map.of("ok", false, "error", "知识库不存在");
+        boolean autoReport = kb.getAutoReport() == null || kb.getAutoReport() == 1;
+        boolean feishuPush = kb.getFeishuPush() == null || kb.getFeishuPush() == 1;
+        return Map.of(
+            "ok", true,
+            "autoReport", autoReport,
+            "feishuPush", feishuPush
+        );
+    }
+
+    @PostMapping("/kb/{id}/api/report/config")
+    @ResponseBody
+    public Map<String, Object> saveReportConfig(@PathVariable Long id,
+                                                @RequestBody Map<String, Object> body) {
+        KnowledgeBaseEntity kb = kbService.getById(id);
+        if (kb == null) return Map.of("ok", false, "error", "知识库不存在");
+        try {
+            Map<String, Object> update = new HashMap<>();
+            update.put("id", id);
+            if (body.containsKey("autoReport")) {
+                update.put("autoReport", Boolean.TRUE.equals(body.get("autoReport")));
+            }
+            if (body.containsKey("feishuPush")) {
+                update.put("feishuPush", Boolean.TRUE.equals(body.get("feishuPush")));
+            }
+            kbService.save(update);
+            logService.add("日报配置", "更新",
+                    (body.containsKey("autoReport") ? "自动生成:" + update.get("autoReport") : "")
+                    + (body.containsKey("feishuPush") ? " 飞书推送:" + update.get("feishuPush") : ""));
+            return Map.of("ok", true);
+        } catch (Exception e) {
+            return Map.of("ok", false, "error", e.getMessage() != null ? e.getMessage() : "保存配置失败");
+        }
+    }
+
     @PostMapping("/kb/{id}/api/generate")
     @ResponseBody
     public Map<String, Object> generate(@PathVariable Long id) {

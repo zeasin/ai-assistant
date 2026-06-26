@@ -1,6 +1,7 @@
 package com.laoqi.assistant.service;
 
 import com.laoqi.assistant.config.AppConfig;
+import com.laoqi.assistant.entity.KnowledgeBaseEntity;
 import com.laoqi.assistant.util.FileUtil;
 import com.laoqi.assistant.util.MarkdownUtil;
 import com.laoqi.assistant.util.TimeUtil;
@@ -232,14 +233,29 @@ public class ReportService {
         if (r.report != null) {
             String today = TimeUtil.todayStr();
             String wd = TimeUtil.weekdayCn(TimeUtil.now());
+            KnowledgeBaseEntity kb = null;
             String kbLabel = "";
             if (kbId != null) {
-                var kb = kbService.getById(kbId);
+                kb = kbService.getById(kbId);
                 if (kb != null) kbLabel = "【" + kb.getName() + "】";
             }
             String title = TimeUtil.greetingEmoji() + " 老齐" + TimeUtil.greetingText() + " · " + today + " · " + wd + kbLabel;
-            var paras = feishuService.reportToParagraphs(r.report);
-            feishuService.sendPost(title, paras);
+
+            // 检查飞书推送开关（默认开启）
+            boolean feishuPush = kb != null && (kb.getFeishuPush() == null || kb.getFeishuPush() == 1);
+
+            if (feishuPush) {
+                // 使用卡片格式推送
+                String markdownContent = r.report
+                    .replace("\\n", "\n")
+                    .replace("\n", "\\n")
+                    .replace("\"", "\\\"")
+                    .replace("|", "\\|");
+                feishuService.sendCard(title, markdownContent);
+            } else {
+                log.info("[日报推送] 知识库「{}」已关闭飞书推送，跳过", kbLabel.replaceAll("[【】]", ""));
+            }
+
             saveComprehensiveReport(r.report, kbId);
             logService.add("日报生成", "成功", "AI 日报已生成并推送" + kbLabel);
         } else {

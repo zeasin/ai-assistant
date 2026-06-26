@@ -9,7 +9,6 @@ import com.laoqi.assistant.datacenter.model.DataSet;
 import com.laoqi.assistant.datacenter.model.ImportConfig;
 import com.laoqi.assistant.entity.DataSetEntity;
 import com.laoqi.assistant.entity.DataSetRecordEntity;
-import com.laoqi.assistant.service.ConfigService;
 import com.laoqi.assistant.service.LogService;
 import com.laoqi.assistant.service.db.DataSetDbService;
 import com.laoqi.assistant.service.db.DataSetRecordDbService;
@@ -38,16 +37,14 @@ public class DataSetService {
     private static final int MAX_RECORDS = 10000;
     private static final Set<String> META_FIELDS = Set.of("_id", "_source", "_importTime", "_hash");
 
-    private final ConfigService configService;
     private final LogService logService;
     private final DataSource dataSource;
     private final DataSetDbService dataSetDbService;
     private final DataSetRecordDbService recordDbService;
 
-    public DataSetService(ConfigService configService, LogService logService,
+    public DataSetService(LogService logService,
                           DataSource dataSource, DataSetDbService dataSetDbService,
                           DataSetRecordDbService recordDbService) {
-        this.configService = configService;
         this.logService = logService;
         this.dataSource = dataSource;
         this.dataSetDbService = dataSetDbService;
@@ -58,7 +55,6 @@ public class DataSetService {
     public void init() {
         log.info("Initializing DataSetService");
         createTables();
-        migrateFromFiles();
         log.info("DataSetService initialized");
     }
 
@@ -101,47 +97,6 @@ public class DataSetService {
             log.info("Data center tables initialized");
         } catch (Exception e) {
             throw new RuntimeException("Failed to create data center tables", e);
-        }
-    }
-
-    private void migrateFromFiles() {
-        try {
-            String baseDir = configService.getNotesDir();
-            if (baseDir == null || baseDir.isEmpty()) return;
-
-            Path fileDir = java.nio.file.Paths.get(baseDir).resolve("AI").resolve("数据中心");
-            Path datasetsFile = fileDir.resolve("datasets.json");
-            if (!java.nio.file.Files.exists(datasetsFile)) return;
-
-            List<DataSet> fileDatasets = mapper.readValue(datasetsFile.toFile(),
-                    new TypeReference<List<DataSet>>() {});
-            if (fileDatasets == null || fileDatasets.isEmpty()) return;
-
-            long dbCount = dataSetDbService.count();
-            if (dbCount > 0) {
-                log.info("Database already has {} datasets, skipping file migration", dbCount);
-                return;
-            }
-
-            log.info("Migrating {} datasets from files to database", fileDatasets.size());
-            for (DataSet ds : fileDatasets) {
-                saveDatasetToDb(ds);
-
-                Path dsDir = fileDir.resolve(ds.getId());
-                Path dataFile = dsDir.resolve("data.json");
-                if (java.nio.file.Files.exists(dataFile)) {
-                    List<Map<String, Object>> records = mapper.readValue(dataFile.toFile(),
-                            new TypeReference<List<Map<String, Object>>>() {});
-                    if (records != null) {
-                        for (Map<String, Object> record : records) {
-                            saveRecordToDb(ds.getId(), record, "migrated");
-                        }
-                    }
-                }
-            }
-            log.info("File migration completed");
-        } catch (Exception e) {
-            log.warn("File migration failed: {}", e.getMessage());
         }
     }
 

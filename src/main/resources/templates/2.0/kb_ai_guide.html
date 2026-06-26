@@ -137,6 +137,43 @@
             <div id="memoryList"></div>
         </div>
     </div>
+
+    <!-- 综合日报设置 -->
+    <div class="card">
+        <h2>📊 综合日报设置</h2>
+        <div style="color:#909296;font-size:13px;margin-bottom:16px;">配置每日 9:00 自动生成综合日报的行为。</div>
+        <style>
+            .toggle-label { display:inline-flex; align-items:center; gap:8px; cursor:pointer; user-select:none; }
+            .toggle-label input[type="checkbox"] { display:none; }
+            .toggle-slider { width:36px; height:20px; background:#ccc; border-radius:10px; position:relative; transition:all .2s; display:inline-block; }
+            .toggle-slider::after { content:''; width:16px; height:16px; background:#fff; border-radius:50%; position:absolute; top:2px; left:2px; transition:all .2s; }
+            .toggle-label input:checked + .toggle-slider { background:#7c5cfc; }
+            .toggle-label input:checked + .toggle-slider::after { left:18px; }
+            .toggle-label .toggle-text { font-size:14px; color:#1a1b1e; }
+            .toggle-label .toggle-desc { font-size:12px; color:#909296; margin-left:4px; }
+        </style>
+        <div style="display:flex;flex-direction:column;gap:16px;">
+            <label class="toggle-label">
+                <input type="checkbox" id="autoReportToggle" onchange="saveReportConfig()">
+                <span class="toggle-slider"></span>
+                <span>
+                    <span class="toggle-text">每天 9:00 自动生成</span>
+                    <span class="toggle-desc">启用后，定时任务将自动为这个知识库生成综合日报</span>
+                </span>
+            </label>
+            <label class="toggle-label">
+                <input type="checkbox" id="feishuPushToggle" onchange="saveReportConfig()">
+                <span class="toggle-slider"></span>
+                <span>
+                    <span class="toggle-text">推送飞书通知</span>
+                    <span class="toggle-desc">启用后，日报生成后将通过飞书 Webhook 以卡片形式推送</span>
+                </span>
+            </label>
+        </div>
+        <div style="margin-top:12px;padding:8px 12px;background:#f0edff;border-radius:6px;font-size:12px;color:#5c3dcf;">
+            💡 提示：日报配置按知识库独立存储，不同知识库可设置不同的规则。
+        </div>
+    </div>
 </div>
 
 <!-- Memory Edit Modal -->
@@ -435,8 +472,44 @@ function escapeJs(str) {
     return String(str).replace(/'/g, "\\'").replace(/"/g, '\\"');
 }
 
+// ---- 综合日报配置 ----
+
+function loadReportConfig() {
+    fetch('/kb/' + KB_ID + '/api/report/config')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.ok) {
+                document.getElementById('autoReportToggle').checked = data.autoReport !== false;
+                document.getElementById('feishuPushToggle').checked = data.feishuPush !== false;
+            }
+        })
+        .catch(function(e) { console.error('加载日报配置失败:', e); });
+}
+
+function saveReportConfig() {
+    var autoReport = document.getElementById('autoReportToggle').checked;
+    var feishuPush = document.getElementById('feishuPushToggle').checked;
+    fetch('/kb/' + KB_ID + '/api/report/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ autoReport: autoReport, feishuPush: feishuPush })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.ok) {
+            toast('✅ 日报配置已保存');
+        } else {
+            toast('❌ ' + (data.error || '保存失败'), 'error');
+        }
+    })
+    .catch(function() {
+        toast('❌ 请求失败', 'error');
+    });
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     loadAgents();
+    loadReportConfig();
 });
 </script>
 

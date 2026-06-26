@@ -163,6 +163,46 @@ public class FeishuService {
         ));
     }
 
+    /**
+     * 发送飞书卡片消息（通过 Webhook）
+     * 使用飞书消息卡片 JSON 格式
+     */
+    public boolean sendCard(String title, String contentHtml) {
+        var config = configService.load();
+        String webhookUrl = config.getFeishuWebhookUrl();
+        if (webhookUrl == null || webhookUrl.isEmpty()) {
+            String msg = "未配置 Webhook URL";
+            log.warn("[飞书卡片推送] {}", msg);
+            logService.add("飞书卡片推送", "跳过", msg);
+            return false;
+        }
+        try {
+            // 构建飞书消息卡片 (interactive)
+            // 参考: https://open.feishu.cn/document/uAjLw4CM/ukzMukzMukzM/feishu-cards/card-components
+            String body = "{\"msg_type\":\"interactive\",\"card\":{"
+                + "\"header\":{\"title\":{\"tag\":\"plain_text\",\"content\":\"" + escapeJson(title) + "\"},\"template\":\"indigo\"},"
+                + "\"elements\":[{\"tag\":\"markdown\",\"content\":\"" + escapeJson(contentHtml) + "\"}]"
+                + "}}";
+            log.info("[飞书卡片推送] 发送卡片消息: title={}", title);
+            String response = httpPost(webhookUrl, body, "application/json; charset=utf-8");
+            Map<String, Object> json = parseJson(response);
+            Object code = json.get("code");
+            if (code == null || !"0".equals(String.valueOf(code))) {
+                String errMsg = "Webhook响应异常: " + json.get("msg");
+                log.error("[飞书卡片推送] {}", errMsg);
+                logService.add("飞书卡片推送", "失败", title + " - " + errMsg);
+                return false;
+            }
+            log.info("[飞书卡片推送] 发送成功");
+            logService.add("飞书卡片推送", "成功", title);
+            return true;
+        } catch (IOException e) {
+            log.error("[飞书卡片推送] 发送失败: {}", e.getMessage(), e);
+            logService.add("飞书卡片推送", "失败", e.getMessage());
+            return false;
+        }
+    }
+
     private String escapeJson(String s) {
         return s.replace("\\", "\\\\").replace("\"", "\\\"")
                 .replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t");

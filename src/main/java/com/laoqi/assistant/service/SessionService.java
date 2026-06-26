@@ -167,12 +167,16 @@ public class SessionService {
                     created_at   TEXT NOT NULL,
                     dir_settings TEXT NOT NULL DEFAULT '',
                     ignore_dirs  TEXT NOT NULL DEFAULT '',
-                    ignore_files TEXT NOT NULL DEFAULT ''
+                    ignore_files TEXT NOT NULL DEFAULT '',
+                    auto_report  INTEGER NOT NULL DEFAULT 1,
+                    feishu_push  INTEGER NOT NULL DEFAULT 1
                 )
                 """);
             try { stmt.execute("ALTER TABLE knowledge_bases ADD COLUMN dir_settings TEXT NOT NULL DEFAULT ''"); } catch (Exception ignored) {}
             try { stmt.execute("ALTER TABLE knowledge_bases ADD COLUMN ignore_dirs TEXT NOT NULL DEFAULT ''"); } catch (Exception ignored) {}
             try { stmt.execute("ALTER TABLE knowledge_bases ADD COLUMN ignore_files TEXT NOT NULL DEFAULT ''"); } catch (Exception ignored) {}
+            try { stmt.execute("ALTER TABLE knowledge_bases ADD COLUMN auto_report INTEGER NOT NULL DEFAULT 1"); } catch (Exception ignored) {}
+            try { stmt.execute("ALTER TABLE knowledge_bases ADD COLUMN feishu_push INTEGER NOT NULL DEFAULT 1"); } catch (Exception ignored) {}
             log.info("Table knowledge_bases initialized");
 
             // 迁移：从 config.json 迁移第一条知识库

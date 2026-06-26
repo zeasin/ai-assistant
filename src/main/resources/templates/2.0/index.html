@@ -567,7 +567,7 @@ async function generateReport() {
     btn.disabled = true;
     btn.textContent = '生成中...';
     try {
-        const resp = await fetch('/kb/' + KB_ID + '/api/report/generate', {method: 'POST'});
+        const resp = await fetch('/kb/' + KB_ID + '/api/generate', {method: 'POST'});
         const data = await resp.json();
         if (data.ok) {
             location.reload();
@@ -581,6 +581,7 @@ async function generateReport() {
         btn.textContent = '重新生成';
     }
 }
+
 </script>
 
 </th:block>

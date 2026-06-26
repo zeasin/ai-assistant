@@ -17,6 +17,8 @@ public class KnowledgeBaseEntity {
     private String dirSettings;
     private String ignoreDirs;
     private String ignoreFiles;
+    private Integer autoReport;
+    private Integer feishuPush;
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -36,4 +38,8 @@ public class KnowledgeBaseEntity {
     public void setIgnoreDirs(String ignoreDirs) { this.ignoreDirs = ignoreDirs; }
     public String getIgnoreFiles() { return ignoreFiles; }
     public void setIgnoreFiles(String ignoreFiles) { this.ignoreFiles = ignoreFiles; }
+    public Integer getAutoReport() { return autoReport; }
+    public void setAutoReport(Integer autoReport) { this.autoReport = autoReport; }
+    public Integer getFeishuPush() { return feishuPush; }
+    public void setFeishuPush(Integer feishuPush) { this.feishuPush = feishuPush; }
 }

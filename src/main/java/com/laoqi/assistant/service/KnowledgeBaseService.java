@@ -97,6 +97,14 @@ public class KnowledgeBaseService {
         if (body.containsKey("sortOrder")) {
             e.setSortOrder(Integer.valueOf(body.get("sortOrder").toString()));
         }
+        if (body.containsKey("autoReport")) {
+            Object v = body.get("autoReport");
+            e.setAutoReport(Boolean.TRUE.equals(v) ? 1 : 0);
+        }
+        if (body.containsKey("feishuPush")) {
+            Object v = body.get("feishuPush");
+            e.setFeishuPush(Boolean.TRUE.equals(v) ? 1 : 0);
+        }
 
         if (isNew) {
             int maxOrder = kbDbService.lambdaQuery()

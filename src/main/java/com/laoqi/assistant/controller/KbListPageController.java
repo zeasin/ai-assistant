@@ -58,8 +58,7 @@ public class KbListPageController {
             info.put("id", kb.getId());
             info.put("name", kb.getName());
             info.put("notesDir", kb.getNotesDir());
-
-            try {
+                        try {
                 long activeTaskCount = taskService.getAllTasks(kb.getNotesDir()).stream()
                         .filter(t -> !"done".equals(t.status))
                         .count();

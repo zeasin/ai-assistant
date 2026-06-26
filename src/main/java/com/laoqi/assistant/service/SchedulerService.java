@@ -37,6 +37,12 @@ public class SchedulerService {
         List<KnowledgeBaseEntity> kbs = kbService.getAll();
         for (KnowledgeBaseEntity kb : kbs) {
             try {
+                // 检查是否启用了自动日报（默认开启）
+                boolean autoReport = kb.getAutoReport() == null || kb.getAutoReport() == 1;
+                if (!autoReport) {
+                    log.info("[{}] ⏰ 知识库「{}」已关闭自动日报，跳过", TimeUtil.nowStr(), kb.getName());
+                    continue;
+                }
                 log.info("[{}] ⏰ 为知识库「{}」生成日报", TimeUtil.nowStr(), kb.getName());
                 reportService.generateAndPush(kb.getId());
             } catch (Exception e) {
