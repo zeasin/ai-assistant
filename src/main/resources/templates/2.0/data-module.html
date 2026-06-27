@@ -142,7 +142,9 @@
             <div class="form-group"><label>描述</label><textarea id="dsDesc" rows="2" style="resize:vertical;"></textarea></div>
             <div class="form-group"><label>类型</label><input id="dsType" type="text" placeholder="如：项目管理"></div>
             <div class="form-group"><label>状态</label><input id="dsStatus" type="text" placeholder="如：启用"></div>
-            <div class="form-group"><label>Schema 字段（每行一个）</label><textarea id="dsSchema" rows="3" style="resize:vertical;font-family:monospace;font-size:12px;" placeholder="name&#10;phone&#10;company"></textarea></div>
+            <div class="form-group"><label>Schema 字段（每行一个）</label><textarea id="dsSchema" rows="3" style="resize:vertical;font-family:monospace;font-size:12px;" placeholder="编号&#10;项目&#10;负责人"></textarea>
+                <div style="color:#909296;font-size:11px;margin-top:4px;">💡 系统固定字段（id/type/status/创建时间/更新时间）无需设置，保存记录时自动生成；即使写入也会被替换</div>
+            </div>
             <div class="form-group"><label>类型选项（每行一个，留空则记录为文本框）</label><textarea id="dsTypeOptions" rows="2" style="resize:vertical;font-family:monospace;font-size:12px;" placeholder="需求&#10;Bug&#10;优化"></textarea></div>
             <div class="form-group"><label>状态选项（每行一个，留空则记录为文本框）</label><textarea id="dsStatusOptions" rows="2" style="resize:vertical;font-family:monospace;font-size:12px;" placeholder="待办&#10;进行中&#10;已完成"></textarea></div>
             <div class="form-group"><label style="color:#909296;font-weight:normal;font-size:11px;">💡「类型/状态」是数据集本身属性；下面的「类型选项/状态选项」用于控制记录表单中对应字段是下拉还是文本框</label></div>
@@ -372,7 +374,7 @@ function generateLocalAnalysis() {
 }
 
 // ========== 数据集Tab ==========
-const SYSTEM_FIELDS = ['创建时间', '更新时间'];
+const SYSTEM_FIELDS = ['id', 'type', 'status', '创建时间', '更新时间'];
 const SYSTEM_FIELD_SET = new Set(SYSTEM_FIELDS);
 
 function buildCols(schemaFields, recKeys) {

@@ -120,12 +120,56 @@ public class DataSetService {
         return ds;
     }
 
+    public static final Set<String> RECORD_SYSTEM_FIELDS = Set.of("id", "type", "status", "创建时间", "更新时间");
+
+    private Map<String, Object> normalizeData(Map<String, Object> raw, String datasetId, String recordIdForUpdate) {
+        Map<String, Object> out = raw == null ? new HashMap<>() : new HashMap<>(raw);
+        String now = TimeUtil.nowStr();
+        if (recordIdForUpdate != null) {
+            out.put("更新时间", now);
+        } else {
+            out.put("创建时间", now);
+            out.put("更新时间", now);
+        }
+        if (!out.containsKey("id") || out.get("id") == null || "".equals(out.get("id"))) {
+            out.put("id", recordIdForUpdate != null ? recordIdForUpdate : UUID.randomUUID().toString().substring(0, 12));
+        }
+        String effectiveType = out.get("type") != null ? String.valueOf(out.get("type")) : null;
+        if (effectiveType == null || effectiveType.isBlank() || "null".equalsIgnoreCase(effectiveType)) {
+            DataSet ds = getDataset(datasetId);
+            if (ds != null && ds.getType() != null && !ds.getType().isBlank()) {
+                out.put("type", ds.getType());
+            }
+        }
+        String effectiveStatus = out.get("status") != null ? String.valueOf(out.get("status")) : null;
+        if (effectiveStatus == null || effectiveStatus.isBlank() || "null".equalsIgnoreCase(effectiveStatus)) {
+            DataSet ds = getDataset(datasetId);
+            if (ds != null && ds.getStatus() != null && !ds.getStatus().isBlank()) {
+                out.put("status", ds.getStatus());
+            }
+        }
+        return out;
+    }
+
+    private DataSchema normalizeSchema(DataSchema schema) {
+        if (schema == null) return null;
+        if (schema.getFields() == null) return schema;
+        List<DataField> cleaned = new ArrayList<>();
+        for (DataField f : schema.getFields()) {
+            if (f == null || f.getName() == null) continue;
+            if (RECORD_SYSTEM_FIELDS.contains(f.getName().trim())) continue;
+            cleaned.add(f);
+        }
+        schema.setFields(cleaned);
+        return schema;
+    }
+
     public DataSet createDataset(DataSet ds) {
         String id = UUID.randomUUID().toString().substring(0, 12);
         ds.setId(id);
         ds.setCreatedAt(TimeUtil.nowStr());
         ds.setUpdatedAt(TimeUtil.nowStr());
-        if (ds.getSchema() == null) ds.setSchema(new DataSchema());
+        ds.setSchema(normalizeSchema(ds.getSchema()));
 
         saveDatasetToDb(ds);
 
@@ -142,7 +186,7 @@ public class DataSetService {
         if (update.getDescription() != null) existing.setDescription(update.getDescription());
         if (update.getType() != null) existing.setType(update.getType());
         if (update.getStatus() != null) existing.setStatus(update.getStatus());
-        if (update.getSchema() != null) existing.setSchema(update.getSchema());
+        if (update.getSchema() != null) existing.setSchema(normalizeSchema(update.getSchema()));
         if (update.getImportConfigs() != null) existing.setImportConfigs(update.getImportConfigs());
         if (update.getModuleId() != null) existing.setModuleId(update.getModuleId());
         existing.setUpdatedAt(TimeUtil.nowStr());
@@ -201,12 +245,13 @@ public class DataSetService {
 
         int skipped = 0;
         int imported = 0;
-        for (Map<String, Object> record : newRecords) {
+        for (Map<String, Object> raw : newRecords) {
             if (existingCount + imported >= MAX_RECORDS) {
                 log.warn("Dataset {} reached MAX_RECORDS ({}), stopping import", datasetId, MAX_RECORDS);
                 skipped += (newRecords.size() - imported - skipped);
                 break;
             }
+            Map<String, Object> record = normalizeData(raw, datasetId, null);
             String hash = computeHash(record);
             if (hash != null && recordDbService.existsByHash(datasetId, hash)) {
                 skipped++;
@@ -236,9 +281,7 @@ public class DataSetService {
         DataSetRecordEntity entity = recordDbService.getOne(wrapper);
         if (entity == null) return null;
 
-        Map<String, Object> merged = newData;
-        String now = TimeUtil.nowStr();
-        merged.put("更新时间", now);
+        Map<String, Object> merged = normalizeData(newData, datasetId, recordId);
         String contentHash = computeHash(merged);
         try {
             String dataJson = mapper.writeValueAsString(merged);
@@ -260,10 +303,32 @@ public class DataSetService {
         if (entity == null) return false;
 
         try {
-            Map<String, Object> data = mapper.readValue(entity.getDataJson(),
+            Map<String, Object> record = mapper.readValue(entity.getDataJson(),
                     new TypeReference<Map<String, Object>>() {});
-            data.put(field, value);
-            entity.setDataJson(mapper.writeValueAsString(data));
+            record.put(field, value);
+            String now = TimeUtil.nowStr();
+            record.put("更新时间", now);
+            if (!record.containsKey("id") || record.get("id") == null || "".equals(record.get("id"))) {
+                record.put("id", recordId);
+            }
+            String effectiveType = record.get("type") != null ? String.valueOf(record.get("type")) : null;
+            if (effectiveType == null || effectiveType.isBlank() || "null".equalsIgnoreCase(effectiveType)) {
+                DataSet ds = getDataset(datasetId);
+                if (ds != null && ds.getType() != null && !ds.getType().isBlank()) {
+                    record.put("type", ds.getType());
+                }
+            }
+            String effectiveStatus = record.get("status") != null ? String.valueOf(record.get("status")) : null;
+            if (effectiveStatus == null || effectiveStatus.isBlank() || "null".equalsIgnoreCase(effectiveStatus)) {
+                DataSet ds = getDataset(datasetId);
+                if (ds != null && ds.getStatus() != null && !ds.getStatus().isBlank()) {
+                    record.put("status", ds.getStatus());
+                }
+            }
+            String hash = computeHash(record);
+            String dataJson = mapper.writeValueAsString(record);
+            entity.setDataJson(dataJson);
+            entity.setContentHash(hash);
             recordDbService.updateById(entity);
             return true;
         } catch (Exception e) {
@@ -324,10 +389,8 @@ public class DataSetService {
 
     private void saveRecordToDb(String datasetId, Map<String, Object> record, String source) {
         String recordId = UUID.randomUUID().toString().substring(0, 12);
-        String now = TimeUtil.nowStr();
-        record.put("创建时间", now);
-        if (record.get("更新时间") == null) {
-            record.put("更新时间", now);
+        if (!record.containsKey("id") || record.get("id") == null || "".equals(record.get("id"))) {
+            record.put("id", recordId);
         }
         String hash = computeHash(record);
         try {
@@ -338,7 +401,7 @@ public class DataSetService {
             entity.setDataJson(dataJson);
             entity.setSource(source);
             entity.setContentHash(hash);
-            entity.setCreatedAt(now);
+            entity.setCreatedAt(TimeUtil.nowStr());
             recordDbService.save(entity);
         } catch (Exception e) {
             log.error("Failed to save record to DB: {}", e.getMessage());
