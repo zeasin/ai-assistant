@@ -14,7 +14,11 @@ public class DataSetRecordEntity {
     private String dataJson;
     private String source;
     private String contentHash;
+    private String recordNum;
+    private String recordType;
+    private String recordStatus;
     private String createdAt;
+    private String updatedAt;
 
     public Integer getId() { return id; }
     public void setId(Integer id) { this.id = id; }
@@ -28,6 +32,21 @@ public class DataSetRecordEntity {
     public void setSource(String source) { this.source = source; }
     public String getContentHash() { return contentHash; }
     public void setContentHash(String contentHash) { this.contentHash = contentHash; }
+
+    public String getRecordNum() {
+        return recordNum;
+    }
+
+    public void setRecordNum(String recordNum) {
+        this.recordNum = recordNum;
+    }
+
+    public String getRecordType() { return recordType; }
+    public void setRecordType(String recordType) { this.recordType = recordType; }
+    public String getRecordStatus() { return recordStatus; }
+    public void setRecordStatus(String recordStatus) { this.recordStatus = recordStatus; }
     public String getCreatedAt() { return createdAt; }
     public void setCreatedAt(String createdAt) { this.createdAt = createdAt; }
+    public String getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(String updatedAt) { this.updatedAt = updatedAt; }
 }

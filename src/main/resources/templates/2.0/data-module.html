@@ -374,13 +374,47 @@ function generateLocalAnalysis() {
 }
 
 // ========== 数据集Tab ==========
-const SYSTEM_FIELDS = ['id', 'type', 'status', '创建时间', '更新时间'];
+const SYSTEM_FIELDS = ['recordNum', '编号', '类型', '状态', '创建时间', '更新时间'];
 const SYSTEM_FIELD_SET = new Set(SYSTEM_FIELDS);
+const SYSTEM_EDITABLE = ['类型', '状态', '编号'];
 
 function buildCols(schemaFields, recKeys) {
+    const schemaSet = new Set(schemaFields);
     const cols = [...schemaFields];
-    SYSTEM_FIELDS.forEach(k => { if (!cols.includes(k)) cols.push(k); });
+    if (!schemaSet.has('编号')) {
+        cols.unshift('编号');
+    }
+    if (!schemaSet.has('类型')) {
+        const idxBianHao = cols.indexOf('编号');
+        if (idxBianHao >= 0) {
+            cols.splice(idxBianHao + 1, 0, '类型');
+        } else {
+            cols.push('类型');
+        }
+    }
+    if (!schemaSet.has('状态')) {
+        cols.push('状态');
+    }
+    if (!cols.includes('创建时间')) cols.push('创建时间');
+    if (!cols.includes('更新时间')) cols.push('更新时间');
     return cols;
+}
+
+function buildFormFields(schemaFields, rec) {
+    const schemaSet = new Set(schemaFields);
+    const merged = [...schemaFields];
+    if (!schemaSet.has('编号')) merged.push('编号');
+    if (!schemaSet.has('类型')) merged.push('类型');
+    if (!schemaSet.has('状态')) merged.push('状态');
+    if (rec) {
+        Object.keys(rec).forEach(fn => {
+            if (fn.startsWith('_')) return;
+            if (SYSTEM_FIELD_SET.has(fn) && !SYSTEM_EDITABLE.includes(fn)) return;
+            if (merged.includes(fn)) return;
+            merged.push(fn);
+        });
+    }
+    return merged;
 }
 
 function parseTimeField(v) {
@@ -488,17 +522,9 @@ function showEditRecord(rid) {
 }
 
 function showRecordForm(rec) {
-    let fieldNames;
     const schema = currentDs.schema || {};
     const schemaFields = schema.fields ? schema.fields.map(f => f.name) : [];
-    if (rec) {
-        const recordFields = Object.keys(rec).filter(k => !k.startsWith('_') && !SYSTEM_FIELD_SET.has(k));
-        const merged = [...schemaFields];
-        recordFields.forEach(fn => { if (!merged.includes(fn)) merged.push(fn); });
-        fieldNames = merged;
-    } else {
-        fieldNames = schemaFields;
-    }
+    const fieldNames = buildFormFields(schemaFields, rec);
     document.getElementById('recordModalTitle').textContent = rec ? '编辑记录' : '新增记录';
 
     const typeOptions = (schema.typeOptions && schema.typeOptions.length) ? schema.typeOptions : [];
@@ -507,31 +533,56 @@ function showRecordForm(rec) {
         statusOptions = schema.statuses;
     }
 
-    const isTypeField = (fn) => fn === 'type' || fn === '类型' || /类型/i.test(fn);
-    const isStatusField = (fn) => fn === 'status' || fn === '状态' || /状态/i.test(fn);
+    const isTypeField = (fn) => fn === 'type' || fn === '类型';
+    const isStatusField = (fn) => fn === 'status' || fn === '状态';
+    const AUTO_ONLY_SET = new Set(['id', '创建时间', '更新时间']);
 
     let html = '';
     const schemaFieldSet = new Set(schemaFields);
     fieldNames.forEach((fn, idx) => {
-        const val = rec ? (rec[fn] !== null && rec[fn] !== undefined ? String(rec[fn]) : '') : '';
-        const canRemove = !schemaFieldSet.has(fn);
+        if (AUTO_ONLY_SET.has(fn)) return;
+        let val = '';
+        if (rec) {
+            if (rec[fn] !== null && rec[fn] !== undefined) {
+                val = String(rec[fn]);
+            } else if (isTypeField(fn)) {
+                if (rec['type']) val = String(rec['type']);
+                else if (rec['类型']) val = String(rec['类型']);
+                else if (currentDs.type) val = currentDs.type;
+            } else if (isStatusField(fn)) {
+                if (rec['status']) val = String(rec['status']);
+                else if (rec['状态']) val = String(rec['状态']);
+                else if (currentDs.status) val = currentDs.status;
+            }
+        } else {
+            if (isTypeField(fn)) val = currentDs.type || '';
+            if (isStatusField(fn)) val = currentDs.status || '';
+        }
+        const canRemove = !schemaFieldSet.has(fn) && !SYSTEM_EDITABLE.includes(fn);
         html += '<div class="form-group" id="rf_wrap_'+idx+'">'
              + '<label>' + esc(fn)
              + (canRemove ? ' <button type="button" onclick="removeField('+idx+', \''+esc(fn).replace(/'/g,"\\'")+'\')" style="border:none;background:transparent;color:#e74c3c;cursor:pointer;font-size:14px;padding:0 4px;" title="从这条记录中删除该字段">✕</button>' : '')
+             + (SYSTEM_EDITABLE.includes(fn) ? ' <span style="color:#aaa;font-size:11px;">系统</span>' : '')
              + '</label>';
 
         if (isTypeField(fn) && typeOptions.length > 0) {
-            html += '<select id="rf_'+esc(fn)+'">';
+            const selectKey = fn === '类型' ? '类型' : fn;
+            html += '<select id="rf_'+esc(selectKey)+'">';
             typeOptions.forEach(opt => {
                 html += '<option value="'+esc(opt)+'"'+(val===opt?' selected':'')+'>'+esc(opt)+'</option>';
             });
             html += '</select>';
         } else if (isStatusField(fn) && statusOptions.length > 0) {
-            html += '<select id="rf_'+esc(fn)+'">';
+            const selectKey = fn === '状态' ? '状态' : fn;
+            html += '<select id="rf_'+esc(selectKey)+'">';
             statusOptions.forEach(opt => {
                 html += '<option value="'+esc(opt)+'"'+(val===opt?' selected':'')+'>'+esc(opt)+'</option>';
             });
             html += '</select>';
+        } else if (isTypeField(fn)) {
+            html += '<input id="rf_类型" value="'+esc(val)+'" placeholder="系统自动补全">';
+        } else if (isStatusField(fn)) {
+            html += '<input id="rf_状态" value="'+esc(val)+'" placeholder="系统自动补全">';
         } else {
             html += '<input id="rf_'+esc(fn)+'" value="'+esc(val)+'">';
         }
@@ -562,6 +613,12 @@ async function saveRecord() {
         if (removed.includes(fieldName)) return;
         data[fieldName] = el.value || null;
     });
+    if (data['类型'] !== undefined) {
+        data['type'] = data['类型'];
+    }
+    if (data['状态'] !== undefined) {
+        data['status'] = data['状态'];
+    }
 
     let r;
     if (rid) {
