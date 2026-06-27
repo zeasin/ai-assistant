@@ -1,7 +1,6 @@
 package com.laoqi.assistant.service;
 
 import com.laoqi.assistant.model.TaskData.*;
-import com.laoqi.assistant.util.FileUtil;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,50 +25,6 @@ public class TaskService {
         this.dataSource = dataSource;
     }
 
-    @PostConstruct
-    public void init() {
-        migrateFromJson();
-    }
-
-    private void migrateFromJson() {
-        try {
-            String notesDir = configService.getNotesDirIfExists();
-            if (notesDir == null || notesDir.isEmpty()) return;
-
-            Path dataFile = dataFile(notesDir);
-            if (!java.nio.file.Files.exists(dataFile)) return;
-
-            Root root = FileUtil.readJson(dataFile, Root.class, new Root());
-            if (root.tasks == null || root.tasks.isEmpty()) return;
-
-            List<TaskItem> existing = getAllTasksFromDb();
-            if (!existing.isEmpty()) {
-                log.info("[任务迁移] SQLite 中已有任务，跳过迁移");
-                return;
-            }
-
-            int count = 0;
-            for (TaskItem task : root.tasks) {
-                insertTaskToDb(task, null);
-                count++;
-            }
-            log.info("[任务迁移] 从笔记库 JSON 迁移 {} 条任务到 SQLite", count);
-        } catch (Exception e) {
-            log.warn("[任务迁移] 迁移失败: {}", e.getMessage());
-        }
-    }
-
-    private Path dataFile(String notesDir) {
-        Path taskDir = Paths.get(notesDir).resolve("AI").resolve("任务");
-        if (!java.nio.file.Files.exists(taskDir)) {
-            try {
-                java.nio.file.Files.createDirectories(taskDir);
-            } catch (Exception e) {
-                log.warn("[任务] 创建目录失败: {}", taskDir);
-            }
-        }
-        return taskDir.resolve("data.json");
-    }
 
     // ========== SQLite CRUD ==========
 
@@ -201,7 +156,6 @@ public class TaskService {
         insertTaskToDb(task, kbId);
 
         if (kbId != null) {
-            syncToNoteLibrary(kbId);
         }
 
         return task;
@@ -237,7 +191,6 @@ public class TaskService {
         updateTaskInDb(task);
 
         if (kbId != null) {
-            syncToNoteLibrary(kbId);
         }
 
         return task;
@@ -260,29 +213,11 @@ public class TaskService {
 
         // 同步到笔记库 JSON
         if (kbId != null) {
-            syncToNoteLibrary(kbId);
         }
 
         return true;
     }
 
-    private void syncToNoteLibrary(Long kbId) {
-        try {
-            String notesDir = configService.getNotesDir(kbId);
-            if (notesDir == null || notesDir.isEmpty()) return;
-
-            List<TaskItem> allTasks = getTasksByKbId(kbId);
-            Root root = new Root();
-            root.tasks = allTasks;
-            root.meta = new LinkedHashMap<>();
-            root.meta.put("lastUpdated", java.time.LocalDate.now().toString());
-
-            FileUtil.writeJson(dataFile(notesDir), root);
-            log.debug("[任务] 同步到笔记库: kbId={}, count={}", kbId, allTasks.size());
-        } catch (Exception e) {
-            log.warn("[任务] 同步到笔记库失败: {}", e.getMessage());
-        }
-    }
 
     private List<TaskItem> getTasksByKbId(Long kbId) {
         List<TaskItem> tasks = new ArrayList<>();

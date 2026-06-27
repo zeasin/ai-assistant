@@ -1,13 +1,17 @@
 package com.laoqi.assistant.collector;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.laoqi.assistant.collector.model.CollectorLog;
 import com.laoqi.assistant.collector.model.CollectorResult;
 import com.laoqi.assistant.collector.model.CollectorTask;
+import com.laoqi.assistant.entity.CollectorTaskEntity;
 import com.laoqi.assistant.service.LlmService;
 import com.laoqi.assistant.service.LogService;
+import com.laoqi.assistant.service.db.CollectorTaskDbService;
 import com.laoqi.assistant.datacenter.DataSetService;
 import com.laoqi.assistant.util.TimeUtil;
+import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -22,6 +26,7 @@ public class CollectorService {
 
     private static final Logger log = LoggerFactory.getLogger(CollectorService.class);
     private static final ObjectMapper mapper = new ObjectMapper();
+    private static final TypeReference<Map<String, String>> PARAMS_TYPE = new TypeReference<>() {};
     private static final Map<String, String> DEFAULT_PROMPTS = Map.of(
         "csdn-collect", "请从CSDN博客页面中提取文章数据，包括：标题、作者、发布时间、阅读数、点赞数、评论数。输出JSON数组格式。"
     );
@@ -29,6 +34,7 @@ public class CollectorService {
     private final LlmService llmService;
     private final LogService logService;
     private final DataSetService dataSetService;
+    private final CollectorTaskDbService taskDbService;
 
     private final Map<String, CollectorTask> tasks = new ConcurrentHashMap<>();
     private final Map<String, List<CollectorLog>> taskLogs = new ConcurrentHashMap<>();
@@ -36,10 +42,66 @@ public class CollectorService {
 
     public CollectorService(LlmService llmService,
                            LogService logService,
-                           DataSetService dataSetService) {
+                           DataSetService dataSetService,
+                           CollectorTaskDbService taskDbService) {
         this.llmService = llmService;
         this.logService = logService;
         this.dataSetService = dataSetService;
+        this.taskDbService = taskDbService;
+    }
+
+    @PostConstruct
+    public void init() {
+        List<CollectorTaskEntity> entities = taskDbService.list();
+        for (CollectorTaskEntity entity : entities) {
+            CollectorTask task = toModel(entity);
+            tasks.put(task.getId(), task);
+        }
+        log.info("Loaded {} collector tasks from database", tasks.size());
+    }
+
+    private CollectorTask toModel(CollectorTaskEntity entity) {
+        CollectorTask task = new CollectorTask();
+        task.setId(entity.getTaskId());
+        task.setName(entity.getName());
+        task.setTaskType(entity.getTaskType());
+        task.setPromptKey(entity.getPromptKey());
+        task.setUrl(entity.getUrl());
+        task.setCronExpression(entity.getCronExpression());
+        task.setEnabled(entity.getEnabled() != null && entity.getEnabled() == 1);
+        task.setDatasetId(entity.getDatasetId());
+        if (entity.getParamsJson() != null && !entity.getParamsJson().isBlank()) {
+            try {
+                task.setParams(mapper.readValue(entity.getParamsJson(), PARAMS_TYPE));
+            } catch (Exception e) {
+                log.warn("Failed to parse params JSON for task {}", entity.getTaskId());
+            }
+        }
+        task.setCreatedAt(entity.getCreatedAt());
+        task.setUpdatedAt(entity.getUpdatedAt());
+        return task;
+    }
+
+    private CollectorTaskEntity toEntity(CollectorTask task) {
+        CollectorTaskEntity entity = new CollectorTaskEntity();
+        entity.setTaskId(task.getId());
+        entity.setName(task.getName());
+        entity.setTaskType(task.getTaskType());
+        entity.setPromptKey(task.getPromptKey());
+        entity.setUrl(task.getUrl());
+        entity.setCronExpression(task.getCronExpression());
+        entity.setEnabled(Boolean.TRUE.equals(task.getEnabled()) ? 1 : 0);
+        entity.setDatasetId(task.getDatasetId());
+        if (task.getParams() != null && !task.getParams().isEmpty()) {
+            try {
+                entity.setParamsJson(mapper.writeValueAsString(task.getParams()));
+            } catch (Exception e) {
+                log.warn("Failed to serialize params JSON for task {}", task.getId());
+            }
+        }
+        entity.setCreatedAt(task.getCreatedAt());
+        entity.setUpdatedAt(task.getUpdatedAt());
+        return entity;
     }
 
     public List<CollectorTask> getAllTasks() {
@@ -53,12 +115,14 @@ public class CollectorService {
     public CollectorTask createTask(CollectorTask task) {
         String id = UUID.randomUUID().toString();
         task.setId(id);
-        task.setCreatedAt(TimeUtil.nowStr());
-        task.setUpdatedAt(TimeUtil.nowStr());
+        String now = TimeUtil.nowStr();
+        task.setCreatedAt(now);
+        task.setUpdatedAt(now);
         if (task.getEnabled() == null) {
             task.setEnabled(true);
         }
 
+        taskDbService.save(toEntity(task));
         tasks.put(id, task);
         log.info("Created collector task: {}", id);
         return task;
@@ -78,6 +142,14 @@ public class CollectorService {
         if (task.getParams() != null) existing.setParams(task.getParams());
         existing.setUpdatedAt(TimeUtil.nowStr());
 
+        // 更新数据库
+        CollectorTaskEntity entity = taskDbService.getByTaskId(id);
+        if (entity != null) {
+            CollectorTaskEntity updated = toEntity(existing);
+            updated.setId(entity.getId());
+            taskDbService.updateById(updated);
+        }
+
         log.info("Updated collector task: {}", id);
         return existing;
     }
@@ -86,6 +158,10 @@ public class CollectorService {
         if (tasks.remove(id) != null) {
             taskLogs.remove(id);
             taskResults.remove(id);
+            CollectorTaskEntity entity = taskDbService.getByTaskId(id);
+            if (entity != null) {
+                taskDbService.removeById(entity.getId());
+            }
             log.info("Deleted collector task: {}", id);
             return true;
         }

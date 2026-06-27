@@ -1,9 +1,0 @@
-[ {
-  "id" : "csdn-default",
-  "name" : "CSDN数据采集",
-  "promptKey" : "csdn-collect",
-  "cronExpression" : "0 0 8 * * ?",
-  "enabled" : false,
-  "createdAt" : "2026-06-26 23:32:30",
-  "updatedAt" : "2026-06-26 23:32:30"
-} ]

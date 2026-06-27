@@ -179,6 +179,24 @@ public class SessionService {
             try { stmt.execute("ALTER TABLE knowledge_bases ADD COLUMN feishu_push INTEGER NOT NULL DEFAULT 1"); } catch (Exception ignored) {}
             log.info("Table knowledge_bases initialized");
 
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS collector_tasks (
+                    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                    task_id        TEXT NOT NULL UNIQUE,
+                    name           TEXT NOT NULL,
+                    task_type      TEXT NOT NULL DEFAULT 'ai_prompt',
+                    prompt_key     TEXT,
+                    url            TEXT,
+                    cron_expression TEXT,
+                    enabled        INTEGER NOT NULL DEFAULT 1,
+                    dataset_id     TEXT,
+                    params_json    TEXT,
+                    created_at     TEXT NOT NULL,
+                    updated_at     TEXT NOT NULL
+                )
+                """);
+            log.info("Table collector_tasks initialized");
+
             // 迁移：从 config.json 迁移第一条知识库
 
             // 识图分析记录表

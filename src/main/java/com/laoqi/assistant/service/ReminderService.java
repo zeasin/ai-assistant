@@ -4,16 +4,13 @@ import com.laoqi.assistant.config.AppConfig;
 import com.laoqi.assistant.model.ReminderData;
 import com.laoqi.assistant.model.ReminderData.Reminder;
 import com.laoqi.assistant.model.ReminderData.Root;
-import com.laoqi.assistant.util.FileUtil;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import javax.sql.DataSource;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.sql.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -30,71 +27,19 @@ public class ReminderService {
     private static final Logger log = LoggerFactory.getLogger(ReminderService.class);
     private static final ZoneId TZ = ZoneId.of("Asia/Shanghai");
 
-    private final AppConfig appConfig;
+    
     private final FeishuService feishuService;
-    private final ConfigService configService;
+
     private final DataSource dataSource;
 
-    public ReminderService(AppConfig appConfig, FeishuService feishuService,
-                           ConfigService configService, DataSource dataSource) {
-        this.appConfig = appConfig;
+    public ReminderService(FeishuService feishuService, DataSource dataSource) {
         this.feishuService = feishuService;
-        this.configService = configService;
         this.dataSource = dataSource;
     }
 
     @PostConstruct
     public void init() {
-        migrateFromJson();
         ensureDefaultReminder();
-    }
-
-    private void migrateFromJson() {
-        try {
-            Path globalFile = getGlobalRemindersFile();
-            if (!Files.exists(globalFile)) {
-                // 尝试从笔记库迁移
-                migrateFromNoteLibrary();
-            }
-
-            if (!Files.exists(globalFile)) return;
-
-            List<Reminder> existing = getAllRemindersFromDb();
-            if (!existing.isEmpty()) {
-                log.info("[提醒迁移] SQLite 中已有提醒，跳过迁移");
-                return;
-            }
-
-            Root root = FileUtil.readJson(globalFile, Root.class, new Root());
-            if (root.reminders == null || root.reminders.isEmpty()) return;
-
-            int count = 0;
-            for (Reminder r : root.reminders) {
-                insertReminderToDb(r, null);
-                count++;
-            }
-            log.info("[提醒迁移] 从 JSON 迁移 {} 条提醒到 SQLite", count);
-        } catch (Exception e) {
-            log.warn("[提醒迁移] 迁移失败: {}", e.getMessage());
-        }
-    }
-
-    private void migrateFromNoteLibrary() {
-        try {
-            String notesDir = configService.getNotesDirIfExists();
-            if (notesDir == null || notesDir.isEmpty()) return;
-
-            Path oldFile = Paths.get(notesDir, "AI", "提醒", "reminders.json");
-            if (Files.exists(oldFile)) {
-                Root oldRoot = FileUtil.readJson(oldFile, Root.class, null);
-                if (oldRoot != null && oldRoot.reminders != null && !oldRoot.reminders.isEmpty()) {
-                    FileUtil.writeJson(getGlobalRemindersFile(), oldRoot);
-                    log.info("[提醒迁移] 从笔记库迁移 {} 条提醒", oldRoot.reminders.size());
-                }
-            }
-        } catch (Exception e) {
-            log.warn("[提醒迁移] 从笔记库迁移失败: {}", e.getMessage());
-        }
     }
 
     private void ensureDefaultReminder() {
@@ -110,23 +55,13 @@ public class ReminderService {
                 r.type = "daily";
                 r.time = "18:00";
                 r.enabled = true;
-                r.createdAt = LocalDateTime.now(TZ).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+                r.createdAt = java.time.LocalDateTime.now(ZoneId.of("Asia/Shanghai")).format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
                 insertReminderToDb(r, null);
                 log.info("[提醒] 已创建默认下班日报提醒");
             }
         } catch (Exception e) {
             log.warn("[提醒] 初始化默认提醒失败: {}", e.getMessage());
         }
-    }
-
-    private Path getGlobalRemindersFile() {
-        Path dir = appConfig.getConfigDirPath().resolve("AI").resolve("reminders");
-        if (!Files.exists(dir)) {
-            try { Files.createDirectories(dir); } catch (Exception e) {
-                log.warn("[提醒] 创建全局提醒目录失败: {}", dir);
-            }
-        }
-        return dir.resolve("reminders_data.json");
     }
 
     // ========== SQLite CRUD ==========
@@ -289,7 +224,6 @@ public class ReminderService {
         insertReminderToDb(r, kbId);
 
         if (kbId != null) {
-            syncToNoteLibrary(kbId);
         }
 
         log.info("[提醒] 新增提醒: {} ({})", name, type);
@@ -364,7 +298,6 @@ public class ReminderService {
         updateReminderInDb(r);
 
         if (kbId != null) {
-            syncToNoteLibrary(kbId);
         }
 
         log.info("[提醒] 更新提醒: {} ({})", r.name, type);
@@ -400,7 +333,6 @@ public class ReminderService {
         deleteReminderFromDb(id);
 
         if (kbId != null) {
-            syncToNoteLibrary(kbId);
         }
 
         log.info("[提醒] 删除提醒: {}", id);
@@ -427,7 +359,6 @@ public class ReminderService {
         updateReminderInDb(r);
 
         if (kbId != null) {
-            syncToNoteLibrary(kbId);
         }
 
         log.info("[提醒] {}提醒: {}", r.enabled ? "启用" : "禁用", r.name);
@@ -566,28 +497,6 @@ public class ReminderService {
             sb.append(" (").append(r.monthDay.replace("-", "月")).append("日)");
         }
         return sb.toString();
-    }
-
-    private void syncToNoteLibrary(Long kbId) {
-        try {
-            String notesDir = configService.getNotesDir(kbId);
-            if (notesDir == null || notesDir.isEmpty()) return;
-
-            List<Reminder> allReminders = getRemindersByKbId(kbId);
-            Root root = new Root();
-            root.reminders = allReminders;
-            root.meta = new LinkedHashMap<>();
-            root.meta.put("lastUpdated", LocalDate.now(TZ).toString());
-
-            Path reminderDir = Paths.get(notesDir, "AI", "提醒");
-            if (!Files.exists(reminderDir)) {
-                Files.createDirectories(reminderDir);
-            }
-            FileUtil.writeJson(reminderDir.resolve("reminders.json"), root);
-            log.debug("[提醒] 同步到笔记库: kbId={}, count={}", kbId, allReminders.size());
-        } catch (Exception e) {
-            log.warn("[提醒] 同步到笔记库失败: {}", e.getMessage());
-        }
     }
 
     private List<Reminder> getRemindersByKbId(Long kbId) {
