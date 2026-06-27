@@ -9,6 +9,9 @@ import com.laoqi.assistant.model.TaskData.TaskItem;
 import com.laoqi.assistant.service.AgentAnalysisService;
 import com.laoqi.assistant.service.ConfigService;
 import com.laoqi.assistant.service.DirectoryDataService;
+import com.laoqi.assistant.service.NoteIndexService;
+import com.laoqi.assistant.service.NoteIndexService.IndexStats;
+import com.laoqi.assistant.service.db.MessageDbService;
 import com.laoqi.assistant.service.KnowledgeBaseService;
 import com.laoqi.assistant.service.LogService;
 import com.laoqi.assistant.service.ReportService;
@@ -55,6 +58,8 @@ public class KnowledgeBaseController {
     private final DirectoryDataService directoryDataService;
     private final com.laoqi.assistant.service.LlmService llmService;
     private final AiAnalysisDbService aiAnalysisDbService;
+    private final NoteIndexService noteIndexService;
+    private final MessageDbService messageDbService;
 
     public KnowledgeBaseController(KnowledgeBaseService kbService,
                                    LogService logService, TaskService taskService,
@@ -63,7 +68,9 @@ public class KnowledgeBaseController {
                                    AgentAnalysisService agentAnalysisService,
                                    DirectoryDataService directoryDataService,
                                    com.laoqi.assistant.service.LlmService llmService,
-                                   AiAnalysisDbService aiAnalysisDbService) {
+                                   AiAnalysisDbService aiAnalysisDbService,
+                                   NoteIndexService noteIndexService,
+                                   MessageDbService messageDbService) {
         this.kbService = kbService;
         this.logService = logService;
         this.taskService = taskService;
@@ -74,6 +81,8 @@ public class KnowledgeBaseController {
         this.directoryDataService = directoryDataService;
         this.llmService = llmService;
         this.aiAnalysisDbService = aiAnalysisDbService;
+        this.noteIndexService = noteIndexService;
+        this.messageDbService = messageDbService;
     }
 
     private Path kbDir(KnowledgeBaseEntity kb) {
@@ -90,38 +99,34 @@ public class KnowledgeBaseController {
     // ========== 页面路由 ==========
 
     @GetMapping("/kb/{id}")
-    public String overview(@PathVariable Long id, Map<String, Object> model) {
+    public String overview(@PathVariable Long id) {
+        return "redirect:/kb/" + id + "/ai";
+    }
+
+    @GetMapping("/kb/{id}/ai")
+    public String aiHub(@PathVariable Long id, Map<String, Object> model) {
         KnowledgeBaseEntity kb = kbService.getById(id);
         if (kb == null) return "redirect:/config";
 
         model.put("kb", kb);
         model.put("labels", parseLabels(kb.getLabels()));
 
-        long activeTaskCount = taskService.getAllTasks(kb.getNotesDir()).stream()
-                .filter(t -> !"done".equals(t.status))
-                .count();
-        model.put("taskCount", activeTaskCount);
-        model.put("reminderCount", reminderService.getAllReminders(kb.getNotesDir()).size());
-
-        String todayReport = reportService.readTodayReport(kb.getId());
-        if (todayReport != null) {
-            model.put("report", MarkdownUtil.toHtml(todayReport));
-            model.put("report_time", reportService.getLatestReportTime().isEmpty() ? "今日已生成" : reportService.getLatestReportTime());
-            model.put("report_error", "");
-        } else {
-            String report = reportService.getLatestReport();
-            String rt = reportService.getLatestReportTime();
-            String err = reportService.getLatestError();
-            if (report != null && !report.isEmpty()) {
-                model.put("report", MarkdownUtil.toHtml(report));
-            } else {
-                model.put("report", "");
-            }
-            model.put("report_time", rt.isEmpty() ? "尚未生成" : rt);
-            model.put("report_error", err);
+        // 笔记库统计
+        try {
+            var stats = noteIndexService.getIndexStats(kb.getId());
+            model.put("kbFileCount", stats.fileCount());
+            model.put("kbIndexCount", stats.chunkCount());
+        } catch (Exception e) {
+            model.put("kbFileCount", 0);
+            model.put("kbIndexCount", 0);
+        }
+        try {
+            model.put("kbTotalMessages", messageDbService.countByKb(id.intValue()));
+        } catch (Exception e) {
+            model.put("kbTotalMessages", 0);
         }
 
-        return "1.0/kb_overview";
+        return "2.0/kb_ai_guide";
     }
 
     // 任务/提醒页面已迁移到 /planner
@@ -872,12 +877,8 @@ public class KnowledgeBaseController {
     }
 
     @GetMapping("/kb/{id}/config")
-    public String config(@PathVariable Long id, Map<String, Object> model) {
-        KnowledgeBaseEntity kb = kbService.getById(id);
-        if (kb == null) return "redirect:/config";
-        model.put("kb", kb);
-        model.put("labels", parseLabels(kb.getLabels()));
-        return "2.0/kb_ai_guide";
+    public String config(@PathVariable Long id) {
+        return "redirect:/kb/" + id + "/ai";
     }
 
     // ========== KB 范围的任务 API ==========

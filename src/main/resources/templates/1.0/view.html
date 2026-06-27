@@ -10,7 +10,7 @@
 <div th:if="${kb != null}" style="display:flex;gap:4px;margin-bottom:20px;border-bottom:2px solid #e1e3e6;">
     <a th:href="@{/planner}" style="padding:10px 20px;font-size:14px;text-decoration:none;color:#5c5f66;border-bottom:2px solid transparent;" th:text="'📋 计划'">📋 计划</a>
     <a th:href="@{/kb/{id}/notes(id=${kb.id})}" style="padding:10px 20px;font-size:14px;text-decoration:none;color:#7c5cfc;border-bottom:2px solid #7c5cfc;font-weight:600;" th:text="'📂 ' + ${labels.get('notes')}">📂 笔记</a>
-    <a th:href="@{/kb/{id}/config(id=${kb.id})}" style="padding:10px 20px;font-size:14px;text-decoration:none;color:#5c5f66;border-bottom:2px solid transparent;" th:text="${labels.get('config')}">配置</a>
+    <a th:href="@{/kb/{id}/ai(id=${kb.id})}" style="padding:10px 20px;font-size:14px;text-decoration:none;color:#5c5f66;border-bottom:2px solid transparent;">🤖 AI 中心</a>
 </div>
 
 <div th:if="${kb != null}" style="font-size:13px;color:#909296;margin-bottom:16px;display:flex;align-items:center;gap:4px;">

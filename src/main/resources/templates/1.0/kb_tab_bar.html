@@ -3,10 +3,10 @@
         <h1 style="font-size:22px;font-weight:600;margin:0;" th:text="${kb.name}">笔记库</h1>
     </div>
     <div style="display:flex;gap:0;border-bottom:2px solid #e1e3e6;">
-        <a th:href="@{/kb/{id}(id=${kb.id})}"
+        <a th:href="@{/kb/{id}/ai(id=${kb.id})}"
            style="padding:10px 20px;font-size:14px;text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s;"
            th:styleappend="${active == 'overview'} ? 'color:#7c5cfc;border-bottom-color:#7c5cfc;font-weight:600;' : 'color:#5c5f66;'"
-           th:text="'📊 概览'">📊 概览</a>
+           th:text="'🤖 AI 中心'">🤖 AI 中心</a>
         <a th:href="@{/kb/{id}/data(id=${kb.id})}"
            style="padding:10px 20px;font-size:14px;text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s;"
            th:styleappend="${active == 'data'} ? 'color:#7c5cfc;border-bottom-color:#7c5cfc;font-weight:600;' : 'color:#5c5f66;'"
@@ -19,7 +19,7 @@
            style="padding:10px 20px;font-size:14px;text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s;"
            th:styleappend="${active == 'index'} ? 'color:#7c5cfc;border-bottom-color:#7c5cfc;font-weight:600;' : 'color:#5c5f66;'"
            th:text="'🔍 索引'">🔍 索引</a>
-        <a th:href="@{/kb/{id}/config(id=${kb.id})}"
+        <a th:href="@{/kb/{id}/ai(id=${kb.id})}"
            style="padding:10px 20px;font-size:14px;text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s;"
            th:styleappend="${active == 'config'} ? 'color:#7c5cfc;border-bottom-color:#7c5cfc;font-weight:600;' : 'color:#5c5f66;'"
            th:text="'⚙️ ' + ${labels.get('config')}">⚙️ 配置</a>

@@ -102,18 +102,53 @@
 
 <div class="config-page">
     <div class="page-header">
-        <h2>⚙️ AI 分析中心</h2>
+        <h2>🤖 AI 中心</h2>
+        <span style="font-size:13px;color:#909296;" th:text="${kb.name}">笔记库名</span>
+    </div>
+
+    <!-- 笔记库概览统计 -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;">
+        <div style="background:#fff;border:1px solid #e1e3e6;border-radius:10px;padding:14px;text-align:center;">
+            <div style="font-size:22px;font-weight:700;color:#7c5cfc;" th:text="${kbFileCount} ?: 0">0</div>
+            <div style="font-size:12px;color:#909296;margin-top:4px;">📄 笔记文件</div>
+        </div>
+        <div style="background:#fff;border:1px solid #e1e3e6;border-radius:10px;padding:14px;text-align:center;">
+            <div style="font-size:22px;font-weight:700;color:#7c5cfc;" th:text="${kbIndexCount} ?: 0">0</div>
+            <div style="font-size:12px;color:#909296;margin-top:4px;">🔗 索引片段</div>
+        </div>
+        <div style="background:#fff;border:1px solid #e1e3e6;border-radius:10px;padding:14px;text-align:center;">
+            <div style="font-size:22px;font-weight:700;color:#7c5cfc;" th:text="${kbTotalMessages} ?: 0">0</div>
+            <div style="font-size:12px;color:#909296;margin-top:4px;">💬 对话消息</div>
+        </div>
+        <a th:href="@{/kb/{id}/notes(id=${kb.id})}" style="background:#fff;border:1px solid #e1e3e6;border-radius:10px;padding:14px;text-align:center;text-decoration:none;cursor:pointer;display:block;transition:all .15s;">
+            <div style="font-size:22px;font-weight:700;color:#7c5cfc;">📂</div>
+            <div style="font-size:12px;color:#7c5cfc;margin-top:4px;font-weight:500;">浏览笔记</div>
+        </a>
     </div>
 
     <div class="card">
         <div class="tabs-nav">
-            <button class="tab-btn active" onclick="switchTab('agents')">📋 AI 指南</button>
+            <button class="tab-btn active" onclick="switchTab('daily')">📊 综合日报</button>
+            <button class="tab-btn" onclick="switchTab('agents')">📋 AI 指南</button>
             <button class="tab-btn" onclick="switchTab('analysis')">🔬 AI 分析</button>
-            <button class="tab-btn" onclick="switchTab('report')">📊 综合日报</button>
         </div>
 
-        <!-- ====== Tab 1: AI 指南 ====== -->
-        <div id="tab-agents" class="tab-content active">
+        <!-- ====== Tab 1: 综合日报 ====== -->
+        <div id="tab-daily" class="tab-content active">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+                <div style="font-size:13px;color:#909296;">每日 9:00 自动生成，也可手动重新生成</div>
+                <div style="display:flex;gap:8px;">
+                    <button class="btn btn-secondary" onclick="openReportSettings()">⚙️ 日报设置</button>
+                    <button class="btn btn-primary" onclick="generateReport()" id="genReportBtn">🔄 重新生成</button>
+                </div>
+            </div>
+            <div id="reportContent" class="preview-area" style="padding:16px;min-height:120px;">
+                <div style="text-align:center;padding:30px;color:#909296;">加载中...</div>
+            </div>
+        </div>
+
+        <!-- ====== Tab 2: AI 指南 ====== -->
+        <div id="tab-agents" class="tab-content">
             <div class="toolbar">
                 <button class="btn btn-primary" onclick="saveAgents()">保存</button>
                 <button class="btn btn-secondary" onclick="toggleAgentsPreview()">预览</button>
@@ -135,7 +170,7 @@
             </div>
         </div>
 
-        <!-- ====== Tab 2: AI 分析 ====== -->
+        <!-- ====== Tab 3: AI 分析 ====== -->
         <div id="tab-analysis" class="tab-content">
             <div style="margin-bottom:12px;color:#909296;font-size:13px;">选择一个目录，输入自定义分析提示词，AI 将根据你的要求进行分析。</div>
 
@@ -159,7 +194,6 @@
 
             <div id="analysisResult" class="preview-area" style="display:none;"></div>
 
-            <!-- 历史分析结果 -->
             <div style="margin-top:16px;">
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
                     <span style="font-size:14px;font-weight:500;">📜 历史分析记录</span>
@@ -168,30 +202,30 @@
                 <div id="analysisHistory" style="font-size:13px;color:#909296;">暂无分析记录</div>
             </div>
         </div>
+    </div>
 
-        <!-- ====== Tab 3: 综合日报 ====== -->
-        <div id="tab-report" class="tab-content">
-            <div style="margin-bottom:16px;">
-                <div style="display:flex;align-items:center;gap:24px;margin-bottom:16px;">
-                    <label class="toggle-label">
-                        <input type="checkbox" id="autoReportToggle" onchange="saveReportConfig()">
-                        <span class="toggle-slider"></span>
-                        <span>
-                            <span class="toggle-text">每天 9:00 自动生成</span>
-                            <span class="toggle-desc">定时任务自动为这个知识库生成综合日报</span>
-                        </span>
-                    </label>
-                    <label class="toggle-label">
-                        <input type="checkbox" id="feishuPushToggle" onchange="saveReportConfig()">
-                        <span class="toggle-slider"></span>
-                        <span>
-                            <span class="toggle-text">推送飞书通知</span>
-                            <span class="toggle-desc">日报生成后通过飞书 Webhook 推送</span>
-                        </span>
-                    </label>
-                </div>
+    <!-- ====== 日报设置弹窗 ====== -->
+    <div class="modal-overlay" id="reportSettingsModal" onclick="if(event.target===this)closeReportSettings()">
+        <div class="modal" style="width:600px;">
+            <h3>⚙️ 综合日报设置</h3>
+            <div style="display:flex;flex-direction:column;gap:16px;margin-bottom:20px;">
+                <label class="toggle-label">
+                    <input type="checkbox" id="autoReportToggle" onchange="saveReportConfig()">
+                    <span class="toggle-slider"></span>
+                    <span>
+                        <span class="toggle-text">每天 9:00 自动生成</span>
+                        <span class="toggle-desc">定时任务自动为这个知识库生成综合日报</span>
+                    </span>
+                </label>
+                <label class="toggle-label">
+                    <input type="checkbox" id="feishuPushToggle" onchange="saveReportConfig()">
+                    <span class="toggle-slider"></span>
+                    <span>
+                        <span class="toggle-text">推送飞书通知</span>
+                        <span class="toggle-desc">日报生成后通过飞书 Webhook 推送</span>
+                    </span>
+                </label>
             </div>
-
             <div class="form-group">
                 <label>日报生成提示词</label>
                 <div class="toolbar">
@@ -200,13 +234,9 @@
                 </div>
                 <textarea id="reportPrompt" rows="8" style="width:100%;padding:10px;border:1px solid #e1e3e6;border-radius:6px;font-size:13px;outline:none;resize:vertical;box-sizing:border-box;font-family:monospace;margin-top:4px;"></textarea>
             </div>
-
-            <div class="toolbar" style="margin-bottom:12px;">
-                <button class="btn btn-primary" onclick="generateReport()" id="genReportBtn">🔄 手动生成日报</button>
-                <span id="reportStatus" class="status-text"></span>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeReportSettings()">关闭</button>
             </div>
-
-            <div id="reportContent" class="preview-area" style="display:none;"></div>
         </div>
     </div>
 </div>
@@ -254,13 +284,13 @@ document.querySelectorAll('.modal-overlay').forEach(function(m) {
 function switchTab(tab) {
     document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
     document.querySelectorAll('.tab-content').forEach(function(c) { c.classList.remove('active'); });
-    var tabs = ['agents', 'analysis', 'report'];
+    var tabs = ['daily', 'agents', 'analysis'];
     var idx = tabs.indexOf(tab);
     document.querySelectorAll('.tab-btn')[idx].classList.add('active');
     document.getElementById('tab-' + tab).classList.add('active');
+    if (tab === 'daily') loadLatestReport();
     if (tab === 'agents') loadMemoryList();
     if (tab === 'analysis') { loadDirs(); loadAnalysisHistory(); }
-    if (tab === 'report') { loadReportPrompt(); loadReportContent(); }
 }
 
 // ==================== Tab 1: AI 指南 ====================
@@ -550,27 +580,16 @@ function loadReportContent() {
 function generateReport() {
     var btn = document.getElementById('genReportBtn');
     btn.disabled = true; btn.textContent = '⏳ 生成中...';
-    document.getElementById('reportStatus').textContent = '';
-    document.getElementById('reportContent').style.display = 'block';
-    document.getElementById('reportContent').innerHTML = '<span style="color:#909296;">⏳ AI 正在生成日报...</span>';
+    document.getElementById('reportContent').innerHTML = '<div style="text-align:center;padding:30px;color:#909296;">⏳ AI 正在生成日报...</div>';
 
     fetch('/kb/' + KB_ID + '/api/generate', { method: 'POST' })
         .then(function(r) { return r.json(); })
         .then(function(data) {
-            if (data.ok) {
-                setStatus('reportStatus', '✅ 生成成功', 'success');
-                // 重新加载日报
-                setTimeout(function() { loadLatestReport(); }, 500);
-            } else {
-                document.getElementById('reportContent').innerHTML = '<span style="color:#e03131;">❌ ' + (data.error || '生成失败') + '</span>';
-                setStatus('reportStatus', '❌ ' + (data.error || '失败'), 'error');
-            }
+            if (data.ok) { toast('✅ 日报生成成功'); loadLatestReport(); }
+            else { document.getElementById('reportContent').innerHTML = '<div style="text-align:center;padding:30px;color:#e03131;">❌ ' + (data.error || '生成失败') + '</div>'; }
         })
-        .catch(function() {
-            document.getElementById('reportContent').innerHTML = '<span style="color:#e03131;">❌ 请求失败</span>';
-            setStatus('reportStatus', '❌ 请求失败', 'error');
-        })
-        .finally(function() { btn.disabled = false; btn.textContent = '🔄 手动生成日报'; });
+        .catch(function() { document.getElementById('reportContent').innerHTML = '<div style="text-align:center;padding:30px;color:#e03131;">❌ 请求失败</div>'; })
+        .finally(function() { btn.disabled = false; btn.textContent = '🔄 重新生成'; });
 }
 
 function loadLatestReport() {
@@ -581,12 +600,15 @@ function loadLatestReport() {
             if (data.ok && data.content) {
                 c.innerHTML = marked.parse(data.content);
             } else {
-                c.innerHTML = '<div style="color:#909296;text-align:center;padding:30px;">暂无日报数据</div>';
+                c.innerHTML = '<div style="text-align:center;padding:30px;color:#909296;">暂无日报数据，点击「重新生成」创建今日日报</div>';
             }
-        });
+        })
+        .catch(function() { document.getElementById('reportContent').innerHTML = '<div style="text-align:center;padding:30px;color:#909296;">加载失败</div>'; });
 }
 
-function loadReportConfig() {
+// ==================== 日报设置弹窗 ====================
+
+function openReportSettings() {
     fetch('/kb/' + KB_ID + '/api/report/config')
         .then(function(r) { return r.json(); })
         .then(function(data) {
@@ -595,6 +617,16 @@ function loadReportConfig() {
                 document.getElementById('feishuPushToggle').checked = data.feishuPush !== false;
             }
         });
+    fetch('/kb/' + KB_ID + '/api/report/prompt')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.ok) document.getElementById('reportPrompt').value = data.prompt || '';
+        });
+    document.getElementById('reportSettingsModal').classList.add('active');
+}
+
+function closeReportSettings() {
+    document.getElementById('reportSettingsModal').classList.remove('active');
 }
 
 function saveReportConfig() {
@@ -607,6 +639,19 @@ function saveReportConfig() {
     })
     .then(function(r) { return r.json(); })
     .then(function(data) { if (data.ok) toast('✅ 日报配置已保存'); else toast('❌ ' + (data.error || '保存失败'), 'error'); })
+    .catch(function() { toast('❌ 请求失败', 'error'); });
+}
+
+function saveReportPrompt() {
+    fetch('/kb/' + KB_ID + '/api/report/prompt', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: document.getElementById('reportPrompt').value })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.ok) { toast('✅ 提示词已保存'); }
+        else { toast('❌ ' + (data.error || '保存失败'), 'error'); }
+    })
     .catch(function() { toast('❌ 请求失败', 'error'); });
 }
 
@@ -625,7 +670,7 @@ function escapeJs(str) { return String(str).replace(/'/g, "\\'").replace(/"/g, '
 
 document.addEventListener('DOMContentLoaded', function() {
     loadAgents();
-    loadReportConfig();
+    loadLatestReport();
 });
 </script>
 
