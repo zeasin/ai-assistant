@@ -106,6 +106,15 @@
         <span style="font-size:13px;color:#909296;" th:text="${kb.name}">笔记库名</span>
     </div>
 
+    <!-- 统一导航 Tab -->
+    <div style="display:flex;gap:0;border-bottom:2px solid #e1e3e6;margin-bottom:16px;">
+        <a th:href="@{/v2?kbId={id}(id=${kb.id})}" class="tab-btn" style="text-decoration:none;display:inline-flex;">💬 对话</a>
+        <a th:href="@{/kb/{id}/notes(id=${kb.id})}" class="tab-btn" style="text-decoration:none;display:inline-flex;">📝 笔记</a>
+        <button class="tab-btn" onclick="switchTab('daily')">📊 综合日报</button>
+        <button class="tab-btn" onclick="switchTab('agents')">📋 AI 指南</button>
+        <button class="tab-btn" onclick="switchTab('analysis')">🔬 AI 分析</button>
+    </div>
+
     <!-- 笔记库概览统计 -->
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;">
         <div style="background:#fff;border:1px solid #e1e3e6;border-radius:10px;padding:14px;text-align:center;">

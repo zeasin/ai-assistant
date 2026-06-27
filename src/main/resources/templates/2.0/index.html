@@ -12,6 +12,7 @@
     <button class="tab-btn" onclick="switchTab('notes')">📝 笔记</button>
     <button class="tab-btn" onclick="switchTab('search')">🔍 搜索</button>
     <button class="tab-btn" onclick="switchTab('overview')">📊 概览</button>
+    <a th:if="${currentKb != null}" th:href="@{/kb/{id}/ai(id=${currentKb.id})}" class="tab-btn" style="text-decoration:none;display:inline-flex;padding:10px 24px;font-size:14px;font-weight:500;color:#5c5f66;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s;">🤖 AI 中心</a>
 </div>
 
 <style>
