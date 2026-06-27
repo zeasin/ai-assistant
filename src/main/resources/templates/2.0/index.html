@@ -6,33 +6,26 @@
 <body>
 <th:block layout:fragment="content">
 
-<!-- Tab 切换 -->
-<div style="display:flex;gap:0;border-bottom:2px solid #e1e3e6;margin-bottom:20px;">
-    <button class="tab-btn active" onclick="switchTab('chat')">💬 对话</button>
-    <button class="tab-btn" onclick="switchTab('notes')">📝 笔记</button>
-    <button class="tab-btn" onclick="switchTab('search')">🔍 搜索</button>
-    <button class="tab-btn" onclick="switchTab('overview')">📊 概览</button>
-    <a th:if="${currentKb != null}" th:href="@{/kb/{id}/ai(id=${currentKb.id})}" class="tab-btn" style="text-decoration:none;display:inline-flex;padding:10px 24px;font-size:14px;font-weight:500;color:#5c5f66;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s;">🤖 AI 中心</a>
+<!-- KB 导航 Tab -->
+<div style="display:flex;gap:0;border-bottom:2px solid #e1e3e6;margin-bottom:16px;">
+    <a th:if="${currentKb != null}" th:href="@{/v2?kbId={id}(id=${currentKb.id})}"
+       style="padding:10px 20px;font-size:14px;text-decoration:none;border-bottom:2px solid #7c5cfc;margin-bottom:-2px;color:#7c5cfc;font-weight:600;">💬 对话</a>
+    <a th:if="${currentKb != null}" th:href="@{/kb/{id}/ai(id=${currentKb.id})}"
+       style="padding:10px 20px;font-size:14px;text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-2px;color:#5c5f66;">🤖 AI 中心</a>
+    <a th:if="${currentKb != null}" th:href="@{/kb/{id}/search(id=${currentKb.id})}"
+       style="padding:10px 20px;font-size:14px;text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-2px;color:#5c5f66;">🔍 搜索</a>
+    <a th:if="${currentKb != null}" th:href="@{/kb/{id}/notes(id=${currentKb.id})}"
+       style="padding:10px 20px;font-size:14px;text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-2px;color:#5c5f66;">📂 笔记本</a>
 </div>
 
 <style>
-    .tab-btn {
-        padding: 10px 24px; border: none; background: none;
-        font-size: 14px; font-weight: 500; color: #5c5f66;
-        cursor: pointer; border-bottom: 2px solid transparent;
-        margin-bottom: -2px; transition: all .15s;
-    }
-    .tab-btn:hover { color: #1a1b1e; }
-    .tab-btn.active { color: #7c5cfc; border-bottom-color: #7c5cfc; }
-    .tab-panel { display: none; }
-    .tab-panel.active { display: block; }
-    /* 对话 tab 占满剩余高度 */
-    #tab-chat { height: calc(100vh - 180px); }
-    #tab-chat > .card { height: 100%; }
+    /* 对话占满剩余高度 */
+    #chatWrapper { height: calc(100vh - 180px); }
+    #chatWrapper > .card { height: 100%; }
 </style>
 
-<!-- ==================== Tab 1: 对话 ==================== -->
-<div id="tab-chat" class="tab-panel active">
+<!-- ==================== 对话 ==================== -->
+<div id="chatWrapper">
     <div class="card" style="padding:0;overflow:hidden;display:flex;flex-direction:column;max-width:1100px;margin:0 auto;">
         <!-- 对话头部 -->
         <div style="padding:12px 16px;border-bottom:1px solid #eef0f4;display:flex;align-items:center;justify-content:space-between;">
@@ -68,163 +61,6 @@
     </div>
 </div>
 
-<!-- ==================== Tab: 笔记 ==================== -->
-<div id="tab-notes" class="tab-panel" style="height:calc(100vh - 180px);overflow:hidden;max-width:1100px;margin:0 auto;">
-    <div th:if="${currentKb == null}" style="text-align:center;padding:40px;color:#909296;">
-        请先从左侧选择一个笔记库
-    </div>
-    <iframe th:if="${currentKb != null}"
-            th:src="@{/kb/{id}/notes(id=${currentKb.id})}"
-            scrolling="no"
-            onload="try{this.contentWindow.dispatchEvent(new Event('resize'));}catch(e){}"
-            style="width:100%;height:100%;border:none;border-radius:12px;"
-            id="notesFrame"></iframe>
-</div>
-
-<!-- ==================== Tab 2: 搜索 ==================== -->
-<div id="tab-search" class="tab-panel" style="max-width:1100px;margin:0 auto;">
-    <!-- 索引状态 -->
-    <div class="status-bar">
-        <div class="status-item">
-            <div class="label">索引状态</div>
-            <div class="value" id="idxStatus">加载中...</div>
-        </div>
-        <div class="status-item">
-            <div class="label">已索引文件</div>
-            <div class="value" id="idxFileCount">-</div>
-        </div>
-        <div class="status-item">
-            <div class="label">内容片段</div>
-            <div class="value" id="idxChunkCount">-</div>
-        </div>
-        <div class="status-item">
-            <div class="label">Embedding</div>
-            <div class="value" id="idxEmbedStatus">-</div>
-        </div>
-    </div>
-
-    <!-- 索引操作 -->
-    <div class="card" style="margin-bottom:12px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-            <h2 style="margin:0;font-size:15px;">索引管理</h2>
-            <div style="display:flex;gap:6px;">
-                <button class="btn btn-primary" onclick="buildIndex()" id="idxBtnBuild" style="padding:5px 14px;font-size:12px;">🔄 构建索引</button>
-                <button class="btn btn-secondary" onclick="refreshIndexStatus(true)" style="padding:5px 14px;font-size:12px;">刷新</button>
-                <button class="btn btn-danger" onclick="clearIndex()" id="idxBtnClear" style="padding:5px 14px;font-size:12px;">清空</button>
-            </div>
-        </div>
-        <div id="idxBuildProgress" style="display:none;padding:8px 12px;background:#f0edff;border-radius:6px;font-size:13px;margin-bottom:8px;">
-            <span id="idxBuildText"></span>
-        </div>
-        <!-- 排除配置（折叠） -->
-        <details>
-            <summary style="font-size:12px;color:#909296;cursor:pointer;">排除配置</summary>
-            <div style="margin-top:8px;display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-                <div>
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-                        <span style="font-size:12px;font-weight:500;">排除文件夹</span>
-                        <button onclick="saveIgnoredDirs()" class="btn btn-secondary" style="padding:2px 8px;font-size:11px;">保存</button>
-                    </div>
-                    <input id="idxIgnoreDirs" type="text" placeholder="AI分析,AI/任务"
-                           style="width:100%;padding:6px 8px;border:1px solid #e1e3e6;border-radius:6px;font-size:12px;">
-                </div>
-                <div>
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-                        <span style="font-size:12px;font-weight:500;">排除文件</span>
-                        <button onclick="saveIgnoredFiles()" class="btn btn-secondary" style="padding:2px 8px;font-size:11px;">保存</button>
-                    </div>
-                    <input id="idxIgnoreFiles" type="text" placeholder="README.md,AGENTS.md"
-                           style="width:100%;padding:6px 8px;border:1px solid #e1e3e6;border-radius:6px;font-size:12px;">
-                </div>
-            </div>
-        </details>
-    </div>
-
-    <!-- 搜索 -->
-    <div class="card">
-        <div style="display:flex;gap:8px;margin-bottom:12px;">
-            <input id="searchInput" type="text" placeholder="搜索笔记内容，如：客户跟进、本周工作..."
-                   style="flex:1;padding:10px 14px;border:1px solid #e1e3e6;border-radius:8px;font-size:14px;outline:none;"
-                   onkeydown="if(event.key==='Enter')doSearch()">
-            <button class="btn btn-primary" onclick="doSearch()">搜索</button>
-        </div>
-        <div id="searchStatus" style="font-size:13px;color:#909296;margin-bottom:12px;display:none;"></div>
-        <div id="searchResults"></div>
-        <div id="searchEmpty" style="text-align:center;padding:30px 20px;color:#909296;">
-            输入关键词搜索笔记库内容
-        </div>
-        <div id="searchPagination" style="display:none;justify-content:center;gap:8px;margin-top:12px;"></div>
-    </div>
-</div>
-
-<!-- 文件详情弹窗 -->
-<div id="fileModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;justify-content:center;align-items:center;" onclick="closeFileModal(event)">
-    <div style="background:#fff;border-radius:12px;width:800px;max-width:90vw;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,0.2);" onclick="event.stopPropagation()">
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid #e1e3e6;">
-            <h3 id="modalTitle" style="margin:0;font-size:16px;">文件详情</h3>
-            <button onclick="closeFileModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#909296;">✕</button>
-        </div>
-        <div id="modalContent" class="report" style="padding:20px;overflow-y:auto;flex:1;font-size:14px;line-height:1.8;"></div>
-    </div>
-</div>
-
-<!-- ==================== Tab 3: 分析 ==================== -->
-<div id="tab-overview" class="tab-panel" style="max-width:1100px;margin:0 auto;">
-    <!-- 笔记库概览 -->
-    <div class="card" th:if="${currentKb != null}">
-        <h2>笔记库概览</h2>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
-            <div style="text-align:center;padding:16px;background:#f8f9fa;border-radius:8px;">
-                <div style="font-size:24px;font-weight:700;color:#7c5cfc;" th:text="${kbFileCount} ?: 0">0</div>
-                <div style="font-size:12px;color:#909296;margin-top:4px;">笔记文件</div>
-            </div>
-            <div style="text-align:center;padding:16px;background:#f8f9fa;border-radius:8px;">
-                <div style="font-size:24px;font-weight:700;color:#7c5cfc;" th:text="${kbIndexCount} ?: 0">0</div>
-                <div style="font-size:12px;color:#909296;margin-top:4px;">索引片段</div>
-            </div>
-            <div style="text-align:center;padding:16px;background:#f8f9fa;border-radius:8px;">
-                <div style="font-size:24px;font-weight:700;color:#7c5cfc;" th:text="${kbTotalMessages} ?: 0">0</div>
-                <div style="font-size:12px;color:#909296;margin-top:4px;">对话消息</div>
-            </div>
-        </div>
-        <div style="margin-top:16px;display:grid;grid-template-columns:repeat(2,1fr);gap:8px;">
-            <a th:href="@{/kb/{id}/notes(id=${currentKb.id})}" class="card" style="text-decoration:none;text-align:center;padding:16px;cursor:pointer;border:1px solid #eef0f4;border-radius:8px;transition:all .15s;">
-                <div style="font-size:20px;margin-bottom:6px;">📂</div>
-                <div style="font-size:13px;font-weight:500;color:#1a1b1e;">笔记浏览</div>
-                <div style="font-size:11px;color:#909296;margin-top:2px;">查看和管理笔记文件</div>
-            </a>
-            <a th:href="@{/kb/{id}/ai(id=${currentKb.id})}" class="card" style="text-decoration:none;text-align:center;padding:16px;cursor:pointer;border:1px solid #eef0f4;border-radius:8px;transition:all .15s;">
-                <div style="font-size:20px;margin-bottom:6px;">🤖</div>
-                <div style="font-size:13px;font-weight:500;color:#1a1b1e;">AI 中心</div>
-                <div style="font-size:11px;color:#909296;margin-top:2px;">日报 · 分析 · 提示词 · 配置</div>
-            </a>
-        </div>
-    </div>
-
-    <!-- 综合日报 -->
-    <div class="card">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-            <h2 style="margin:0;">综合日报</h2>
-            <div style="display:flex;gap:6px;">
-                <span th:if="${currentKb != null}" class="text-muted" th:text="${report_time}">时间</span>
-                <button th:if="${currentKb != null}" class="btn btn-primary" style="padding:5px 14px;font-size:12px;"
-                        onclick="generateReport()">重新生成</button>
-            </div>
-        </div>
-        <div th:if="${currentKb == null}" style="text-align:center;padding:30px;color:#909296;">
-            请先从左侧选择一个笔记库
-        </div>
-        <div th:if="${currentKb != null and (report == null or report == '')}" style="text-align:center;padding:30px;color:#909296;">
-            <div style="margin-bottom:8px;">暂无日报</div>
-            <button class="btn btn-primary" onclick="generateReport()">生成今日日报</button>
-        </div>
-        <div th:if="${currentKb != null and report != null and report != ''}" class="report" th:utext="${report}"></div>
-        <div th:if="${currentKb != null and report_error != null and report_error != ''}"
-             style="margin-top:8px;padding:8px 12px;background:#fff3cd;border-radius:6px;font-size:13px;color:#856404;"
-             th:text="${report_error}">错误</div>
-    </div>
-</div>
-
 <!-- ==================== JS ==================== -->
 <script th:inline="javascript">
 /*<![CDATA[*/
@@ -234,34 +70,6 @@ const KB_NAME = /*[[${currentKb?.name}]]*/ '';
 
 let chatMessages = [];
 let chatSessionId = null;
-
-function switchTab(tab) {
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-    event.target.classList.add('active');
-    document.getElementById('tab-' + tab).classList.add('active');
-    // 切到笔记 tab 时通知 iframe 重新计算高度
-    if (tab === 'notes') {
-        syncIframeHeight();
-    }
-}
-
-/** 通知 iframe 重新计算高度 */
-function syncIframeHeight() {
-    var f = document.getElementById('notesFrame');
-    if (!f) return;
-    try {
-        f.contentWindow.dispatchEvent(new Event('resize'));
-    } catch(e) {}
-}
-
-// 父窗口缩放时也通知 iframe
-window.addEventListener('resize', function() {
-    var f = document.getElementById('notesFrame');
-    if (f && f.style.display !== 'none') {
-        try { f.contentWindow.dispatchEvent(new Event('resize')); } catch(e) {}
-    }
-});
 
 // ========== 加载聊天记录 ==========
 async function loadChatHistory() {
@@ -282,21 +90,17 @@ async function loadChatHistory() {
         box.innerHTML = '';
     }
 }
-// 页面加载后自动加载聊天记录
 if (KB_ID) loadChatHistory();
 
-// ========== 对话 ==========
 let chatSending = false;
 
-// ========== 发送消息（SSE 流式） ==========
 async function sendChat() {
     const input = document.getElementById('chatInput');
     const msg = input.value.trim();
     if (!msg || !KB_ID || chatSending) return;
 
-    // 禁用发送按钮，防止重复提交
     chatSending = true;
-    const btn = document.querySelector('#tab-chat .btn-primary');
+    const btn = document.querySelector('#chatWrapper .btn-primary');
     if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
 
     input.value = '';
@@ -333,7 +137,6 @@ async function sendChat() {
                     const d = JSON.parse(p.replace(/^data:\s*/, ''));
                     if (d.type === 'text') {
                         replyText += d.content;
-                        // 优化1：只有非空白内容才替换"正在处理..."
                         if (replyText.trim()) {
                             hasRealContent = true;
                             const el = document.getElementById('reply-' + aiId);
@@ -341,8 +144,6 @@ async function sendChat() {
                             box.scrollTop = box.scrollHeight;
                         }
                     } else if (d.type === 'status') {
-                        // 优化2：显示思考过程（如"正在读取笔记..."）
-                        // 仅当还没有实际内容时才显示状态
                         if (!hasRealContent && d.content) {
                             const el = document.getElementById('reply-' + aiId);
                             if (el) el.innerHTML = '<span style="color:#909296;">' + d.content + '</span>';
@@ -355,7 +156,6 @@ async function sendChat() {
                         const el = document.getElementById('reply-' + aiId);
                         if (el) el.innerHTML = '<span style="color:#e03131;">' + d.content + '</span>';
                     }
-                    // session / heartbeat 类型忽略
                 } catch (e) {}
             }
         }
@@ -363,7 +163,6 @@ async function sendChat() {
         const el = document.getElementById('reply-' + aiId);
         if (el) el.innerHTML = '<span style="color:#e03131;">请求失败: ' + e.message + '</span>';
     } finally {
-        // 恢复发送按钮
         chatSending = false;
         if (btn) { btn.disabled = false; btn.textContent = '发送'; }
         input.focus();
@@ -384,205 +183,6 @@ function clearChat() {
     chatSessionId = null;
     document.getElementById('chatBox').innerHTML = '';
 }
-
-// ========== 搜索（索引管理 + 搜索 + 分页 + 文件详情） ==========
-let idxPollingTimer = null;
-let idxLastFileCount = 0, idxLastChunkCount = 0;
-let allSearchResults = [], searchPage = 1;
-const SEARCH_PAGE_SIZE = 10;
-
-function refreshIndexStatus(showLoading) {
-    if (!KB_ID) return;
-    if (showLoading) document.getElementById('idxStatus').textContent = '加载中...';
-    fetch('/kb/' + KB_ID + '/api/index/status')
-        .then(r => r.json())
-        .then(data => {
-            if (!data.ok) return;
-            var st = document.getElementById('idxStatus');
-            if (data.building) { st.textContent = '⏳ 构建中'; st.className = 'value'; }
-            else if (data.status === 'ready') { st.textContent = '✅ 已就绪'; st.className = 'value status-up'; }
-            else if (data.status === 'empty') { st.textContent = '📭 未索引'; st.className = 'value'; }
-            else { st.textContent = '⚠️ 不可用'; st.className = 'value status-down'; }
-
-            var em = document.getElementById('idxEmbedStatus');
-            if (data.embeddingAvailable) { em.textContent = '✅ 可用'; em.className = 'value status-up'; }
-            else { em.textContent = '❌ 不可用'; em.className = 'value status-down'; }
-
-            document.getElementById('idxFileCount').textContent = data.fileCount;
-            document.getElementById('idxChunkCount').textContent = data.chunkCount;
-
-            if (idxPollingTimer && data.building) {
-                var cur = data.currentFile || '';
-                document.getElementById('idxBuildText').textContent =
-                    '⏳ 已处理 ' + data.processedFiles + ' / ' + data.totalFiles + ' 个文件'
-                    + (cur && cur !== '完成' ? ' — ' + cur : '');
-            }
-            if (idxPollingTimer && !data.building) stopIdxPolling();
-        })
-        .catch(() => { document.getElementById('idxStatus').textContent = '❌ 加载失败'; });
-}
-
-function startIdxPolling() {
-    if (idxPollingTimer) return;
-    document.getElementById('idxBuildProgress').style.display = 'block';
-    document.getElementById('idxBuildText').textContent = '⏳ 正在构建...';
-    idxPollingTimer = setInterval(() => refreshIndexStatus(false), 1000);
-}
-
-function stopIdxPolling() {
-    if (idxPollingTimer) { clearInterval(idxPollingTimer); idxPollingTimer = null; }
-    document.getElementById('idxBuildProgress').style.display = 'none';
-    document.getElementById('idxBuildText').textContent = '✅ 构建完成';
-    document.getElementById('idxBuildProgress').style.display = 'block';
-    setTimeout(() => { document.getElementById('idxBuildProgress').style.display = 'none'; }, 3000);
-}
-
-function buildIndex() {
-    if (!KB_ID) return;
-    var btn = document.getElementById('idxBtnBuild');
-    btn.disabled = true; btn.textContent = '⏳ 构建中...';
-    fetch('/kb/' + KB_ID + '/api/index/build', {method:'POST'})
-        .then(r => r.json())
-        .then(data => {
-            if (data.ok) startIdxPolling();
-            else { toast(data.error || '构建失败', 'error'); }
-        })
-        .catch(e => { toast('请求失败: ' + e.message, 'error'); })
-        .finally(() => { btn.disabled = false; btn.textContent = '🔄 构建索引'; });
-}
-
-function clearIndex() {
-    if (!KB_ID || !confirm('确定清空索引？')) return;
-    fetch('/kb/' + KB_ID + '/api/index', {method:'DELETE'})
-        .then(r => r.json())
-        .then(data => { if (data.ok) { toast('索引已清空'); refreshIndexStatus(true); } });
-}
-
-function loadIgnoredConfig() {
-    if (!KB_ID) return;
-    fetch('/kb/' + KB_ID + '/api/index/ignored-dirs').then(r=>r.json()).then(d => { if(d.ok) document.getElementById('idxIgnoreDirs').value = d.user || ''; });
-    fetch('/kb/' + KB_ID + '/api/index/ignored-files').then(r=>r.json()).then(d => { if(d.ok) document.getElementById('idxIgnoreFiles').value = d.user || ''; });
-}
-
-function saveIgnoredDirs() {
-    if (!KB_ID) return;
-    fetch('/kb/' + KB_ID + '/api/index/ignored-dirs', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ignoreDirs: document.getElementById('idxIgnoreDirs').value.trim()})
-    }).then(r=>r.json()).then(d => { if(d.ok) toast('已保存'); else toast(d.error||'失败','error'); });
-}
-
-function saveIgnoredFiles() {
-    if (!KB_ID) return;
-    fetch('/kb/' + KB_ID + '/api/index/ignored-files', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ignoreFiles: document.getElementById('idxIgnoreFiles').value.trim()})
-    }).then(r=>r.json()).then(d => { if(d.ok) toast('已保存'); else toast(d.error||'失败','error'); });
-}
-
-function doSearch() {
-    var query = document.getElementById('searchInput').value.trim();
-    if (!query || !KB_ID) return;
-    document.getElementById('searchStatus').style.display = 'block';
-    document.getElementById('searchStatus').textContent = '搜索中...';
-    document.getElementById('searchResults').innerHTML = '';
-    document.getElementById('searchEmpty').style.display = 'none';
-    document.getElementById('searchPagination').style.display = 'none';
-
-    fetch('/kb/' + KB_ID + '/api/index/search', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({query: query, limit: 100})
-    }).then(r=>r.json()).then(data => {
-        if (data.ok) { allSearchResults = data.results||[]; searchPage = 1; renderSearchResults(); }
-        else { document.getElementById('searchStatus').textContent = '搜索失败: ' + data.error; }
-    }).catch(e => { document.getElementById('searchStatus').textContent = '请求失败: ' + e.message; });
-}
-
-function renderSearchResults() {
-    var el = document.getElementById('searchResults');
-    var pg = document.getElementById('searchPagination');
-    if (allSearchResults.length === 0) {
-        document.getElementById('searchStatus').textContent = '未找到结果';
-        el.innerHTML = '<div style="text-align:center;padding:30px;color:#909296;">😔 未找到相关笔记，请尝试其他关键词</div>';
-        pg.style.display = 'none'; return;
-    }
-    var totalPages = Math.ceil(allSearchResults.length / SEARCH_PAGE_SIZE);
-    var start = (searchPage - 1) * SEARCH_PAGE_SIZE;
-    var pageItems = allSearchResults.slice(start, start + SEARCH_PAGE_SIZE);
-
-    document.getElementById('searchStatus').textContent = '共 ' + allSearchResults.length + ' 条结果';
-    var html = '';
-    pageItems.forEach(r => {
-        var score = (r.score * 100).toFixed(0);
-        var cls = r.score >= 0.8 ? 'badge-ok' : (r.score >= 0.6 ? 'badge-info' : 'badge-fail');
-        var preview = (r.content||'').length > 200 ? r.content.substring(0,200)+'...' : (r.content||'');
-        var title = r.title ? ' <span style="color:#e67e22;font-weight:500;">'+r.title+'</span>' : '';
-        var pathInfo = r.pathContext ? ' <span style="color:#909296;font-size:11px;">📂 '+r.pathContext+'</span>' : '';
-        html += '<div style="border:1px solid #eef0f4;border-radius:8px;padding:12px;margin-bottom:8px;">'
-            + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">'
-            + '<div><a href="javascript:void(0)" onclick="openFileDetail(\''+r.filePath.replace(/'/g,"\\'")+'\')" style="font-weight:500;color:#7c5cfc;text-decoration:none;">📄 '+r.filePath+'</a>'+title+pathInfo+'</div>'
-            + '<span class="badge '+cls+'">'+score+'%</span>'
-            + '</div>'
-            + '<div style="font-size:13px;color:#5c5f66;line-height:1.6;">'+preview+'</div>'
-            + '</div>';
-    });
-    el.innerHTML = html;
-
-    if (totalPages > 1) {
-        var ph = '';
-        if (searchPage > 1) ph += '<button class="btn btn-secondary" onclick="goSearchPage('+(searchPage-1)+')" style="padding:4px 12px;font-size:12px;">上一页</button>';
-        ph += '<span style="padding:4px 12px;font-size:13px;color:#5c5f66;">'+searchPage+' / '+totalPages+'</span>';
-        if (searchPage < totalPages) ph += '<button class="btn btn-secondary" onclick="goSearchPage('+(searchPage+1)+')" style="padding:4px 12px;font-size:12px;">下一页</button>';
-        pg.innerHTML = ph; pg.style.display = 'flex';
-    } else { pg.style.display = 'none'; }
-}
-
-function goSearchPage(p) { searchPage = p; renderSearchResults(); document.getElementById('searchResults').scrollIntoView({behavior:'smooth'}); }
-
-function openFileDetail(filePath) {
-    document.getElementById('fileModal').style.display = 'flex';
-    document.getElementById('modalTitle').textContent = '📄 ' + filePath;
-    document.getElementById('modalContent').innerHTML = '<p style="color:#909296;">加载中...</p>';
-    fetch('/kb/' + KB_ID + '/notes/raw?path=' + encodeURIComponent(filePath))
-        .then(r => r.json())
-        .then(data => {
-            if (data.ok) {
-                var c = data.content.replace(/^---[\s\S]*?---\n*/, '');
-                document.getElementById('modalContent').innerHTML = marked.parse(c);
-            } else { document.getElementById('modalContent').innerHTML = '<p style="color:#e03131;">加载失败</p>'; }
-        })
-        .catch(e => { document.getElementById('modalContent').innerHTML = '<p style="color:#e03131;">'+e.message+'</p>'; });
-}
-
-function closeFileModal(e) { if (e && e.target !== e.currentTarget) return; document.getElementById('fileModal').style.display = 'none'; }
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeFileModal(); });
-
-// 页面加载时初始化
-if (KB_ID) { refreshIndexStatus(true); loadIgnoredConfig(); }
-
-// ========== 日报 ==========
-async function generateReport() {
-    if (!KB_ID) return;
-    const card = event.target.closest('.card');
-    const btn = event.target;
-    btn.disabled = true;
-    btn.textContent = '生成中...';
-    try {
-        const resp = await fetch('/kb/' + KB_ID + '/api/generate', {method: 'POST'});
-        const data = await resp.json();
-        if (data.ok) {
-            location.reload();
-        } else {
-            alert('生成失败: ' + (data.error || ''));
-        }
-    } catch(e) {
-        alert('请求失败: ' + e.message);
-    } finally {
-        btn.disabled = false;
-        btn.textContent = '重新生成';
-    }
-}
-
 </script>
 
 </th:block>
