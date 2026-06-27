@@ -270,7 +270,7 @@
             </div>
             <ul class="sidebar-kb-list">
                 <li th:each="kb : ${kbList}">
-                    <a th:href="@{/v2(kbId=${kb.id})}"
+                    <a th:href="@{/kb/{id}/chat(id=${kb.id})}"
                        th:classappend="${currentKb != null and currentKb.id == kb.id} ? 'active' : ''">
                         <span class="kb-dot"></span>
                         <span th:text="${kb.name}">笔记库名</span>

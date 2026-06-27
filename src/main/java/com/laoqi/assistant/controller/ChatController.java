@@ -68,13 +68,13 @@ public class ChatController {
     // ========== 页面路由 ==========
 
     @GetMapping
-    public String chatPage(@RequestParam(required = false) Long kbId, Model model) {
-        // 1. 检查大模型是否已配置
+    public String chatPage(@RequestParam(required = false) Long kbId) {
+        // 检查大模型是否已配置
         if (!llmService.isAvailable()) {
             return "redirect:/config#ai-model-section";
         }
 
-        // 2. 检查笔记库是否配置
+        // 重定向到新版 /kb/{id}/chat 路由
         KnowledgeBaseEntity kb = null;
         if (kbId != null) {
             kb = kbService.getById(kbId);
@@ -82,73 +82,10 @@ public class ChatController {
         if (kb == null) {
             kb = kbService.getFirst();
         }
-
-        // 3. 如果没有传 kbId 或传了无效的，重定向到正确的 URL
-        if (kb != null && (kbId == null || !kbId.equals(kb.getId()))) {
-            return "redirect:/chat?kbId=" + kb.getId();
-        }
-
         if (kb != null) {
-            model.addAttribute("currentKb", kb);
-            model.addAttribute("kbId", kb.getId());
-            model.addAttribute("kbName", kb.getName());
-            model.addAttribute("kbReady", true);
-        } else {
-            model.addAttribute("kbReady", false);
-            model.addAttribute("kbId", null);
-            model.addAttribute("kbName", null);
-            model.addAttribute("currentKb", null);
+            return "redirect:/kb/" + kb.getId() + "/chat";
         }
-
-        if (kb != null) {
-            // 获取消息总数
-            long total = messageDbService.countByKb(kb.getId().intValue());
-            model.addAttribute("totalMessages", total);
-
-            // 加载当前 KB 的待办任务
-            try {
-                String kbNotesDir = kb.getNotesDir();
-                if (kbNotesDir != null && !kbNotesDir.isEmpty()) {
-                    List<TaskItem> activeTasks = taskService.getAllTasks(kbNotesDir).stream()
-                            .filter(t -> !"done".equals(t.status))
-                            .collect(Collectors.toList());
-                    model.addAttribute("todoHigh", activeTasks.stream().filter(t -> "high".equals(t.priority)).collect(Collectors.toList()));
-                    model.addAttribute("todoMid", activeTasks.stream().filter(t -> "mid".equals(t.priority)).collect(Collectors.toList()));
-                    model.addAttribute("todoLow", activeTasks.stream().filter(t -> "low".equals(t.priority)).collect(Collectors.toList()));
-                    model.addAttribute("todoTotal", activeTasks.size());
-                } else {
-                    model.addAttribute("todoHigh", List.of());
-                    model.addAttribute("todoMid", List.of());
-                    model.addAttribute("todoLow", List.of());
-                    model.addAttribute("todoTotal", 0);
-                }
-            } catch (Exception e) {
-                log.warn("加载待办任务失败", e);
-                model.addAttribute("todoHigh", List.of());
-                model.addAttribute("todoMid", List.of());
-                model.addAttribute("todoLow", List.of());
-                model.addAttribute("todoTotal", 0);
-            }
-        } else {
-            model.addAttribute("totalMessages", 0L);
-            model.addAttribute("todoHigh", List.of());
-            model.addAttribute("todoMid", List.of());
-            model.addAttribute("todoLow", List.of());
-            model.addAttribute("todoTotal", 0);
-        }
-
-        // 聊天页面只显示文本模型和多模态模型，不显示向量模型
-        List<LlmProfileEntity> chatModels = llmConfigResolver.getAllProfiles()
-                .stream()
-                .filter(p -> !LlmProfileEntity.TYPE_EMBEDDING.equals(p.getModelType()))
-                .collect(Collectors.toList());
-        model.addAttribute("chatModels", chatModels);
-        LlmProfileEntity defaultProfile = llmConfigResolver.getDefaultProfile();
-        model.addAttribute("defaultModel", defaultProfile != null ? defaultProfile.getName() : "");
-
-        model.addAttribute("aiProvider", "direct");
-
-        return "1.0/chat";
+        return "redirect:/config";
     }
 
     // ========== API: 加载消息（分页） ==========

@@ -57,7 +57,7 @@
                 <div class="kb-dropdown" id="kbDropdown">
                     <th:block th:each="kb : ${kbList}">
                     <a th:classappend="${kb.id == kbId} ? 'active' : ''"
-                       th:href="@{/chat?kbId={id}(id=${kb.id})}"
+                       th:href="@{/kb/{id}/chat(id=${kb.id})}"
                        th:text="${kb.name}">笔记库</a>
                     </th:block>
                 </div>

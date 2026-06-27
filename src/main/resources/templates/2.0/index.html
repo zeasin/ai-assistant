@@ -6,27 +6,26 @@
 <body>
 <th:block layout:fragment="content">
 
-<!-- KB 导航 Tab -->
-<div style="display:flex;gap:0;border-bottom:2px solid #e1e3e6;margin-bottom:16px;">
-    <a th:if="${currentKb != null}" th:href="@{/v2?kbId={id}(id=${currentKb.id})}"
-       style="padding:10px 20px;font-size:14px;text-decoration:none;border-bottom:2px solid #7c5cfc;margin-bottom:-2px;color:#7c5cfc;font-weight:600;">💬 对话</a>
-    <a th:if="${currentKb != null}" th:href="@{/kb/{id}/ai(id=${currentKb.id})}"
-       style="padding:10px 20px;font-size:14px;text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-2px;color:#5c5f66;">🤖 AI 中心</a>
-    <a th:if="${currentKb != null}" th:href="@{/kb/{id}/search(id=${currentKb.id})}"
-       style="padding:10px 20px;font-size:14px;text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-2px;color:#5c5f66;">🔍 搜索</a>
-    <a th:if="${currentKb != null}" th:href="@{/kb/{id}/notes(id=${currentKb.id})}"
-       style="padding:10px 20px;font-size:14px;text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-2px;color:#5c5f66;">📂 笔记本</a>
-</div>
+<div style="max-width:1200px;margin:0 auto;padding:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+        <h2 style="font-size:20px;font-weight:600;margin:0;">💬 对话</h2>
+        <span th:if="${currentKb != null}" style="font-size:13px;color:#909296;" th:text="${currentKb.name}">笔记库名</span>
+    </div>
 
-<style>
-    /* 对话占满剩余高度 */
-    #chatWrapper { height: calc(100vh - 180px); }
-    #chatWrapper > .card { height: 100%; }
-</style>
+    <!-- KB 导航 Tab -->
+    <div style="display:flex;gap:0;border-bottom:2px solid #e1e3e6;margin-bottom:16px;">
+        <a th:if="${currentKb != null}" th:href="@{/kb/{id}/chat(id=${currentKb.id})}"
+           style="padding:10px 20px;font-size:14px;text-decoration:none;border-bottom:2px solid #7c5cfc;margin-bottom:-2px;color:#7c5cfc;font-weight:600;">💬 对话</a>
+        <a th:if="${currentKb != null}" th:href="@{/kb/{id}/ai(id=${currentKb.id})}"
+           style="padding:10px 20px;font-size:14px;text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-2px;color:#5c5f66;">🤖 AI 中心</a>
+        <a th:if="${currentKb != null}" th:href="@{/kb/{id}/search(id=${currentKb.id})}"
+           style="padding:10px 20px;font-size:14px;text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-2px;color:#5c5f66;">🔍 搜索</a>
+        <a th:if="${currentKb != null}" th:href="@{/kb/{id}/notes(id=${currentKb.id})}"
+           style="padding:10px 20px;font-size:14px;text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-2px;color:#5c5f66;">📂 笔记本</a>
+    </div>
 
-<!-- ==================== 对话 ==================== -->
-<div id="chatWrapper">
-    <div class="card" style="padding:0;overflow:hidden;display:flex;flex-direction:column;max-width:1100px;margin:0 auto;">
+    <!-- ==================== 对话 ==================== -->
+    <div class="card" style="padding:0;overflow:hidden;display:flex;flex-direction:column;height:calc(100vh - 280px);">
         <!-- 对话头部 -->
         <div style="padding:12px 16px;border-bottom:1px solid #eef0f4;display:flex;align-items:center;justify-content:space-between;">
             <div style="display:flex;align-items:center;gap:8px;">
@@ -100,7 +99,7 @@ async function sendChat() {
     if (!msg || !KB_ID || chatSending) return;
 
     chatSending = true;
-    const btn = document.querySelector('#chatWrapper .btn-primary');
+    const btn = document.querySelector('.card .btn-primary');
     if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
 
     input.value = '';

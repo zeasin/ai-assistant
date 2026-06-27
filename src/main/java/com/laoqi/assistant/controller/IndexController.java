@@ -40,9 +40,9 @@ public class IndexController {
     public String home() {
         var first = kbService.getFirst();
         if (first != null) {
-            return "redirect:/v2?kbId=" + first.getId();
+            return "redirect:/kb/" + first.getId() + "/chat";
         }
-        return "redirect:/v2";
+        return "redirect:/config";
     }
 
     @GetMapping("/v1")

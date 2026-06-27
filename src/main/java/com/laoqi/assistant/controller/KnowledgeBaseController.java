@@ -4,10 +4,12 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.laoqi.assistant.config.AppConfig;
 import com.laoqi.assistant.entity.AiAnalysisEntity;
 import com.laoqi.assistant.entity.KnowledgeBaseEntity;
+import com.laoqi.assistant.entity.LlmProfileEntity;
 import com.laoqi.assistant.model.ReminderData.Reminder;
 import com.laoqi.assistant.model.TaskData.TaskItem;
 import com.laoqi.assistant.service.AgentAnalysisService;
 import com.laoqi.assistant.service.ConfigService;
+import com.laoqi.assistant.service.LlmConfigResolver;
 import com.laoqi.assistant.service.DirectoryDataService;
 import com.laoqi.assistant.service.NoteIndexService;
 import com.laoqi.assistant.service.NoteIndexService.IndexStats;
@@ -57,6 +59,7 @@ public class KnowledgeBaseController {
     private final AgentAnalysisService agentAnalysisService;
     private final DirectoryDataService directoryDataService;
     private final com.laoqi.assistant.service.LlmService llmService;
+    private final com.laoqi.assistant.service.LlmConfigResolver llmConfigResolver;
     private final AiAnalysisDbService aiAnalysisDbService;
     private final NoteIndexService noteIndexService;
     private final MessageDbService messageDbService;
@@ -68,6 +71,7 @@ public class KnowledgeBaseController {
                                    AgentAnalysisService agentAnalysisService,
                                    DirectoryDataService directoryDataService,
                                    com.laoqi.assistant.service.LlmService llmService,
+                                   com.laoqi.assistant.service.LlmConfigResolver llmConfigResolver,
                                    AiAnalysisDbService aiAnalysisDbService,
                                    NoteIndexService noteIndexService,
                                    MessageDbService messageDbService) {
@@ -80,6 +84,7 @@ public class KnowledgeBaseController {
         this.agentAnalysisService = agentAnalysisService;
         this.directoryDataService = directoryDataService;
         this.llmService = llmService;
+        this.llmConfigResolver = llmConfigResolver;
         this.aiAnalysisDbService = aiAnalysisDbService;
         this.noteIndexService = noteIndexService;
         this.messageDbService = messageDbService;
@@ -127,6 +132,25 @@ public class KnowledgeBaseController {
         }
 
         return "2.0/kb_ai_guide";
+    }
+
+    @GetMapping("/kb/{id}/chat")
+    public String kbChat(@PathVariable Long id, Map<String, Object> model) {
+        KnowledgeBaseEntity kb = kbService.getById(id);
+        if (kb == null) return "redirect:/config";
+
+        model.put("currentKb", kb);
+        model.put("kb", kb);
+
+        List<LlmProfileEntity> chatModels = llmConfigResolver.getAllProfiles()
+                .stream()
+                .filter(p -> !LlmProfileEntity.TYPE_EMBEDDING.equals(p.getModelType()))
+                .collect(Collectors.toList());
+        model.put("chatModels", chatModels);
+        LlmProfileEntity defaultProfile = llmConfigResolver.getDefaultProfile();
+        model.put("defaultModel", defaultProfile != null ? defaultProfile.getName() : "");
+
+        return "2.0/index";
     }
 
     // 任务/提醒页面已迁移到 /planner
