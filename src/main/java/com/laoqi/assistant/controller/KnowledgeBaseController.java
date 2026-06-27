@@ -143,6 +143,17 @@ public class KnowledgeBaseController {
         return "1.0/kb_index";
     }
 
+    @GetMapping("/kb/{id}/search")
+    public String kbSearch(@PathVariable Long id, Map<String, Object> model) {
+        KnowledgeBaseEntity kb = kbService.getById(id);
+        if (kb == null) return "redirect:/config";
+
+        model.put("kb", kb);
+        model.put("labels", parseLabels(kb.getLabels()));
+
+        return "2.0/kb_search";
+    }
+
     @GetMapping("/kb/{id}/data")
     public String kbData(@PathVariable Long id, Map<String, Object> model) {
         KnowledgeBaseEntity kb = kbService.getById(id);
