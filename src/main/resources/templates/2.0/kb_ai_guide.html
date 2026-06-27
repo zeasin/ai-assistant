@@ -106,13 +106,20 @@
         <span style="font-size:13px;color:#909296;" th:text="${kb.name}">笔记库名</span>
     </div>
 
-    <!-- 统一导航 Tab -->
+    <!-- KB 导航 Tab -->
     <div style="display:flex;gap:0;border-bottom:2px solid #e1e3e6;margin-bottom:16px;">
-        <a th:href="@{/v2?kbId={id}(id=${kb.id})}" class="tab-btn" style="text-decoration:none;display:inline-flex;">💬 对话</a>
-        <a th:href="@{/kb/{id}/notes(id=${kb.id})}" class="tab-btn" style="text-decoration:none;display:inline-flex;">📝 笔记</a>
-        <button class="tab-btn" onclick="switchTab('daily')">📊 综合日报</button>
-        <button class="tab-btn" onclick="switchTab('agents')">📋 AI 指南</button>
-        <button class="tab-btn" onclick="switchTab('analysis')">🔬 AI 分析</button>
+        <a th:href="@{/kb/{id}/ai(id=${kb.id})}"
+           style="padding:10px 20px;font-size:14px;text-decoration:none;border-bottom:2px solid #7c5cfc;margin-bottom:-2px;color:#7c5cfc;font-weight:600;">🤖 AI 中心</a>
+        <a th:href="@{/kb/{id}/data(id=${kb.id})}"
+           style="padding:10px 20px;font-size:14px;text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-2px;color:#5c5f66;">📈 数据</a>
+        <a th:href="@{/kb/{id}/notes(id=${kb.id})}"
+           style="padding:10px 20px;font-size:14px;text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-2px;color:#5c5f66;"
+           th:text="'📂 ' + ${labels.get('notes')}">📂 笔记</a>
+        <a th:href="@{/kb/{id}/index(id=${kb.id})}"
+           style="padding:10px 20px;font-size:14px;text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-2px;color:#5c5f66;">🔍 索引</a>
+        <a th:href="@{/kb/{id}/ai(id=${kb.id})}"
+           style="padding:10px 20px;font-size:14px;text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-2px;color:#5c5f66;"
+           th:text="'⚙️ ' + ${labels.get('config')}">⚙️ 配置</a>
     </div>
 
     <!-- 笔记库概览统计 -->

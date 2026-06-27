@@ -86,7 +86,26 @@
 <body>
 <th:block layout:fragment="content">
 
-<div class="notes-page">
+<div style="max-width:1200px;margin:0 auto;padding:20px;">
+    <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+        <h2 style="font-size:20px;font-weight:600;margin:0;">📝 笔记</h2>
+        <span style="font-size:13px;color:#909296;" th:text="${kb.name}">笔记库名</span>
+    </div>
+    <!-- KB 导航 Tab -->
+    <div style="display:flex;gap:0;border-bottom:2px solid #e1e3e6;margin-bottom:16px;">
+        <a th:href="@{/kb/{id}/ai(id=${kb.id})}"
+           style="padding:10px 20px;font-size:14px;text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-2px;color:#5c5f66;">🤖 AI 中心</a>
+        <a th:href="@{/kb/{id}/data(id=${kb.id})}"
+           style="padding:10px 20px;font-size:14px;text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-2px;color:#5c5f66;">📈 数据</a>
+        <a th:href="@{/kb/{id}/notes(id=${kb.id})}"
+           style="padding:10px 20px;font-size:14px;text-decoration:none;border-bottom:2px solid #7c5cfc;margin-bottom:-2px;color:#7c5cfc;font-weight:600;"
+           th:text="'📂 ' + ${labels.get('notes')}">📂 笔记</a>
+        <a th:href="@{/kb/{id}/index(id=${kb.id})}"
+           style="padding:10px 20px;font-size:14px;text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-2px;color:#5c5f66;">🔍 索引</a>
+        <a th:href="@{/kb/{id}/ai(id=${kb.id})}"
+           style="padding:10px 20px;font-size:14px;text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-2px;color:#5c5f66;"
+           th:text="'⚙️ ' + ${labels.get('config')}">⚙️ 配置</a>
+    </div>
     <!-- 顶部统计栏 -->
     <div class="notes-stats">
         <div class="stat-card">
@@ -561,17 +580,14 @@ document.addEventListener('keydown', function(e) {
 // 在 iframe 中，100vh 可能引用父窗口视口导致溢出。
 // 改用 getBoundingClientRect() 精确计算可用高度。
 function syncHeight() {
-    var el = document.querySelector('.notes-page');
+    var el = document.querySelector('.notes-layout');
     if (!el) return;
     if (window !== window.top) {
-        // 在 iframe 内：利用 getBoundingClientRect 计算精确可用高度
-        // rect.top 已包含 main-body padding 等偏移量
         var rect = el.getBoundingClientRect();
         var available = Math.max(Math.floor(window.innerHeight - rect.top), 300);
         el.style.height = available + 'px';
     } else {
-        // 独立页面：用 vh
-        el.style.height = 'calc(100vh - 120px)';
+        el.style.height = 'calc(100vh - 280px)';
     }
 }
 window.addEventListener('resize', syncHeight);
