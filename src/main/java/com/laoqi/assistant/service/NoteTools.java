@@ -78,7 +78,7 @@ public class NoteTools {
         if (cb != null) {
             cb.accept(message);
         } else {
-            log.warn("[NoteTools] reportStatus 回调为 null（message={}）", message);
+            log.debug("[NoteTools] reportStatus 回调为 null（message={}）", message);
         }
     }
 
@@ -172,6 +172,24 @@ public class NoteTools {
         log.info("[NoteTools] 写入文件: {} ({} 字符)", path, content.length());
         reportStatus("💾 文件写入完成");
         return "写入成功: " + path;
+    }
+
+    @Tool(description = "删除笔记库中的指定文件，path 是相对于笔记库根目录的路径。注意：这是删除笔记文件，不是操作数据集。如果要删除数据集记录请使用deleteRecord工具")
+    public String deleteFile(@ToolParam(description = "文件路径，相对于笔记库根目录，例如 \"客户管理/data/xxx.json\"") String path) {
+        reportStatus("🗑️ 正在删除文件...");
+        if (path == null || path.isEmpty()) return "文件路径不能为空";
+        Path file = baseDir().resolve(path).normalize();
+        if (!file.startsWith(baseDir())) return "路径越界: " + path;
+        if (!Files.isRegularFile(file)) return "文件不存在: " + path;
+
+        try {
+            Files.delete(file);
+            log.info("[NoteTools] 删除文件: {}", path);
+            reportStatus("🗑️ 文件已删除");
+            return "删除成功: " + path;
+        } catch (IOException e) {
+            return "删除失败: " + e.getMessage();
+        }
     }
 
     @Tool(description = "在笔记库中搜索文件名包含指定关键词的文件和目录。注意：这是搜索笔记文件，不是搜索数据集。如果要搜索数据集请使用searchRecords工具")
