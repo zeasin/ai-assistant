@@ -12,6 +12,8 @@ public class DataSetEntity {
     private String datasetId;
     private String name;
     private String description;
+    private String type;
+    private String status;
     private String schemaJson;
     private String importConfigsJson;
     private String moduleId;
@@ -26,6 +28,10 @@ public class DataSetEntity {
     public void setName(String name) { this.name = name; }
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
+    public String getType() { return type; }
+    public void setType(String type) { this.type = type; }
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
     public String getSchemaJson() { return schemaJson; }
     public void setSchemaJson(String schemaJson) { this.schemaJson = schemaJson; }
     public String getImportConfigsJson() { return importConfigsJson; }

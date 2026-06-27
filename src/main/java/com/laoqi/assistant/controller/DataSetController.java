@@ -274,24 +274,37 @@ public class DataSetController {
                 return ResponseEntity.ok(Map.of("ok", false, "error", "数据集不存在"));
             }
 
-            // 删除旧记录
-            boolean deleted = dataSetService.deleteRecord(id, recordId);
-            if (!deleted) {
-                return ResponseEntity.ok(Map.of("ok", false, "error", "记录不存在"));
-            }
-
-            // 添加新记录
             @SuppressWarnings("unchecked")
             Map<String, Object> data = (Map<String, Object>) body.get("data");
             if (data != null) {
                 data.put("更新时间", java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-                dataSetService.addRecords(id, List.of(data), "web_update");
+            }
+
+            Map<String, Object> updated = dataSetService.updateRecord(id, recordId, data);
+            if (updated == null) {
+                return ResponseEntity.ok(Map.of("ok", false, "error", "记录不存在"));
             }
 
             return ResponseEntity.ok(Map.of("ok", true));
         } catch (Exception e) {
             return ResponseEntity.ok(Map.of("ok", false, "error", e.getMessage()));
         }
+    }
+
+    @PatchMapping("/datasets/{id}/records/{recordId}/status")
+    public ResponseEntity<Map<String, Object>> updateRecordStatus(
+            @PathVariable String id,
+            @PathVariable String recordId,
+            @RequestBody Map<String, String> body) {
+        String status = body.get("status");
+        if (status == null || status.isBlank()) {
+            return ResponseEntity.ok(Map.of("ok", false, "error", "状态不能为空"));
+        }
+        boolean updated = dataSetService.updateRecordField(id, recordId, "status", status);
+        if (!updated) {
+            return ResponseEntity.ok(Map.of("ok", false, "error", "记录不存在"));
+        }
+        return ResponseEntity.ok(Map.of("ok", true));
     }
 
     @PostMapping("/datasets/{id}/import/excel")

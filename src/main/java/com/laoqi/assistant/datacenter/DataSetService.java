@@ -66,6 +66,8 @@ public class DataSetService {
                     dataset_id      TEXT NOT NULL UNIQUE,
                     name            TEXT NOT NULL,
                     description     TEXT,
+                    type            TEXT,
+                    status          TEXT,
                     schema_json     TEXT,
                     import_configs_json TEXT,
                     module_id       TEXT,
@@ -87,12 +89,9 @@ public class DataSetService {
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_records_dataset ON data_center_records(dataset_id)");
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_records_hash ON data_center_records(dataset_id, content_hash)");
 
-            // Add module_id column if not exists (for existing databases)
-            try {
-                stmt.execute("ALTER TABLE data_center_datasets ADD COLUMN module_id TEXT");
-            } catch (Exception e) {
-                // Column already exists, ignore
-            }
+            try { stmt.execute("ALTER TABLE data_center_datasets ADD COLUMN module_id TEXT"); } catch (Exception ignored) {}
+            try { stmt.execute("ALTER TABLE data_center_datasets ADD COLUMN type TEXT"); } catch (Exception ignored) {}
+            try { stmt.execute("ALTER TABLE data_center_datasets ADD COLUMN status TEXT"); } catch (Exception ignored) {}
 
             log.info("Data center tables initialized");
         } catch (Exception e) {
@@ -141,6 +140,8 @@ public class DataSetService {
 
         if (update.getName() != null) existing.setName(update.getName());
         if (update.getDescription() != null) existing.setDescription(update.getDescription());
+        if (update.getType() != null) existing.setType(update.getType());
+        if (update.getStatus() != null) existing.setStatus(update.getStatus());
         if (update.getSchema() != null) existing.setSchema(update.getSchema());
         if (update.getImportConfigs() != null) existing.setImportConfigs(update.getImportConfigs());
         if (update.getModuleId() != null) existing.setModuleId(update.getModuleId());
@@ -222,6 +223,47 @@ public class DataSetService {
         return recordDbService.remove(wrapper);
     }
 
+    public Map<String, Object> updateRecord(String datasetId, String recordId, Map<String, Object> newData) {
+        LambdaQueryWrapper<DataSetRecordEntity> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(DataSetRecordEntity::getDatasetId, datasetId)
+               .eq(DataSetRecordEntity::getRecordId, recordId);
+        DataSetRecordEntity entity = recordDbService.getOne(wrapper);
+        if (entity == null) return null;
+
+        Map<String, Object> merged = newData;
+        String contentHash = computeHash(merged);
+        try {
+            String dataJson = mapper.writeValueAsString(merged);
+            entity.setDataJson(dataJson);
+            entity.setContentHash(contentHash);
+            recordDbService.updateById(entity);
+        } catch (Exception e) {
+            log.error("Failed to update record: {}", e.getMessage());
+            return null;
+        }
+        return merged;
+    }
+
+    public boolean updateRecordField(String datasetId, String recordId, String field, String value) {
+        LambdaQueryWrapper<DataSetRecordEntity> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(DataSetRecordEntity::getDatasetId, datasetId)
+               .eq(DataSetRecordEntity::getRecordId, recordId);
+        DataSetRecordEntity entity = recordDbService.getOne(wrapper);
+        if (entity == null) return false;
+
+        try {
+            Map<String, Object> data = mapper.readValue(entity.getDataJson(),
+                    new TypeReference<Map<String, Object>>() {});
+            data.put(field, value);
+            entity.setDataJson(mapper.writeValueAsString(data));
+            recordDbService.updateById(entity);
+            return true;
+        } catch (Exception e) {
+            log.error("Failed to update record field: {}", e.getMessage());
+            return false;
+        }
+    }
+
     public List<Map<String, Object>> searchRecords(String datasetId, String keyword) {
         if (keyword == null || keyword.isBlank()) {
             return loadRecords(datasetId);
@@ -246,6 +288,8 @@ public class DataSetService {
             if (existing != null) {
                 existing.setName(ds.getName());
                 existing.setDescription(ds.getDescription());
+                existing.setType(ds.getType());
+                existing.setStatus(ds.getStatus());
                 existing.setSchemaJson(schemaJson);
                 existing.setImportConfigsJson(importJson);
                 existing.setModuleId(ds.getModuleId());
@@ -256,6 +300,8 @@ public class DataSetService {
                 entity.setDatasetId(ds.getId());
                 entity.setName(ds.getName());
                 entity.setDescription(ds.getDescription());
+                entity.setType(ds.getType());
+                entity.setStatus(ds.getStatus());
                 entity.setSchemaJson(schemaJson);
                 entity.setImportConfigsJson(importJson);
                 entity.setModuleId(ds.getModuleId());
@@ -291,6 +337,8 @@ public class DataSetService {
         ds.setId(entity.getDatasetId());
         ds.setName(entity.getName());
         ds.setDescription(entity.getDescription());
+        ds.setType(entity.getType());
+        ds.setStatus(entity.getStatus());
         ds.setModuleId(entity.getModuleId());
         ds.setCreatedAt(entity.getCreatedAt());
         ds.setUpdatedAt(entity.getUpdatedAt());

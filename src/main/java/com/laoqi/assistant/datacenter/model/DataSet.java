@@ -9,6 +9,8 @@ public class DataSet {
     private String id;
     private String name;
     private String description;
+    private String type;
+    private String status;
     private DataSchema schema;
     private String outputDir;
     private Map<String, ImportConfig> importConfigs = new HashMap<>();
@@ -27,6 +29,12 @@ public class DataSet {
 
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
+
+    public String getType() { return type; }
+    public void setType(String type) { this.type = type; }
+
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
 
     public DataSchema getSchema() { return schema; }
     public void setSchema(DataSchema schema) { this.schema = schema; }

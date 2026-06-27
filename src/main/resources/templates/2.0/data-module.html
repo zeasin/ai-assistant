@@ -140,7 +140,12 @@
             <input type="hidden" id="editDsId">
             <div class="form-group"><label>名称 *</label><input id="dsName" type="text" placeholder="如：客户信息"></div>
             <div class="form-group"><label>描述</label><textarea id="dsDesc" rows="2" style="resize:vertical;"></textarea></div>
-            <div class="form-group"><label>Schema 字段（每行一个）</label><textarea id="dsSchema" rows="4" style="resize:vertical;font-family:monospace;font-size:12px;" placeholder="name&#10;phone&#10;company"></textarea></div>
+            <div class="form-group"><label>类型</label><input id="dsType" type="text" placeholder="如：项目管理"></div>
+            <div class="form-group"><label>状态</label><input id="dsStatus" type="text" placeholder="如：启用"></div>
+            <div class="form-group"><label>Schema 字段（每行一个）</label><textarea id="dsSchema" rows="3" style="resize:vertical;font-family:monospace;font-size:12px;" placeholder="name&#10;phone&#10;company"></textarea></div>
+            <div class="form-group"><label>类型选项（每行一个，留空则记录为文本框）</label><textarea id="dsTypeOptions" rows="2" style="resize:vertical;font-family:monospace;font-size:12px;" placeholder="需求&#10;Bug&#10;优化"></textarea></div>
+            <div class="form-group"><label>状态选项（每行一个，留空则记录为文本框）</label><textarea id="dsStatusOptions" rows="2" style="resize:vertical;font-family:monospace;font-size:12px;" placeholder="待办&#10;进行中&#10;已完成"></textarea></div>
+            <div class="form-group"><label style="color:#909296;font-weight:normal;font-size:11px;">💡「类型/状态」是数据集本身属性；下面的「类型选项/状态选项」用于控制记录表单中对应字段是下拉还是文本框</label></div>
         </div>
         <div class="modal-footer">
             <button class="btn btn-secondary" onclick="closeModal('dsModal')">取消</button>
@@ -154,7 +159,9 @@
     <div class="modal-box" style="width:540px;" onclick="event.stopPropagation()">
         <div class="modal-header"><h3 id="detailModalTitle">记录详情</h3><button class="btn btn-secondary" onclick="closeModal('detailModal')">✕</button></div>
         <div class="modal-body" id="detailBody"></div>
-        <div class="modal-footer">
+        <div class="modal-footer" id="detailModalFooter">
+            <button class="btn btn-secondary" onclick="completeFromDetail()" id="btnComplete" style="display:none;">✅ 完成</button>
+            <button class="btn btn-secondary" onclick="closeFromDetail()" id="btnClose" style="display:none;">🔒 关闭</button>
             <button class="btn btn-danger" onclick="deleteFromDetail()">🗑️ 删除</button>
             <button class="btn btn-primary" onclick="editFromDetail()">✏️ 编辑</button>
             <button class="btn btn-secondary" onclick="closeModal('detailModal')">关闭</button>
@@ -384,17 +391,28 @@ function renderDatasetTab(dsId) {
     if (records.length === 0) {
         html += '<div class="empty-state"><div class="icon">📭</div><p>暂无数据</p></div>';
     } else {
-        const cols = Object.keys(records[0]).filter(k=>!k.startsWith('_'));
+        const schema = currentDs.schema || {};
+        const schemaFields = schema.fields ? schema.fields.map(f => f.name) : [];
+        const schemaFieldSet = new Set(schemaFields);
+        const extraSet = new Set();
+        records.forEach(r => Object.keys(r).forEach(k => { if (!k.startsWith('_') && !schemaFieldSet.has(k)) extraSet.add(k); }));
+        const cols = [...schemaFields, ...extraSet];
         html += '<div style="overflow-x:auto;max-height:60vh;overflow-y:auto;"><table class="data-table"><thead><tr>'
-            + cols.map(c=>'<th>'+c+'</th>').join('')
-            + '<th style="width:80px;">操作</th></tr></thead><tbody id="recordsBody">';
+            + cols.map(c=>'<th>'+esc(c)+'</th>').join('')
+            + '</tr></thead><tbody id="recordsBody">';
         records.forEach(rec => {
-            html += '<tr data-search="'+JSON.stringify(rec).toLowerCase()+'" style="cursor:pointer;" onclick="showRecordDetail(\''+rec._id+'\')">'
-                + cols.map(c=>'<td title="'+esc(String(rec[c]||''))+'">'+esc(String(rec[c]||'').substring(0,150))+'</td>').join('')
-                + '<td style="white-space:nowrap;" onclick="event.stopPropagation()">'
-                + '<button class="btn btn-secondary btn-sm" onclick="showEditRecord(\''+rec._id+'\')">✏️</button> '
-                + '<button class="btn btn-danger btn-sm" onclick="deleteRecord(\''+rec._id+'\')">🗑️</button>'
-                + '</td></tr>';
+            const statusVal = rec['status'];
+            const statusBadge = statusVal ? getStatusBadge(statusVal) : '';
+            html += '<tr data-search="'+esc(JSON.stringify(rec).toLowerCase())+'" style="cursor:pointer;" onclick="showRecordDetail(\''+esc(rec._id||'')+'\')">'
+                + cols.map(c=>{
+                    if (c === 'status') {
+                        return '<td>'+(statusVal ? statusBadge : '')+'</td>';
+                    }
+                    const v = rec[c];
+                    const s = v !== null && v !== undefined ? String(v) : '';
+                    return '<td title="'+esc(s)+'">'+esc(s.substring(0,150))+'</td>';
+                }).join('')
+                + '</tr>';
         });
         html += '</tbody></table></div>';
     }
@@ -416,67 +434,96 @@ function showEditRecord(rid) {
 }
 
 function showRecordForm(rec) {
-    // 编辑时：合并记录已有字段 + 数据集Schema定义的字段（补全新字段）
-    // 新增时：使用数据集Schema定义的字段
     let fieldNames;
+    const schema = currentDs.schema || {};
+    const schemaFields = schema.fields ? schema.fields.map(f => f.name) : [];
     if (rec) {
-        // 取记录自身字段（去元字段）
         const recordFields = Object.keys(rec).filter(k => !k.startsWith('_'));
-        // 取Schema定义的字段名
-        const schemaFields = currentDs.schema && currentDs.schema.fields ? currentDs.schema.fields.map(f => f.name) : [];
-        // 合并：先显示记录已有字段，再追加schema中有但记录中没有的新字段
-        const allFields = [...recordFields];
-        schemaFields.forEach(fn => {
-            if (!allFields.includes(fn)) {
-                allFields.push(fn);
-            }
-        });
-        fieldNames = allFields;
+        const merged = [...schemaFields];
+        recordFields.forEach(fn => { if (!merged.includes(fn)) merged.push(fn); });
+        fieldNames = merged;
     } else {
-        fieldNames = currentDs.schema && currentDs.schema.fields ? currentDs.schema.fields.map(f => f.name) : [];
+        fieldNames = schemaFields;
     }
     document.getElementById('recordModalTitle').textContent = rec ? '编辑记录' : '新增记录';
+
+    const typeOptions = (schema.typeOptions && schema.typeOptions.length) ? schema.typeOptions : [];
+    let statusOptions = (schema.statusOptions && schema.statusOptions.length) ? schema.statusOptions : [];
+    if (statusOptions.length === 0 && schema.statuses && schema.statuses.length) {
+        statusOptions = schema.statuses;
+    }
+
+    const isTypeField = (fn) => fn === 'type' || fn === '类型' || /类型/i.test(fn);
+    const isStatusField = (fn) => fn === 'status' || fn === '状态' || /状态/i.test(fn);
+
     let html = '';
-    fieldNames.forEach(fn => {
+    const schemaFieldSet = new Set(schemaFields);
+    fieldNames.forEach((fn, idx) => {
         const val = rec ? (rec[fn] !== null && rec[fn] !== undefined ? String(rec[fn]) : '') : '';
-        // 标记新增字段（记录中没有但schema中有）
-        const isNewField = rec && (!(fn in rec) || rec[fn] === null || rec[fn] === undefined);
-        html += '<div class="form-group"><label>' + esc(fn)
-            + (isNewField ? ' <span class="badge badge-new">新增</span>' : '')
-            + '</label>'
-            + '<input id="rf_'+esc(fn)+'" value="'+esc(val)+'"></div>';
+        const canRemove = !schemaFieldSet.has(fn);
+        html += '<div class="form-group" id="rf_wrap_'+idx+'">'
+             + '<label>' + esc(fn)
+             + (canRemove ? ' <button type="button" onclick="removeField('+idx+', \''+esc(fn).replace(/'/g,"\\'")+'\')" style="border:none;background:transparent;color:#e74c3c;cursor:pointer;font-size:14px;padding:0 4px;" title="从这条记录中删除该字段">✕</button>' : '')
+             + '</label>';
+
+        if (isTypeField(fn) && typeOptions.length > 0) {
+            html += '<select id="rf_'+esc(fn)+'">';
+            typeOptions.forEach(opt => {
+                html += '<option value="'+esc(opt)+'"'+(val===opt?' selected':'')+'>'+esc(opt)+'</option>';
+            });
+            html += '</select>';
+        } else if (isStatusField(fn) && statusOptions.length > 0) {
+            html += '<select id="rf_'+esc(fn)+'">';
+            statusOptions.forEach(opt => {
+                html += '<option value="'+esc(opt)+'"'+(val===opt?' selected':'')+'>'+esc(opt)+'</option>';
+            });
+            html += '</select>';
+        } else {
+            html += '<input id="rf_'+esc(fn)+'" value="'+esc(val)+'">';
+        }
+        html += '</div>';
     });
     document.getElementById('recordFormBody').innerHTML = html;
     document.getElementById('recordModal').dataset.rid = rec ? rec._id : '';
+    document.getElementById('recordModal').dataset.removed = '';
     openModal('recordModal');
+}
+
+function removeField(idx, fn) {
+    document.getElementById('rf_wrap_'+idx).style.display = 'none';
+    const rmStr = document.getElementById('recordModal').dataset.removed || '';
+    const arr = rmStr ? rmStr.split('\x01') : [];
+    if (!arr.includes(fn)) arr.push(fn);
+    document.getElementById('recordModal').dataset.removed = arr.join('\x01');
 }
 
 async function saveRecord() {
     const rid = document.getElementById('recordModal').dataset.rid;
-    const inputs = document.querySelectorAll('#recordFormBody input[id^="rf_"]');
+    const removedStr = document.getElementById('recordModal').dataset.removed || '';
+    const removed = removedStr ? removedStr.split('\x01') : [];
+    const fields = document.querySelectorAll('#recordFormBody input[id^="rf_"], #recordFormBody select[id^="rf_"]');
     const data = {};
-    inputs.forEach(input => {
-        const fieldName = input.id.substring(3); // 去掉 "rf_" 前缀
-        data[fieldName] = input.value || null;
+    fields.forEach(el => {
+        const fieldName = el.id.substring(3);
+        if (removed.includes(fieldName)) return;
+        data[fieldName] = el.value || null;
     });
-    
+
     let r;
     if (rid) {
-        // 编辑模式：调用更新API
         r = await fetch(API+'/datasets/'+currentDs.id+'/records/'+rid, {
             method: 'PUT',
             headers: {'Content-Type':'application/json'},
             body: JSON.stringify({data})
         });
     } else {
-        // 新增模式：调用导入API
         r = await fetch(API+'/datasets/'+currentDs.id+'/import/json', {
             method: 'POST',
             headers: {'Content-Type':'application/json'},
             body: JSON.stringify({data: [data]})
         });
     }
-    
+
     const d = await r.json();
     if (d.ok) { closeModal('recordModal'); toast('已保存'); loadAll(); }
     else toast(d.error||'失败','error');
@@ -488,22 +535,81 @@ async function deleteRecord(rid) {
     toast('已删除'); loadAll();
 }
 
+function getStatusBadge(status) {
+    if (status === '已完成' || status === '完成') return '<span class="badge" style="background:#e8f5e9;color:#2e7d32;font-weight:500;">✅ 已完成</span>';
+    if (status === '已关闭' || status === '关闭') return '<span class="badge" style="background:#f0f0f0;color:#909296;">🔒 已关闭</span>';
+    if (status === '进行中') return '<span class="badge" style="background:#e3f2fd;color:#1565c0;">🔄 进行中</span>';
+    if (status === '待办') return '<span class="badge" style="background:#fff8e1;color:#f57f17;">📋 待办</span>';
+    return '<span class="badge badge-gray">'+esc(status)+'</span>';
+}
+
 // ========== 记录详情弹窗 ==========
 function showRecordDetail(rid) {
     const rec = allRecords[currentDs.id].find(r => r._id === rid);
     if (!rec) return;
 
-    // 获取所有非元数据字段（去掉 _id, _source, _importTime 等前缀带 _ 的字段）
-    const fields = Object.keys(rec).filter(k => !k.startsWith('_'));
+    const schema = currentDs.schema || {};
+    const schemaFields = schema.fields ? schema.fields.map(f => f.name) : [];
+    const schemaFieldSet = new Set(schemaFields);
+    const recFields = Object.keys(rec).filter(k => !k.startsWith('_'));
+    const extra = recFields.filter(k => !schemaFieldSet.has(k));
+    const allFields = [...schemaFields, ...extra];
+
     document.getElementById('detailModalTitle').textContent = '📄 记录详情';
     let html = '';
-    fields.forEach(f => {
+
+    allFields.forEach(f => {
         const val = rec[f] !== null && rec[f] !== undefined ? String(rec[f]) : '';
-        html += '<div class="detail-row"><label>' + esc(f) + '</label><span>' + esc(val) + '</span></div>';
+        const statusVal = rec['status'];
+        if (f === 'status' && statusVal) {
+            html += '<div class="detail-row"><label>状态</label><span>' + getStatusBadge(statusVal) + '</span></div>';
+        } else {
+            html += '<div class="detail-row"><label>' + esc(f) + '</label><span>' + esc(val) + '</span></div>';
+        }
     });
+
     document.getElementById('detailBody').innerHTML = html;
     document.getElementById('detailModal').dataset.rid = rid;
+
+    const statusVal = rec['status'];
+    document.getElementById('btnComplete').style.display = (!statusVal || statusVal === '已完成') ? 'none' : '';
+    document.getElementById('btnClose').style.display = (!statusVal || statusVal === '已关闭') ? 'none' : '';
+
     openModal('detailModal');
+}
+
+async function completeFromDetail() {
+    const rid = document.getElementById('detailModal').dataset.rid;
+    const r = await fetch(API+'/datasets/'+currentDs.id+'/records/'+rid+'/status', {
+        method: 'PATCH',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({status:'已完成'})
+    });
+    const d = await r.json();
+    if (d.ok) {
+        closeModal('detailModal');
+        toast('✅ 已完成');
+        loadAll();
+    } else {
+        toast(d.error||'失败','error');
+    }
+}
+
+async function closeFromDetail() {
+    const rid = document.getElementById('detailModal').dataset.rid;
+    const r = await fetch(API+'/datasets/'+currentDs.id+'/records/'+rid+'/status', {
+        method: 'PATCH',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({status:'已关闭'})
+    });
+    const d = await r.json();
+    if (d.ok) {
+        closeModal('detailModal');
+        toast('🔒 已关闭');
+        loadAll();
+    } else {
+        toast(d.error||'失败','error');
+    }
 }
 
 function editFromDetail() {
@@ -525,7 +631,11 @@ function showCreateDs() {
     document.getElementById('editDsId').value = '';
     document.getElementById('dsName').value = '';
     document.getElementById('dsDesc').value = '';
+    document.getElementById('dsType').value = '';
+    document.getElementById('dsStatus').value = '';
     document.getElementById('dsSchema').value = '';
+    document.getElementById('dsTypeOptions').value = '';
+    document.getElementById('dsStatusOptions').value = '';
     openModal('dsModal');
 }
 
@@ -535,8 +645,17 @@ function showEditDs() {
     document.getElementById('editDsId').value = currentDs.id;
     document.getElementById('dsName').value = currentDs.name;
     document.getElementById('dsDesc').value = currentDs.description || '';
+    document.getElementById('dsType').value = currentDs.type || '';
+    document.getElementById('dsStatus').value = currentDs.status || '';
     const schemaText = currentDs.schema && currentDs.schema.fields ? currentDs.schema.fields.map(f=>f.name).join('\n') : '';
     document.getElementById('dsSchema').value = schemaText;
+    let typeOptList = (currentDs.schema && currentDs.schema.typeOptions && currentDs.schema.typeOptions.length) ? currentDs.schema.typeOptions : [];
+    let statusOptList = (currentDs.schema && currentDs.schema.statusOptions && currentDs.schema.statusOptions.length) ? currentDs.schema.statusOptions : [];
+    if (statusOptList.length === 0 && currentDs.schema && currentDs.schema.statuses && currentDs.schema.statuses.length) {
+        statusOptList = currentDs.schema.statuses;
+    }
+    document.getElementById('dsTypeOptions').value = typeOptList.join('\n');
+    document.getElementById('dsStatusOptions').value = statusOptList.join('\n');
     openModal('dsModal');
 }
 
@@ -544,9 +663,22 @@ async function saveDataset() {
     const id = document.getElementById('editDsId').value;
     const name = document.getElementById('dsName').value.trim();
     if (!name) { toast('请输入名称','error'); return; }
+    const type = document.getElementById('dsType').value.trim();
+    const status = document.getElementById('dsStatus').value.trim();
     const schemaText = document.getElementById('dsSchema').value.trim();
     const fields = schemaText ? schemaText.split('\n').filter(l=>l.trim()).map(l=>({name:l.trim(),type:'string'})) : [];
-    const body = { name, description: document.getElementById('dsDesc').value.trim(), moduleId: MODULE_ID, schema: {fields} };
+    const typeOptText = document.getElementById('dsTypeOptions').value.trim();
+    const typeOptions = typeOptText ? typeOptText.split('\n').filter(l=>l.trim()).map(l=>l.trim()) : [];
+    const statusOptText = document.getElementById('dsStatusOptions').value.trim();
+    const statusOptions = statusOptText ? statusOptText.split('\n').filter(l=>l.trim()).map(l=>l.trim()) : [];
+    const body = {
+        name,
+        description: document.getElementById('dsDesc').value.trim(),
+        type,
+        status,
+        moduleId: MODULE_ID,
+        schema: {fields, typeOptions, statusOptions}
+    };
     const r = id ? await fetch(API+'/datasets/'+id, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)})
                  : await fetch(API+'/datasets', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
     const d = await r.json();
