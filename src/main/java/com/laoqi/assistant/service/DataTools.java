@@ -197,6 +197,73 @@ public class DataTools {
         return "❌ 未找到记录: " + recordId;
     }
 
+    @Tool(description = "按条件查询数据集中的记录，支持按字段精确匹配筛选。当用户需要查询特定状态、类型或条件的数据时使用此工具，例如：查找所有待修复的Bug、查询今天的任务等。如果不确定数据集名称，请先调用listDatasets查看所有数据集")
+    public String queryRecords(
+            @ToolParam(description = "数据集ID或名称") String dataset,
+            @ToolParam(description = "JSON过滤条件，如 {\"状态\":\"待修复\",\"类型\":\"Bug\"} 表示查询状态为待修复且类型为Bug的所有记录") String filterJson) {
+        DataSet ds = findDataset(dataset);
+        if (ds == null) {
+            return "未找到数据集: " + dataset;
+        }
+
+        try {
+            Map<String, String> filters = mapper.readValue(filterJson,
+                    new TypeReference<Map<String, String>>() {});
+            List<Map<String, Object>> records = dataSetService.queryRecords(ds.getId(), filters);
+
+            if (records.isEmpty()) {
+                return "在数据集「" + ds.getName() + "」中未找到匹配条件的记录";
+            }
+
+            // Group by type if available for summary
+            Map<String, Integer> typeCount = new LinkedHashMap<>();
+            Map<String, Integer> statusCount = new LinkedHashMap<>();
+            for (Map<String, Object> r : records) {
+                Object t = r.get("type");
+                if (t == null) t = r.get("类型");
+                typeCount.merge(String.valueOf(t), 1, Integer::sum);
+
+                Object s = r.get("status");
+                if (s == null) s = r.get("状态");
+                statusCount.merge(String.valueOf(s), 1, Integer::sum);
+            }
+
+            StringBuilder sb = new StringBuilder();
+            sb.append("在「").append(ds.getName()).append("」中找到 ").append(records.size()).append(" 条匹配记录：\n");
+
+            if (typeCount.size() > 1) {
+                sb.append("类型分布：");
+                typeCount.forEach((k, v) -> sb.append(" ").append(k).append("(").append(v).append(")"));
+                sb.append("\n");
+            }
+            if (statusCount.size() > 1) {
+                sb.append("状态分布：");
+                statusCount.forEach((k, v) -> sb.append(" ").append(k).append("(").append(v).append(")"));
+                sb.append("\n");
+            }
+            sb.append("\n");
+
+            for (int i = 0; i < Math.min(records.size(), 30); i++) {
+                Map<String, Object> record = records.get(i);
+                sb.append("[").append(i + 1).append("] ");
+                String id = String.valueOf(record.get("_id"));
+                sb.append("ID: ").append(id).append(" | ");
+                record.forEach((k, v) -> {
+                    if (!k.startsWith("_") && v != null && !k.equals("id")) {
+                        sb.append(k).append(": ").append(v).append(" | ");
+                    }
+                });
+                sb.append("\n");
+            }
+            if (records.size() > 30) {
+                sb.append("... 还有 ").append(records.size() - 30).append(" 条记录未显示");
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            return "❌ 查询失败: " + e.getMessage();
+        }
+    }
+
     /**
      * 根据ID或名称查找数据集
      */

@@ -102,10 +102,14 @@ public class ReportService {
                 return result;
             }
 
-            String systemPrompt = "你是一个日报生成助手。你拥有文件操作工具，可以自主读取笔记库中的文件。\n"
+            String systemPrompt = "你是一个日报生成助手。你拥有以下工具：\n"
+                + "1. 文件工具（listDir / searchFiles / readFile）— 读取笔记库中的文件、AGENTS.md、工作日报、记忆文件等\n"
+                + "2. 数据集工具（listDatasets / queryRecords）— 查询结构化数据（任务、Bug、项目管理等）\n\n"
                 + "请先用 listDir 探索目录结构，用 searchFiles 搜索相关文件，"
-                + "用 readFile 读取需要的内容（AGENTS.md、记忆文件、工作日报、笔记文档等），"
-                + "然后根据提示词生成今日综合日报。用中文回复。";
+                + "用 readFile 读取需要的内容。\n"
+                + "同时用 listDatasets 查看有哪些数据集，用 queryRecords 按条件查询（如{\"状态\":\"待修复\"}、{\"类型\":\"Bug\"}等），"
+                + "将笔记非结构化数据与数据集结构化数据结合，生成更全面的日报。\n"
+                + "用中文回复。";
 
             String report = agentAnalysisService.analyze(kbDir, prompt, systemPrompt);
 

@@ -391,6 +391,21 @@ public class DataSetService {
                 .toList();
     }
 
+    public List<Map<String, Object>> queryRecords(String datasetId, Map<String, String> filters) {
+        List<Map<String, Object>> all = loadRecords(datasetId);
+        if (filters == null || filters.isEmpty()) return all;
+        return all.stream()
+                .filter(r -> filters.entrySet().stream()
+                        .allMatch(e -> {
+                            Object v = r.get(e.getKey());
+                            if (v == null) return false;
+                            String target = e.getValue();
+                            if (target == null || target.isBlank()) return false;
+                            return v.toString().equals(target);
+                        }))
+                .toList();
+    }
+
     private void saveDatasetToDb(DataSet ds) {
         LambdaQueryWrapper<DataSetEntity> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(DataSetEntity::getDatasetId, ds.getId());
