@@ -1200,6 +1200,68 @@ public class KnowledgeBaseController {
         return Map.of("ok", true);
     }
 
+    @GetMapping("/kb/{id}/api/report/latest")
+    @ResponseBody
+    public Map<String, Object> getLatestReport(@PathVariable Long id) {
+        String content = reportService.readTodayReport(id);
+        if (content == null) content = reportService.readLatestReport(id);
+        return Map.of("ok", true, "content", content != null ? content : "");
+    }
+
+    // ========== AI 分析 API ==========
+
+    @GetMapping("/kb/{id}/api/analysis/list")
+    @ResponseBody
+    public Map<String, Object> listAnalysis(@PathVariable Long id) {
+        List<AiAnalysisEntity> list = aiAnalysisDbService.lambdaQuery()
+                .eq(AiAnalysisEntity::getKbId, id)
+                .eq(AiAnalysisEntity::getType, "dir_analysis")
+                .orderByDesc(AiAnalysisEntity::getCreatedAt)
+                .list();
+        List<Map<String, Object>> result = list.stream().map(e -> {
+            Map<String, Object> m = new HashMap<>();
+            m.put("id", e.getId());
+            m.put("dirPath", e.getDirPath());
+            m.put("content", e.getContent());
+            m.put("createdAt", e.getCreatedAt());
+            return m;
+        }).collect(Collectors.toList());
+        return Map.of("ok", true, "list", result);
+    }
+
+    @GetMapping("/kb/{id}/api/analysis/get")
+    @ResponseBody
+    public Map<String, Object> getAnalysis(@PathVariable Long id, @RequestParam Long aid) {
+        AiAnalysisEntity entity = aiAnalysisDbService.getById(aid);
+        if (entity == null || !id.equals(entity.getKbId())) {
+            return Map.of("ok", false, "error", "分析记录不存在");
+        }
+        return Map.of("ok", true, "content", entity.getContent(), "dirPath", entity.getDirPath() != null ? entity.getDirPath() : "");
+    }
+
+    @PostMapping("/kb/{id}/api/analysis/save")
+    @ResponseBody
+    public Map<String, Object> saveAnalysis(@PathVariable Long id,
+                                             @RequestBody Map<String, String> body) {
+        String dirPath = body.getOrDefault("dirPath", "");
+        String content = body.getOrDefault("content", "");
+        String prompt = body.getOrDefault("prompt", "");
+        if (content.isEmpty()) return Map.of("ok", false, "error", "内容不能为空");
+
+        AiAnalysisEntity entity = new AiAnalysisEntity();
+        entity.setKbId(id);
+        entity.setType("dir_analysis");
+        entity.setDirPath(dirPath);
+        entity.setContent(content);
+        entity.setPrompt(prompt);
+        String now = TimeUtil.nowStr();
+        entity.setCreatedAt(now);
+        entity.setUpdatedAt(now);
+        aiAnalysisDbService.save(entity);
+        logService.add("AI分析", "保存", "目录: " + dirPath);
+        return Map.of("ok", true);
+    }
+
     // ========== KB API ==========
 
     @ResponseBody

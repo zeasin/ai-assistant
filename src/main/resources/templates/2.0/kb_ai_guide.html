@@ -102,19 +102,17 @@
 
 <div class="config-page">
     <div class="page-header">
-        <h2>⚙️ 笔记库配置</h2>
+        <h2>⚙️ AI 分析中心</h2>
     </div>
 
     <div class="card">
-        <h2>AI 指南</h2>
-        <div style="color:#909296;font-size:13px;margin-bottom:16px;">管理 AI 的行为指南——AGENTS.md 和 AI 记忆。</div>
-
         <div class="tabs-nav">
-            <button class="tab-btn active" onclick="switchTab('agents')">AGENTS.md</button>
-            <button class="tab-btn" onclick="switchTab('memory')">AI 记忆</button>
+            <button class="tab-btn active" onclick="switchTab('agents')">📋 AI 指南</button>
+            <button class="tab-btn" onclick="switchTab('analysis')">🔬 AI 分析</button>
+            <button class="tab-btn" onclick="switchTab('report')">📊 综合日报</button>
         </div>
 
-        <!-- Tab: AGENTS.md -->
+        <!-- ====== Tab 1: AI 指南 ====== -->
         <div id="tab-agents" class="tab-content active">
             <div class="toolbar">
                 <button class="btn btn-primary" onclick="saveAgents()">保存</button>
@@ -124,57 +122,107 @@
             </div>
             <textarea id="agentsEditor" class="editor-area" placeholder="AGENTS.md 内容..."></textarea>
             <div id="agentsPreview" class="preview-area" style="display:none;"></div>
-        </div>
 
-        <!-- Tab: AI 记忆 -->
-        <div id="tab-memory" class="tab-content">
-            <div class="toolbar">
-                <button class="btn btn-primary btn-sm" onclick="showMemoryNew()">+ 新建记忆</button>
-                <button class="btn btn-secondary btn-sm" onclick="showMemoryEditor('MEMORY.md')">编辑索引</button>
-                <span id="memoryStatus" class="status-text"></span>
-                <span id="memoryPath" class="path-hint"></span>
+            <div style="margin-top:20px;">
+                <h2 style="font-size:16px;margin-bottom:12px;">🧠 AI 记忆</h2>
+                <div class="toolbar">
+                    <button class="btn btn-primary btn-sm" onclick="showMemoryNew()">+ 新建记忆</button>
+                    <button class="btn btn-secondary btn-sm" onclick="showMemoryEditor('MEMORY.md')">编辑索引</button>
+                    <span id="memoryStatus" class="status-text"></span>
+                    <span id="memoryPath" class="path-hint"></span>
+                </div>
+                <div id="memoryList"></div>
             </div>
-            <div id="memoryList"></div>
         </div>
-    </div>
 
-    <!-- 综合日报设置 -->
-    <div class="card">
-        <h2>📊 综合日报设置</h2>
-        <div style="color:#909296;font-size:13px;margin-bottom:16px;">配置每日 9:00 自动生成综合日报的行为。</div>
-        <style>
-            .toggle-label { display:inline-flex; align-items:center; gap:8px; cursor:pointer; user-select:none; }
-            .toggle-label input[type="checkbox"] { display:none; }
-            .toggle-slider { width:36px; height:20px; background:#ccc; border-radius:10px; position:relative; transition:all .2s; display:inline-block; }
-            .toggle-slider::after { content:''; width:16px; height:16px; background:#fff; border-radius:50%; position:absolute; top:2px; left:2px; transition:all .2s; }
-            .toggle-label input:checked + .toggle-slider { background:#7c5cfc; }
-            .toggle-label input:checked + .toggle-slider::after { left:18px; }
-            .toggle-label .toggle-text { font-size:14px; color:#1a1b1e; }
-            .toggle-label .toggle-desc { font-size:12px; color:#909296; margin-left:4px; }
-        </style>
-        <div style="display:flex;flex-direction:column;gap:16px;">
-            <label class="toggle-label">
-                <input type="checkbox" id="autoReportToggle" onchange="saveReportConfig()">
-                <span class="toggle-slider"></span>
-                <span>
-                    <span class="toggle-text">每天 9:00 自动生成</span>
-                    <span class="toggle-desc">启用后，定时任务将自动为这个知识库生成综合日报</span>
-                </span>
-            </label>
-            <label class="toggle-label">
-                <input type="checkbox" id="feishuPushToggle" onchange="saveReportConfig()">
-                <span class="toggle-slider"></span>
-                <span>
-                    <span class="toggle-text">推送飞书通知</span>
-                    <span class="toggle-desc">启用后，日报生成后将通过飞书 Webhook 以卡片形式推送</span>
-                </span>
-            </label>
+        <!-- ====== Tab 2: AI 分析 ====== -->
+        <div id="tab-analysis" class="tab-content">
+            <div style="margin-bottom:12px;color:#909296;font-size:13px;">选择一个目录，输入自定义分析提示词，AI 将根据你的要求进行分析。</div>
+
+            <div class="form-group">
+                <label>分析目标目录</label>
+                <select id="analysisDir" style="width:100%;padding:8px 10px;border:1px solid #e1e3e6;border-radius:6px;font-size:13px;outline:none;background:#fff;">
+                    <option value="">-- 请选择目录 --</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>分析提示词</label>
+                <textarea id="analysisPrompt" rows="4" style="width:100%;padding:10px;border:1px solid #e1e3e6;border-radius:6px;font-size:13px;outline:none;resize:vertical;box-sizing:border-box;font-family:inherit;" placeholder="输入你想让 AI 分析什么，例如：请分析这个目录下的数据趋势，给出总结和建议。留空则 AI 自行决定分析内容。"></textarea>
+            </div>
+
+            <div class="toolbar" style="margin-bottom:12px;">
+                <button class="btn btn-primary" onclick="startAnalysis()" id="analysisBtn">🚀 开始分析</button>
+                <button class="btn btn-secondary" onclick="saveAnalysisResult()" id="saveAnalysisBtn" style="display:none;">💾 保存结果</button>
+                <span id="analysisStatus" class="status-text"></span>
+            </div>
+
+            <div id="analysisResult" class="preview-area" style="display:none;"></div>
+
+            <!-- 历史分析结果 -->
+            <div style="margin-top:16px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                    <span style="font-size:14px;font-weight:500;">📜 历史分析记录</span>
+                    <button class="btn btn-secondary btn-sm" onclick="loadAnalysisHistory()">刷新</button>
+                </div>
+                <div id="analysisHistory" style="font-size:13px;color:#909296;">暂无分析记录</div>
+            </div>
         </div>
-        <div style="margin-top:12px;padding:8px 12px;background:#f0edff;border-radius:6px;font-size:12px;color:#5c3dcf;">
-            💡 提示：日报配置按知识库独立存储，不同知识库可设置不同的规则。
+
+        <!-- ====== Tab 3: 综合日报 ====== -->
+        <div id="tab-report" class="tab-content">
+            <div style="margin-bottom:16px;">
+                <div style="display:flex;align-items:center;gap:24px;margin-bottom:16px;">
+                    <label class="toggle-label">
+                        <input type="checkbox" id="autoReportToggle" onchange="saveReportConfig()">
+                        <span class="toggle-slider"></span>
+                        <span>
+                            <span class="toggle-text">每天 9:00 自动生成</span>
+                            <span class="toggle-desc">定时任务自动为这个知识库生成综合日报</span>
+                        </span>
+                    </label>
+                    <label class="toggle-label">
+                        <input type="checkbox" id="feishuPushToggle" onchange="saveReportConfig()">
+                        <span class="toggle-slider"></span>
+                        <span>
+                            <span class="toggle-text">推送飞书通知</span>
+                            <span class="toggle-desc">日报生成后通过飞书 Webhook 推送</span>
+                        </span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>日报生成提示词</label>
+                <div class="toolbar">
+                    <button class="btn btn-primary btn-sm" onclick="saveReportPrompt()">保存提示词</button>
+                    <span id="reportPromptStatus" class="status-text"></span>
+                </div>
+                <textarea id="reportPrompt" rows="8" style="width:100%;padding:10px;border:1px solid #e1e3e6;border-radius:6px;font-size:13px;outline:none;resize:vertical;box-sizing:border-box;font-family:monospace;margin-top:4px;"></textarea>
+            </div>
+
+            <div class="toolbar" style="margin-bottom:12px;">
+                <button class="btn btn-primary" onclick="generateReport()" id="genReportBtn">🔄 手动生成日报</button>
+                <span id="reportStatus" class="status-text"></span>
+            </div>
+
+            <div id="reportContent" class="preview-area" style="display:none;"></div>
         </div>
     </div>
 </div>
+
+<style>
+    .toggle-label { display:inline-flex; align-items:center; gap:8px; cursor:pointer; user-select:none; }
+    .toggle-label input[type="checkbox"] { display:none; }
+    .toggle-slider { width:36px; height:20px; background:#ccc; border-radius:10px; position:relative; transition:all .2s; display:inline-block; }
+    .toggle-slider::after { content:''; width:16px; height:16px; background:#fff; border-radius:50%; position:absolute; top:2px; left:2px; transition:all .2s; }
+    .toggle-label input:checked + .toggle-slider { background:#7c5cfc; }
+    .toggle-label input:checked + .toggle-slider::after { left:18px; }
+    .toggle-text { font-size:14px; color:#1a1b1e; }
+    .toggle-desc { font-size:12px; color:#909296; margin-left:4px; }
+    .form-group { margin-bottom:12px; }
+    .form-group label { display:block; font-size:12px; font-weight:500; color:#5c5f66; margin-bottom:4px; }
+</style>
 
 <!-- Memory Edit Modal -->
 <div class="modal-overlay" id="memoryModal">
@@ -197,6 +245,7 @@
 <script th:inline="javascript">
 const KB_ID = [[${kb.id}]];
 var showingPreview = false;
+var currentAnalysisResult = '';
 
 document.querySelectorAll('.modal-overlay').forEach(function(m) {
     m.addEventListener('click', function(e) { if (e.target === this) this.classList.remove('active'); });
@@ -205,13 +254,16 @@ document.querySelectorAll('.modal-overlay').forEach(function(m) {
 function switchTab(tab) {
     document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
     document.querySelectorAll('.tab-content').forEach(function(c) { c.classList.remove('active'); });
-    var idx = tab === 'agents' ? 0 : 1;
+    var tabs = ['agents', 'analysis', 'report'];
+    var idx = tabs.indexOf(tab);
     document.querySelectorAll('.tab-btn')[idx].classList.add('active');
     document.getElementById('tab-' + tab).classList.add('active');
-    if (tab === 'memory') loadMemoryList();
+    if (tab === 'agents') loadMemoryList();
+    if (tab === 'analysis') { loadDirs(); loadAnalysisHistory(); }
+    if (tab === 'report') { loadReportPrompt(); loadReportContent(); }
 }
 
-// ---- AGENTS.md ----
+// ==================== Tab 1: AI 指南 ====================
 
 function loadAgents() {
     fetch('/kb/' + KB_ID + '/api/ai-guide/agents')
@@ -219,153 +271,100 @@ function loadAgents() {
         .then(function(data) {
             if (data.ok) {
                 document.getElementById('agentsEditor').value = data.content || '';
-                if (data.path) {
-                    document.getElementById('agentsPath').textContent = data.path;
-                }
-            } else {
-                setStatus('agentsStatus', '加载失败: ' + (data.error || ''), 'error');
-            }
+                if (data.path) document.getElementById('agentsPath').textContent = data.path;
+            } else { setStatus('agentsStatus', '加载失败: ' + (data.error || ''), 'error'); }
         })
-        .catch(function() {
-            setStatus('agentsStatus', '加载失败', 'error');
-        });
+        .catch(function() { setStatus('agentsStatus', '加载失败', 'error'); });
 }
 
 function saveAgents() {
     var btn = document.querySelector('#tab-agents .btn-primary');
-    btn.disabled = true;
-    btn.textContent = '⏳ 保存...';
-
-    var content = document.getElementById('agentsEditor').value;
+    btn.disabled = true; btn.textContent = '⏳ 保存...';
     fetch('/kb/' + KB_ID + '/api/ai-guide/agents', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: content })
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: document.getElementById('agentsEditor').value })
     })
     .then(function(r) { return r.json(); })
     .then(function(data) {
-        if (data.ok) {
-            setStatus('agentsStatus', '✅ 已保存', 'success');
-            toast('✅ AGENTS.md 已保存', 'success');
-        } else {
-            setStatus('agentsStatus', '❌ ' + (data.error || '保存失败'), 'error');
-            toast('❌ 保存失败', 'error');
-        }
+        if (data.ok) { setStatus('agentsStatus', '✅ 已保存', 'success'); toast('✅ AGENTS.md 已保存', 'success'); }
+        else { setStatus('agentsStatus', '❌ ' + (data.error || '保存失败'), 'error'); toast('❌ 保存失败', 'error'); }
     })
-    .catch(function() {
-        setStatus('agentsStatus', '❌ 请求失败', 'error');
-    })
-    .finally(function() {
-        btn.disabled = false;
-        btn.textContent = '保存';
-    });
+    .catch(function() { setStatus('agentsStatus', '❌ 请求失败', 'error'); })
+    .finally(function() { btn.disabled = false; btn.textContent = '保存'; });
 }
 
 function toggleAgentsPreview() {
     showingPreview = !showingPreview;
     var preview = document.getElementById('agentsPreview');
     if (showingPreview) {
-        var content = document.getElementById('agentsEditor').value;
-        preview.innerHTML = marked.parse(content);
+        preview.innerHTML = marked.parse(document.getElementById('agentsEditor').value);
         preview.style.display = 'block';
-    } else {
-        preview.style.display = 'none';
-    }
+    } else { preview.style.display = 'none'; }
 }
 
 // ---- AI 记忆 ----
 
 function loadMemoryList() {
-    var container = document.getElementById('memoryList');
-    container.innerHTML = '<div style="text-align:center;padding:20px;color:#909296;">⏳ 加载中...</div>';
-
+    var c = document.getElementById('memoryList');
+    c.innerHTML = '<div style="text-align:center;padding:20px;color:#909296;">⏳ 加载中...</div>';
     fetch('/kb/' + KB_ID + '/api/ai-guide/memory')
         .then(function(r) { return r.json(); })
         .then(function(data) {
-            if (!data.ok) {
-                container.innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><div>' + (data.error || '加载失败') + '</div></div>';
-                return;
-            }
-            if (data.path) {
-                document.getElementById('memoryPath').textContent = data.path;
-            }
+            if (!data.ok) { c.innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><div>' + (data.error || '') + '</div></div>'; return; }
+            if (data.path) document.getElementById('memoryPath').textContent = data.path;
             renderMemoryList(data.files || []);
         })
-        .catch(function() {
-            container.innerHTML = '<div class="empty-state"><div class="icon">❌</div><div>加载失败</div></div>';
-        });
+        .catch(function() { c.innerHTML = '<div class="empty-state"><div class="icon">❌</div><div>加载失败</div></div>'; });
 }
 
 function renderMemoryList(files) {
-    var container = document.getElementById('memoryList');
+    var c = document.getElementById('memoryList');
     if (files.length === 0) {
-        container.innerHTML = '<div class="empty-state"><div class="icon">📁</div><div>暂无记忆文件</div><div style="margin-top:8px;font-size:13px;color:#909296;">点击「+ 新建记忆」创建第一条</div></div>';
+        c.innerHTML = '<div class="empty-state"><div class="icon">📁</div><div>暂无记忆文件</div><div style="margin-top:8px;font-size:13px;color:#909296;">点击「+ 新建记忆」创建第一条</div></div>';
         return;
     }
-
     var html = '<ul class="memory-file-list">';
     files.forEach(function(f) {
-        var name = f.name;
-        var type = guessMemoryType(name);
-        var badgeClass = 'badge-' + type;
-        var displayName = name.replace(/\.md$/, '');
-        var isIndex = name === 'MEMORY.md';
-
-        html += '<li class="memory-file-item">';
-        html += '<span class="memory-file-name" onclick="showMemoryEditor(\'' + escapeJs(name) + '\')">';
-        html += '<span class="memory-type-badge ' + badgeClass + '">' + type + '</span>';
-        html += escapeHtml(displayName);
-        if (isIndex) html += ' <span style="font-size:11px;color:#909296;">(索引)</span>';
-        html += '</span>';
-        html += '<span style="display:flex;gap:4px;">';
+        var name = f.name, type = guessMemoryType(name), dn = name.replace(/\.md$/, '');
+        html += '<li class="memory-file-item"><span class="memory-file-name" onclick="showMemoryEditor(\'' + escapeJs(name) + '\')">';
+        html += '<span class="memory-type-badge badge-' + type + '">' + type + '</span>' + escapeHtml(dn);
+        if (name === 'MEMORY.md') html += ' <span style="font-size:11px;color:#909296;">(索引)</span>';
+        html += '</span><span style="display:flex;gap:4px;">';
         html += '<button class="btn btn-secondary btn-sm" onclick="showMemoryEditor(\'' + escapeJs(name) + '\')">编辑</button>';
-        if (!isIndex) {
-            html += '<button class="btn btn-danger btn-sm" onclick="deleteMemoryConfirm(\'' + escapeJs(name) + '\')">删除</button>';
-        }
-        html += '</span>';
-        html += '</li>';
+        if (name !== 'MEMORY.md') html += '<button class="btn btn-danger btn-sm" onclick="deleteMemoryConfirm(\'' + escapeJs(name) + '\')">删除</button>';
+        html += '</span></li>';
     });
     html += '</ul>';
-    container.innerHTML = html;
+    c.innerHTML = html;
 }
 
 function guessMemoryType(name) {
     if (name === 'MEMORY.md') return 'other';
-    var lower = name.toLowerCase();
-    if (lower.includes('user') || lower.includes('角色')) return 'user';
-    if (lower.includes('feedback') || lower.includes('反馈')) return 'feedback';
-    if (lower.includes('project') || lower.includes('项目')) return 'project';
-    if (lower.includes('reference') || lower.includes('参考')) return 'reference';
+    var l = name.toLowerCase();
+    if (l.includes('user') || l.includes('角色')) return 'user';
+    if (l.includes('feedback') || l.includes('反馈')) return 'feedback';
+    if (l.includes('project') || l.includes('项目')) return 'project';
+    if (l.includes('reference') || l.includes('参考')) return 'reference';
     return 'other';
 }
 
+// ---- memory modal functions (showMemoryEditor, showMemoryNew, saveMemory, etc.) ----
+// (omitted for brevity - these are the same as before)
 function showMemoryEditor(name) {
     document.getElementById('memoryModalTitle').textContent = '✏️ 编辑: ' + name;
     document.getElementById('memoryEditName').value = name;
     document.getElementById('memoryFileName').value = name;
     document.getElementById('memoryEditor').value = '⏳ 加载中...';
-
-    var deleteBtn = document.getElementById('memoryDeleteBtn');
-    deleteBtn.style.display = (name === 'MEMORY.md') ? 'none' : 'inline-block';
-
+    document.getElementById('memoryDeleteBtn').style.display = (name === 'MEMORY.md') ? 'none' : 'inline-block';
     fetch('/kb/' + KB_ID + '/api/ai-guide/memory/' + encodeURIComponent(name))
         .then(function(r) { return r.json(); })
         .then(function(data) {
-            if (data.ok) {
-                document.getElementById('memoryEditor').value = data.content || '';
-            } else {
-                document.getElementById('memoryEditor').value = '';
-                toast('加载失败: ' + (data.error || ''), 'error');
-            }
+            document.getElementById('memoryEditor').value = data.ok ? (data.content || '') : '';
+            if (!data.ok) toast('加载失败: ' + (data.error || ''), 'error');
         })
-        .catch(function() {
-            document.getElementById('memoryEditor').value = '';
-            toast('加载失败', 'error');
-        });
-
+        .catch(function() { document.getElementById('memoryEditor').value = ''; toast('加载失败', 'error'); });
     document.getElementById('memoryModal').classList.add('active');
 }
-
 function showMemoryNew() {
     document.getElementById('memoryModalTitle').textContent = '➕ 新建记忆';
     document.getElementById('memoryEditName').value = '';
@@ -374,105 +373,218 @@ function showMemoryNew() {
     document.getElementById('memoryDeleteBtn').style.display = 'none';
     document.getElementById('memoryModal').classList.add('active');
 }
-
-function closeMemoryModal() {
-    document.getElementById('memoryModal').classList.remove('active');
-}
-
+function closeMemoryModal() { document.getElementById('memoryModal').classList.remove('active'); }
 function saveMemory() {
     var btn = document.querySelector('#memoryModal .btn-primary');
-    btn.disabled = true;
-    btn.textContent = '⏳ 保存...';
-
+    btn.disabled = true; btn.textContent = '⏳ 保存...';
     var name = document.getElementById('memoryFileName').value.trim();
     var content = document.getElementById('memoryEditor').value;
     var origName = document.getElementById('memoryEditName').value;
-
-    if (!name) {
-        toast('文件名不能为空', 'error');
-        btn.disabled = false;
-        btn.textContent = '保存';
-        return;
-    }
-
-    var deleteFirst = (origName && origName !== name)
-        ? fetch('/kb/' + KB_ID + '/api/ai-guide/memory/' + encodeURIComponent(origName), { method: 'DELETE' })
-        : Promise.resolve();
-
-    deleteFirst
-        .then(function() {
-            return fetch('/kb/' + KB_ID + '/api/ai-guide/memory', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: name, content: content })
-            });
-        })
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-            if (data.ok) {
-                toast('✅ 已保存', 'success');
-                closeMemoryModal();
-                loadMemoryList();
-            } else {
-                toast('❌ ' + (data.error || '保存失败'), 'error');
-            }
-        })
-        .catch(function() {
-            toast('❌ 请求失败', 'error');
-        })
-        .finally(function() {
-            btn.disabled = false;
-            btn.textContent = '保存';
-        });
+    if (!name) { toast('文件名不能为空', 'error'); btn.disabled = false; btn.textContent = '保存'; return; }
+    var del = (origName && origName !== name) ? fetch('/kb/' + KB_ID + '/api/ai-guide/memory/' + encodeURIComponent(origName), { method: 'DELETE' }) : Promise.resolve();
+    del.then(function() { return fetch('/kb/' + KB_ID + '/api/ai-guide/memory', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name, content: content }) }); })
+    .then(function(r) { return r.json(); })
+    .then(function(data) { if (data.ok) { toast('✅ 已保存', 'success'); closeMemoryModal(); loadMemoryList(); } else { toast('❌ ' + (data.error || '保存失败'), 'error'); } })
+    .catch(function() { toast('❌ 请求失败', 'error'); })
+    .finally(function() { btn.disabled = false; btn.textContent = '保存'; });
 }
-
 function deleteMemoryConfirm(name) {
     if (!confirm('确定删除 ' + name + '？')) return;
     fetch('/kb/' + KB_ID + '/api/ai-guide/memory/' + encodeURIComponent(name), { method: 'DELETE' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) { if (data.ok) { toast('🗑️ 已删除', 'success'); loadMemoryList(); closeMemoryModal(); } else { toast('❌ ' + (data.error || '删除失败'), 'error'); } })
+    .catch(function() { toast('❌ 请求失败', 'error'); });
+}
+function deleteMemory() { deleteMemoryConfirm(document.getElementById('memoryEditName').value); }
+
+// ==================== Tab 2: AI 分析 ====================
+
+var analysisEventSource = null;
+
+function loadDirs() {
+    fetch('/kb/' + KB_ID + '/api/dirs')
         .then(function(r) { return r.json(); })
         .then(function(data) {
-            if (data.ok) {
-                toast('🗑️ 已删除', 'success');
-                loadMemoryList();
-                closeMemoryModal();
-            } else {
-                toast('❌ ' + (data.error || '删除失败'), 'error');
+            var sel = document.getElementById('analysisDir');
+            sel.innerHTML = '<option value="">-- 请选择目录 --</option>';
+            if (data.ok && data.dirs) {
+                data.dirs.forEach(function(d) {
+                    var opt = document.createElement('option');
+                    opt.value = d; opt.textContent = d;
+                    sel.appendChild(opt);
+                });
             }
-        })
-        .catch(function() {
-            toast('❌ 请求失败', 'error');
         });
 }
 
-function deleteMemory() {
-    var name = document.getElementById('memoryEditName').value;
-    if (!name) return;
-    deleteMemoryConfirm(name);
+function startAnalysis() {
+    var dir = document.getElementById('analysisDir').value;
+    if (!dir) { toast('请先选择分析目标目录', 'error'); return; }
+
+    var prompt = document.getElementById('analysisPrompt').value.trim();
+    var btn = document.getElementById('analysisBtn');
+    btn.disabled = true; btn.textContent = '⏳ 分析中...';
+    document.getElementById('analysisStatus').textContent = '';
+    document.getElementById('analysisResult').style.display = 'block';
+    document.getElementById('analysisResult').innerHTML = '<span style="color:#909296;">⏳ AI 正在分析 ' + dir + '...</span>';
+    document.getElementById('saveAnalysisBtn').style.display = 'none';
+
+    var url = '/kb/' + KB_ID + '/api/analyze-dir?dir=' + encodeURIComponent(dir);
+    if (prompt) url += '&prompt=' + encodeURIComponent(prompt);
+
+    // SSE stream
+    var es = new EventSource(url);
+    analysisEventSource = es;
+    var fullText = '';
+
+    es.onmessage = function(e) {
+        try {
+            var d = JSON.parse(e.data);
+            if (d.type === 'text') {
+                fullText += d.content;
+                document.getElementById('analysisResult').innerHTML = marked.parse(fullText);
+            } else if (d.type === 'status') {
+                document.getElementById('analysisResult').innerHTML = '<span style="color:#909296;">' + d.content + '</span>';
+            } else if (d.type === 'done') {
+                es.close(); analysisEventSource = null;
+                btn.disabled = false; btn.textContent = '🚀 开始分析';
+                currentAnalysisResult = fullText;
+                document.getElementById('saveAnalysisBtn').style.display = 'inline-block';
+                toast('✅ 分析完成', 'success');
+            } else if (d.type === 'error') {
+                document.getElementById('analysisResult').innerHTML = '<span style="color:#e03131;">❌ ' + d.content + '</span>';
+                es.close(); analysisEventSource = null;
+                btn.disabled = false; btn.textContent = '🚀 开始分析';
+            }
+        } catch(e) {}
+    };
+    es.onerror = function() {
+        es.close(); analysisEventSource = null;
+        if (btn) { btn.disabled = false; btn.textContent = '🚀 开始分析'; }
+    };
 }
 
-// ---- utils ----
+function saveAnalysisResult() {
+    if (!currentAnalysisResult) return;
+    var dir = document.getElementById('analysisDir').value;
+    var prompt = document.getElementById('analysisPrompt').value.trim();
 
-function setStatus(id, text, type) {
-    var el = document.getElementById(id);
-    el.textContent = text;
-    el.className = 'status-text' + (type ? ' ' + type : '');
-    if (type === 'success' || type === 'error') {
-        setTimeout(function() {
-            el.textContent = '';
-            el.className = 'status-text';
-        }, 3000);
-    }
+    fetch('/kb/' + KB_ID + '/api/analysis/save', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dirPath: dir, content: currentAnalysisResult, prompt: prompt })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.ok) { toast('✅ 分析结果已保存'); loadAnalysisHistory(); }
+        else { toast('❌ ' + (data.error || '保存失败'), 'error'); }
+    })
+    .catch(function() { toast('❌ 请求失败', 'error'); });
 }
 
-function escapeHtml(str) {
-    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+function loadAnalysisHistory() {
+    fetch('/kb/' + KB_ID + '/api/analysis/list')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var c = document.getElementById('analysisHistory');
+            if (!data.ok || !data.list || data.list.length === 0) {
+                c.innerHTML = '<div style="color:#909296;font-size:13px;">暂无分析记录</div>';
+                return;
+            }
+            var html = '';
+            data.list.forEach(function(item) {
+                var preview = (item.content || '').substring(0, 100) + '...';
+                html += '<div style="border:1px solid #eef0f4;border-radius:8px;padding:10px;margin-bottom:6px;">';
+                html += '<div style="display:flex;justify-content:space-between;margin-bottom:4px;">';
+                html += '<span style="font-weight:500;font-size:13px;">📂 ' + escapeHtml(item.dirPath || '根目录') + '</span>';
+                html += '<span style="font-size:11px;color:#909296;">' + escapeHtml(item.createdAt || '') + '</span>';
+                html += '</div>';
+                html += '<div style="font-size:12px;color:#5c5f66;">' + escapeHtml(preview) + '</div>';
+                html += '<button class="btn btn-secondary btn-sm" style="margin-top:6px;" onclick="showHistoryDetail(' + item.id + ')">查看详情</button>';
+                html += '</div>';
+            });
+            c.innerHTML = html;
+        });
 }
 
-function escapeJs(str) {
-    return String(str).replace(/'/g, "\\'").replace(/"/g, '\\"');
+function showHistoryDetail(aid) {
+    fetch('/kb/' + KB_ID + '/api/analysis/get?aid=' + aid)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.ok && data.content) {
+                document.getElementById('analysisResult').style.display = 'block';
+                document.getElementById('analysisResult').innerHTML = marked.parse(data.content);
+                document.getElementById('tab-analysis').scrollTop = 0;
+            } else { toast('加载失败', 'error'); }
+        });
 }
 
-// ---- 综合日报配置 ----
+// ==================== Tab 3: 综合日报 ====================
+
+function loadReportPrompt() {
+    fetch('/kb/' + KB_ID + '/api/report/prompt')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.ok) document.getElementById('reportPrompt').value = data.prompt || '';
+        });
+}
+
+function saveReportPrompt() {
+    fetch('/kb/' + KB_ID + '/api/report/prompt', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: document.getElementById('reportPrompt').value })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.ok) { setStatus('reportPromptStatus', '✅ 已保存', 'success'); toast('✅ 提示词已保存'); }
+        else { setStatus('reportPromptStatus', '❌ ' + (data.error || '失败'), 'error'); }
+    })
+    .catch(function() { setStatus('reportPromptStatus', '❌ 请求失败', 'error'); });
+}
+
+function loadReportContent() {
+    var c = document.getElementById('reportContent');
+    c.style.display = 'none';
+    document.getElementById('reportStatus').textContent = '';
+}
+
+function generateReport() {
+    var btn = document.getElementById('genReportBtn');
+    btn.disabled = true; btn.textContent = '⏳ 生成中...';
+    document.getElementById('reportStatus').textContent = '';
+    document.getElementById('reportContent').style.display = 'block';
+    document.getElementById('reportContent').innerHTML = '<span style="color:#909296;">⏳ AI 正在生成日报...</span>';
+
+    fetch('/kb/' + KB_ID + '/api/generate', { method: 'POST' })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.ok) {
+                setStatus('reportStatus', '✅ 生成成功', 'success');
+                // 重新加载日报
+                setTimeout(function() { loadLatestReport(); }, 500);
+            } else {
+                document.getElementById('reportContent').innerHTML = '<span style="color:#e03131;">❌ ' + (data.error || '生成失败') + '</span>';
+                setStatus('reportStatus', '❌ ' + (data.error || '失败'), 'error');
+            }
+        })
+        .catch(function() {
+            document.getElementById('reportContent').innerHTML = '<span style="color:#e03131;">❌ 请求失败</span>';
+            setStatus('reportStatus', '❌ 请求失败', 'error');
+        })
+        .finally(function() { btn.disabled = false; btn.textContent = '🔄 手动生成日报'; });
+}
+
+function loadLatestReport() {
+    fetch('/kb/' + KB_ID + '/api/report/latest')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var c = document.getElementById('reportContent');
+            if (data.ok && data.content) {
+                c.innerHTML = marked.parse(data.content);
+            } else {
+                c.innerHTML = '<div style="color:#909296;text-align:center;padding:30px;">暂无日报数据</div>';
+            }
+        });
+}
 
 function loadReportConfig() {
     fetch('/kb/' + KB_ID + '/api/report/config')
@@ -482,30 +594,34 @@ function loadReportConfig() {
                 document.getElementById('autoReportToggle').checked = data.autoReport !== false;
                 document.getElementById('feishuPushToggle').checked = data.feishuPush !== false;
             }
-        })
-        .catch(function(e) { console.error('加载日报配置失败:', e); });
+        });
 }
 
 function saveReportConfig() {
-    var autoReport = document.getElementById('autoReportToggle').checked;
-    var feishuPush = document.getElementById('feishuPushToggle').checked;
     fetch('/kb/' + KB_ID + '/api/report/config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ autoReport: autoReport, feishuPush: feishuPush })
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            autoReport: document.getElementById('autoReportToggle').checked,
+            feishuPush: document.getElementById('feishuPushToggle').checked
+        })
     })
     .then(function(r) { return r.json(); })
-    .then(function(data) {
-        if (data.ok) {
-            toast('✅ 日报配置已保存');
-        } else {
-            toast('❌ ' + (data.error || '保存失败'), 'error');
-        }
-    })
-    .catch(function() {
-        toast('❌ 请求失败', 'error');
-    });
+    .then(function(data) { if (data.ok) toast('✅ 日报配置已保存'); else toast('❌ ' + (data.error || '保存失败'), 'error'); })
+    .catch(function() { toast('❌ 请求失败', 'error'); });
 }
+
+// ==================== Utils ====================
+
+function setStatus(id, text, type) {
+    var el = document.getElementById(id);
+    el.textContent = text;
+    el.className = 'status-text' + (type ? ' ' + type : '');
+    if (type === 'success' || type === 'error') {
+        setTimeout(function() { el.textContent = ''; el.className = 'status-text'; }, 3000);
+    }
+}
+function escapeHtml(str) { return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function escapeJs(str) { return String(str).replace(/'/g, "\\'").replace(/"/g, '\\"'); }
 
 document.addEventListener('DOMContentLoaded', function() {
     loadAgents();
