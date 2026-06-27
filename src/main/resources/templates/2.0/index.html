@@ -61,6 +61,11 @@
 </div>
 
 <!-- ==================== JS ==================== -->
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/contrib/auto-render.min.js"
+        onload="window.__katexLoaded = true"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css">
+
 <script th:inline="javascript">
 /*<![CDATA[*/
 const KB_ID = /*[[${currentKb?.id}]]*/ null;
@@ -139,7 +144,10 @@ async function sendChat() {
                         if (replyText.trim()) {
                             hasRealContent = true;
                             const el = document.getElementById('reply-' + aiId);
-                            if (el) el.innerHTML = marked.parse(replyText);
+                            if (el) {
+                                el.innerHTML = marked.parse(replyText);
+                                renderMath(el);
+                            }
                             box.scrollTop = box.scrollHeight;
                         }
                     } else if (d.type === 'status') {
@@ -150,7 +158,10 @@ async function sendChat() {
                         }
                     } else if (d.type === 'done') {
                         const el = document.getElementById('reply-' + aiId);
-                        if (el && replyText.trim()) el.innerHTML = marked.parse(replyText);
+                        if (el && replyText.trim()) {
+                            el.innerHTML = marked.parse(replyText);
+                            renderMath(el);
+                        }
                     } else if (d.type === 'error') {
                         const el = document.getElementById('reply-' + aiId);
                         if (el) el.innerHTML = '<span style="color:#e03131;">' + d.content + '</span>';
@@ -168,12 +179,27 @@ async function sendChat() {
     }
 }
 
+function renderMath(el) {
+    if (window.__katexLoaded || typeof renderMathInElement !== 'undefined') {
+        try {
+            renderMathInElement(el, {
+                delimiters: [
+                    {left: '$$', right: '$$', display: true},
+                    {left: '$', right: '$', display: false}
+                ],
+                throwOnError: false
+            });
+        } catch(e) {}
+    }
+}
+
 function appendMsg(role, text) {
     const box = document.getElementById('chatBox');
     const div = document.createElement('div');
     div.className = 'chat-msg ' + role;
     div.innerHTML = '<div class="text">' + (role === 'ai' ? marked.parse(text) : text) + '</div>';
     box.appendChild(div);
+    if (role === 'ai') setTimeout(() => renderMath(div), 50);
     box.scrollTop = box.scrollHeight;
 }
 
