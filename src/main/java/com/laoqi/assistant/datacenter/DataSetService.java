@@ -179,6 +179,12 @@ public class DataSetService {
                 record.put("_id", entity.getRecordId());
                 record.put("_source", entity.getSource());
                 record.put("_importTime", entity.getCreatedAt());
+                if (record.get("创建时间") == null || "".equals(record.get("创建时间"))) {
+                    record.put("创建时间", entity.getCreatedAt());
+                }
+                if (record.get("更新时间") == null || "".equals(record.get("更新时间"))) {
+                    record.put("更新时间", entity.getCreatedAt());
+                }
                 result.add(record);
             } catch (Exception e) {
                 log.warn("Failed to parse record: {}", e.getMessage());
@@ -231,6 +237,8 @@ public class DataSetService {
         if (entity == null) return null;
 
         Map<String, Object> merged = newData;
+        String now = TimeUtil.nowStr();
+        merged.put("更新时间", now);
         String contentHash = computeHash(merged);
         try {
             String dataJson = mapper.writeValueAsString(merged);
@@ -316,6 +324,11 @@ public class DataSetService {
 
     private void saveRecordToDb(String datasetId, Map<String, Object> record, String source) {
         String recordId = UUID.randomUUID().toString().substring(0, 12);
+        String now = TimeUtil.nowStr();
+        record.put("创建时间", now);
+        if (record.get("更新时间") == null) {
+            record.put("更新时间", now);
+        }
         String hash = computeHash(record);
         try {
             String dataJson = mapper.writeValueAsString(record);
@@ -325,7 +338,7 @@ public class DataSetService {
             entity.setDataJson(dataJson);
             entity.setSource(source);
             entity.setContentHash(hash);
-            entity.setCreatedAt(TimeUtil.nowStr());
+            entity.setCreatedAt(now);
             recordDbService.save(entity);
         } catch (Exception e) {
             log.error("Failed to save record to DB: {}", e.getMessage());

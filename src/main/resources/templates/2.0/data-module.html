@@ -372,10 +372,63 @@ function generateLocalAnalysis() {
 }
 
 // ========== 数据集Tab ==========
+const SYSTEM_FIELDS = ['创建时间', '更新时间'];
+const SYSTEM_FIELD_SET = new Set(SYSTEM_FIELDS);
+
+function buildCols(schemaFields, recKeys) {
+    const cols = [...schemaFields];
+    SYSTEM_FIELDS.forEach(k => { if (!cols.includes(k)) cols.push(k); });
+    return cols;
+}
+
+function parseTimeField(v) {
+    if (v === null || v === undefined || v === '') return 0;
+    if (typeof v === 'number') return v;
+    const s = String(v).trim();
+    if (!s) return 0;
+    const m = s.match(/(\d{4})[-\/\.]?(\d{1,2})[-\/\.]?(\d{1,2})[\sT]?(\d{1,2})?[:\.]?(\d{1,2})?[:\.]?(\d{1,2})?/);
+    if (m) {
+        const d = new Date(
+            parseInt(m[1]),
+            parseInt(m[2]) - 1,
+            parseInt(m[3]),
+            m[4] ? parseInt(m[4]) : 0,
+            m[5] ? parseInt(m[5]) : 0,
+            m[6] ? parseInt(m[6]) : 0
+        );
+        return d.getTime();
+    }
+    const ms = Date.parse(s);
+    return isNaN(ms) ? 0 : ms;
+}
+
+function sortRecordsByUpdatedAt(records) {
+    return [...records].sort((a, b) => {
+        let ta = parseTimeField(a['更新时间']);
+        let tb = parseTimeField(b['更新时间']);
+        if (!ta && !tb) {
+            ta = parseTimeField(a['完成日期']);
+            tb = parseTimeField(b['完成日期']);
+        }
+        if (!ta && !tb) {
+            ta = parseTimeField(a['提出日期']);
+            tb = parseTimeField(b['提出日期']);
+        }
+        if (!ta && !tb) {
+            if (a['_importTime'] && b['_importTime']) {
+                ta = parseTimeField(a['_importTime']);
+                tb = parseTimeField(b['_importTime']);
+            }
+        }
+        if (ta === tb) return 0;
+        return ta < tb ? 1 : -1;
+    });
+}
+
 function renderDatasetTab(dsId) {
     currentDs = datasets.find(d => d.id === dsId);
     if (!currentDs) return;
-    const records = allRecords[dsId] || [];
+    const records = sortRecordsByUpdatedAt(allRecords[dsId] || []);
     const el = document.getElementById('tabContent');
 
     let html = '<div class="toolbar">'
@@ -393,10 +446,7 @@ function renderDatasetTab(dsId) {
     } else {
         const schema = currentDs.schema || {};
         const schemaFields = schema.fields ? schema.fields.map(f => f.name) : [];
-        const schemaFieldSet = new Set(schemaFields);
-        const extraSet = new Set();
-        records.forEach(r => Object.keys(r).forEach(k => { if (!k.startsWith('_') && !schemaFieldSet.has(k)) extraSet.add(k); }));
-        const cols = [...schemaFields, ...extraSet];
+        const cols = buildCols(schemaFields);
         html += '<div style="overflow-x:auto;max-height:60vh;overflow-y:auto;"><table class="data-table"><thead><tr>'
             + cols.map(c=>'<th>'+esc(c)+'</th>').join('')
             + '</tr></thead><tbody id="recordsBody">';
@@ -410,7 +460,9 @@ function renderDatasetTab(dsId) {
                     }
                     const v = rec[c];
                     const s = v !== null && v !== undefined ? String(v) : '';
-                    return '<td title="'+esc(s)+'">'+esc(s.substring(0,150))+'</td>';
+                    const isSystem = SYSTEM_FIELD_SET.has(c);
+                    const cls = isSystem ? ' style="white-space:nowrap;color:#888;font-size:12px;"' : '';
+                    return '<td'+cls+' title="'+esc(s)+'">'+esc(s.substring(0,150))+'</td>';
                 }).join('')
                 + '</tr>';
         });
@@ -438,7 +490,7 @@ function showRecordForm(rec) {
     const schema = currentDs.schema || {};
     const schemaFields = schema.fields ? schema.fields.map(f => f.name) : [];
     if (rec) {
-        const recordFields = Object.keys(rec).filter(k => !k.startsWith('_'));
+        const recordFields = Object.keys(rec).filter(k => !k.startsWith('_') && !SYSTEM_FIELD_SET.has(k));
         const merged = [...schemaFields];
         recordFields.forEach(fn => { if (!merged.includes(fn)) merged.push(fn); });
         fieldNames = merged;
@@ -550,21 +602,24 @@ function showRecordDetail(rid) {
 
     const schema = currentDs.schema || {};
     const schemaFields = schema.fields ? schema.fields.map(f => f.name) : [];
-    const schemaFieldSet = new Set(schemaFields);
-    const recFields = Object.keys(rec).filter(k => !k.startsWith('_'));
-    const extra = recFields.filter(k => !schemaFieldSet.has(k));
-    const allFields = [...schemaFields, ...extra];
+    const recKeys = Object.keys(rec);
+    const cols = buildCols(schemaFields, recKeys);
 
     document.getElementById('detailModalTitle').textContent = '📄 记录详情';
     let html = '';
 
-    allFields.forEach(f => {
+    cols.forEach(f => {
+        if (f.startsWith('_')) return;
         const val = rec[f] !== null && rec[f] !== undefined ? String(rec[f]) : '';
         const statusVal = rec['status'];
+        const isSystem = SYSTEM_FIELD_SET.has(f);
+        const label = esc(f) + (isSystem ? ' <span style="font-size:10px;color:#9aa0a6;">系统</span>' : '');
         if (f === 'status' && statusVal) {
-            html += '<div class="detail-row"><label>状态</label><span>' + getStatusBadge(statusVal) + '</span></div>';
+            html += '<div class="detail-row"><label>' + label + '</label><span>' + getStatusBadge(statusVal) + '</span></div>';
+        } else if (isSystem) {
+            html += '<div class="detail-row"><label>' + label + '</label><span style="color:#888;font-size:12px;">' + esc(val) + '</span></div>';
         } else {
-            html += '<div class="detail-row"><label>' + esc(f) + '</label><span>' + esc(val) + '</span></div>';
+            html += '<div class="detail-row"><label>' + label + '</label><span>' + esc(val) + '</span></div>';
         }
     });
 

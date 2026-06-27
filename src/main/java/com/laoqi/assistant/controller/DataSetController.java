@@ -276,9 +276,6 @@ public class DataSetController {
 
             @SuppressWarnings("unchecked")
             Map<String, Object> data = (Map<String, Object>) body.get("data");
-            if (data != null) {
-                data.put("更新时间", java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-            }
 
             Map<String, Object> updated = dataSetService.updateRecord(id, recordId, data);
             if (updated == null) {
