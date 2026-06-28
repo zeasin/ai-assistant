@@ -1,6 +1,9 @@
 package com.laoqi.assistant.service;
 
-import com.laoqi.assistant.entity.KnowledgeBaseEntity;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.laoqi.assistant.datacenter.DataSetService;
+import com.laoqi.assistant.datacenter.model.DataSet;
 import com.laoqi.assistant.util.FileUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,6 +15,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -29,15 +33,19 @@ public class NoteTools {
     /** 状态回调（静态引用，不用 ThreadLocal——Spring AI 可能在异步线程执行工具） */
     private static Consumer<String> STATUS_CALLBACK;
 
+    private static final ObjectMapper mapper = new ObjectMapper();
+
     private final ConfigService configService;
     private final KnowledgeBaseService kbService;
     private final NoteIndexService noteIndexService;
+    private final DataSetService dataSetService;
 
     public NoteTools(ConfigService configService, KnowledgeBaseService kbService,
-                    NoteIndexService noteIndexService) {
+                    NoteIndexService noteIndexService, DataSetService dataSetService) {
         this.configService = configService;
         this.kbService = kbService;
         this.noteIndexService = noteIndexService;
+        this.dataSetService = dataSetService;
     }
 
     public static void setCurrentKbId(Long kbId) {
@@ -259,5 +267,65 @@ public class NoteTools {
             log.error("[NoteTools] 搜索笔记失败", e);
             return "搜索失败: " + e.getMessage();
         }
+    }
+
+    @Tool(description = "同时保存笔记文件并添加数据集记录。当用户汇报工作、记录客户沟通、反馈问题时使用此工具"
+        + "（而不是分别调用 writeFile 和 addRecord），确保详细内容记录到笔记，关键结构信息记录到数据集")
+    public String logRecord(
+            @ToolParam(description = "笔记文件路径，相对于笔记库根目录，如 \"客户/张三-2026-06-28.md\"") String notePath,
+            @ToolParam(description = "笔记详细内容（Markdown格式）") String noteContent,
+            @ToolParam(description = "数据集ID或名称，如 \"客户跟进\"、\"Bug追踪\"") String dataset,
+            @ToolParam(description = "JSON格式的结构化数据，如 {\"公司\":\"张三\",\"阶段\":\"报价\"}") String jsonData) {
+        reportStatus("📝 正在保存笔记并更新数据集...");
+
+        // 1. 写笔记文件
+        if (notePath == null || notePath.isEmpty()) return "笔记文件路径不能为空";
+        Path file = baseDir().resolve(notePath).normalize();
+        if (!file.startsWith(baseDir())) return "路径越界: " + notePath;
+
+        try {
+            Files.createDirectories(file.getParent());
+        } catch (IOException e) {
+            return "创建目录失败: " + e.getMessage();
+        }
+
+        FileUtil.writeText(file, noteContent);
+        log.info("[NoteTools] logRecord 写入文件: {} ({} 字符)", notePath, noteContent.length());
+
+        // 2. 写数据集
+        String datasetResult;
+        try {
+            DataSet ds = findDataset(dataset);
+            if (ds == null) {
+                datasetResult = "⚠️ 未找到数据集「" + dataset + "」，仅保存了笔记文件";
+                log.warn("[NoteTools] logRecord 数据集不存在: {}", dataset);
+            } else {
+                Map<String, Object> record = mapper.readValue(jsonData, new TypeReference<Map<String, Object>>() {});
+                record.put("更新时间", java.time.LocalDateTime.now().format(
+                        java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                int count = dataSetService.addRecords(ds.getId(), List.of(record), "ai_log");
+                datasetResult = count > 0
+                        ? "✅ 已添加到数据集「" + ds.getName() + "」"
+                        : "⚠️ 数据集「" + ds.getName() + "」记录已存在（重复），未添加";
+            }
+        } catch (Exception e) {
+            datasetResult = "⚠️ 数据集写入失败: " + e.getMessage();
+            log.warn("[NoteTools] logRecord 写入数据集失败", e);
+        }
+
+        reportStatus("✅ 完成");
+        return "✅ 笔记已保存: " + notePath + "\n" + datasetResult;
+    }
+
+    private DataSet findDataset(String identifier) {
+        DataSet ds = dataSetService.getDataset(identifier);
+        if (ds != null) return ds;
+        List<DataSet> all = dataSetService.getAllDatasets();
+        for (DataSet d : all) {
+            if (d.getName().equalsIgnoreCase(identifier) || d.getName().contains(identifier)) {
+                return d;
+            }
+        }
+        return null;
     }
 }
