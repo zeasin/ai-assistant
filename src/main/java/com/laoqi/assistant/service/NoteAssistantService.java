@@ -23,6 +23,8 @@ public class NoteAssistantService {
     private final ContextBuilder contextBuilder;
     private final MemoryManagerService memoryManager;
     private final LlmService llmService;
+    private final TaskPlannerService taskPlanner;
+    private final AgentTraceService agentTrace;
 
     /** 用于异步提取记忆的后台执行器 */
     private final java.util.concurrent.ExecutorService memoryExecutor =
@@ -39,13 +41,16 @@ public class NoteAssistantService {
 
     public NoteAssistantService(LlmConfigResolver configResolver, ToolRegistry toolRegistry,
                                SessionService sessionService, ContextBuilder contextBuilder,
-                               MemoryManagerService memoryManager, LlmService llmService) {
+                               MemoryManagerService memoryManager, LlmService llmService,
+                               TaskPlannerService taskPlanner, AgentTraceService agentTrace) {
         this.configResolver = configResolver;
         this.toolRegistry = toolRegistry;
         this.sessionService = sessionService;
         this.contextBuilder = contextBuilder;
         this.memoryManager = memoryManager;
         this.llmService = llmService;
+        this.taskPlanner = taskPlanner;
+        this.agentTrace = agentTrace;
     }
 
     public boolean isAvailable() {
@@ -132,6 +137,19 @@ public class NoteAssistantService {
 
         NoteTools.setCurrentKbId(kbId);
         try {
+            // Step 0: 任务规划 — 复杂请求先生成执行计划
+            String planContext = "";
+            if (taskPlanner.needsPlanning(userMessage)) {
+                if (statusCallback != null) statusCallback.accept("正在制定执行计划...");
+                planContext = taskPlanner.buildPlanContext(sessionId, userMessage, kbId);
+                if (!planContext.isEmpty()) {
+                    log.info("[编排] 已生成执行计划，注入上下文");
+                    // 记录追踪
+                    agentTrace.record(sessionId, agentTrace.getNextStepIndex(sessionId), "plan",
+                            "为复杂请求生成执行计划", planContext, 0);
+                }
+            }
+
             // Step 1: 注入记忆 — 回忆与用户相关的关键信息
             String memoryContext = memoryManager.formatMemories(kbId);
 
@@ -142,13 +160,16 @@ public class NoteAssistantService {
             if (statusCallback != null) statusCallback.accept("正在构建上下文...");
             String baseMessage = contextBuilder.merge(context, userMessage);
 
-            // Step 3: 合并记忆到上下文中
-            String fullMessage;
-            if (memoryContext != null && !memoryContext.isEmpty()) {
-                fullMessage = memoryContext + "\n" + baseMessage;
-            } else {
-                fullMessage = baseMessage;
+            // Step 3: 按优先级合并：计划 > 记忆 > 笔记上下文
+            StringBuilder fullMessageBuilder = new StringBuilder();
+            if (!planContext.isEmpty()) {
+                fullMessageBuilder.append(planContext).append("\n");
             }
+            if (memoryContext != null && !memoryContext.isEmpty()) {
+                fullMessageBuilder.append(memoryContext).append("\n");
+            }
+            fullMessageBuilder.append(baseMessage);
+            String fullMessage = fullMessageBuilder.toString();
 
             int noteCount = context.relevantNotes() != null ? context.relevantNotes().size() : 0;
             log.info("[编排] 上下文构建完成，总消息长度={}, 相关笔记={}, 记忆已注入={}",
@@ -191,12 +212,25 @@ public class NoteAssistantService {
             String reply = fullReply.toString().trim().replaceAll("\\n{3,}", "\n\n");
             log.info("[编排] 回复长度: {}", reply.length());
 
-            // Step 4: 后处理 — 异步提取对话中的关键信息存入记忆
+            // Step 4: 记录决策追踪
             String finalReply = reply;
+            String finalUserMsg = userMessage;
             Long finalKbId = kbId;
+            try {
+                int stepIdx = agentTrace.getNextStepIndex(sessionId);
+                agentTrace.record(sessionId, stepIdx++, "thought",
+                        "理解用户意图: " + (finalUserMsg.length() > 60 ? finalUserMsg.substring(0, 60) + "..." : finalUserMsg),
+                        "用户消息: " + finalUserMsg, 0);
+                agentTrace.record(sessionId, stepIdx, "answer",
+                        "AI 回复", finalReply.length() > 200 ? finalReply.substring(0, 200) + "..." : finalReply, 0);
+            } catch (Exception e) {
+                log.debug("[编排] 追踪记录跳过: {}", e.getMessage());
+            }
+
+            // Step 5: 后处理 — 异步提取对话中的关键信息存入记忆
             memoryExecutor.execute(() -> {
                 try {
-                    extractMemoriesFromConversation(sessionId, userMessage, finalReply, finalKbId);
+                    extractMemoriesFromConversation(sessionId, finalUserMsg, finalReply, finalKbId);
                 } catch (Exception e) {
                     log.debug("[编排] 记忆提取跳过: {}", e.getMessage());
                 }
@@ -265,22 +299,6 @@ public class NoteAssistantService {
         } catch (Exception e) {
             log.debug("[编排] 记忆提取失败: {}", e.getMessage());
         }
-    }
-
-    /**
-     * 判断用户请求是否需要多步规划。
-     * 复杂任务（如"分析本周工作"、"生成月度报告"）需要先规划再执行。
-     */
-    private boolean needsPlanning(String userMessage) {
-        if (userMessage == null || userMessage.isEmpty()) return false;
-        String msg = userMessage.toLowerCase();
-        // 触发多步规划的典型短语
-        String[] triggers = {"分析", "总结", "报告", "汇总", "对比", "统计",
-                "梳理", "整理", "计划", "规划", "评估", "调研"};
-        for (String t : triggers) {
-            if (msg.contains(t)) return true;
-        }
-        return userMessage.length() > 30;
     }
 
     // ========== ChatClient 管理 ==========
