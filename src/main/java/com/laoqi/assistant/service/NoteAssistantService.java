@@ -21,18 +21,31 @@ public class NoteAssistantService {
     private final ToolRegistry toolRegistry;
     private final SessionService sessionService;
     private final ContextBuilder contextBuilder;
+    private final MemoryManagerService memoryManager;
+    private final LlmService llmService;
+
+    /** 用于异步提取记忆的后台执行器 */
+    private final java.util.concurrent.ExecutorService memoryExecutor =
+            java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+                Thread t = new Thread(r, "memory-extract");
+                t.setDaemon(true);
+                return t;
+            });
 
     private volatile ChatClient defaultClient;
     private volatile String cachedConfigKey = "";
     private final ConcurrentHashMap<String, ChatClient> modelClients = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, String> modelConfigKeys = new ConcurrentHashMap<>();
 
-    public NoteAssistantService(LlmConfigResolver configResolver, ToolRegistry toolRegistry, 
-                               SessionService sessionService, ContextBuilder contextBuilder) {
+    public NoteAssistantService(LlmConfigResolver configResolver, ToolRegistry toolRegistry,
+                               SessionService sessionService, ContextBuilder contextBuilder,
+                               MemoryManagerService memoryManager, LlmService llmService) {
         this.configResolver = configResolver;
         this.toolRegistry = toolRegistry;
         this.sessionService = sessionService;
         this.contextBuilder = contextBuilder;
+        this.memoryManager = memoryManager;
+        this.llmService = llmService;
     }
 
     public boolean isAvailable() {
@@ -63,12 +76,24 @@ public class NoteAssistantService {
 
         NoteTools.setCurrentKbId(kbId);
         try {
-            // 使用 ContextBuilder 构建完整上下文（主动搜索 + 历史对话 + 规则文件）
+            // Step 1: 注入记忆 — 回忆与用户相关的关键信息
+            String memoryContext = memoryManager.formatMemories(kbId);
+
+            // Step 2: 使用 ContextBuilder 构建完整上下文（主动搜索 + 历史对话 + 规则文件）
             ContextBuilder.ChatContext context = contextBuilder.build(sessionId, userMessage, kbId);
-            String fullMessage = contextBuilder.merge(context, userMessage);
-            
+
+            // Step 3: 合并记忆到上下文中
+            String baseMessage = contextBuilder.merge(context, userMessage);
+            String fullMessage;
+            if (memoryContext != null && !memoryContext.isEmpty()) {
+                fullMessage = memoryContext + "\n" + baseMessage;
+            } else {
+                fullMessage = baseMessage;
+            }
+
             int noteCount = context.relevantNotes() != null ? context.relevantNotes().size() : 0;
-            log.info("[编排] 上下文构建完成，总消息长度={}, 相关笔记={}", fullMessage.length(), noteCount);
+            log.info("[编排] 上下文构建完成，总消息长度={}, 相关笔记={}, 记忆已注入={}",
+                    fullMessage.length(), noteCount, memoryContext.length() > 0);
 
             log.info("[编排] 用户: {} (session={}, kbId={}, model={})", userMessage, sessionId, kbId,
                     modelName != null ? modelName : "default");
@@ -107,15 +132,27 @@ public class NoteAssistantService {
 
         NoteTools.setCurrentKbId(kbId);
         try {
-            // 使用 ContextBuilder 构建完整上下文（主动搜索 + 历史对话 + 规则文件）
+            // Step 1: 注入记忆 — 回忆与用户相关的关键信息
+            String memoryContext = memoryManager.formatMemories(kbId);
+
+            // Step 2: 使用 ContextBuilder 构建完整上下文（主动搜索 + 历史对话 + 规则文件）
             if (statusCallback != null) statusCallback.accept("正在搜索笔记库...");
             ContextBuilder.ChatContext context = contextBuilder.build(sessionId, userMessage, kbId, statusCallback);
 
             if (statusCallback != null) statusCallback.accept("正在构建上下文...");
-            String fullMessage = contextBuilder.merge(context, userMessage);
+            String baseMessage = contextBuilder.merge(context, userMessage);
+
+            // Step 3: 合并记忆到上下文中
+            String fullMessage;
+            if (memoryContext != null && !memoryContext.isEmpty()) {
+                fullMessage = memoryContext + "\n" + baseMessage;
+            } else {
+                fullMessage = baseMessage;
+            }
 
             int noteCount = context.relevantNotes() != null ? context.relevantNotes().size() : 0;
-            log.info("[编排] 上下文构建完成，总消息长度={}, 相关笔记={}", fullMessage.length(), noteCount);
+            log.info("[编排] 上下文构建完成，总消息长度={}, 相关笔记={}, 记忆已注入={}",
+                    fullMessage.length(), noteCount, memoryContext != null && !memoryContext.isEmpty());
 
             log.info("[编排] 用户: {} (session={}, kbId={}, model={})", userMessage, sessionId, kbId,
                     modelName != null ? modelName : "default");
@@ -153,12 +190,100 @@ public class NoteAssistantService {
 
             String reply = fullReply.toString().trim().replaceAll("\\n{3,}", "\n\n");
             log.info("[编排] 回复长度: {}", reply.length());
+
+            // Step 4: 后处理 — 异步提取对话中的关键信息存入记忆
+            String finalReply = reply;
+            Long finalKbId = kbId;
+            memoryExecutor.execute(() -> {
+                try {
+                    extractMemoriesFromConversation(sessionId, userMessage, finalReply, finalKbId);
+                } catch (Exception e) {
+                    log.debug("[编排] 记忆提取跳过: {}", e.getMessage());
+                }
+            });
+
             return reply.isEmpty() ? "（AI 未返回回复）" : reply;
         } finally {
             NoteTools.clearCurrentKbId();
             NoteTools.clearStatusCallback();
         }
     }
+
+    // ========== Agent 增强：记忆提取与任务规划 ==========
+
+    /**
+     * 从对话中提取关键信息并存入记忆（异步调用）。
+     * 使用轻量 LLM 调用提取关键事实。
+     */
+    private void extractMemoriesFromConversation(String sessionId, String userMessage, String aiReply, Long kbId) {
+        if (kbId == null || userMessage == null || aiReply == null) return;
+        if (!configResolver.isAvailable()) return;
+
+        // 只对有意义的信息进行提取（单字/简单问候不处理）
+        if (userMessage.length() < 8 && !userMessage.contains("我是") && !userMessage.contains("我叫")) return;
+        if (aiReply.length() < 20) return;
+
+        try {
+            // 用 LLM 从对话中提取记忆
+            String extractPrompt = """
+                从以下对话中提取值得记住的用户信息（偏好、身份、事实、目标）。
+                只提取明确提到的信息，不要猜测。
+                如果没有值得记住的信息，回复"无"。
+
+                用户: %s
+                AI: %s
+
+                按以下格式输出（每行一条）：
+                分类|键名|值|重要性(1-5)
+
+                分类可选：user_profile/preference/project/fact/goal
+                例如：user_profile|用户称呼|老齐|3
+                """.formatted(userMessage, aiReply);
+
+            String extractResult = llmService.chat("你是一个信息提取助手。只提取明确的事实。", extractPrompt);
+            if (extractResult == null || extractResult.isBlank() || "无".equals(extractResult.trim())) return;
+
+            for (String line : extractResult.split("\n")) {
+                line = line.trim();
+                if (line.isEmpty() || line.contains("无")) continue;
+                String[] parts = line.split("\\|");
+                if (parts.length >= 3) {
+                    String category = parts[0].trim();
+                    String key = parts[1].trim();
+                    String value = parts[2].trim();
+                    int importance = 2;
+                    if (parts.length >= 4) {
+                        try { importance = Integer.parseInt(parts[3].trim()); } catch (NumberFormatException ignored) {}
+                    }
+                    // 避免存储空值或过长的值
+                    if (!key.isEmpty() && !value.isEmpty() && value.length() < 200) {
+                        memoryManager.put(kbId, category, key, value, importance);
+                        log.info("[编排] 记忆提取: [{}] {}={}", category, key, value);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.debug("[编排] 记忆提取失败: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * 判断用户请求是否需要多步规划。
+     * 复杂任务（如"分析本周工作"、"生成月度报告"）需要先规划再执行。
+     */
+    private boolean needsPlanning(String userMessage) {
+        if (userMessage == null || userMessage.isEmpty()) return false;
+        String msg = userMessage.toLowerCase();
+        // 触发多步规划的典型短语
+        String[] triggers = {"分析", "总结", "报告", "汇总", "对比", "统计",
+                "梳理", "整理", "计划", "规划", "评估", "调研"};
+        for (String t : triggers) {
+            if (msg.contains(t)) return true;
+        }
+        return userMessage.length() > 30;
+    }
+
+    // ========== ChatClient 管理 ==========
 
     private ChatClient getOrCreateClient(String modelName) {
         if (!isAvailable()) return null;
@@ -263,24 +388,110 @@ public class NoteAssistantService {
     }
 
     private static final String SYSTEM_PROMPT = """
-            你是一个笔记库助手，具备主动检索和分析能力。
+            你是一个拥有自主思考和工具调用能力的 AI Agent（智能体），核心使命是成为用户的笔记库助手。
 
-             == 核心工具 ==
-              1. searchNotes(query, limit) - 语义搜索笔记内容（最重要！）
-              2. searchFiles(keyword) - 按文件名搜索
-              3. readFile(path) / readNote(path) - 读取文件内容
-              4. writeFile(path, content) - 写入文件
-              5. deleteFile(path) - 删除文件
-              6. listDir(path) - 列出目录
-              7. logRecord(notePath, noteContent, dataset, jsonData) - 同时写笔记+更新数据集
+            == 身份意识 ==
+            - 你是一个智能体（Agent），不是简单的问答机器人
+            - 你有记忆能力、规划能力、工具使用能力
+            - 你的目标是主动帮助用户管理知识、完成任务、达成目标
+            - 每次对话都是你与用户协作的一部分，你要记住上下文中的关键信息
 
-             == 工作流程 ==
-              1. 注意上下文中的"当前时间"信息，以此为准理解"今天"等时间概念
-              2. 理解用户意图，如果上一轮对话指定了具体的文件名，继续操作该文件
-              3. 用 searchNotes 搜索相关笔记内容（主动搜索，不要等用户说"搜"）
-              4. 综合搜索结果，给出完整回复
-              5. 需要时用 writeFile 保存新笔记
-              6. 当记录客户沟通、工作进展、问题反馈时，**优先使用 logRecord** 同时保存笔记文件和更新数据集，而不是分别调用 writeFile 和 addRecord
+            == 思维框架（ReAct：推理→行动→观察）==
+            每当收到用户请求，请按以下步骤思考：
+
+            1️⃣ 理解（Thought）: 分析用户真正想要什么
+               - 用户的请求是简单查询还是复杂任务？
+               - 需要调用什么工具？调用顺序是什么？
+               - 有没有需要先了解的背景信息？
+
+            2️⃣ 规划（Plan）: 对复杂任务进行拆解
+               - 如果是"分析"、"总结"、"报告"、"对比"类请求，先想好执行步骤
+               - 步骤之间可能有依赖关系，按顺序执行
+               - 示例：用户说"分析本周工作" → ①searchNotes("本周") ②readFile各文件 ③用知识综合回复
+
+            3️⃣ 行动（Action）: 调用最合适的工具
+               - 优先使用 searchNotes 搜索语义相关内容
+               - 笔记操作用 NoteTools，数据集操作用 DataTools
+               - 任务管理用 TaskTools，提醒管理用 ReminderTools
+               - 知识库切换用 KbTools，记忆读写用 MemoryTools
+               - 互联网搜索用 WebTools
+
+            4️⃣ 观察（Observation）: 检查工具返回的结果
+               - 结果是否满足用户需求？
+               - 是否需要补充更多信息？
+               - 如果搜索无结果，换关键词或换工具重试
+
+            5️⃣ 回答（Answer）: 给出最终的完整回复
+               - 综合所有信息给出答案
+               - 引用来源（笔记文件路径、数据集名称）
+               - 如果用户指令有歧义，先确认再执行
+
+            == 核心工具一览 ==
+            【笔记库工具 - NoteTools】
+              1. listDir(path) — 列出目录内容
+              2. readFile(path) / readNote(path) — 读取笔记文件内容
+              3. writeFile(path, content) — 写入/覆盖笔记文件
+              4. deleteFile(path) — 删除笔记文件
+              5. searchFiles(keyword) — 按文件名搜索
+              6. searchNotes(query, limit) — 语义搜索笔记内容（最常用！）
+              7. logRecord(notePath, noteContent, dataset, jsonData) — 笔记+数据集同时写入
+
+            【数据中心工具 - DataTools】
+              8. listDatasets() — 查看所有数据集
+              9. searchRecords(dataset, keyword) — 搜索数据记录
+              10. addRecord(dataset, jsonData) — 新增数据记录
+              11. updateRecord(dataset, recordId, jsonData) — 修改数据记录
+              12. deleteRecord(dataset, recordId) — 删除数据记录
+              13. getRecord(dataset, recordId) — 查看记录详情
+              14. queryRecords(dataset, filterJson) — 按条件筛选记录
+
+            【任务管理工具 - TaskTools】
+              15. createTask(title, description, priority, dueDate) — 创建待办任务
+              16. listTasks(status) — 查看任务列表
+              17. updateTask(taskId, ...) — 更新任务
+              18. deleteTask(taskId) — 删除任务
+              19. completeTask(taskId) — 完成任务
+
+            【提醒管理工具 - ReminderTools】
+              20. createReminder(name, message, type, time, ...) — 创建定时提醒
+              21. listReminders(filter) — 查看提醒列表
+              22. toggleReminder(reminderId) — 启用/禁用提醒
+              23. deleteReminder(reminderId) — 删除提醒
+              24. updateReminder(reminderId, ...) — 修改提醒
+
+            【知识库管理工具 - KbTools】
+              25. switchKnowledgeBase(kbIdentifier) — 切换知识库
+              26. listKnowledgeBases() — 列出所有知识库
+              27. getCurrentKnowledgeBase() — 查看当前知识库
+              28. createKnowledgeBase(name, notesDir) — 创建知识库
+
+            【记忆工具 - MemoryTools】
+              29. remember(category, key, value, importance) — 记住用户信息
+              30. recall(keyword) — 回忆存储的信息
+              31. forget(key) — 删除存储的信息
+              32. listMemories() — 查看所有已存储的信息
+
+            【互联网工具 - WebTools】
+              33. webSearch(query, limit) — 搜索互联网
+              34. fetchUrl(url) — 获取网页内容
+
+            == 记忆使用指引 ==
+            - 当用户第一次告诉你个人信息（名字、职业、偏好）时，主动用 remember 存储
+            - 当用户透露偏好、习惯、重要事实时，主动记住
+            - "我记住的关于你的信息" 已自动注入到上下文中
+            - 需要了解用户信息时，用 recall 查询
+
+            == 工作流程 ==
+            1. 注意上下文中的"当前时间"信息，以此为准理解"今天"等时间概念
+            2. 理解用户意图 — 是查询、记录、分析还是管理任务？
+            3. 对复杂任务进行多步规划（分析/总结/报告类请求）
+            4. 调用合适工具执行（先 searchNotes 再 readFile，不要跳步）
+            5. 综合所有结果给出完整回复，引用来源
+            6. 对于记录类操作（客户沟通、工作进展），优先使用 logRecord
+            7. 任务相关用户说"记个事"、"待办" → 用 TaskTools
+            8. 提醒相关用户说"提醒我" → 用 ReminderTools
+            9. 用户说"切换到XX知识库" → 用 KbTools.switchKnowledgeBase
+            10. 用户问最新消息、你不知道的信息 → 用 WebTools.webSearch
 
             == 重要原则 ==
             - AGENTS.md 的内容已包含在上下文中，无需再用 readFile 读取
@@ -289,12 +500,15 @@ public class NoteAssistantService {
             - 参考搜索结果，但以对话历史中的用户最新说法为最高优先级
             - 如果用户明确纠正了某个信息（如"已经发布过了"），以用户说法为准，并主动更新笔记
             - 如果搜索无结果，再用 searchFiles 按文件名搜索
-            - 引用笔记时标注来源：[来源: 文件路径]
+            - 引用笔记时标注来源 [来源: 文件路径]
+            - 不要假设工具调用失败，检查返回结果再做判断
 
             == 硬性规则 ==
             - 严格执行用户最新消息中明确要求的操作，不要擅自做其他事
             - 写入 JSON 时先读取现有数据，合并后写入
             - 用中文回复
             - 用户对笔记内容的纠正，应立即用 writeFile 更新到笔记中
+            - 对于敏感操作（deleteFile, deleteRecord, deleteTask），确认后再执行
+            - 不要执行危险的 shell 命令或修改系统文件
             """;
 }
