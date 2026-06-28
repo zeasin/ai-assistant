@@ -114,6 +114,7 @@ async function sendChat() {
     const aiId = 'ai-' + Date.now();
     const box = document.getElementById('chatBox');
     box.innerHTML += '<div class="chat-msg ai" id="' + aiId + '">'
+        + '<div class="trace-panel" id="trace-' + aiId + '" style="display:none;"></div>'
         + '<div class="text" id="reply-' + aiId + '"><span style="color:#909296;">正在处理...</span></div></div>';
     box.scrollTop = box.scrollHeight;
 
@@ -139,7 +140,9 @@ async function sendChat() {
                 if (p.indexOf('data:') !== 0) continue;
                 try {
                     const d = JSON.parse(p.replace(/^data:\s*/, ''));
-                    if (d.type === 'text') {
+                    if (d.type === 'session') {
+                        chatSessionId = d.sessionId;
+                    } else if (d.type === 'text') {
                         replyText += d.content;
                         if (replyText.trim()) {
                             hasRealContent = true;
@@ -161,6 +164,10 @@ async function sendChat() {
                         if (el && replyText.trim()) {
                             el.innerHTML = marked.parse(replyText);
                             renderMath(el);
+                        }
+                        // 加载决策追踪
+                        if (chatSessionId) {
+                            loadTrace(chatSessionId, aiId);
                         }
                     } else if (d.type === 'error') {
                         const el = document.getElementById('reply-' + aiId);
@@ -201,6 +208,78 @@ function appendMsg(role, text) {
     box.appendChild(div);
     if (role === 'ai') setTimeout(() => renderMath(div), 50);
     box.scrollTop = box.scrollHeight;
+}
+
+// ========== 决策追踪可视化 ==========
+
+async function loadTrace(sessionId, aiId) {
+    try {
+        const resp = await fetch('/api/trace/' + encodeURIComponent(sessionId));
+        const data = await resp.json();
+        if (!data.ok || !data.steps || data.steps.length === 0) return;
+
+        const panel = document.getElementById('trace-' + aiId);
+        if (!panel) return;
+
+        // 构建追踪面板 HTML
+        let html = '<div class="trace-toggle" onclick="toggleTrace(this)">'
+            + '<span class="trace-icon">🤔</span> 查看思考过程'
+            + '<span class="trace-arrow">▾</span></div>'
+            + '<div class="trace-steps" style="display:none;">';
+
+        for (const step of data.steps) {
+            const icon = getTraceIcon(step.type);
+            const label = getTraceLabel(step.type);
+            html += '<div class="trace-step">'
+                + '<div class="trace-step-header">'
+                + '<span class="trace-step-icon">' + icon + '</span>'
+                + '<span class="trace-step-label">' + label + '</span>'
+                + '<span class="trace-step-num">Step ' + step.index + '</span>'
+                + '</div>'
+                + '<div class="trace-step-content">' + escapeHtml(step.content) + '</div>';
+            if (step.details) {
+                const preview = step.details.length > 150 ? step.details.substring(0, 150) + '...' : step.details;
+                html += '<div class="trace-step-details" onclick="this.classList.toggle(\'expanded\')">'
+                    + '<span class="trace-details-toggle">📎 详情</span>'
+                    + '<div class="trace-details-body">' + escapeHtml(preview) + '</div>'
+                    + '</div>';
+            }
+            html += '</div>';
+        }
+
+        html += '</div></div>';
+        panel.innerHTML = html;
+        panel.style.display = 'block';
+    } catch(e) {
+        // 追踪加载失败不影响主对话
+        console.debug('Trace load failed:', e);
+    }
+}
+
+function getTraceIcon(type) {
+    const icons = { thought: '🤔', plan: '📋', tool_call: '🔧', tool_result: '📥', observation: '👀', answer: '💬' };
+    return icons[type] || '•';
+}
+
+function getTraceLabel(type) {
+    const labels = { thought: '思考', plan: '规划', tool_call: '工具调用', tool_result: '工具结果', observation: '观察', answer: '回答' };
+    return labels[type] || type;
+}
+
+function toggleTrace(header) {
+    const steps = header.nextElementSibling;
+    const arrow = header.querySelector('.trace-arrow');
+    if (steps) {
+        const isHidden = steps.style.display === 'none';
+        steps.style.display = isHidden ? 'block' : 'none';
+        arrow.textContent = isHidden ? '▴' : '▾';
+    }
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 
 function clearChat() {

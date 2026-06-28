@@ -44,6 +44,7 @@ public class ChatController {
     private final LlmConfigResolver llmConfigResolver;
     private final LogService logService;
     private final TaskService taskService;
+    private final AgentTraceService agentTraceService;
 
     public ChatController(KnowledgeBaseService kbService,
                           SessionDbService sessionDbService,
@@ -53,7 +54,8 @@ public class ChatController {
                           NoteAssistantService noteAssistantService,
                           LlmConfigResolver llmConfigResolver,
                           LogService logService,
-                          TaskService taskService) {
+                          TaskService taskService,
+                          AgentTraceService agentTraceService) {
         this.kbService = kbService;
         this.sessionDbService = sessionDbService;
         this.messageDbService = messageDbService;
@@ -63,6 +65,7 @@ public class ChatController {
         this.llmConfigResolver = llmConfigResolver;
         this.logService = logService;
         this.taskService = taskService;
+        this.agentTraceService = agentTraceService;
     }
 
     // ========== 页面路由 ==========
@@ -409,5 +412,15 @@ public class ChatController {
             }
         }
         return "AI 服务调用失败: " + (msg != null ? msg : "未知错误");
+    }
+
+    // ========== Agent 决策追踪 API ==========
+
+    @GetMapping("/api/trace/{sessionId}")
+    @ResponseBody
+    public Map<String, Object> getTrace(@PathVariable String sessionId) {
+        var steps = agentTraceService.getTrace(sessionId);
+        var formatted = agentTraceService.formatTrace(sessionId);
+        return Map.of("ok", true, "steps", steps, "formatted", formatted);
     }
 }

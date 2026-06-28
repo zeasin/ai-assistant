@@ -242,6 +242,32 @@
         .log-table td { padding: 8px 12px; border-bottom: 1px solid #e1e3e6; }
         .log-table tr:hover { background: #f5f5f7; }
 
+        /* 决策追踪面板 */
+        .trace-panel {
+            margin-bottom: 8px; font-size: 13px; border: 1px solid #eef0f4;
+            border-radius: 8px; overflow: hidden; background: #fafbfc;
+        }
+        .trace-toggle {
+            display: flex; align-items: center; gap: 6px; padding: 6px 10px;
+            cursor: pointer; color: #7c5cfc; font-size: 12px; font-weight: 500;
+            user-select: none; transition: background .1s;
+        }
+        .trace-toggle:hover { background: #f0edff; }
+        .trace-arrow { margin-left: auto; font-size: 10px; color: #909296; transition: transform .15s; }
+        .trace-steps { padding: 4px 10px 10px; border-top: 1px solid #eef0f4; }
+        .trace-step { padding: 6px 0; border-bottom: 1px solid #f5f5f7; }
+        .trace-step:last-child { border-bottom: none; }
+        .trace-step-header { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
+        .trace-step-icon { font-size: 13px; }
+        .trace-step-label { font-size: 12px; font-weight: 600; color: #5c5f66; }
+        .trace-step-num { font-size: 10px; color: #c2c5cc; margin-left: auto; }
+        .trace-step-content { font-size: 12px; color: #1a1b1e; padding-left: 22px; line-height: 1.5; word-break: break-all; }
+        .trace-step-details { padding-left: 22px; margin-top: 2px; }
+        .trace-details-toggle { font-size: 11px; color: #909296; cursor: pointer; }
+        .trace-details-toggle:hover { color: #7c5cfc; }
+        .trace-details-body { display: none; font-size: 11px; color: #5c5f66; padding: 4px 8px; background: #f5f5f7; border-radius: 4px; margin-top: 2px; max-height: 80px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; }
+        .trace-step-details.expanded .trace-details-body { display: block; }
+
         /* 响应式 */
         @media (max-width: 768px) {
             .sidebar { width: 60px; min-width: 60px; }
