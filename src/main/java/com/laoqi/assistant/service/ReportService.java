@@ -2,6 +2,8 @@ package com.laoqi.assistant.service;
 
 import com.laoqi.assistant.config.AppConfig;
 import com.laoqi.assistant.entity.AiAnalysisEntity;
+import com.laoqi.assistant.datacenter.DataSetService;
+import com.laoqi.assistant.datacenter.model.DataSet;
 import com.laoqi.assistant.entity.KnowledgeBaseEntity;
 import com.laoqi.assistant.service.db.AiAnalysisDbService;
 import com.laoqi.assistant.util.MarkdownUtil;
@@ -12,6 +14,8 @@ import org.springframework.stereotype.Service;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
+import java.util.Map;
 
 @Service
 public class ReportService {
@@ -26,6 +30,7 @@ public class ReportService {
     private final ConfigService configService;
     private final KnowledgeBaseService kbService;
     private final AiAnalysisDbService aiAnalysisDbService;
+    private final DataSetService dataSetService;
 
     private volatile String latestReport = "";
     private volatile String latestReportTime = "";
@@ -37,7 +42,8 @@ public class ReportService {
                           AgentAnalysisService agentAnalysisService,
                           ConfigService configService,
                           KnowledgeBaseService kbService,
-                          AiAnalysisDbService aiAnalysisDbService) {
+                          AiAnalysisDbService aiAnalysisDbService,
+                          DataSetService dataSetService) {
         this.appConfig = appConfig;
         this.feishuService = feishuService;
         this.logService = logService;
@@ -45,6 +51,7 @@ public class ReportService {
         this.configService = configService;
         this.kbService = kbService;
         this.aiAnalysisDbService = aiAnalysisDbService;
+        this.dataSetService = dataSetService;
     }
 
     // ==================== 提示词 ====================
@@ -111,7 +118,10 @@ public class ReportService {
                 + "将笔记非结构化数据与数据集结构化数据结合，生成更全面的日报。\n"
                 + "用中文回复。";
 
-            String report = agentAnalysisService.analyze(kbDir, prompt, systemPrompt);
+            // 主动读取所有数据集内容，注入到对话上下文中，确保日报包含结构化数据
+            String datasetContext = buildDatasetContext();
+
+            String report = agentAnalysisService.analyze(kbDir, prompt + "\n\n" + datasetContext, systemPrompt);
 
             if (report != null && !report.isEmpty()) {
                 result.report = report;
@@ -163,6 +173,61 @@ public class ReportService {
     public String getLatestReportDate(Long kbId) {
         if (kbId == null) return null;
         return aiAnalysisDbService.getLatestReportDate(kbId);
+    }
+
+    // ==================== 数据集读取 ====================
+
+    /**
+     * 主动读取所有数据集内容，格式化为上下文字符串注入到 prompt 中。
+     * 这样 AI 无需额外调用工具即可直接使用结构化数据生成日报。
+     */
+    private String buildDatasetContext() {
+        try {
+            List<DataSet> datasets = dataSetService.getAllDatasets();
+            if (datasets.isEmpty()) {
+                return "\n===== 数据集信息 =====\n当前没有数据集，仅根据笔记文件生成日报。";
+            }
+
+            StringBuilder sb = new StringBuilder();
+            sb.append("\n===== 数据集信息（已自动读取，无需再调用数据集工具） =====\n\n");
+
+            for (DataSet ds : datasets) {
+                sb.append("📦 数据集：「").append(ds.getName()).append("」");
+                if (ds.getDescription() != null && !ds.getDescription().isEmpty()) {
+                    sb.append("（").append(ds.getDescription()).append("）");
+                }
+                sb.append("\n");
+
+                // 读取该数据集的所有记录（最多 50 条）
+                List<Map<String, Object>> records = dataSetService.queryRecords(ds.getId(), null);
+                if (records.isEmpty()) {
+                    sb.append("  暂无记录\n\n");
+                    continue;
+                }
+
+                sb.append("  共 ").append(records.size()).append(" 条记录：\n");
+                for (int i = 0; i < Math.min(records.size(), 50); i++) {
+                    Map<String, Object> record = records.get(i);
+                    sb.append("  [").append(i + 1).append("] ");
+                    record.forEach((k, v) -> {
+                        if (!k.startsWith("_") && v != null) {
+                            sb.append(k).append(": ").append(v).append(" | ");
+                        }
+                    });
+                    sb.append("\n");
+                }
+                if (records.size() > 50) {
+                    sb.append("  ... 还有 ").append(records.size() - 50).append(" 条记录未显示\n");
+                }
+                sb.append("\n");
+            }
+
+            sb.append("===== 数据集信息结束 =====\n");
+            return sb.toString();
+        } catch (Exception e) {
+            log.warn("[日报] 读取数据集失败，继续生成：{}", e.getMessage());
+            return "\n（数据集读取失败：" + e.getMessage() + "）";
+        }
     }
 
     // ==================== 日报推送与保存 ====================
