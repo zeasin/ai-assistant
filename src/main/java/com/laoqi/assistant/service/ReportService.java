@@ -187,11 +187,7 @@ public class ReportService {
             boolean feishuPush = kb != null && (kb.getFeishuPush() == null || kb.getFeishuPush() == 1);
 
             if (feishuPush) {
-                String markdownContent = r.report
-                    .replace("\\n", "\n")
-                    .replace("\n", "\\n")
-                    .replace("\"", "\\\"")
-                    .replace("|", "\\|");
+                String markdownContent = r.report.replace("\\n", "\n");
                 feishuService.sendCard(title, markdownContent);
             } else {
                 log.info("[日报推送] 知识库「{}」已关闭飞书推送，跳过", kbLabel.replaceAll("[【】]", ""));
