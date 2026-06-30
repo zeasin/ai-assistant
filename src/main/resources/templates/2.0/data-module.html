@@ -40,8 +40,23 @@
     /* 概览 */
     .overview-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:16px; margin-bottom:20px; }
     .overview-card { background:#fafbfc; border:1px solid #eef0f4; border-radius:10px; padding:16px; }
-    .overview-card h4 { margin:0 0 12px; font-size:14px; color:#1a1b1e; }
+    .overview-card h4 { margin:0 0 12px; font-size:14px; color:#1a1b1e; display:flex; align-items:center; gap:6px; }
     .overview-chart { height:240px; }
+    .overview-card-full { grid-column:1 / -1; }
+    .chart-time-wrap { height:200px; }
+
+    /* 状态卡片 */
+    .status-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(240px,1fr)); gap:12px; margin-bottom:16px; }
+    .status-card { background:#fff; border:1px solid #eef0f4; border-radius:10px; padding:14px; }
+    .status-card h5 { margin:0 0 8px; font-size:13px; color:#1a1b1e; display:flex; align-items:center; gap:5px; }
+    .status-bar-wrap { display:flex; height:22px; border-radius:6px; overflow:hidden; background:#f0f0f5; margin-bottom:8px; }
+    .status-bar-seg { display:flex; align-items:center; justify-content:center; font-size:10px; color:#fff; font-weight:500; transition:width .3s; }
+    .status-legend { display:flex; flex-wrap:wrap; gap:6px 14px; font-size:11px; color:#5c5f66; }
+    .status-legend-item { display:flex; align-items:center; gap:4px; }
+    .status-dot { width:8px; height:8px; border-radius:50%; display:inline-block; }
+    .status-complete-rate { font-size:20px; font-weight:700; color:#10b981; margin-right:4px; }
+    .status-meta { font-size:11px; color:#909296; }
+
     .ai-analysis { background:linear-gradient(135deg, #f8f6ff 0%, #fafbfc 100%); border:1px solid #e8dff5; border-radius:10px; padding:20px; }
     .ai-analysis h4 { margin:0 0 12px; font-size:14px; color:#7c5cfc; display:flex; align-items:center; gap:6px; }
     .ai-analysis-content { font-size:13px; line-height:1.8; color:#3d3d3d; }
@@ -252,15 +267,18 @@ function renderOverview() {
         return;
     }
 
-    // 汇总统计
-    let totalRecords = 0;
-    datasets.forEach(ds => { totalRecords += (allRecords[ds.id]||[]).length; });
-
     let html = '<div class="overview-grid">'
-        // 数据集统计卡片
+
+        // 1. 时间趋势图（全宽）
+        + '<div class="overview-card overview-card-full"><h4>📈 时间趋势 <span style="font-weight:400;font-size:11px;color:#909296;">按创建时间聚合</span></h4>'
+        + '<div class="chart-time-wrap"><canvas id="chartTrend"></canvas></div></div>'
+
+        // 2. 数据集分布饼图（保持缩小版）
         + '<div class="overview-card"><h4>📦 数据集分布</h4><div class="overview-chart"><canvas id="chartDs"></canvas></div></div>'
-        // 记录数统计
-        + '<div class="overview-card"><h4>📈 记录数统计</h4><div class="overview-chart"><canvas id="chartRecords"></canvas></div></div>'
+
+        // 3. 状态分布（动态内容，通过JS填充）
+        + '<div class="overview-card" id="statusCard"><h4>✅ 状态分布</h4><div id="statusContent"><div class="ai-loading">计算中...</div></div></div>'
+
         + '</div>';
 
     // AI分析区域
@@ -273,36 +291,213 @@ function renderOverview() {
 
     // 渲染图表
     setTimeout(() => {
+        renderTrendChart();
         renderDsChart();
-        renderRecordsChart();
+        renderStatusOverview();
         generateAiAnalysis();
     }, 100);
 }
 
+// ---------- 1. 时间趋势图 ----------
+function renderTrendChart() {
+    const ctx = document.getElementById('chartTrend');
+    if (!ctx) return;
+    if (charts.trend) charts.trend.destroy();
+
+    // 从所有记录的"创建时间"提取日期
+    const dateCount = {}; // { '2026-06-24': { total:5, byDs:{客户信息:2,...} } }
+    datasets.forEach(ds => {
+        const records = allRecords[ds.id] || [];
+        records.forEach(r => {
+            const raw = r['创建时间'] || r['_importTime'] || '';
+            // 提取 YYYY-MM-DD
+            const m = String(raw).match(/(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
+            if (!m) return;
+            const day = m[1] + '-' + m[2].padStart(2,'0') + '-' + m[3].padStart(2,'0');
+            if (!dateCount[day]) dateCount[day] = { total:0, byDs:{} };
+            dateCount[day].total++;
+            if (!dateCount[day].byDs[ds.name]) dateCount[day].byDs[ds.name] = 0;
+            dateCount[day].byDs[ds.name]++;
+        });
+    });
+
+    const sortedDays = Object.keys(dateCount).sort();
+    if (sortedDays.length === 0) {
+        ctx.parentElement.innerHTML = '<div style="text-align:center;padding:60px 0;color:#909296;font-size:13px;">📭 暂无时间数据</div>';
+        return;
+    }
+
+    // 如果有多个数据集，用堆叠面积图；否则简单折线
+    const hasMultiDs = datasets.filter(d => (allRecords[d.id]||[]).length > 0).length > 1;
+
+    if (hasMultiDs) {
+        // 按数据集分线（堆叠面积图）
+        const dsNames = datasets.filter(d => {
+            return (allRecords[d.id]||[]).some(r => {
+                const raw = r['创建时间'] || r['_importTime'] || '';
+                return raw.match(/(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
+            });
+        }).map(d => d.name);
+
+        const colors = ['#7c5cfc','#f59e0b','#10b981','#ef4444','#3b82f6','#8b5cf6','#ec4899','#06b6d4'];
+        const datasets_chart = dsNames.map((name, i) => ({
+            label: name,
+            data: sortedDays.map(d => dateCount[d].byDs[name] || 0),
+            backgroundColor: colors[i % colors.length] + '33',
+            borderColor: colors[i % colors.length],
+            borderWidth: 2,
+            fill: true,
+            tension: 0.3,
+            pointRadius: 2
+        }));
+
+        charts.trend = new Chart(ctx, {
+            type: 'line',
+            data: { labels: sortedDays, datasets: datasets_chart },
+            options: {
+                responsive:true, maintainAspectRatio:false,
+                interaction:{ mode:'index', intersect:false },
+                plugins:{
+                    legend:{ position:'top', labels:{ boxWidth:12, padding:8, font:{size:11} } },
+                    tooltip:{ callbacks:{ title:(items) => '📅 '+items[0].label } }
+                },
+                scales:{
+                    x:{ ticks:{ font:{size:10}, maxTicksLimit:15 }, grid:{display:false} },
+                    y:{ beginAtZero:true, ticks:{ stepSize:1, font:{size:10} }, grid:{color:'#f0f0f0'} }
+                }
+            }
+        });
+    } else {
+        // 单数据集：简单折线
+        const totalData = sortedDays.map(d => dateCount[d].total);
+        charts.trend = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: sortedDays,
+                datasets: [{
+                    label: '记录数', data: totalData,
+                    borderColor: '#7c5cfc', backgroundColor: '#7c5cfc22',
+                    borderWidth: 2, fill: true, tension: 0.3, pointRadius: 3
+                }]
+            },
+            options: {
+                responsive:true, maintainAspectRatio:false,
+                plugins:{ legend:{ display:false } },
+                scales:{
+                    x:{ ticks:{ font:{size:10}, maxTicksLimit:15 }, grid:{display:false} },
+                    y:{ beginAtZero:true, ticks:{ stepSize:1, font:{size:10} }, grid:{color:'#f0f0f0'} }
+                }
+            }
+        });
+    }
+}
+
+// ---------- 2. 状态分布/完成率 ----------
+function renderStatusOverview() {
+    const el = document.getElementById('statusContent');
+    if (!el) return;
+
+    // 收集所有有状态字段的数据集
+    const statusDsList = [];
+    datasets.forEach(ds => {
+        const records = allRecords[ds.id] || [];
+        const statusValues = [];
+        records.forEach(r => {
+            const s = r['status'] || r['状态'];
+            if (s && String(s).trim()) statusValues.push(String(s).trim());
+        });
+        if (statusValues.length > 0) {
+            // 统计各状态数量
+            const countMap = {};
+            statusValues.forEach(s => { countMap[s] = (countMap[s] || 0) + 1; });
+            const total = statusValues.length;
+            const sorted = Object.entries(countMap).sort((a,b) => b[1]-a[1]);
+
+            // 判断是否有"完成"类状态
+            const doneKeywords = ['已完成','完成','已发布','已修复','完结'];
+            const doneCount = Object.entries(countMap)
+                .filter(([k]) => doneKeywords.some(dk => k.includes(dk)))
+                .reduce((s, [,c]) => s+c, 0);
+            const rate = total > 0 ? (doneCount/total*100).toFixed(0) : 0;
+
+            // 从 schema 获取状态选项颜色
+            const statusOpts = (ds.schema && (ds.schema.statusOptions || ds.schema.statuses)) || [];
+            const statusColorMap = assignStatusColors(statusOpts);
+
+            statusDsList.push({
+                dsName: ds.name,
+                dsIcon: ds.icon || '📦',
+                total,
+                doneCount,
+                rate,
+                distribution: sorted,
+                statusColorMap,
+                countMap
+            });
+        }
+    });
+
+    if (statusDsList.length === 0) {
+        el.innerHTML = '<div style="text-align:center;padding:30px 0;color:#909296;font-size:13px;">📭 暂无状态数据</div>';
+        return;
+    }
+
+    let html = '<div class="status-grid">';
+    statusDsList.forEach(item => {
+        const segs = item.distribution.map(([status, count]) => {
+            const pct = (count / item.total * 100).toFixed(0);
+            const color = item.statusColorMap[status] || '#909296';
+            return `<div class="status-bar-seg" style="width:${pct}%;background:${color};" title="${esc(status)}: ${count}条">${pct}%</div>`;
+        }).join('');
+
+        const legend = item.distribution.map(([status, count]) => {
+            const color = item.statusColorMap[status] || '#909296';
+            return `<span class="status-legend-item"><span class="status-dot" style="background:${color}"></span>${esc(status)} ${count}</span>`;
+        }).join('');
+
+        html += '<div class="status-card">'
+            + `<h5>${item.dsIcon} ${esc(item.dsName)}</h5>`
+            + `<div><span class="status-complete-rate">${item.rate}%</span><span class="status-meta">完成率（${item.doneCount}/${item.total}）</span></div>`
+            + `<div class="status-bar-wrap">${segs}</div>`
+            + `<div class="status-legend">${legend}</div>`
+            + '</div>';
+    });
+    html += '</div>';
+
+    el.innerHTML = html;
+}
+
+function assignStatusColors(statusOpts) {
+    const palette = ['#10b981','#f59e0b','#ef4444','#3b82f6','#8b5cf6','#ec4899','#06b6d4','#f97316'];
+    const map = {};
+    // 智能识别
+    statusOpts.forEach((opt, i) => {
+        const lower = opt.toLowerCase();
+        if (lower.includes('完成')||lower.includes('完结')||lower.includes('发布')||lower.includes('修复')) map[opt] = '#10b981';
+        else if (lower.includes('待')||lower.includes('进行')||lower.includes('继续')) map[opt] = '#f59e0b';
+        else if (lower.includes('取消')||lower.includes('关闭')||lower.includes('失效')||lower.includes('流失')) map[opt] = '#909296';
+        else if (lower.includes('正常')||lower.includes('启用')) map[opt] = '#3b82f6';
+        else map[opt] = palette[i % palette.length];
+    });
+    return map;
+}
+
+// ---------- 3. 更新数据集分布（保留缩小版） ----------
 function renderDsChart() {
     const ctx = document.getElementById('chartDs');
     if (!ctx) return;
     if (charts.ds) charts.ds.destroy();
     const labels = datasets.map(d => d.name);
     const data = datasets.map(d => (allRecords[d.id]||[]).length);
+    if (data.every(v => v === 0)) {
+        ctx.parentElement.innerHTML = '<div style="text-align:center;padding:60px 0;color:#909296;font-size:13px;">📭 暂无数据</div>';
+        return;
+    }
     const colors = ['#7c5cfc','#f59e0b','#10b981','#ef4444','#3b82f6','#8b5cf6','#ec4899','#06b6d4'];
     charts.ds = new Chart(ctx, {
         type: 'doughnut',
         data: { labels, datasets: [{ data, backgroundColor: colors.slice(0, labels.length), borderWidth: 0 }] },
         options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom',labels:{padding:12,font:{size:12}}}} }
-    });
-}
-
-function renderRecordsChart() {
-    const ctx = document.getElementById('chartRecords');
-    if (!ctx) return;
-    if (charts.records) charts.records.destroy();
-    const labels = datasets.map(d => d.name);
-    const data = datasets.map(d => (allRecords[d.id]||[]).length);
-    charts.records = new Chart(ctx, {
-        type: 'bar',
-        data: { labels, datasets: [{ label:'记录数', data, backgroundColor:'#7c5cfc', borderRadius:6 }] },
-        options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true,ticks:{stepSize:1}}} }
     });
 }
 
@@ -332,7 +527,7 @@ async function refreshAnalysis() {
 }
 
 async function doGenerateAnalysis(el) {
-    // 构建分析数据
+    // 构建丰富的分析数据（包含状态分布、趋势、字段统计）
     const dsInfo = datasets.map(ds => {
         const records = allRecords[ds.id] || [];
         const fields = ds.schema && ds.schema.fields ? ds.schema.fields.map(f=>f.name).join('、') : '';
@@ -340,7 +535,64 @@ async function doGenerateAnalysis(el) {
             const fieldNames = ds.schema && ds.schema.fields ? ds.schema.fields.map(f=>f.name) : Object.keys(r).filter(k=>!k.startsWith('_'));
             return fieldNames.slice(0, 5).map(f => f + ':' + (r[f]||'')).join(', ');
         }).join(' | ');
-        return { name: ds.name, count: records.length, fields, sample };
+
+        // 状态分布统计
+        const statusCount = {};
+        let hasStatus = false;
+        records.forEach(r => {
+            const s = r['status'] || r['状态'];
+            if (s && String(s).trim()) {
+                hasStatus = true;
+                const key = String(s).trim();
+                statusCount[key] = (statusCount[key]||0) + 1;
+            }
+        });
+
+        // 时间分布
+        const dayCount = {};
+        records.forEach(r => {
+            const raw = r['创建时间'] || r['_importTime'] || '';
+            const m = String(raw).match(/(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
+            if (m) {
+                const day = m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0');
+                dayCount[day] = (dayCount[day]||0) + 1;
+            }
+        });
+        const days = Object.keys(dayCount).sort();
+        const trendDesc = days.length >= 2
+            ? `从 ${days[0]} 到 ${days[days.length-1]}，共${days.length}天有记录`
+            : (days.length === 1 ? `仅有 ${days[0]} 有记录` : '暂无时间数据');
+
+        // 统计枚举字段分布（取字段值的前5个高频值）
+        const fieldDistributions = {};
+        if (ds.schema && ds.schema.fields) {
+            ds.schema.fields.forEach(f => {
+                const fName = f.name;
+                if (['编号','创建时间','更新时间','id','recordNum'].includes(fName)) return;
+                const valCount = {};
+                records.forEach(r => {
+                    const v = r[fName];
+                    if (v !== null && v !== undefined && String(v).trim()) {
+                        const key = String(v).trim();
+                        valCount[key] = (valCount[key]||0) + 1;
+                    }
+                });
+                const entries = Object.entries(valCount);
+                if (entries.length >= 2 && entries.length <= 15) {
+                    fieldDistributions[fName] = entries.sort((a,b) => b[1]-a[1]).slice(0, 5);
+                }
+            });
+        }
+
+        return {
+            name: ds.name,
+            count: records.length,
+            fields,
+            sample,
+            statusCount: hasStatus ? statusCount : null,
+            trendDesc,
+            fieldDistributions: Object.keys(fieldDistributions).length > 0 ? fieldDistributions : null
+        };
     });
 
     try {
@@ -352,24 +604,99 @@ async function doGenerateAnalysis(el) {
         if (d.ok && d.reply) {
             el.innerHTML = d.reply;
         } else {
-            el.innerHTML = generateLocalAnalysis();
+            el.innerHTML = generateLocalAnalysis(dsInfo);
         }
     } catch(e) {
-        el.innerHTML = generateLocalAnalysis();
+        el.innerHTML = generateLocalAnalysis(dsInfo);
     }
 }
 
-function generateLocalAnalysis() {
-    let html = '<h4 style="font-size:14px;margin-bottom:8px;">📊 数据概览</h4><ul>';
-    html += '<li>模块包含 <strong>' + datasets.length + '</strong> 个数据集</li>';
+function generateLocalAnalysis(dsInfo) {
+    if (!dsInfo) {
+        // 兼容旧调用
+        dsInfo = datasets.map(ds => {
+            const records = allRecords[ds.id] || [];
+            const fields = ds.schema && ds.schema.fields ? ds.schema.fields.map(f=>f.name).join('、') : '';
+            return { name: ds.name, count: records.length, fields };
+        });
+    }
+
     let total = 0;
-    datasets.forEach(ds => { total += (allRecords[ds.id]||[]).length; });
-    html += '<li>总计 <strong>' + total + '</strong> 条记录</li>';
-    datasets.forEach(ds => {
-        html += '<li>' + ds.name + '：' + (allRecords[ds.id]||[]).length + ' 条</li>';
+    dsInfo.forEach(d => total += d.count);
+
+    let html = '<h4 style="font-size:14px;margin-bottom:10px;">📊 数据概览</h4>';
+
+    // 总体统计行
+    html += '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;">'
+        + `<span style="background:#f0edff;padding:4px 12px;border-radius:16px;font-size:13px;">📦 ${datasets.length} 个数据集</span>`
+        + `<span style="background:#f0edff;padding:4px 12px;border-radius:16px;font-size:13px;">📝 ${total} 条记录</span>`
+        + '</div>';
+
+    // 每个数据集详细
+    dsInfo.forEach(d => {
+        html += `<div style="background:#fafbfc;border:1px solid #eef0f4;border-radius:8px;padding:12px;margin-bottom:10px;">`;
+        html += `<div style="font-weight:600;font-size:13px;margin-bottom:6px;">📁 ${esc(d.name)} <span style="font-weight:400;color:#909296;">（${d.count}条）</span></div>`;
+
+        if (d.fields) {
+            html += `<div style="font-size:12px;color:#5c5f66;margin-bottom:4px;">字段：${esc(d.fields)}</div>`;
+        }
+
+        // 状态分布
+        if (d.statusCount) {
+            const entries = Object.entries(d.statusCount).sort((a,b) => b[1]-a[1]);
+            const doneKeywords = ['已完成','完成','已发布','已修复','完结'];
+            const doneCount = entries.filter(([k]) => doneKeywords.some(dk=>k.includes(dk))).reduce((s, [,c])=>s+c, 0);
+            const rate = d.count > 0 ? (doneCount/d.count*100).toFixed(0) : 0;
+            html += `<div style="font-size:12px;margin-top:4px;">`
+                + `<span style="color:#10b981;">✅ 完成率 ${rate}%</span>`
+                + ` <span style="color:#909296;">（${doneCount}/${d.count}）</span>`
+                + ` <span style="color:#909296;">|</span> `;
+            entries.forEach(([s, c], i) => {
+                if (i > 0) html += ' ';
+                html += `<span>${esc(s)} ${c}</span>`;
+            });
+            html += `</div>`;
+        }
+
+        // 趋势
+        if (d.trendDesc) {
+            html += `<div style="font-size:12px;color:#909296;margin-top:3px;">📈 ${d.trendDesc}</div>`;
+        }
+
+        // 字段分布
+        if (d.fieldDistributions) {
+            Object.entries(d.fieldDistributions).forEach(([fName, topVals]) => {
+                html += `<div style="font-size:12px;color:#5c5f66;margin-top:3px;">🔹 ${esc(fName)}：`;
+                topVals.forEach(([v, c], i) => {
+                    if (i > 0) html += '、';
+                    html += `${esc(v)}(${c})`;
+                });
+                html += `</div>`;
+            });
+        }
+
+        html += '</div>';
     });
-    html += '</ul>';
-    html += '<p style="color:#909296;font-size:12px;margin-top:12px;">💡 AI分析需要配置LLM API Key</p>';
+
+    // 全局趋势概要
+    if (dsInfo.some(d => d.count > 0)) {
+        const allDays = new Set();
+        datasets.forEach(ds => {
+            (allRecords[ds.id]||[]).forEach(r => {
+                const raw = r['创建时间'] || r['_importTime'] || '';
+                const m = String(raw).match(/(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
+                if (m) allDays.add(m[0]+'-'+m[1].padStart(2,'0')+'-'+m[2].padStart(2,'0'));
+            });
+        });
+        if (allDays.size > 0) {
+            const sorted = [...allDays].sort();
+            html += `<p style="font-size:12px;color:#909296;margin-top:8px;">📅 数据时间跨度：${sorted[0]} ~ ${sorted[sorted.length-1]}（共${sorted.length}天）</p>`;
+        }
+    }
+
+    if (!window.llmAvailable) {
+        html += '<p style="color:#909296;font-size:12px;margin-top:10px;padding-top:8px;border-top:1px solid #eef0f4;">💡 配置 LLM API Key 可获得更深入的智能分析</p>';
+    }
     return html;
 }
 

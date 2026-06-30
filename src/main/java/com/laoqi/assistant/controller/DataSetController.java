@@ -102,6 +102,38 @@ public class DataSetController {
                     if (ds.get("fields") != null) {
                         summary.append("字段：").append(ds.get("fields")).append("\n");
                     }
+
+                    // 状态分布
+                    if (ds.get("statusCount") != null) {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> statusCount = (Map<String, Object>) ds.get("statusCount");
+                        summary.append("状态分布：");
+                        for (Map.Entry<String, Object> e : statusCount.entrySet()) {
+                            summary.append(e.getKey()).append("=").append(e.getValue()).append(" ");
+                        }
+                        summary.append("\n");
+                    }
+
+                    // 趋势描述
+                    if (ds.get("trendDesc") != null) {
+                        summary.append("时间趋势：").append(ds.get("trendDesc")).append("\n");
+                    }
+
+                    // 字段枚举分布
+                    if (ds.get("fieldDistributions") != null) {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> fieldDistributions = (Map<String, Object>) ds.get("fieldDistributions");
+                        for (Map.Entry<String, Object> e : fieldDistributions.entrySet()) {
+                            summary.append("字段[").append(e.getKey()).append("]分布：");
+                            @SuppressWarnings("unchecked")
+                            List<List<Object>> vals = (List<List<Object>>) e.getValue();
+                            for (List<Object> pair : vals) {
+                                summary.append(pair.get(0)).append("(").append(pair.get(1)).append(") ");
+                            }
+                            summary.append("\n");
+                        }
+                    }
+
                     if (ds.get("sample") != null) {
                         summary.append("样本数据：").append(ds.get("sample")).append("\n");
                     }
@@ -109,12 +141,13 @@ public class DataSetController {
                 }
             }
 
-            String systemPrompt = "你是一个数据分析助手。请根据提供的数据生成简要的分析报告，包括：\n"
-                    + "1. 数据概览（总量、分布）\n"
-                    + "2. 关键发现（亮点、异常）\n"
-                    + "3. 趋势分析（如有时间维度）\n"
-                    + "4. 建议（基于数据的建议）\n"
-                    + "使用简洁的中文，用HTML格式输出（用<h4>、<p>、<ul><li>等标签）。";
+            String systemPrompt = "你是一个数据分析助手。请根据提供的数据生成详细的分析报告，包括：\n"
+                    + "1. 数据概览（总量、各数据集分布）\n"
+                    + "2. 状态分析（完成率、各状态占比、瓶颈环节）\n"
+                    + "3. 趋势分析（随时间变化趋势、忙碌/空闲期、增长/下降）\n"
+                    + "4. 关键发现（亮点数据、异常情况、值得关注的点）\n"
+                    + "5. 建议（基于数据的具体可执行建议）\n"
+                    + "使用简洁的中文，用HTML格式输出（用<h4>、<p>、<ul><li>等标签）。最后加一句鼓励的话。";
 
             String reply = doAiChat(systemPrompt, summary.toString());
             analysisCache.put(moduleId, reply);
