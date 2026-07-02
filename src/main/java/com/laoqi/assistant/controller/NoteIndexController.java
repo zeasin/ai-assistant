@@ -1,6 +1,9 @@
 package com.laoqi.assistant.controller;
 
 import com.laoqi.assistant.entity.KnowledgeBaseEntity;
+import com.laoqi.assistant.service.IndexScannerService;
+import com.laoqi.assistant.service.IndexScannerService.ScanResult;
+import com.laoqi.assistant.service.IndexWatcherService;
 import com.laoqi.assistant.service.LogService;
 import com.laoqi.assistant.service.NoteIndexService;
 import com.laoqi.assistant.service.NoteIndexService.IndexResult;
@@ -27,7 +30,9 @@ public class NoteIndexController {
     private final NoteIndexService noteIndexService;
     private final LogService logService;
     private final KnowledgeBaseService kbService;
-    
+    private final IndexScannerService indexScannerService;
+    private final IndexWatcherService indexWatcherService;
+
     private volatile boolean isBuilding = false;
     private volatile String lastBuildResult = "";
     private volatile int buildFileCount = 0;
@@ -36,11 +41,18 @@ public class NoteIndexController {
     private volatile int processedFiles = 0;
     private volatile String currentFile = "";
 
+    private volatile boolean isScanning = false;
+    private volatile String lastScanResult = "";
+
     public NoteIndexController(NoteIndexService noteIndexService, LogService logService,
-                               KnowledgeBaseService kbService) {
+                               KnowledgeBaseService kbService,
+                               IndexScannerService indexScannerService,
+                               IndexWatcherService indexWatcherService) {
         this.noteIndexService = noteIndexService;
         this.logService = logService;
         this.kbService = kbService;
+        this.indexScannerService = indexScannerService;
+        this.indexWatcherService = indexWatcherService;
     }
 
     @PostMapping("/build")
@@ -116,7 +128,13 @@ public class NoteIndexController {
             result.put("currentFile", currentFile);
             result.put("progress", totalFiles > 0 ? (processedFiles * 100 / totalFiles) : 0);
         }
-        
+
+        // 动态扫描信息
+        result.put("scanning", isScanning);
+        result.put("lastScanResult", lastScanResult);
+        result.put("watching", indexWatcherService.isWatching(id));
+        result.put("watchedKbCount", indexWatcherService.getWatchedKbCount());
+
         return result;
     }
 
@@ -209,5 +227,71 @@ public class NoteIndexController {
         noteIndexService.updateIgnoredFiles(id, ignoreFiles);
         logService.add("笔记索引", "更新排除文件列表", "知识库: " + id);
         return Map.of("ok", true, "message", "排除文件列表已更新");
+    }
+
+    // ========== 动态扫描 API ==========
+
+    /**
+     * 触发增量扫描（异步）
+     */
+    @PostMapping("/scan")
+    public Map<String, Object> triggerScan(@PathVariable Long id) {
+        log.info("[NoteIndex] 收到增量扫描请求，kbId={}", id);
+
+        if (!noteIndexService.isAvailable()) {
+            return Map.of("ok", false, "error", "Embedding 服务不可用");
+        }
+
+        if (isScanning) {
+            return Map.of("ok", false, "error", "扫描正在进行中，请稍候");
+        }
+
+        indexExecutor.execute(() -> {
+            isScanning = true;
+            try {
+                ScanResult result = indexScannerService.scanKb(id);
+                lastScanResult = result.toString();
+                logService.add("笔记索引", "增量扫描",
+                        "KB=" + id + " " + result.toString());
+                log.info("[NoteIndex] 增量扫描完成: {}", result);
+            } catch (Exception e) {
+                log.error("[NoteIndex] 增量扫描失败", e);
+                lastScanResult = "失败: " + e.getMessage();
+            } finally {
+                isScanning = false;
+            }
+        });
+
+        return Map.of("ok", true, "message", "增量扫描已启动");
+    }
+
+    /**
+     * 触发所有知识库的增量扫描
+     */
+    @PostMapping("/scan-all")
+    public Map<String, Object> triggerScanAll() {
+        if (isScanning) {
+            return Map.of("ok", false, "error", "扫描正在进行中");
+        }
+
+        indexExecutor.execute(() -> {
+            isScanning = true;
+            try {
+                var results = indexScannerService.scanAllKbs();
+                StringBuilder sb = new StringBuilder();
+                for (var entry : results.entrySet()) {
+                    sb.append("KB").append(entry.getKey()).append(": ")
+                      .append(entry.getValue()).append("; ");
+                }
+                lastScanResult = sb.toString();
+                logService.add("笔记索引", "全量扫描", lastScanResult);
+            } catch (Exception e) {
+                lastScanResult = "失败: " + e.getMessage();
+            } finally {
+                isScanning = false;
+            }
+        });
+
+        return Map.of("ok", true, "message", "全量扫描已启动");
     }
 }

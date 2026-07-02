@@ -33,18 +33,23 @@ public class NoteIndexService {
     private final NoteEmbeddingDbService noteEmbeddingDbService;
     private final OllamaEmbeddingService embeddingService;
     private final KnowledgeBaseService kbService;
+    private final com.laoqi.assistant.service.db.FileIndexMetaDbService fileIndexMetaDbService;
 
     public NoteIndexService(NoteEmbeddingDbService noteEmbeddingDbService,
                            OllamaEmbeddingService embeddingService,
-                           KnowledgeBaseService kbService) {
+                           KnowledgeBaseService kbService,
+                           com.laoqi.assistant.service.db.FileIndexMetaDbService fileIndexMetaDbService) {
         this.noteEmbeddingDbService = noteEmbeddingDbService;
         this.embeddingService = embeddingService;
         this.kbService = kbService;
+        this.fileIndexMetaDbService = fileIndexMetaDbService;
     }
 
     public boolean isAvailable() {
         return embeddingService.isAvailable();
     }
+
+    // ========== 增量索引接口（供 IndexScannerService / IndexWatcherService 调用） ==========
 
     // ========== 排除列表管理 ==========
 
@@ -157,6 +162,9 @@ public class NoteIndexService {
         Set<String> ignoredFiles = getIgnoredFiles(kbId);
         log.info("[NoteIndex] 排除文件夹: {}, 排除文件: {}", ignoredDirs, ignoredFiles);
 
+        // 全量重建前清空旧元数据
+        fileIndexMetaDbService.deleteByKb(kbId);
+
         IndexResult result = new IndexResult();
         try (Stream<Path> walk = Files.walk(baseDir, 10)) {
             List<Path> files = walk
@@ -175,10 +183,14 @@ public class NoteIndexService {
                 if (callback != null) {
                     callback.onProgress(total, processed, fileName);
                 }
-                
+
                 try {
-                    indexFile(file, baseDir, kbId);
+                    boolean indexed = indexFile(file, baseDir, kbId);
                     result.fileCount++;
+                    // 更新元数据表
+                    if (indexed) {
+                        updateFileMeta(file, baseDir, kbId);
+                    }
                 } catch (Exception e) {
                     log.warn("[NoteIndex] 索引文件失败: {}", file, e);
                     result.errors.add(file.getFileName().toString() + ": " + e.getMessage());
@@ -199,7 +211,7 @@ public class NoteIndexService {
         return result;
     }
 
-    private boolean shouldIndex(Path file, Path baseDir, Set<String> ignoredDirs, Set<String> ignoredFiles) {
+    public boolean shouldIndex(Path file, Path baseDir, Set<String> ignoredDirs, Set<String> ignoredFiles) {
         String fileName = file.getFileName().toString();
 
         // 排除所有以 . 开头的文件和目录
@@ -233,11 +245,15 @@ public class NoteIndexService {
         return INDEXED_EXTENSIONS.contains(ext);
     }
 
-    private void indexFile(Path file, Path baseDir, Long kbId) throws Exception {
+    /**
+     * 对单个文件执行索引。返回 true 表示实际完成了索引，false 表示跳过（内容未变或为空）。
+     * 此方法公开供 IndexScannerService / IndexWatcherService 增量调用。
+     */
+    public boolean indexFile(Path file, Path baseDir, Long kbId) throws Exception {
         String relativePath = baseDir.relativize(file).toString().replace("\\", "/");
         String content = FileUtil.readText(file);
 
-        if (content == null || content.isBlank()) return;
+        if (content == null || content.isBlank()) return false;
 
         String contentHash = md5(content);
 
@@ -254,13 +270,13 @@ public class NoteIndexService {
             String firstChunkContent = existing.get(0).getContent();
             if (firstChunkContent != null && firstChunkContent.startsWith(pathContext)) {
                 log.debug("[NoteIndex] 跳过未变更文件: {}", relativePath);
-                return;
+                return false;
             }
             log.info("[NoteIndex] 文件内容未变但需重新索引（添加路径信息）: {}", relativePath);
         }
 
         noteEmbeddingDbService.deleteByKbAndPath(kbId, relativePath);
-        
+
         List<String> chunks = chunkContent(content);
         String now = TimeUtil.nowStr();
 
@@ -289,6 +305,7 @@ public class NoteIndexService {
         }
 
         log.debug("[NoteIndex] 已索引: {} ({} 个片段, 路径上下文: {})", relativePath, chunks.size(), pathContext);
+        return true;
     }
 
     /**
@@ -599,6 +616,54 @@ public class NoteIndexService {
         int fileCount = noteEmbeddingDbService.countFilesByKb(kbId);
         int chunkCount = noteEmbeddingDbService.countByKb(kbId);
         return new IndexStats(fileCount, chunkCount);
+    }
+
+    /**
+     * 更新文件索引元数据（file_index_meta 表）
+     */
+    private void updateFileMeta(Path file, Path baseDir, Long kbId) throws Exception {
+        String relPath = baseDir.relativize(file).toString().replace("\\", "/");
+        long lastModified = java.nio.file.Files.getLastModifiedTime(file).toMillis();
+        long fileSize = java.nio.file.Files.size(file);
+
+        String content = FileUtil.readText(file);
+        String contentHash = content != null && !content.isBlank() ? md5(content) : null;
+        String now = com.laoqi.assistant.util.TimeUtil.nowStr();
+
+        com.laoqi.assistant.entity.FileIndexMetaEntity existing = fileIndexMetaDbService.findByKbAndPath(kbId, relPath);
+        if (existing != null) {
+            existing.setLastModified(lastModified);
+            existing.setFileSize(fileSize);
+            existing.setContentHash(contentHash);
+            existing.setLastIndexedAt(now);
+            fileIndexMetaDbService.updateById(existing);
+        } else {
+            com.laoqi.assistant.entity.FileIndexMetaEntity meta = new com.laoqi.assistant.entity.FileIndexMetaEntity();
+            meta.setKbId(kbId);
+            meta.setFilePath(relPath);
+            meta.setLastModified(lastModified);
+            meta.setFileSize(fileSize);
+            meta.setContentHash(contentHash);
+            meta.setLastIndexedAt(now);
+            meta.setCreatedAt(now);
+            fileIndexMetaDbService.save(meta);
+        }
+    }
+
+    /**
+     * 从索引中移除指定文件（文件已删除时调用）
+     */
+    public void removeFileFromIndex(Long kbId, String filePath) {
+        noteEmbeddingDbService.deleteByKbAndPath(kbId, filePath);
+        fileIndexMetaDbService.deleteByKbAndPath(kbId, filePath);
+        log.debug("[NoteIndex] 已移除索引: kbId={}, path={}", kbId, filePath);
+    }
+
+    /**
+     * 增量索引单个文件的别名（兼容旧版调用，返回 boolean 表示是否实际索引）
+     */
+    public boolean indexSingleFile(Path file, Path baseDir, Long kbId) throws Exception {
+        return indexFile(file, baseDir, kbId);
     }
 
     // ========== 工具方法 ==========

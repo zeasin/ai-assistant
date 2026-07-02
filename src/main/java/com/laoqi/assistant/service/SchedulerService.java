@@ -20,15 +20,18 @@ public class SchedulerService {
     private final LogService logService;
     private final ReminderService reminderService;
     private final KnowledgeBaseService kbService;
+    private final IndexScannerService indexScannerService;
 
     public SchedulerService(ReportService reportService,
                             LogService logService,
                             ReminderService reminderService,
-                            KnowledgeBaseService kbService) {
+                            KnowledgeBaseService kbService,
+                            IndexScannerService indexScannerService) {
         this.reportService = reportService;
         this.logService = logService;
         this.reminderService = reminderService;
         this.kbService = kbService;
+        this.indexScannerService = indexScannerService;
     }
 
     @Scheduled(cron = "0 0 9 * * ?", zone = "Asia/Shanghai")
@@ -69,6 +72,58 @@ public class SchedulerService {
             }
         } catch (Exception e) {
             log.error("[提醒] 检查动态提醒失败: {}", e.getMessage(), e);
+        }
+    }
+
+    // ========== 笔记库索引自动扫描 ==========
+
+    /**
+     * 每 5 分钟执行一次增量扫描，检测笔记库文件变更并更新索引。
+     * 使用 file_index_meta 元数据表快速判断，只处理有变化的文件。
+     */
+    @Scheduled(fixedRate = 300_000, zone = "Asia/Shanghai")
+    public void incrementalIndexScan() {
+        if (!indexScannerService.isEmbeddingAvailable()) {
+            log.debug("[{}] ⏰ Embedding 服务不可用，跳过索引扫描", TimeUtil.nowStr());
+            return;
+        }
+        log.info("[{}] ⏰ 开始增量索引扫描...", TimeUtil.nowStr());
+        try {
+            var results = indexScannerService.scanAllKbs();
+            for (var entry : results.entrySet()) {
+                var r = entry.getValue();
+                if (r.success && r.actualChanged > 0) {
+                    log.info("[{}] ⏰ 知识库 {} 索引更新: {}", TimeUtil.nowStr(), entry.getKey(), r);
+                    logService.add("索引扫描", "增量更新",
+                            "KB=" + entry.getKey() + " " + r.toString());
+                } else if (!r.success) {
+                    log.warn("[{}] ⏰ 知识库 {} 索引扫描失败: {}", TimeUtil.nowStr(), entry.getKey(), r.errorMessage);
+                }
+            }
+        } catch (Exception e) {
+            log.error("[{}] ⏰ 增量索引扫描失败: {}", TimeUtil.nowStr(), e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 每天凌晨 3:00 执行一次全量扫描兜底，确保索引与文件系统完全一致。
+     */
+    @Scheduled(cron = "0 0 3 * * ?", zone = "Asia/Shanghai")
+    public void fullIndexScan() {
+        if (!indexScannerService.isEmbeddingAvailable()) {
+            log.debug("[{}] ⏰ Embedding 服务不可用，跳过全量索引扫描", TimeUtil.nowStr());
+            return;
+        }
+        log.info("[{}] ⏰ 开始全量索引扫描（兜底）...", TimeUtil.nowStr());
+        try {
+            var results = indexScannerService.scanAllKbs();
+            for (var entry : results.entrySet()) {
+                var r = entry.getValue();
+                logService.add("索引扫描", "全量兜底",
+                        "KB=" + entry.getKey() + " " + r.toString());
+            }
+        } catch (Exception e) {
+            log.error("[{}] ⏰ 全量索引扫描失败: {}", TimeUtil.nowStr(), e.getMessage(), e);
         }
     }
 }

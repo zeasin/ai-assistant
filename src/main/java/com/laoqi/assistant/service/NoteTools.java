@@ -39,13 +39,36 @@ public class NoteTools {
     private final KnowledgeBaseService kbService;
     private final NoteIndexService noteIndexService;
     private final DataSetService dataSetService;
+    private final IndexScannerService indexScannerService;
 
     public NoteTools(ConfigService configService, KnowledgeBaseService kbService,
-                    NoteIndexService noteIndexService, DataSetService dataSetService) {
+                    NoteIndexService noteIndexService, DataSetService dataSetService,
+                    IndexScannerService indexScannerService) {
         this.configService = configService;
         this.kbService = kbService;
         this.noteIndexService = noteIndexService;
         this.dataSetService = dataSetService;
+        this.indexScannerService = indexScannerService;
+    }
+
+    /**
+     * 文件写入后主动触发增量索引（异步）
+     */
+    private void notifyFileChanged(Long kbId, String relativePath) {
+        if (kbId == null || !noteIndexService.isAvailable()) return;
+        String notesDir = kbService.getNotesDirById(kbId);
+        if (notesDir == null || notesDir.isBlank()) return;
+        java.nio.file.Path file = java.nio.file.Paths.get(notesDir, relativePath);
+        if (!java.nio.file.Files.isRegularFile(file)) return;
+
+        try {
+            boolean indexed = noteIndexService.indexFile(file, java.nio.file.Paths.get(notesDir), kbId);
+            if (indexed) {
+                log.info("[NoteTools] 写后自动索引完成: {}", relativePath);
+            }
+        } catch (Exception e) {
+            log.warn("[NoteTools] 写后自动索引失败: {}", relativePath, e);
+        }
     }
 
     public static void setCurrentKbId(Long kbId) {
@@ -178,6 +201,10 @@ public class NoteTools {
 
         FileUtil.writeText(file, content);
         log.info("[NoteTools] 写入文件: {} ({} 字符)", path, content.length());
+
+        // 写完后主动触发增量索引
+        notifyFileChanged(getCurrentKbId(), path);
+
         reportStatus("💾 文件写入完成");
         return "写入成功: " + path;
     }
@@ -291,6 +318,9 @@ public class NoteTools {
 
         FileUtil.writeText(file, noteContent);
         log.info("[NoteTools] logRecord 写入文件: {} ({} 字符)", notePath, noteContent.length());
+
+        // 写完后主动触发增量索引
+        notifyFileChanged(getCurrentKbId(), notePath);
 
         // 2. 写数据集
         String datasetResult;
